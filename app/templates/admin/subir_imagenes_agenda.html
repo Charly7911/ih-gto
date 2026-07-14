@@ -1,0 +1,82 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow border-0">
+                <div class="card-header bg-primary text-white text-center py-3">
+                    <h4 class="mb-0"><i class="bi bi-images me-2"></i>Cargar Imágenes de Agenda</h4>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-muted small text-center">
+                        Sube las imágenes generadas. Se organizarán automáticamente como páginas del libro.
+                        Formatos permitidos: <strong>.webp .jpg, .jpeg, .png</strong>.
+                    </p>
+
+                    <!-- Agregué el id="uploadForm" y quité los puntos suspensivos (...) -->
+                    <form action="{{ url_for('admin.subir_imagenes_agenda') }}" method="POST"
+                        enctype="multipart/form-data" id="uploadForm">
+
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <div class="mb-4">
+                            <label for="carpeta_imagenes" class="form-label fw-bold">Seleccionar carpeta con
+                                Imágenes</label>
+                            <input class="form-control" type="file" id="carpeta_imagenes" name="carpeta_imagenes"
+                                accept="image/*" webkitdirectory directory multiple required>
+                            <small class="text-muted">Se subirán todas las imágenes de la carpeta seleccionada.</small>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" id="btnSubmit">
+                            <span id="btnText">Procesar y Guardar Imágenes</span>
+                            <span id="btnSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                        </button>
+                    </form>
+                </div>
+
+                <hr class="my-4">
+
+                <div class="text-center">
+                    <p class="small text-muted">¿Deseas actualizar las imágenes? Primero limpia la carpeta actual:</p>
+
+                    <!-- Formulario de eliminación con protección CSRF -->
+                    <form action="{{ url_for('admin.eliminar_imagenes_agenda') }}" method="POST"
+                        onsubmit="return confirm('¿Estás seguro de que deseas eliminar todas las imágenes actuales?');">
+
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-trash"></i> Eliminar Imágenes Existentes
+                        </button>
+                    </form>
+                </div>
+
+                <div class="card-footer bg-light text-center">
+                    <a href="{{ url_for('agenda.visor') }}" class="btn btn-link btn-sm text-decoration-none">
+                        <i class="bi bi-eye"></i> Ir al Visor de Agendas
+                    </a>
+                </div>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show mt-3" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('uploadForm').onsubmit = function () {
+        document.getElementById('btnText').innerText = "Procesando imágenes...";
+        document.getElementById('btnSpinner').classList.remove('d-none');
+    };
+</script>
+{% endblock %}

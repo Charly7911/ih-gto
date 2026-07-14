@@ -1,0 +1,127 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+
+<style>
+    .zona-formulario {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f4f6f8;
+        padding: 40px 0;
+    }
+
+    .zona-formulario h1 {
+        text-align: center;
+        color: #2c3e50;
+        font-size: 1.8rem;
+        margin-bottom: 20px;
+    }
+
+    .zona-formulario .form-container {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 30px 40px;
+        background-color: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .zona-formulario form label {
+        display: block;
+        font-size: 1rem;
+        color: #333;
+        margin-bottom: 10px;
+        font-weight: 500;
+    }
+
+    .zona-formulario form input[type="file"] {
+        width: 100%;
+        padding: 10px;
+        border: 2px solid #ccc;
+        border-radius: 8px;
+        background-color: #fafafa;
+        margin-bottom: 20px;
+    }
+
+    .zona-formulario form input[type="submit"] {
+        width: 100%;
+        padding: 12px;
+        background-color: #007BFF;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        cursor: pointer;
+    }
+
+    .zona-formulario form input[type="submit"]:hover {
+        background-color: #0056b3;
+    }
+
+    .zona-formulario ul {
+        max-width: 500px;
+        margin: 20px auto;
+        padding: 15px;
+        background-color: #e7f7e7;
+        border: 1px solid #b2ddb2;
+        border-radius: 8px;
+        list-style-type: none;
+        color: #2e7d32;
+    }
+</style>
+</head>
+
+<body>
+
+    <div class="zona-formulario">
+        <h1>Subir base CSV - Sistema SIS</h1>
+
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <ul>
+            {% for msg in messages %}
+            <li>{{ msg }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% endwith %}
+
+        <div class="form-container">
+            <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <label for="file">Selecciona archivo CSV:</label>
+                <input type="file" name="file" accept=".csv" required>
+
+                <label for="anio">Año de la información:</label>
+                <input type="number" name="anio" min="2015" max="2100" required>
+
+                <label>Modo de carga:</label>
+                <select name="modo_carga" required>
+                    <option value="" disabled selected>Selecciona modo de carga</option>
+                    <option value="agregar">Agregar</option>
+                    <option value="reemplazar">Reemplazar año</option>
+                </select>
+
+                <label for="estatus">Actualizacion ó Cierre:</label>
+                <select name="estatus_inicio" required>
+                    <option value="Actualizado">Actualizado</option>
+                    <option value="Cierre">Cierre</option>
+                </select>
+
+                <label for="fecha_actualizacion">Fecha de actualización:</label>
+                <input type="date" name="fecha_actualizacion" required>
+
+
+                <label for="estatus">Estatus del año:</label>
+                <select name="estatus" required>
+                    <option value="PRELIMINAR">Preliminar</option>
+                    <option value="CONSOLIDADO">Consolidado</option>
+                </select>
+
+
+                <input type="submit" value="Subir y Procesar" style="margin-top: 60px;">
+            </form>
+        </div>
+    </div>
+
+    {% endblock %}

@@ -1,0 +1,123 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<style>
+    .zona-formulario {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f6f8;
+      padding: 40px 0;
+    }
+    .zona-formulario h2 {
+      text-align: center;
+      color: #2c3e50;
+      font-size: 1.5rem;
+      margin-bottom: 25px;
+    }
+    .zona-formulario .form-container {
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 30px 40px;
+      background-color: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    .zona-formulario label {
+      display: block;
+      font-size: 0.9rem;
+      color: #333;
+      margin-top: 15px;
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+    .zona-formulario input[type="file"],
+    .zona-formulario input[type="number"],
+    .zona-formulario input[type="date"],
+    .zona-formulario select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background-color: #fafafa;
+      box-sizing: border-box; /* Evita que el padding ensanche el input */
+    }
+    .zona-formulario input[type="submit"] {
+      width: 100%;
+      padding: 15px;
+      background-color: #28a745; /* Verde para diferenciar del de Sinerhias */
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 30px;
+      font-weight: bold;
+    }
+    .zona-formulario input[type="submit"]:hover {
+      background-color: #218838;
+    }
+    .mensajes-flash {
+      max-width: 500px;
+      margin: 0 auto 20px;
+      padding: 0;
+      list-style: none;
+    }
+    .alert-flash {
+      padding: 15px;
+      background-color: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+      border-radius: 8px;
+    }
+</style>
+
+<div class="zona-formulario">
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul class="mensajes-flash">
+          {% for message in messages %}
+            <li class="alert-flash">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <div class="form-container">
+      <h2>Subir EQUIPO MÉDICO</h2>
+
+      <form action="{{ url_for('admin.subir_equipo_medico') }}" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        
+        <label>Selecciona Archivo Excel (.xlsx):</label>
+        <input type="file" name="file" accept=".xlsx" required>
+
+        <label for="anio">Año de la información:</label>
+        <input type="number" name="anio" min="2015" max="2100" value="2025" required>
+
+        <label>Modo de carga:</label>
+        <select name="modo_carga" required>
+          <option value="agregar">Agregar / Omitir existentes</option>
+          <option value="actualizar">Reemplazar año completo</option>
+        </select>
+
+        <label for="estatus_inicio">Actualización o Cierre:</label>
+        <select name="estatus_inicio" required>
+          <option value="Actualizado">Actualizado</option>
+          <option value="Cierre">Cierre</option>
+        </select>
+
+        <label for="fecha_actualizacion">Fecha de actualización:</label>
+        <input type="date" name="fecha_actualizacion" required>
+
+        <label for="estatus">Estatus del año:</label>
+        <select name="estatus" required>
+          <option value="PRELIMINAR">Preliminar</option>
+          <option value="CONSOLIDADO">Consolidado</option>
+        </select>
+
+        <input type="submit" value="Subir y Procesar Camas">
+      </form>
+    </div>
+</div>
+
+{% endblock %}

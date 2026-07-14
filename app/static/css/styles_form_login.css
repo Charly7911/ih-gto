@@ -1,0 +1,143 @@
+/* Estilos generales para el cuerpo */
+body {
+   font-family: 'Arial', sans-serif;
+    background: linear-gradient(rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.4)),
+        url("/static/img/fondo_inicio_2.jpg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: flex-start; /* ← Mueve a la izquierda */
+    align-items: center;
+    height: 100vh;
+    padding-left: 5vw; /* ← Opcional: separa un poco del borde izquierdo */
+}
+
+/* Contenedor principal */
+.container {
+    max-width: 400px;
+    width: 100%;
+    margin: auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transform: translateX(-90px); /* Mueve 50px a la izquierda */
+}
+
+/* Título del formulario */
+h1 {
+    text-align: center;
+    /* Centrado */
+    color: #333;
+    margin-bottom: 20px;
+    /* Espacio debajo del título */
+}
+
+/* Estilos de la tarjeta del formulario */
+.card {
+    border: none;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Cabecera de la tarjeta */
+.card-header {
+    background-color: #ffffffc2;
+    color: #476e8d;
+    padding: 15px;
+    text-align: center;
+    font-size: 18px;
+}
+
+/* Cuerpo de la tarjeta */
+.card-body {
+    padding: 20px;
+}
+
+/* Estilos de los campos de formulario */
+.form-control {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 14px;
+}
+
+/* Etiquetas de los campos */
+.form-label {
+    font-weight: bold;
+    color: #555;
+}
+
+/* Botón de inicio de sesión */
+.btn-success {
+    width: 50%;
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    background-color: #0a1ed6c2;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+
+    transition: background-color 0.3s ease;
+}
+
+.btn-success:hover {
+    background-color: #3c8b6d;
+}
+
+/* Mensajes flash (alertas) */
+.flash-messages {
+    margin-bottom: 20px;
+}
+
+.flash-message {
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+}
+
+.flash-message.alert-danger {
+    background-color: #f8d7da;
+    /* Fondo rojo para errores */
+    color: #721c24;
+    /* Color de texto oscuro */
+}
+
+
+/* Responsive: Ajustes para pantallas pequeñas */
+@media (max-width: 768px) {
+    .container {
+        width: 90%;
+    }
+}
+
+/* Contenedor para el campo de contraseña y el ícono de ojo */
+.password-container {
+    position: relative;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 10px;
+    /* Ajusta la distancia desde el borde derecho */
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: #555;
+}
+
+/* Ajustes para el ícono del ojo */
+.password-toggle i {
+    font-size: 16px;
+    /* Ajusta el tamaño del ícono */
+}
+
+

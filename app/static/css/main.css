@@ -1,0 +1,1661 @@
+/* SIDEBAR */
+
+.container,
+.card,
+.table-responsive,
+canvas {
+  position: relative;
+  z-index: 1;
+}
+
+
+#sidebar{
+ position:fixed;
+ z-index:2000;
+ top:0;
+ left:0;
+
+ width:var(--sidebar-width);
+ height:100vh;
+
+ background:#0a162b;
+ padding:20px 15px;
+
+ color:white;
+
+ overflow-y:auto;
+
+ box-shadow:4px 0 15px rgba(0,0,0,.6);
+
+ display:flex;
+ flex-direction:column;
+}
+
+
+#sidebar::before{
+ content:"";
+ position:absolute;
+
+ top:-50%;
+ left:-100%;
+
+ width:300%;
+ height:200%;
+
+ background:url("../img/pie_1.png") center/contain no-repeat;
+
+ transform:rotate(90deg);
+
+ opacity:.3;
+
+ z-index:0;
+ pointer-events:none;
+}
+
+
+#sidebar>*{
+ position:relative;
+ z-index:1;
+}
+
+/* BLOQUES DE FILTRO: Más oscuros y semi-transparentes para que se vea el fondo */
+.filter-block {
+  background: rgba(15, 23, 42, 0.6); /* Azul pizarra profundo */
+  backdrop-filter: blur(4px); /* Efecto de cristal esmerilado */
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* INPUTS Y SELECTS: Color que combine con el logo */
+.input-text,
+.btn-selector,
+.input-text-inline {
+  background: #1e293b !important;
+  color: white !important;
+  border: 1px solid #334155 !important;
+}
+
+/* LABELS: Blanco puro para lectura fácil */
+.filter-label {
+  color: #ffffff !important;
+  text-shadow: 0px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+
+
+#page-wrapper{
+ min-height:100vh;
+ display:flex;
+ flex-direction:column;
+}
+
+
+#main-content{
+ margin-left:var(--sidebar-width);
+ width:calc(100% - var(--sidebar-width));
+ padding:25px;
+ flex:1;
+ transition:.3s ease;
+}
+
+/* TITULO DE SECCIÓN */
+.menu-title {
+  text-transform: uppercase;
+  color: #9ca3af;
+  font-size: 13px;
+  padding-left: 6px;
+  margin-bottom: 10px;
+}
+
+/* CONTENEDOR DE BLOQUES DE FILTRO */
+.filter-block {
+  background: rgba(15, 23, 42, 0.6);
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* LABELS */
+.filter-label {
+  display: block;
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 6px;
+  color: #e5e7eb;
+}
+
+/* CHECKLIST */
+.checklist {
+  background: rgba(15, 23, 42, 0.6);
+  padding: 10px;
+  border-radius: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* INPUTS */
+.input-text {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.6);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 8px;
+}
+
+/* LISTA DE UNIDADES */
+.unidad-list {
+  max-height: 190px;
+  overflow-y: auto;
+  margin-top: 6px;
+  padding-right: 5px;
+}
+
+/* Cada unidad */
+.unidad-item {
+  font-size: 10px;
+  /* 👈 aquí se hace más chica */
+  padding: 4px 6px;
+  /* menos alto */
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+/* Hover */
+.unidad-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* BOTÓN */
+.btn-apply {
+  width: 100%;
+  background: #10b981;
+  border: none;
+  padding: 12px;
+  border-radius: 6px;
+  color: black;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s;
+  margin-top: 10px;
+}
+
+.btn-apply:hover {
+  background: #0ea172;
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-item {
+  display: block;
+  padding: 10px 14px;
+  margin: 4px 0;
+  border-radius: 8px;
+  color: #e5e7eb;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.menu-item:hover {
+  background: rgba(29, 123, 151, 0.473);
+}
+
+.menu-section {
+  margin: 18px 10px 8px;
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.menu-divider {
+  height: 1px;
+  background: rgba(17, 58, 148, 0.493);
+  margin: 16px 0;
+}
+
+.logout {
+  color: #fca5a5;
+}
+
+/* AÑOS EN HORIZONTAL */
+.checklist-years {
+  display: flex;
+  flex-wrap: wrap;
+  /* Salta de línea si no caben */
+  gap: 6px 10px;
+  /* Espacio entre items */
+}
+
+/* Cada año */
+.checklist-years .check-item {
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* BOTÓN SELECTOR UNIDADES */
+.btn-selector {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.6);
+  color: #e5e7eb;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+}
+
+.btn-selector:hover {
+  background: #0d2a3f;
+}
+
+/* POPOVER UNIDADES */
+.popover-unidades {
+  position: fixed;
+  left: 290px;
+  /* sidebar 270px + margen */
+  top: 180px;
+  width: 260px;
+
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+
+  padding: 12px;
+  z-index: 9999;
+  display: none;
+}
+
+.popover-unidades.open {
+  display: block;
+}
+
+/* LISTA */
+.popover-list {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  margin-top: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+/* ITEM */
+.popover-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.popover-item:hover {
+  background: rgba(29, 123, 151, 0.473);
+}
+
+/* ACCIONES */
+.popover-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.popover-actions button {
+  flex: 1;
+  padding: 6px;
+  border-radius: 6px;
+  border: none;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+[id^="aplicarUnidades"] {
+    background: #10b981;
+    color: black;
+    margin-left: 6px;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+[id^="limpiarUnidades"] {
+    background: #cf8920;
+    color: #e5e7eb;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+/* TABLAS GRANDES */
+.table {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  background: #111827;
+  color: #e5e7eb;
+  font-weight: 600;
+  z-index: 2;
+}
+
+.table tbody tr:hover {
+  background-color: rgba(16, 185, 129, 0.08);
+}
+
+.table td,
+.table th {
+  padding: 8px 10px;
+}
+
+.chart-container {
+  position: relative;
+  height: 220px;
+  /* 👈 aquí controlas el tamaño real */
+}
+
+.chart-box {
+  position: relative;
+  height: 220px;
+  /* 👈 MISMO TAMAÑO QUE URGENCIAS */
+}
+
+.resumen-mensual-tabla {
+  display: grid;
+  grid-template-columns: 60px repeat(12, 1fr) 200px;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+/* Las filas no rompen el grid */
+.resumen-fila,
+.encabezado-fila {
+  display: contents;
+}
+
+/* Celdas alineadas al centro del tick */
+.resumen-cell,
+.encabezado-cell {
+  text-align: center;
+  padding: 6px 0;
+  font-weight: 500;
+}
+
+/* Columna de unidad */
+.resumen-unidad {
+  text-align: left;
+  font-weight: 600;
+  padding-left: 8px;
+  white-space: nowrap;
+}
+
+/* Encabezados (meses) */
+.encabezado-cell {
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+/* 1. Resaltar el item activo en el menú superior */
+.menu-item.active {
+  background: rgba(16, 185, 129, 0.2);
+  /* Verde como tus botones pero transparente */
+  border-left: 4px solid #1e2e5ce8;
+  font-weight: bold;
+  color: white;
+}
+
+/* 2. Ajustar el espacio de los filtros para que suban */
+.menu-filtros {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 15px;
+  animation: slideDown 0.3s ease-out;
+}
+
+/* 3. Animación suave cuando aparecen los filtros */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Paleta de colores profesional */
+:root {
+  --sidebar-width:280px;
+  --bg-main:#f8fafc;
+  --primary-green:#12719c;
+  --text-dark:#1e293b;
+  --text-muted:#64748b;
+  --primary-salud:#0a162b;
+  --accent-salud:#10b981;
+}
+
+.card-subsistema {
+  border: none;
+  border-radius: 16px;
+  background: #ffffff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.05),
+    0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+/* Efecto al pasar el mouse */
+.card-subsistema:hover {
+  transform: translateY(-8px);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Contenedores de iconos circulares */
+.icon-box {
+  width: 54px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+}
+
+/* Colores "Soft" Profesionales */
+.bg-info-soft {
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+.bg-primary-soft {
+  background-color: #e0e7ff;
+  color: #4338ca;
+}
+.bg-danger-soft {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+.bg-success-soft {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+.bg-warning-soft {
+  background-color: #fef9c3;
+  color: #a16207;
+}
+.bg-dark-soft {
+  background-color: #f1f5f9;
+  color: var(--primary-salud);
+}
+
+/* Botones con estilo ejecutivo */
+.btn-modulo {
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.2s;
+}
+
+/* El botón de Análisis Predictivo debe resaltar */
+.btn-dark {
+  background-color: var(--primary-salud) !important;
+  border: none;
+}
+.btn-dark:hover {
+  background-color: var(--accent-salud) !important;
+  color: white;
+}
+
+.bg-light-gray {
+  background-color: var(--bg-main);
+  min-height: 100vh;
+}
+
+/* Títulos */
+.dashboard-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  letter-spacing: -0.02em;
+}
+
+.dashboard-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Área de Drop modernizada */
+.drop-area-modern {
+  background: #ffffff;
+  border: 2px dashed #e2e8f0;
+  border-radius: 12px;
+  padding: 25px;
+  text-align: center;
+  transition: all 0.3s ease;
+  color: var(--text-muted);
+}
+
+.drop-area-modern:hover {
+  border-color: var(--primary-green);
+  background: rgba(16, 185, 129, 0.02);
+}
+
+/* Tarjeta de Gráfica */
+.graph-card {
+  border-radius: 16px !important;
+  overflow: hidden;
+}
+
+.card-title-sm {
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+/* Ajuste de la Gráfica */
+.chart-wrapper {
+  position: relative;
+  height: 400px;
+  padding: 20px 15px 10px 15px;
+  /* Aumentamos un poco para mejor visibilidad */
+  width: 100%;
+  overflow: visible;
+}
+
+/* --- OPTIMIZACIÓN DE NOMBRES DE UNIDADES --- */
+/* En el Popover o listas de selección */
+.popover-item {
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  /* Letra pequeña pero legible */
+  color: #e2e8f0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.popover-item input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+}
+
+/* Estilo del Acordeón */
+.acordeon-indicadores {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.acordeon-indicadores summary {
+  padding: 10px 15px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  background: #0e3450;
+  transition: background 0.3s;
+}
+
+.acordeon-indicadores summary:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.acordeon-indicadores summary i {
+  margin-right: 8px;
+  transition: transform 0.3s;
+}
+
+/* Rotar flecha al abrir */
+
+.acordeon-indicadores[open] summary {
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sub-acordeon {
+  margin: 8px 0 10px 12px;
+
+  padding-left: 14px;
+
+  border-left: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+.sub-acordeon summary {
+  font-size: 12px;
+
+  font-weight: 600;
+
+  color: #d7e3ee;
+
+  cursor: pointer;
+
+  padding: 6px 0;
+
+  transition: 0.2s;
+}
+
+.sub-acordeon summary:hover {
+  color: #fff;
+}
+
+.sub-acordeon[open] {
+  border-left: 3px solid #4ea3ff;
+}
+
+.sub-acordeon[open] summary {
+  color: #7ec3ff;
+}
+
+.sub-acordeon .indicador-item {
+  margin-left: 14px;
+
+  padding: 7px 10px;
+
+  border-radius: 6px;
+
+  transition: 0.2s;
+
+  position: relative;
+}
+
+.sub-acordeon .indicador-item::before {
+  content: "";
+
+  position: absolute;
+
+  left: -12px;
+
+  top: 50%;
+
+  width: 8px;
+
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.filter-block-acordeon{
+    padding:10px;
+}
+
+.search-container{
+    margin-bottom:10px;
+}
+
+#searchUnidad{
+    width:100%;
+    padding:8px 10px;
+    border-radius:6px;
+    border:1px solid #394b63;
+    background:#172133;
+    color:white;
+}
+
+#searchUnidad:focus{
+    outline:none;
+    border-color:#5aa9ff;
+}
+
+#searchSinerhias{
+    width:100%;
+    padding:8px 10px;
+    border-radius:6px;
+    border:1px solid #394b63;
+    background:#172133;
+    color:white;
+}
+
+#searchSinerhias:focus{
+    outline:none;
+    border-color:#5aa9ff;
+}
+
+.popover-list-inline{
+
+    max-height:220px;
+
+    overflow-y:auto;
+
+    padding:6px;
+
+    margin-top:6px;
+
+    border-left:2px solid rgba(255,255,255,.08);
+}
+
+
+
+
+
+/* Ajustes de los items arrastrables */
+.indicador-item {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  margin-bottom: 2px;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: grab;
+}
+
+.indicador-item:active {
+  cursor: grabbing;
+}
+
+/* Scrollbar personalizado más fino */
+.custom-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 10px;
+}
+
+/* Contenedor de configuraciones rápidas */
+.quick-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Espacio entre filas */
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+}
+
+/* Fila individual */
+.setting-row {
+  margin-bottom: 20px;
+}
+
+/* Etiqueta izquierda */
+.setting-label {
+  margin-bottom: 10px;
+  color: #9ca3af;
+  letter-spacing: 0.5px;
+}
+
+/* Controles derecha */
+.setting-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  /* Espacio entre chips */
+  justify-content: flex-start;
+  width: 100%;
+}
+
+/* Estilo para los Selects In-line */
+.input-text-inline {
+  width: 100%;
+  max-width: none;
+  /* 👈 Quitamos el límite para que use el ancho del sidebar */
+  height: 38px;
+  /* Altura estándar cómoda */
+  background: #092d66;
+  color: white;
+  border: 1px solid #1b2a42;
+  border-radius: 6px;
+  padding: 0 12px;
+  font-size: 13px;
+  appearance: none;
+  /* Limpiamos estilos nativos */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='C19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+}
+
+.input-text-inline:focus {
+  border-color: #12719c;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+/* Chips para los años (Checkboxes estilo botón) - VERSION COMPACTA */
+.chip-check {
+  /* Quitamos el flex-basis del 33% para que el cuadro se ajuste al texto */
+  flex: 0 0 auto;
+  min-width: 45px;
+  /* Ancho mínimo reducido para que quepa justo el año */
+  text-align: center;
+}
+
+.chip-check input {
+  display: none;
+}
+
+.chip-check span {
+  display: block;
+  width: 100%;
+  /* Reducimos el padding: 3px arriba/abajo y 8px a los lados */
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  /* Un borde sutil ayuda a ver el límite */
+  border-radius: 4px;
+  /* Bordes un poco más rectos para tamaños pequeños */
+  font-size: 11px;
+  /* Fuente más pequeña y discreta */
+  font-weight: 600;
+  color: #cbd5e1;
+  transition: 0.2s;
+  cursor: pointer;
+}
+
+.chip-check input:checked + span {
+  background: #12719c;
+  color: #000;
+  font-weight: bold;
+  border-color: #10b981;
+}
+
+.chip-check:hover span {
+  background: #283342;
+  color: #fff;
+}
+
+/* Tarjeta de unidad con doble fila */
+.unidad-grafica-card {
+  background: #1e293b !important;
+  border: 1px solid #173a6b;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  cursor: grab;
+  display: flex;
+  align-items: flex-start;
+  /* Alinea el icono arriba */
+  gap: 10px;
+  transition: all 0.2s ease;
+}
+
+.unidad-grafica-card:hover {
+  background: #2d3748 !important;
+  border-color: #12719c;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Contenedor de los textos */
+.unidad-info {
+  display: flex;
+  flex-direction: column;
+  /* Apila nombre arriba y clues abajo */
+  gap: 2px;
+}
+
+/* Estilo para el Nombre (Arriba) */
+.unidad-nombre {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+/* Estilo para el CLUES (Abajo) */
+.unidad-clues {
+  font-size: 9px;
+  color: #9ca3af;
+  /* Color gris suave */
+  font-family: monospace;
+  /* Estilo de código */
+  letter-spacing: 0.5px;
+}
+
+.unidad-grafica-card i {
+  color: #12719c;
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+/* El contenedor principal de las etiquetas */
+.drop-area-modern {
+  min-height: 80px;
+  padding: 15px;
+  display: flex;
+  flex-wrap: wrap;
+  /* Para que bajen al siguiente renglón si son muchos */
+  gap: 10px;
+  /* Espacio uniforme entre elementos */
+  align-items: center;
+  background-color: #f8fafc;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.drop-area-modern.drag-over {
+  background-color: #f1f5f9;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+/* Estilo general para las etiquetas (Badges) */
+.badge-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  animation: fadeIn 0.3s ease;
+}
+
+/* Color para UNIDADES (Verde) */
+.badge-item[data-tipo="unidad"] {
+  background-color: #12719c;
+  /* Esmeralda */
+  border: 1px solid #059669;
+}
+
+/* Color para INDICADORES (Azul) */
+.badge-item[data-tipo="indicador"] {
+  background-color: #3b82f6;
+  /* Azul */
+  border: 1px solid #2563eb;
+}
+
+/* El botón de cerrar (X) */
+.close-btn {
+  margin-left: 8px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Contenedor de la lista */
+#listaUnidades {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Espacio entre cada unidad */
+  padding: 8px !important;
+}
+
+/* Estilo de cada item de unidad (Más compacto) */
+.unidad-item-grafica {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  /* Bordes más finos */
+  padding: 4px 8px;
+  /* Reducimos el relleno */
+  color: #e5e7eb;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Menos espacio entre icono y texto */
+  margin-bottom: 4px;
+  /* Margen mínimo */
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.unidad-item-grafica:hover {
+  background: #2d3748;
+  border-color: #10b981;
+  /* Resalte verde al pasar el mouse */
+}
+
+/* Texto del nombre limpio (Letra más chica) */
+.nombre-limpio {
+  font-size: 10.5px;
+  /* Tamaño reducido */
+  font-weight: 400;
+  /* Menos grosor para que no se empaste */
+  line-height: 1.2;
+  text-transform: none;
+  word-break: break-word;
+  /* Opcional: ayuda a leer mejor en pequeño */
+}
+
+/* Icono más pequeño */
+.unidad-item-grafica i {
+  color: #60a5fa;
+  font-size: 10px;
+  /* Icono miniatura */
+  flex-shrink: 0;
+}
+
+/* Buscador más discreto */
+#searchUnidad {
+  font-size: 10px !important;
+  height: 28px !important;
+  padding: 6px 10px !important;
+  margin-bottom: 12px;
+}
+
+#searchSinerhias {
+  font-size: 10px !important;
+  height: 28px !important;
+  padding: 6px 10px !important;
+  margin-bottom: 12px;
+}
+
+/* Contenedor del encabezado de filtros */
+.header-filtros {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #334155;
+  /* Línea divisoria sutil */
+  margin-bottom: 20px;
+}
+
+/* Texto "FILTROS" */
+.menu-section {
+  color: #f8fafc;
+  /* Blanco azulado muy brillante */
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+/* Botón "Limpiar" alineado */
+.btn-reset-link {
+  background: #334155;
+  /* Fondo sutil para que parezca botón */
+  border: none;
+  color: #fbbf24;
+  /* Color ámbar/oro para que resalte del resto */
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+
+.btn-reset-link:hover {
+  background: #475569;
+  color: #ffffff;
+}
+
+/* Resaltar etiquetas de los bloques (Años, Unidad, Meses) */
+.filter-label {
+  color: #ffffff !important;
+  /* Blanco puro */
+  font-weight: 600;
+  margin-bottom: 10px;
+  display: block;
+  font-size: 0.95rem;
+}
+
+/* Resaltar los nombres de los checkboxes (2025, Ene, etc.) */
+.check-item {
+  color: #cbd5e1;
+  /* Gris claro que resalta en el fondo oscuro */
+  font-weight: 500;
+}
+
+/* Clase base para ambos botones */
+.btn-dash {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  height: 42px;
+  /* Altura fija para alineación perfecta */
+  min-width: 180px;
+  /* Ancho mínimo para que se vean parejos */
+  padding: 0 20px;
+
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+/* Color específico Excel (Verde) */
+.btn-excel {
+  background-color: #10b981;
+  color: #000;
+}
+
+.btn-excel:hover {
+  background-color: #0ea172;
+}
+
+/* Color específico Limpiar (Rojo) */
+.btn-limpiar {
+  background-color: #ef4444;
+  color: #fff;
+}
+
+.btn-limpiar:hover {
+  background-color: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.footer-global {
+  position: relative;
+  width: 100%;
+  height: 50px;
+  /* un poco más alto si quieres */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+.footer-global img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 2px;
+  /* leve suavidad casi imperceptible */
+}
+
+/* SVG */
+.ecg-line {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.ecg-line path {
+  fill: none;
+  stroke: #08a6c5;
+  stroke-width: 2.5;
+  stroke-linejoin: miter;
+  stroke-linecap: square;
+
+  stroke-dasharray: 1250;
+  stroke-dashoffset: 1250;
+
+  filter: drop-shadow(0 0 6px #08a6c5);
+}
+
+/* Animación tipo monitor */
+.footer-visible .ecg-line path {
+  animation: ecgBeat 3.5s ease-in-out infinite;
+}
+
+/* Pausa + latido + pausa */
+@keyframes ecgBeat {
+  0% {
+    stroke-dashoffset: 1250;
+  }
+
+  40% {
+    stroke-dashoffset: 0;
+  }
+
+  60% {
+    stroke-dashoffset: 0;
+  }
+
+  100% {
+    stroke-dashoffset: -1250;
+  }
+}
+
+/* Aparece suave */
+.footer-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+#page-wrapper {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+
+
+body {
+  overflow-x: hidden;
+}
+
+/* 1. Vista dse los meses de la grafica junto con los botones */
+
+.card-meses {
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.meses-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #34495e;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.meses-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mes-check {
+  display: none;
+}
+
+.mes-pill {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid #dbe3ec;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #34495e;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.mes-pill:hover {
+  background: #e2e8f0;
+  transform: translateY(-1px);
+}
+
+.mes-check:checked + .mes-pill {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+  border-color: #1d93d8;
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.25);
+}
+.btn-todos {
+  background-color: #0a6075 !important;
+  color: white !important;
+  border: 1px solid #10b981 !important;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-todos:hover {
+  background-color: #059669 !important;
+  border-color: #059669 !important;
+  color: white !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.25);
+}
+
+.btn-pill {
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-weight: 600;
+}
+
+.btn-dash {
+  border: none;
+  border-radius: 14px;
+  padding: 10px 18px;
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: 0.2s ease;
+}
+
+.btn-dash:hover {
+  transform: translateY(-2px);
+}
+
+.btn-excel {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: white;
+  box-shadow: 0 4px 10px rgba(22, 163, 74, 0.25);
+}
+
+.btn-limpiar {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  box-shadow: 0 4px 10px rgba(239, 68, 68, 0.25);
+}
+
+/* ==========================================================================
+   OPTIMIZACIÓN PARA LAPTOPS Y PANTALLAS MEDIANAS (1024px - 1440px)
+   ========================================================================== */
+
+@media (max-width: 1440px) {
+  /* 1. Ajuste de Contenedor Principal */
+  .container-fluid {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  h2 {
+    font-size: 1.4rem !important;
+  }
+  h5 {
+    font-size: 1.1rem !important;
+  }
+
+  /* 2. Gráficas: Reducción de altura para visibilidad simultánea */
+  .chart-box,
+  .chart-container,
+  [style*="height:350px"],
+  [style*="height:360px"],
+  .chart-wrapper {
+    height: 260px !important; /* Altura ideal en laptop */
+  }
+
+  /* Especial para la gráfica de Indicadores que es más densa */
+  [style*="height: 300px"] {
+    height: 240px !important;
+  }
+
+  /* 3. KPI Cards (Mortalidad, Ocupación, etc.) */
+  .card-body h3 {
+    font-size: 1.3rem !important; /* Números más pequeños */
+  }
+  .card-body h6 {
+    font-size: 0.7rem !important; /* Etiquetas pequeñas */
+  }
+
+  /* 4. Tablas: El corazón del ajuste */
+  .table-responsive {
+    border-radius: 8px;
+    overflow-x: auto !important;
+  }
+
+  .table {
+    font-size: 0.75rem !important; /* 12px aprox */
+  }
+
+  .table th,
+  .table td {
+    padding: 0.5rem 0.3rem !important;
+    vertical-align: middle;
+  }
+
+  /* Fix específico para la tabla de Indicadores (la más ancha) */
+  #tablaIndicadores {
+    min-width: 1200px !important; /* Permite scroll horizontal sin romper el layout */
+  }
+
+  /* 5. Selectores y Navegación */
+  .nav-tabs .nav-link {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+  }
+
+  .form-select-sm {
+    font-size: 0.75rem !important;
+    padding: 2px 20px 2px 8px !important;
+  }
+
+  /* 6. Dashboard Comparativo Dinámico */
+  .dashboard-title {
+    font-size: 1.3rem !important;
+  }
+  .btn-dash {
+    padding: 0.4rem 1rem !important;
+    min-width: 140px !important;
+    font-size: 0.7rem !important;
+    height: 36px !important;
+  }
+
+  .drop-area-modern {
+    min-height: 60px !important;
+    padding: 10px !important;
+  }
+
+  .placeholder-text {
+    font-size: 0.8rem;
+  }
+}
+
+/* ==========================================================================
+   AJUSTES PARA TABLETS O PANTALLAS MUY PEQUEÑAS (992px)
+   ========================================================================== */
+@media (max-width: 992px) {
+  .col-md-3 {
+    width: 50% !important; /* 2 KPIs por fila en lugar de 4 */
+    margin-bottom: 1rem;
+  }
+
+  .col-md-6 {
+    width: 100% !important; /* Gráficas una sobre otra */
+    margin-bottom: 1rem;
+  }
+}
+
+/* 8. Fix para el error de sintaxis que mencionaste antes */
+.chip-check {
+  flex: 0 0 auto;
+}
+
+.chip-check span {
+  min-width: 40px;
+  text-align: center;
+}
+
+.unidad-item-grafica {
+  background: #1f2937;
+  padding: 6px 8px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+  cursor: grab;
+  font-size: 12px;
+}
+
+.unidad-item-grafica:hover {
+  background: #374151;
+}
+
+.unidad-item-grafica:active {
+  cursor: grabbing;
+}
+
+.badge-item[data-tipo="estado"] {
+  background: #0f766e;
+  border: 1px solid #14b8a6;
+}
+
+/* ==========================================================================
+   TOOLBAR MESES RESPONSIVE
+   ========================================================================== */
+
+.toolbar-meses {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  /* 🔥 ESTO ES LA CLAVE */
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   CONTENEDOR DE MESES
+   ========================================================================== */
+
+.meses-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  /* 🔥 permite crecer y acomodarse */
+  flex: 1;
+  min-width: 280px;
+}
+
+/* ==========================================================================
+   BOTONES SECUNDARIOS
+   ========================================================================== */
+
+.toolbar-meses .d-flex.gap-2.ms-auto {
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   BOTONES PRINCIPALES
+   ========================================================================== */
+
+.toolbar-meses .d-flex.align-items-center.gap-2.ms-2 {
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   LAPTOPS
+   ========================================================================== */
+
+@media (max-width: 1400px) {
+  .toolbar-meses {
+    gap: 10px;
+  }
+
+  .mes-pill {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  .btn-pill {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  .btn-dash {
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+}
+
+/* ==========================================================================
+   TABLETS
+   ========================================================================== */
+
+@media (max-width: 992px) {
+  .toolbar-meses {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .meses-container {
+    width: 100%;
+  }
+
+  .toolbar-meses .d-flex.gap-2.ms-auto,
+  .toolbar-meses .d-flex.align-items-center.gap-2.ms-2 {
+    width: 100%;
+    margin-left: 0 !important;
+  }
+}
+
+/* ==========================================================================
+   MOBILE
+   ========================================================================== */
+
+@media (max-width: 576px) {
+  .btn-dash {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .mes-pill {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+}
+
+.resultado-encontrado {
+    animation: destacarResultado 1.5s ease;
+}
+
+
+@keyframes destacarResultado {
+
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.08);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+
+}
+
+

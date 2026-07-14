@@ -1,0 +1,391 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+<style>
+    /* Tipografía y Base */
+    :root {
+        /* 👉 CAMBIO 1: Nuevo Azul Institucional extraído del logo */
+        --salud-primary: #004a80;
+    }
+
+    /* Forzamos el modal a ser siempre pantalla completa sin scroll lateral */
+    .modal-fullscreen-always {
+        width: 100vw !important;
+        max-width: none !important;
+        height: 100vh !important;
+        margin: 0 !important;
+    }
+
+    .modal-content-full {
+        height: 100vh !important;
+        border-radius: 0 !important;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* TÍTULOS INTELIGENTES: Se ajustan según el ALTO y ANCHO de la pantalla */
+    .titulo-sih {
+        /* Se ajusta dinámicamente: mínimo 3rem, ideal 12vh, máximo 8rem */
+        font-size: clamp(3rem, 12vh, 8rem) !important;
+        line-height: 0.9;
+        letter-spacing: -3px;
+    }
+
+    .titulo-centro {
+        /* Se ajusta dinámicamente: mínimo 1.8rem, ideal 5vh, máximo 3.5rem */
+        font-size: clamp(1.8rem, 5vh, 3.5rem) !important;
+        line-height: 1.1;
+    }
+
+    .texto-descripcion {
+        font-size: clamp(1rem, 2vh, 1.5rem) !important;
+    }
+
+    /* Ajuste para el logo: que no crezca más de lo que la pantalla permite */
+    .logo-container img {
+        height: auto;
+        max-height: 25vh !important;
+        width: auto;
+    }
+
+    /* 👉 CAMBIO 2: Nuevo degradado de fondo azul de acuerdo al tono institucional */
+    .bg-institucional {
+        background: linear-gradient(135deg, #004a80 0%, #002e50 100%);
+    }
+
+    /* Animación del botón */
+    .btn-pulse {
+        animation: pulse-blue 2s infinite;
+    }
+
+    #modalBienvenida {
+        z-index: 99999 !important;
+    }
+
+    /* Forzar que el fondo oscuro del modal también tape el menú */
+    .modal-backdrop {
+        z-index: 99998 !important;
+    }
+
+    /* Asegurar que el modal ocupe todo el ancho sin que el sidebar lo empuje */
+    .modal-fullscreen {
+        left: 0 !important;
+        top: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .titulo-panel {
+        font-size: clamp(1.8rem, 4vw, 3.5rem) !important;
+        line-height: 1.1;
+    }
+
+    .subtitulo-panel {
+        font-size: clamp(0.9rem, 1.5vw, 1.25rem) !important;
+        width: 100% !important;
+        /* Permitir que ocupe más ancho en pantallas chicas */
+        max-width: 600px;
+    }
+
+    /* Ajuste de las Cards para que no se vean "aplastadas" */
+    .card-subsistema {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 280px;
+        /* Asegura un tamaño mínimo uniforme */
+    }
+
+    /* Reducir el padding del Hero en pantallas con poca altura */
+    @media (max-height: 800px) {
+        .hero-gradient {
+            padding-top: 2rem !important;
+            padding-bottom: 2rem !important;
+            margin-bottom: 1.5rem !important;
+        }
+    }
+
+    /* En tablets/laptops pequeñas, pasamos de 3 columnas a 2 para dar aire */
+    @media (max-width: 1200px) and (min-width: 768px) {
+        .col-md-4 {
+            width: 50% !important;
+        }
+    }
+
+    /* 👉 CAMBIO 3: Animación de pulso actualizada con el nuevo color azul */
+    @keyframes pulse-blue {
+        0% {
+            box-shadow: 0 0 0 0 rgba(0, 74, 128, 0.7);
+        }
+
+        70% {
+            box-shadow: 0 0 0 15px rgba(0, 74, 128, 0);
+        }
+
+        100% {
+            box-shadow: 0 0 0 0 rgba(0, 74, 128, 0);
+        }
+    }
+
+    /* Responsividad para Laptops (ajusta paddings) */
+    @media (max-height: 750px) {
+        .p-5 {
+            padding: 2rem !important;
+        }
+
+        .mb-5 {
+            margin-bottom: 1.5rem !important;
+        }
+
+        .mt-4 {
+            margin-top: 1rem !important;
+        }
+    }
+</style>
+
+<div class="hero-gradient py-5 mb-4">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <span class="text-uppercase small fw-bold text-secondary mb-2 d-block"
+                    style="letter-spacing: 2px;">Indicador Hospitalario</span>
+
+                <h1 class="titulo-panel fw-bold text-dark mb-3">
+                    Panel de Control <span style="color: #004a80;">Estadístico</span>
+                </h1>
+
+                <p class="subtitulo-panel text-muted">
+                    Gestión integral de indicadores y análisis predictivo para la
+                    optimización de los servicios de salud pública.
+                </p>
+            </div>
+
+            <div class="col-md-4 text-md-end mt-4 mt-md-0">
+                <span class="badge-status">
+                    <span class="spinner-grow spinner-grow-sm text-success me-2" role="status"></span>
+                    Sincronizado con Bases DGIS
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card card-subsistema p-4 h-100">
+                <div class="icon-box bg-info-soft">
+                    <i class="bi bi-activity"></i>
+                </div>
+                <h4 class="fw-bold h5">Indicadores Operativos</h4>
+                <p class="text-secondary small mb-4">Análisis de eficiencia: días estancia, ocupación y mortalidad
+                    hospitalaria.</p>
+                <a href="/indicadores" class="btn btn-modulo btn-outline-info mt-auto">Explorar Módulo</a>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card card-subsistema p-4 h-100">
+                <div class="icon-box bg-primary-soft">
+                    <i class="bi bi-person-up"></i>
+                </div>
+                <h4 class="fw-bold h5">Egresos</h4>
+                <p class="text-secondary small mb-4">Control de altas clínicos, eventos quirúrgicos y estadísticas de
+                    natalidad.</p>
+                <a href="/egresos/indicadores" class="btn btn-modulo btn-outline-primary mt-auto">Explorar Módulo</a>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card card-subsistema p-4 h-100">
+                <div class="icon-box bg-danger-soft">
+                    <i class="bi bi-clipboard2-pulse"></i>
+                </div>
+
+                <h4 class="fw-bold h5">Morbilidad</h4>
+
+                <p class="text-secondary small mb-4">
+                    Consulta y análisis de las principales causas de morbilidad por unidad médica, periodo, servicio y
+                    grupo de afecciones.
+                </p>
+
+                <a href="/reportes/morbi/reporte" class="btn btn-modulo btn-outline-danger mt-auto">
+                    Explorar módulo
+                </a>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card card-subsistema p-4 h-100">
+                <div class="icon-box bg-dark-subtle">
+                    <i class="bi bi-heart-pulse"></i>
+                </div>
+
+                <h4 class="fw-bold h5">Mortalidad</h4>
+
+                <p class="text-secondary small mb-4">
+                    Consulta y análisis de las principales causas de mortalidad por unidad médica, periodo, servicio y
+                    grupo de afecciones.
+                </p>
+
+                <a href="/reportes/morta/reporte" class="btn btn-modulo btn-outline-dark mt-auto">
+                    Explorar módulo
+                </a>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card card-subsistema p-4 h-100">
+                <div class="icon-box bg-danger-soft">
+                    <i class="bi bi-heart-pulse"></i>
+                </div>
+                <h4 class="fw-bold h5">Urgencias</h4>
+                <p class="text-secondary small mb-4">Análisis de demanda por motivo de atención, distinguiendo entre
+                    urgencias calificadas (riesgo vital) y no calificadas, orientado a la eficiencia del triage.</p>
+                <a href="/urgencias" class="btn btn-modulo btn-outline-danger mt-auto">Explorar Módulo</a>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card card-subsistema p-4 h-100">
+                <div class="icon-box bg-success-soft">
+                    <i class="bi bi-hospital-fill"></i>
+                </div>
+                <h4 class="fw-bold h5">Sistema (SIS)</h4>
+                <p class="text-secondary small mb-4">Consolidado de producción de servicios médicos y auxiliares
+                    diagnósticos.</p>
+                <a href="/sis" class="btn btn-modulo btn-outline-success mt-auto">Explorar Módulo</a>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card card-subsistema p-4 h-100">
+                <div class="icon-box bg-warning-soft">
+                    <i class="bi bi-calendar3-event"></i>
+                </div>
+                <h4 class="fw-bold h5">Agenda Estadística</h4>
+                <p class="text-secondary small mb-4">Planeación de recursos asistenciales y visualización del panorama
+                    de salud.</p>
+                <a href="/agenda/visor" class="btn btn-modulo btn-outline-warning mt-auto">Explorar Módulo</a>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card card-subsistema p-4 h-100 shadow-highlight">
+                <div class="icon-box bg-dark-soft">
+                    <i class="bi bi-cpu"></i>
+                </div>
+                <h4 class="fw-bold h5">Análisis Dinámico</h4>
+                <p class="text-secondary small mb-4">Minería de datos avanzada y exportación masiva de inteligencia
+                    estadística.</p>
+                <a href="/grafica" class="btn btn-modulo btn-dark mt-auto">Explorar Módulo</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<div class="modal fade" id="modalBienvenida" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
+    aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content modal-content-full border-0">
+            <div class="row g-0 h-100">
+
+                <div
+                    class="col-lg-5 d-none d-lg-flex bg-institucional align-items-center justify-content-center text-white p-5">
+                    <div class="text-center w-100">
+                        <div class="mb-4 logo-container">
+                            <div style="background: white; padding: 2vh; border-radius: 20px; display: inline-block;">
+                                <img src="{{ url_for('static', filename='img/logo_gto.png') }}" alt="Logo GTO">
+                            </div>
+                        </div>
+
+                        <h1 class="titulo-sih fw-bold mt-4">S.I.H.</h1>
+                        <p class="fs-3 fw-light">Sistema de Indicadores Hospitalarios</p>
+
+                        <hr class="w-50 mx-auto opacity-50 my-4">
+                        <p class="fs-6 text-uppercase" style="letter-spacing: 3px;">Gobierno del Estado de Guanajuato
+                        </p>
+                    </div>
+                </div>
+
+                <div class="col-lg-7 d-flex align-items-center bg-white overflow-auto">
+                    <div class="p-4 p-md-5 w-100">
+                        <div class="mx-auto" style="max-width: 650px;">
+                            <div class="mb-3">
+                                <span class="badge rounded-pill bg-dark px-3 py-2">
+                                    <i class="bi bi-lock-fill me-2 text-success"></i>CONEXIÓN SEGURA
+                                </span>
+                            </div>
+
+                            <h1 class="titulo-centro fw-bold text-dark mb-4">
+                                Centro de <br><span style="color: #004a80;">Análisis y Evidencia</span>
+                            </h1>
+
+                            <p class="texto-descripcion text-secondary mb-5">
+                                Bienvenido al portal centralizado de analítica estratégica institucional.
+                            </p>
+
+                            <div class="row g-4 mb-4 border-top pt-4">
+                                <div class="col-6">
+                                    <h6 class="fw-bold"><i class="bi bi-shield-check text-primary"></i> Confidencialidad
+                                    </h6>
+                                    <p class="small text-muted mb-0">Uso exclusivo institucional.</p>
+                                </div>
+                                <div class="col-6">
+                                    <h6 class="fw-bold"><i class="bi bi-database-check text-success"></i> Sincronización
+                                    </h6>
+                                    <p class="small text-muted mb-0">Datos validados DGIS.</p>
+                                </div>
+                            </div>
+
+                            <div class="d-grid mt-5">
+                                <button type="button" class="btn btn-lg text-white p-3 fs-4 fw-bold btn-pulse"
+                                    data-bs-dismiss="modal" style="background-color: #004a80; border-radius: 15px;">
+                                    INGRESAR AHORA <i class="bi bi-arrow-right-circle ms-2"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        // Ejecución inmediata: Verificamos antes de que se pinte el DOM si es posible
+        const modalId = 'modalBienvenida';
+
+        document.addEventListener("DOMContentLoaded", function () {
+            // 1. Verificar si ya se mostró en esta sesión
+            if (sessionStorage.getItem("bienvenidaVistaSesion") === "true") {
+                // Si ya se vio, nos aseguramos de que el modal no se abra y salimos
+                return;
+            }
+
+            // 2. Si no se ha visto, procedemos a mostrarlo
+            const modalElement = document.getElementById(modalId);
+
+            if (modalElement && typeof bootstrap !== 'undefined') {
+                const miModal = new bootstrap.Modal(modalElement);
+                miModal.show();
+
+                // 3. Marcamos como visto INMEDIATAMENTE
+                sessionStorage.setItem("bienvenidaVistaSesion", "true");
+
+                // 4. Refuerzo: Si el usuario cierra el modal manualmente, aseguramos la marca
+                modalElement.addEventListener('hidden.bs.modal', function () {
+                    sessionStorage.setItem("bienvenidaVistaSesion", "true");
+                });
+            }
+        });
+    })();
+</script>
+
+{% endblock %}

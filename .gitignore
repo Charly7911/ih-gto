@@ -1,0 +1,19 @@
+# Entorno virtual
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# Variables de entorno
+.env
+
+# Archivos generados por la aplicación
+app/uploads/

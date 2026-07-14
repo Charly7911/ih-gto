@@ -1,0 +1,271 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Usuarios</title>
+
+    <!-- Enlace al archivo CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_form_usuarios.css') }}">
+
+
+</head>
+
+<body>
+    <div class="lomo"></div> <!-- Imagen del lomo -->
+
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-messages">
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} flash-message">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+
+
+    <div class="main-content">
+        <div class="form-container">
+            <!-- Contenedor para el formulario alineado a la izquierda -->
+
+            <div class="card">
+                <!-- Imagen como botón -->
+                <div class="card-header" onclick="toggleFormulario()"
+                    style="cursor: pointer; display: flex; align-items: center; font-size: 14px;">
+                    <strong>Registro de Usuarios</strong>
+                </div>
+                <div class="card-body" id="formulario" style="display: none;">
+                    <form method="POST" action="{{ url_for('admin.crear_usuario') }}" enctype="multipart/form-data"
+                        autocomplete="off">
+                        <!-- Campos Básicos del Usuario -->
+
+                        <div class="md-3">
+                            <label for="nombre">Nombre</label>
+                            <input type="text" class="form-control" id="nombre" name="nombre" required
+                                oninput="this.value = this.value.toUpperCase();">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="primer_apellido">Primer Apellido</label>
+                            <input type="text" class="form-control" id="primer_apellido" name="primer_apellido" required
+                                oninput="this.value = this.value.toUpperCase();">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="segundo_apellido">Segundo Apellido</label>
+                            <input type="text" class="form-control" id="segundo_apellido" name="segundo_apellido"
+                                oninput="this.value = this.value.toUpperCase();">
+                        </div>
+
+                        <div class="mb-3s">
+                            <label for="sexo">Sexo:</label>
+                            <select name="sexo" id="sexo" required>
+                                <option value="" disabled selected>-- Selecciona --</option>
+                                <option value="hombre" {% if sexo=='hombre' %}selected{% endif %}>Hombre</option>
+                                <option value="mujer" {% if sexo=='mujer' %}selected{% endif %}>Mujer</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="rfc">RFC</label>
+                            <input type="text" class="form-control" id="rfc" name="rfc"
+                                oninput="this.value = this.value.toUpperCase();">
+                        </div>
+
+
+
+                        <div class="mb-3">
+                            <label for="email">Correo:</label>
+                            <input type="email" id="email" name="email" required>
+                            <div id="correo-error" class="error-message" style="color: red; display: none;">El
+                                correo
+                                debe ser Gmail/Hotmail/Gobierno válido.</div>
+                        </div>
+
+
+                        <div class="mb-3">
+                            <label for="username">Usuario:</label>
+                            <input type="text" class="form-control" id="username" name="username" required>
+                            <div id="username-error" class="error-message" style="color: red; display: none;"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password">Password:</label>
+                            <input type="password" id="password" name="password" autocomplete="new-password" required
+                                minlength="8">
+                            <div id="password-error" class="error-message" style="color: red; display: none;">
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="togglePassword" checked>
+                                <label class="form-check-label" for="togglePassword">
+                                    Mostrar contraseña
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="rol_id" class="form-label"><strong>Rol Asignado:</strong></label>
+                            <select class="form-control" name="rol_id" id="rol_id" required>
+                                <option value="1" {% if rol=='1' %}selected{% endif %}>Usuario</option>
+                                <option value="2" {% if rol=='2' %}selected{% endif %}>Secretaria</option>
+                                <option value="3" {% if rol=='3' %}selected{% endif %}>Jefe Dep</option>
+                                <option value="4" {% if rol=='4' %}selected{% endif %}>Director</option>
+                                <option value="5" {% if rol=='5' %}selected{% endif %}>Director General</option>
+                                <option value="6" {% if rol=='6' %}selected{% endif %}>Administrador</option>
+                            </select>
+                            <small id="helpId" class="form-text text-muted">Roles: 1 = Usuario / 2 = Secretaria / 3
+                                = Jefe Dep / 5 = Director Gral / 6 = Admin</small>
+                        </div>
+
+                        <!-- Botón de Envío -->
+                        <div class="card-footer text-muted">
+                            <button type="submit" class="btn btn-primary" id="guardarBtn">Registrar</button>
+
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Campo de búsqueda que filtra la tabla -->
+        <div class="table-container">
+            <h2>Lista de Usuarios</h2>
+            <div class="search-container">
+                <input type="text" id="searchInput" class="search-input" placeholder="Buscar registros..."
+                    onkeyup="filterTable()">
+            </div>
+            <!-- Contenedor para la tabla alineado a la derecha -->
+
+            <div class="table-container">
+
+                <div class="table-wrapper">
+                    <table class="table table-hover table-striped" id="usersTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Primer Apellido</th>
+                                <th>Segundo Apellido</th>
+                                <th>RFC</th>
+                                <th>Correo</th>
+                                <th>Usuario</th>
+                                <th>Contraseña</th>
+                                <th>Fecha Registro</th>
+                                <th>Rol</th>
+                                <th>Acción</th>
+
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in usuarios %}
+                            <tr>
+                                <td>{{ user.id }}</td>
+                                <td>{{ user.nombre }} </td>
+                                <td>{{ user.primer_apellido }}</td>
+                                <td>{{ user.segundo_apellido }}</td>
+                                <td>{{ user.rfc}} </td>
+                                <td>{{ user.email }}</td>
+                                <td>{{ user.username }}</td>
+                                <td>{{ user.nombre_oculto }}</td>
+                                <td>{{user.fecha_registro.strftime('%d/%m/%Y') }}</td>
+                                <td>
+                                    {% for rol in roles %}
+                                    {% if rol.id == user.rol_id %}
+                                    {{ rol.nombre }}
+                                    {% endif %}
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    <!-- Formulario para eliminar el usuario -->
+                                    <form action="{{ url_for('admin.eliminar_usuario', id=user.id) }}" method="POST"
+                                        style="display:inline;"
+                                        onsubmit="return confirm('¿Estás seguro de que deseas eliminar este usuario?');">
+                                        <button type="submit" class="btn btn-link"
+                                            style="padding: 0; border: none; background: none; color: #007bff; cursor: pointer;">Eliminar</button>
+                                    </form>
+                                </td>
+
+
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+</body>
+
+</html>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<!-- Script para Manejar las Selecciones en Cascada -->
+<script>
+    function toggleFormulario() {
+        var formulario = document.getElementById("formulario");
+        if (formulario.style.display === "none" || formulario.style.display === "") {
+            formulario.style.display = "block"; // Mostrar formulario
+        } else {
+            formulario.style.display = "none"; // Ocultar formulario
+        }
+    }
+
+    $(document).ready(function () {
+        // **1. Mostrar/Ocultar Contraseña**
+        const togglePassword = $('#togglePassword');
+        const passwordField = $('#password');
+
+        togglePassword.on('click', function () {
+            const type = passwordField.attr('type') === 'password' ? 'text' : 'password';
+            passwordField.attr('type', type);
+        });
+
+        if (togglePassword.is(':checked')) {
+            passwordField.attr('type', 'text');
+        }
+
+        // **2. Filtrar en la Tabla**
+        window.filterTable = function () {
+            var input = $("#searchInput").val().toLowerCase();
+            $("#usersTable tbody tr").filter(function () {
+                $(this).toggle($(this).text().toLowerCase().indexOf(input) > -1)
+            });
+        };
+
+        // **3. Validar y Enviar Formulario al Presionar "Registrar"**
+        $('#guardarBtn').on('click', function (e) {
+            e.preventDefault(); // Evita envío automático del formulario
+
+            let email = $('#email').val();
+            let validEmail = /^[\w\.-]+@(gmail\.com|hotmail\.com|guanajuato\.gob\.mx)$/i;
+
+            if (!validEmail.test(email)) {
+                $('#correo-error').show();
+                return;
+            } else {
+                $('#correo-error').hide();
+            }
+
+
+            // Si todo es válido, envía el formulario
+            $(this).closest('form').submit();
+        });
+
+        // **6. Mensajes de Confirmación**
+        setTimeout(function () {
+            $('.flash-message').fadeOut('slow');
+        }, 3000);
+    });
+</script>
+{% endblock %}

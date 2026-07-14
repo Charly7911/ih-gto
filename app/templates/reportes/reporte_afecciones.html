@@ -1,0 +1,385 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+
+<div class="main-content">
+    <div class="container-fluid mt-4 ps-4 pe-4">
+        <h2>📊 {{ titulo }} </h2>
+        <div id="unidadSeleccionada" class="text-muted mt-2">
+            Todas las unidades
+        </div>
+    </div>
+
+    <!-- =========================
+             RESULTADOS
+        ========================== -->
+    <div id="contenedor"></div>
+
+</div>
+</div>
+
+
+
+<script>
+
+    function actualizarTituloUnidad() {
+
+        const unidades =
+            window.getUnidadesRepSeleccionadas
+                ? window.getUnidadesRepSeleccionadas()
+                : [];
+
+        const servicios =
+            window.getServiciosSeleccionados
+                ? window.getServiciosSeleccionados()
+                : [];
+
+        const lbl =
+            document.getElementById("unidadSeleccionada");
+
+        if (!lbl) return;
+
+        let texto = "";
+
+        if (unidades.length === 0) {
+            texto = "<b>Unidad:</b> Todas las unidades";
+        }
+        else if (unidades.length === 1) {
+            texto = `<b>Unidad:</b> ${unidades[0]}`;
+        }
+        else {
+            texto = `<b>Unidades:</b> ${unidades.join(", ")}`;
+        }
+
+
+        if (servicios.length > 0) {
+            texto += `<br><b>Servicio:</b> ${servicios.join(", ")}`;
+        }
+
+
+        lbl.innerHTML = texto;
+
+    }
+
+
+
+    function cargarDatos() {
+        const anios = Array.from(
+            document.querySelectorAll(`.filtro-anio-${tipo}:checked`)
+        ).map(x => x.value);
+
+        const meses = Array.from(
+            document.querySelectorAll(`.filtro-mes-${tipo}:checked`)
+        ).map(x => x.value);
+
+        const top =
+            document.getElementById(`filtroTop${sufijo}`)?.value || "";
+
+
+
+        const unidades =
+            window.getUnidadesRepSeleccionadas
+                ? window.getUnidadesRepSeleccionadas()
+                : [];
+
+
+
+        const afecciones =
+            window.getAfeccionesSeleccionadas
+                ? window.getAfeccionesSeleccionadas()
+                : [];
+
+
+
+        const servicios =
+            window.getServiciosSeleccionados
+                ? window.getServiciosSeleccionados()
+                : [];
+
+
+
+        actualizarTituloUnidad();
+
+
+
+        const params = new URLSearchParams();
+
+
+
+        if (anios.length)
+            params.append(
+                "anios",
+                anios.join(",")
+            );
+
+
+        if (meses.length)
+            params.append(
+                "meses",
+                meses.join(",")
+            );
+
+
+        if (top)
+            params.append(
+                "top",
+                top
+            );
+
+
+        if (unidades.length)
+            params.append(
+                "unidades",
+                unidades.join(",")
+            );
+
+
+        if (afecciones.length)
+            params.append(
+                "afecciones",
+                afecciones.join(",")
+            );
+
+
+        if (servicios.length)
+            params.append(
+                "servicios",
+                servicios.join(",")
+            );
+
+
+
+        fetch(`/reportes/${tipo}/data?${params.toString()}`)
+            .then(res => res.json())
+            .then(data => render(data))
+            .catch(err => console.error(err));
+
+    }
+
+    function render(data) {
+
+        const afecciones =
+            window.getAfeccionesSeleccionadas
+                ? window.getAfeccionesSeleccionadas()
+                : [];
+
+        const contenedor =
+            document.getElementById("contenedor");
+
+        if (!contenedor) return;
+
+        contenedor.innerHTML = "";
+
+        // =========================
+        // MODO POR UNIDAD
+        // =========================
+        if (
+            afecciones &&
+            afecciones.length === 1 &&
+            data.length &&
+            data[0].causas?.[0]?.unidad !== undefined
+        ) {
+
+            data.forEach(item => {
+
+                let html = `
+        <div class="card mb-3 shadow-sm">
+            <div class="card-body">
+
+                <h5 class="card-title">
+                    Año ${item.anio}
+                </h5>
+
+                <p class="text-muted">
+                    Total unidad: <b>${Number(item.total_unidad ?? 0).toLocaleString('es-MX')}</b>
+                </p>
+
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Unidad</th>
+                            <th>Causa</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+                item.causas.forEach(c => {
+
+                    html += `
+                <tr>
+                    <td>${c.orden ?? ''}</td>
+                    <td>${c.unidad ?? ''}</td>
+                    <td>${c.causa ?? ''}</td>
+                    <td>${Number(c.total ?? 0).toLocaleString('es-MX')}</td>
+                </tr>
+            `;
+                });
+
+                html += `
+                    </tbody>
+                </table>
+
+            </div>
+        </div>
+        `;
+
+                contenedor.insertAdjacentHTML(
+                    "beforeend",
+                    html
+                );
+
+            });
+
+            return;
+        }
+
+        // =========================
+        // REPORTE NORMAL
+        // =========================
+
+        data.forEach(item => {
+
+            let html = `
+        <div class="card mb-3 shadow-sm">
+            <div class="card-body">
+
+                <h5 class="card-title">
+                    Año ${item.anio}
+                </h5>
+
+                <p class="text-muted">
+                    Total unidad: <b>${Number(item.total_unidad ?? 0).toLocaleString('es-MX')}</b>
+                </p>
+
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Causa</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+            item.causas.forEach(c => {
+
+                html += `
+                <tr>
+                    <td>${c.orden || ''}</td>
+                    <td>${c.causa || ''}</td>
+                    <td>${Number(c.total || 0).toLocaleString('es-MX')}</td>
+                </tr>
+            `;
+            });
+
+            html += `
+                    </tbody>
+                </table>
+
+            </div>
+        </div>
+        `;
+
+            contenedor.insertAdjacentHTML("beforeend", html);
+        });
+    }
+
+    document
+        .getElementById(`btnDescargar${sufijo}`)
+        ?.addEventListener("click", () => {
+
+            console.log("CLICK");
+
+            console.log(
+                [...document.querySelectorAll(".filtro-anio-morbi:checked")]
+                    .map(x => x.value)
+            );
+
+            const anios = Array.from(
+                document.querySelectorAll(`.filtro-anio-${tipo}:checked`)
+            ).map(x => x.value);
+
+            const meses = Array.from(
+                document.querySelectorAll(`.filtro-mes-${tipo}:checked`)
+            ).map(x => x.value);
+
+            const top =
+                document.getElementById(`filtroTop${sufijo}`)?.value || "";
+
+            const unidades =
+                window.getUnidadesRepSeleccionadas
+                    ? window.getUnidadesRepSeleccionadas()
+                    : [];
+
+            const afecciones =
+                window.getAfeccionesSeleccionadas
+                    ? window.getAfeccionesSeleccionadas()
+                    : [];
+
+            const servicios =
+                window.getServiciosSeleccionados
+                    ? window.getServiciosSeleccionados()
+                    : [];
+
+            const params = new URLSearchParams();
+
+            if (anios.length) {
+                params.append(
+                    "anios",
+                    anios.join(",")
+                );
+            }
+
+            if (meses.length) {
+                params.append(
+                    "meses",
+                    meses.join(",")
+                );
+            }
+
+            unidades.forEach(
+                x => params.append("unidades", x)
+            );
+
+            afecciones.forEach(
+                x => params.append("afecciones", x)
+            );
+
+            if (top) {
+                params.append("top", top);
+            }
+
+            if (servicios.length) {
+                params.append(
+                    "servicios",
+                    servicios.join(",")
+                );
+            }
+
+            console.log({
+                anios,
+                meses,
+                top,
+                unidades,
+                afecciones,
+                servicios
+            });
+
+
+            window.location.href =
+                `/reportes/${tipo}/excel?${params.toString()}`;
+
+        });
+
+    // carga inicial
+    cargarDatos();
+
+
+
+</script>
+
+{% endblock %}

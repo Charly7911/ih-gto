@@ -1,0 +1,329 @@
+/* --- 1. Reset de Pantalla --- */
+html,
+body {
+    overflow: hidden;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #f1f5f9;
+}
+
+#wrapper {
+    display: flex;
+    height: 100vh;
+}
+
+/* SECCIÓN 2: Sidebar (Mantenemos tus 320px) */
+#sidebar-wrapper {
+    width: 320px;
+    min-width: 320px;
+    background-color: #0c1936 !important;
+    flex-shrink: 0; /* Evita que el sidebar se encoja */
+}
+
+/* SECCIÓN 3: Contenedor Principal */
+#page-content-wrapper {
+    flex-grow: 1; /* Esto hace que ocupe TODO el espacio sobrante a la derecha */
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- 4. El Visor (Subir contenido al tope) --- */
+.visor-wrapper {
+   flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start; /* Asegura el inicio arriba */
+    padding-top: 0 !important;   /* Quitamos cualquier espacio */
+    gap: 0;                      /* Evita espacio entre título y libro */
+}
+
+
+#tituloVisualizador {
+    /* 1. Ajuste de Ancho y Margen */
+    width: 98% !important;
+    margin: 20px auto 0 auto; 
+    padding: 12px 20px; 
+    
+    /* 2. Estética Institucional */
+    background-color: #0c1936;
+    color: #ffffff;
+    
+    /* 3. Tipografía con Ajuste Fluido */
+    /* El texto bajará de tamaño automáticamente entre 18px y 14px */
+    font-size: clamp(14px, 4vw, 18px); 
+    font-weight: 500;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1.5px; 
+    
+    /* 4. Bordes e Indicador */
+    border-radius: 8px 8px 0 0;
+    border-left: 6px solid #0dcaf0; 
+    
+    /* 5. Comportamiento y Flexbox */
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 45px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* --- AJUSTES ESPECÍFICOS PARA PANTALLAS PEQUEÑAS --- */
+
+/* Tablets y Celulares Grandes (e.g. iPhone Pro Max) */
+@media (max-width: 768px) {
+    #tituloVisualizador {
+        font-size: 11px; /* Letra más pequeña */
+        letter-spacing: 1px;
+        padding: 10px 15px;
+        border-left-width: 4px; /* Barra cian más delgada */
+    }
+}
+
+/* Celulares Estándar y Pequeños */
+@media (max-width: 480px) {
+    #tituloVisualizador {
+        font-size: 9px; /* Letra aún más pequeña para que quepa en una línea */
+        letter-spacing: 0.5px;
+        padding: 8px 10px;
+        margin-top: 15px;
+    }
+}
+
+/* Celulares Muy Angostos */
+@media (max-width: 320px) {
+    #tituloVisualizador {
+        font-size: 7px;
+        letter-spacing: 0px;
+        padding: 6px 8px;
+        
+    }
+}
+
+/* Unimos el libro al título quitando cualquier separación */
+#flipbook-container {
+    width: 98% !important;
+    margin-top: 0 !important; 
+    border-top: 1px solid rgba(255,255,255,0.1); /* Línea de división mínima */
+    border-radius: 0 0 8px 8px !important;
+    background: #ffffff;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+}
+/* --- 5. El Libro (MÁS GRANDE) --- */
+/* Añade esto después de la sección 5 */
+
+
+/* Esta clase la añadiremos con JS cuando el libro cargue */
+#flipbook.libro-listo {
+    opacity: 1;
+}
+
+#flipbook-container {
+ width: 98% !important;  /* Cambiado de 1000px a 98% */
+    max-width: none !important;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    
+    /* Calculamos la altura restando título, controles y footer */
+    height: calc(100vh - 190px) !important; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* --- 6. Visualización de Imágenes (Solución definitiva para tablas largas) --- */
+.page {
+    background-color: white !important;
+    overflow: hidden !important; /* Evita que Turn.js muestre scrollbars o cortes feos */
+}
+
+.page img {
+    touch-action: none;
+    cursor: zoom-in;
+    -webkit-user-drag: none;
+
+    backface-visibility: hidden;
+    transform: translateZ(0);
+    display: block;
+}
+
+/* Este es el contenedor que añadimos en el JS */
+.page-viewport {
+width: 100%;
+    height: 100%;
+    padding: 5px; /* Reducimos el padding de 10px a 5px para ganar espacio */
+}
+
+.page-viewport img {
+  /* Esto obliga a la imagen a crecer hasta tocar los bordes del contenedor */
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important; /* Mantiene la proporción sin deformar */
+}
+
+/* Asegura que la portada no fluctúe de tamaño */
+.page:first-child img {
+    object-fit: contain !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.small-cover img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+
+    backface-visibility: hidden;
+    transform: translateZ(0);
+    display: block;
+}
+
+/* --- 7. Controles y Footer --- */
+.controles-inferiores {
+    height: 50px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 5px;
+}
+
+/* --- 1. Contenedor del Footer --- */
+.footer-global {
+    position: relative;
+    height: 45px; /* Altura según tu diseño previo */
+    background: #0c1936;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    flex-shrink: 0;
+}
+
+/* --- 2. Imagen de fondo (Ajuste total) --- */
+.footer-global img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover; /* Esto evita que se vea corta */
+    z-index: 1;
+    opacity: 0.6;
+}
+
+/* --- 3. Línea ECG Animada --- */
+.ecg-line {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 200%; /* Necesario para el desplazamiento infinito */
+    height: 100%;
+    z-index: 2;
+}
+
+.ecg-line path {
+    stroke: #0dcaf0;
+    stroke-width: 2;
+    fill: none;
+    /* Aplicamos la animación directamente al path o al svg */
+    animation: moveECG 4s linear infinite;
+}
+
+
+#flipbook {
+    margin: 0 auto;
+    height: 100% !important;
+    width: 100% !important;
+
+    visibility: hidden;
+    opacity: 0;
+
+    transition: opacity 0.4s ease;
+}
+
+/* Cuando ya cargó */
+#flipbook.ready {
+    visibility: visible;
+    opacity: 1;
+}
+
+
+
+
+.preload-page img {
+    opacity: 0;
+    animation: fadeIn 0.3s forwards;
+}
+
+@keyframes fadeIn {
+    to { opacity: 1; }
+}
+
+/* --- 4. La Animación --- */
+@keyframes moveECG {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+
+/* Limitar la altura del cuerpo del acordeón y activar scroll */
+.accordion-collapse {
+    max-height: 400px; /* Ajusta según prefieras */
+    overflow-y: auto;
+}
+
+/* Estilo para la barra de scroll (Chrome/Safari) */
+.accordion-collapse::-webkit-scrollbar {
+    width: 6px;
+}
+.accordion-collapse::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 10px;
+}
+
+/* Diseño de la lista de hojas */
+.accordion-body ul {
+    margin: 0;
+    padding: 0;
+}
+
+.accordion-body li {
+    border-bottom: 1px solid #333;
+    transition: background 0.2s;
+}
+
+.accordion-body li:last-child {
+    border-bottom: none;
+}
+
+.accordion-body li:hover {
+    background: #2c2c2c;
+}
+
+.accordion-body a {
+    display: block;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    color: #0dcaf0 !important; /* Color info de Bootstrap */
+    line-height: 1.2;
+}
+
+/* --- 8. Responsive --- */
+@media (max-width: 992px) {
+    #sidebar-wrapper {
+        position: fixed;
+        left: -320px;
+        transition: left 0.3s;
+    }
+
+    #sidebar-wrapper.active {
+        left: 0;
+    }
+}

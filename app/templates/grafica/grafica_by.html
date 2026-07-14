@@ -1,0 +1,2072 @@
+{% extends "layout/base.html" %} {% block content %}
+<div class="main-content bg-light-gray">
+  <div class="container-fluid py-4 px-4">
+    <div class="d-flex justify-content-between align-items-end mb-4">
+      <div>
+        <h2 class="dashboard-title">Comparativo Dinámico</h2>
+        <p class="dashboard-subtitle">
+          Análisis de indicadores hospitalarios por unidad
+        </p>
+        <div class="card shadow-sm border-0 mb-3 card-meses">
+          <div class="card-body py-3 px-3">
+            <div class="toolbar-meses">
+              <!-- Título -->
+              <div class="meses-title">
+                <i class="bi bi-calendar3"></i>
+                Meses
+              </div>
+
+              <!-- CHECKS -->
+              <div id="checkMeses" class="meses-container">
+                <input type="checkbox" id="mes1" class="mes-check" value="1" checked />
+                <label for="mes1" class="mes-pill">Ene</label>
+
+                <input type="checkbox" id="mes2" class="mes-check" value="2" checked />
+                <label for="mes2" class="mes-pill">Feb</label>
+
+                <input type="checkbox" id="mes3" class="mes-check" value="3" checked />
+                <label for="mes3" class="mes-pill">Mar</label>
+
+                <input type="checkbox" id="mes4" class="mes-check" value="4" checked />
+                <label for="mes4" class="mes-pill">Abr</label>
+
+                <input type="checkbox" id="mes5" class="mes-check" value="5" checked />
+                <label for="mes5" class="mes-pill">May</label>
+
+                <input type="checkbox" id="mes6" class="mes-check" value="6" checked />
+                <label for="mes6" class="mes-pill">Jun</label>
+
+                <input type="checkbox" id="mes7" class="mes-check" value="7" checked />
+                <label for="mes7" class="mes-pill">Jul</label>
+
+                <input type="checkbox" id="mes8" class="mes-check" value="8" checked />
+                <label for="mes8" class="mes-pill">Ago</label>
+
+                <input type="checkbox" id="mes9" class="mes-check" value="9" checked />
+                <label for="mes9" class="mes-pill">Sep</label>
+
+                <input type="checkbox" id="mes10" class="mes-check" value="10" checked />
+                <label for="mes10" class="mes-pill">Oct</label>
+
+                <input type="checkbox" id="mes11" class="mes-check" value="11" checked />
+                <label for="mes11" class="mes-pill">Nov</label>
+
+                <input type="checkbox" id="mes12" class="mes-check" value="12" checked />
+                <label for="mes12" class="mes-pill">Dic</label>
+              </div>
+
+              <!-- BOTONES -->
+              <div class="d-flex gap-2 ms-auto">
+                <button class="btn btn-sm btn-todos btn-pill" onclick="seleccionarTodosMeses()">
+                  <i class="bi bi-check2-square"></i>
+                  Todos
+                </button>
+
+                <button class="btn btn-sm btn-outline-secondary btn-pill" onclick="limpiarMeses()">
+                  <i class="bi bi-x-square"></i>
+                  Ninguno
+                </button>
+              </div>
+
+              <!-- BOTONES PRINCIPALES -->
+              <div class="d-flex align-items-center gap-2 ms-2">
+                <button id="btnExcel" onclick="descargarExcel()" class="btn-dash btn-excel">
+                  <i class="bi bi-file-earmark-excel"></i>
+                  <span id="textoBtn">Descargar Excel</span>
+                </button>
+
+                <button onclick="limpiarTodo()" class="btn-dash btn-limpiar">
+                  <i class="bi bi-arrow-repeat"></i>
+                  Nuevo Comparativo
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="selection-summary" class="text-end"></div>
+    </div>
+
+    <div id="dropZone" class="drop-area-modern shadow-sm mb-4">
+      <div class="drop-content">
+        <i class="bi bi-plus-circle"></i>
+        <span class="placeholder-text">Arrastre indicadores y unidades aquí para comparar</span>
+      </div>
+    </div>
+
+    <div class="card graph-card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center pt-3 ps-4 pe-4">
+        <h5 id="tituloGrafica" class="card-title-sm mb-0">Tendencia Mensual</h5>
+
+        <div class="card-header bg-white border-0 d-flex align-items-center pt-3 ps-4 pe-4">
+          <div class="d-flex align-items-center gap-3 ms-auto">
+            <div class="form-check form-switch custom-switch m-0">
+              <input class="form-check-input" type="checkbox" id="switchEtiquetas" />
+              <label class="form-check-label" style="font-size: 11px; font-weight: 600; color: #6c757d">
+                MOSTRAR DATOS
+              </label>
+            </div>
+
+            <div class="form-check form-switch custom-switch m-0">
+              <input class="form-check-input" type="checkbox" id="switchTendencia" />
+              <label class="form-check-label" style="font-size: 11px; font-weight: 600; color: #6c757d">
+                MOSTRAR TENDENCIA
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body p-4">
+        <div class="chart-wrapper">
+          <canvas id="grafica"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js"></script>
+
+
+<script>
+  let chart = null;
+
+  let unidadesSeleccionadas = new Set();
+  let indicadoresSeleccionados = new Set();
+  let aniosSeleccionados = new Set();
+
+  let avisosMostrados = new Set();
+  let alertasMostradas = new Set();
+
+  let todasUnidades = [];
+
+  let timeoutRender = null;
+
+  Chart.register(ChartDataLabels);
+
+  // =========================
+  // NORMALIZADOR GLOBAL
+  // =========================
+  const norm = (s) =>
+    (s || "")
+      .toString()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "_");
+
+  // =========================
+  // LIMPIEZA DE NOMBRE
+  // =========================
+  function limpiarNombreUnidad(nombre) {
+    if (!nombre) return "";
+    return nombre.replace(/^[A-Z0-9]{10,14}\s+/, "").trim();
+  }
+
+  // =========================
+  // CARGA DE UNIDADES
+  // =========================
+  fetch("/grafica/api/unidades")
+    .then((r) => r.json())
+    .then((data) => {
+      todasUnidades = data;
+      renderListaUnidades(data);
+    })
+    .catch((err) => console.error("Error cargando unidades:", err));
+
+  // =========================
+  // RENDER LISTA UNIDADES
+  // =========================
+  function renderListaUnidades(unidades) {
+
+    const generales = document.getElementById("listaGenerales");
+    const comunitarios = document.getElementById("listaComunitarios");
+    const especialidad = document.getElementById("listaEspecialidad");
+
+    generales.innerHTML = "";
+    comunitarios.innerHTML = "";
+    especialidad.innerHTML = "";
+
+    unidades.forEach((u) => {
+
+      const div = document.createElement("div");
+
+      const nombreMostrar = limpiarNombreUnidad(u.nombre_unidad);
+
+      div.className = "unidad-item-grafica";
+      div.draggable = true;
+      div.dataset.clues = u.clues;
+
+      div.innerHTML = `
+            <i class="bi bi-hospital" style="font-size:9px;opacity:.7;"></i>
+            <span class="nombre-limpio">${nombreMostrar}</span>
+        `;
+
+      div.title = u.nombre_unidad;
+
+
+      div.addEventListener("dragstart", (e) => {
+
+        e.dataTransfer.setData(
+          "application/json",
+          JSON.stringify({
+            type: "unidad",
+            value: u.clues,
+            nombre: nombreMostrar
+          })
+        );
+
+      });
+
+
+      // AGRUPACIÓN POR TIPOLOGÍA
+      switch (u.tipologia) {
+
+        case "HG":
+          generales.appendChild(div);
+          break;
+
+        case "HC":
+          comunitarios.appendChild(div);
+          break;
+
+        case "HE":
+          especialidad.appendChild(div);
+          break;
+
+        default:
+          generales.appendChild(div);
+      }
+
+    });
+
+  }
+  // =========================
+  // MESES
+  // =========================
+  function obtenerMesesSeleccionados() {
+    const meses = Array.from(
+      document.querySelectorAll(".mes-check:checked")
+    ).map(el => parseInt(el.value));
+
+    console.log("MESES CHECKED:", meses);
+
+    return meses;
+  }
+
+  function seleccionarTodosMeses() {
+    document.querySelectorAll(".mes-check").forEach((el) => (el.checked = true));
+    cargarGrafica();
+  }
+
+  function limpiarMeses() {
+    document.querySelectorAll(".mes-check").forEach((el) => (el.checked = false));
+    cargarGrafica();
+  }
+
+  // =========================
+  // DRAG INDICADORES
+  // =========================
+  function initDraggableIndicadores() {
+    const items = document.querySelectorAll(".indicador-item");
+
+    console.log("Indicadores encontrados:", items.length);
+
+    items.forEach((el) => {
+      el.draggable = true;
+
+      const ind = el.dataset.ind;
+
+      if (!ind) {
+        console.warn("Indicador sin data-ind:", el);
+        return;
+      }
+
+      el.addEventListener("dragstart", (e) => {
+        const data = {
+          type: "indicador",
+          value: ind,
+          sub: el.dataset.sub || "general",
+          nombre: el.innerText.trim(),
+        };
+
+        e.dataTransfer.setData(
+          "application/json",
+          JSON.stringify(data)
+        );
+
+        console.log("DRAG INDICADOR:", data);
+      });
+    });
+  }
+
+  // =========================
+  // BUSCADOR
+  // =========================
+  const searchInput = document.getElementById("searchUnidad");
+
+  if (searchInput) {
+
+    searchInput.addEventListener("input", (e) => {
+
+      const filtro = e.target.value.toLowerCase().trim();
+
+      const filtradas = todasUnidades.filter((u) => {
+
+        return (
+          u.nombre_unidad.toLowerCase().includes(filtro) ||
+          u.clues.toLowerCase().includes(filtro)
+        );
+
+      });
+
+
+      renderListaUnidades(filtradas);
+
+
+      // Abrir categorías cuando se está buscando
+      document.querySelectorAll(".sub-acordeon").forEach(acordeon => {
+
+        if (filtro !== "") {
+          acordeon.open = true;
+        } else {
+          acordeon.open = false;
+        }
+
+      });
+
+    });
+
+  }
+
+
+  // =========================
+  // BUSCADOR SINERHIAS
+  // =========================
+
+  const searchSinerhias = document.getElementById("searchSinerhias");
+
+
+  if (searchSinerhias) {
+
+    searchSinerhias.addEventListener("input", (e) => {
+
+      const filtro = e.target.value.toLowerCase().trim();
+
+
+      // Buscamos dentro del acordeón SINERHIAS completo
+      const contenedor = searchSinerhias
+        .closest(".acordeon-indicadores");
+
+
+      const indicadores = contenedor.querySelectorAll(
+        ".indicador-item"
+      );
+
+
+      indicadores.forEach(item => {
+
+        const texto = (
+          item.textContent +
+          " " +
+          item.dataset.ind
+        )
+          .toLowerCase()
+          .trim();
+
+
+        if (texto.includes(filtro)) {
+
+          item.style.display = "";
+
+        } else {
+
+          item.style.display = "none";
+
+        }
+
+      });
+
+
+
+      // Abrir sub-acordeones donde existan resultados
+      const detalles = contenedor.querySelectorAll(
+        "details"
+      );
+
+
+      detalles.forEach(detalle => {
+
+        const visibles = detalle.querySelectorAll(
+          ".indicador-item:not([style*='display: none'])"
+        );
+
+
+        if (filtro !== "" && visibles.length > 0) {
+
+          detalle.open = true;
+
+        }
+
+
+        if (filtro === "") {
+
+          detalle.open = false;
+
+          indicadores.forEach(item => {
+            item.style.display = "";
+          });
+
+        }
+
+      });
+
+
+
+      // ==============================
+      // IR AL PRIMER RESULTADO
+      // ==============================
+
+      if (filtro !== "") {
+
+        const primerResultado = contenedor.querySelector(
+          ".indicador-item:not([style*='display: none'])"
+        );
+
+
+        if (primerResultado) {
+
+
+          setTimeout(() => {
+
+
+            primerResultado.scrollIntoView({
+              behavior: "smooth",
+              block: "center"
+            });
+
+
+            // Resaltar resultado encontrado
+            primerResultado.classList.add(
+              "resultado-encontrado"
+            );
+
+            setTimeout(() => {
+
+              primerResultado.classList.remove(
+                "resultado-encontrado"
+              );
+
+            }, 1500);
+
+
+          }, 300);
+
+
+        }
+
+      }
+
+
+    });
+
+  }
+  // =========================
+  // DROP ZONE
+  // =========================
+  const dropZone = document.getElementById("dropZone");
+
+  if (dropZone) {
+    dropZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropZone.classList.add("drag-over");
+    });
+
+    dropZone.addEventListener("dragleave", () => {
+      dropZone.classList.remove("drag-over");
+    });
+
+    dropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropZone.classList.remove("drag-over");
+
+      const raw = e.dataTransfer.getData("application/json");
+
+      if (!raw) return;
+
+      let data;
+      try {
+        data = JSON.parse(raw);
+      } catch (err) {
+        console.error("JSON inválido:", raw);
+        return;
+      }
+
+      // =========================
+      // UNIDADES
+      // =========================
+      if (data.type === "unidad") {
+        if (!unidadesSeleccionadas.has(data.value)) {
+          unidadesSeleccionadas.add(data.value);
+          addBadge(limpiarNombreUnidad(data.nombre), "unidad", data.value);
+        }
+      }
+
+      // =========================
+      // INDICADORES
+      // =========================
+      if (data.type === "indicador") {
+        if (!indicadoresSeleccionados.has(data.value)) {
+          indicadoresSeleccionados.add(data.value);
+
+          const el = document.querySelector(
+            `.indicador-item[data-ind="${data.value}"]`
+          );
+
+          const texto = el
+            ? el.innerText.trim()
+            : data.nombre || data.value;
+
+          addBadge(texto, "indicador", data.value);
+        }
+      }
+
+      cargarGrafica();
+    });
+  }
+
+  // =========================
+  // BADGES
+  // =========================
+  function addBadge(texto, tipo, value) {
+    const placeholder = dropZone.querySelector(".placeholder-text");
+
+    if (placeholder) placeholder.style.display = "none";
+
+    const span = document.createElement("span");
+    span.className = "badge-item";
+    span.dataset.tipo = tipo;
+    span.dataset.value = value;
+
+    const icono =
+      tipo === "unidad"
+        ? '<i class="bi bi-hospital me-1"></i>'
+        : '<i class="bi bi-graph-up me-1"></i>';
+
+    span.innerHTML = `
+    ${icono}
+    <span>${texto}</span>
+    <span class="close-btn">&times;</span>
+  `;
+
+    span.querySelector(".close-btn").onclick = () => {
+      if (tipo === "unidad") unidadesSeleccionadas.delete(value);
+      if (tipo === "indicador") indicadoresSeleccionados.delete(value);
+
+      span.remove();
+
+      if (
+        dropZone.querySelectorAll(".badge-item").length === 0 &&
+        placeholder
+      ) {
+        placeholder.style.display = "block";
+      }
+
+      cargarGrafica();
+    };
+
+    dropZone.appendChild(span);
+  }
+
+
+
+  function cargarGrafica() {
+
+    if (
+      unidadesSeleccionadas.size === 0 ||
+      indicadoresSeleccionados.size === 0
+    ) {
+      if (chart) chart.destroy();
+      return;
+    }
+
+    const aniosChecked = Array.from(
+      document.querySelectorAll(".anio-check:checked")
+    ).map((el) => el.value);
+
+    if (aniosChecked.length === 0) {
+      if (chart) chart.destroy();
+      return;
+    }
+
+    const modoVista = document.getElementById("modoVista").value;
+    const esAnual = modoVista === "anual";
+
+    const params = new URLSearchParams();
+
+    // =========================
+    // UNIDADES
+    // =========================
+    unidadesSeleccionadas.forEach((u) => {
+      params.append("clues[]", u);
+    });
+
+    // =========================
+    // INDICADORES
+    // =========================
+    indicadoresSeleccionados.forEach((i) => {
+      params.append("indicadores[]", i);
+    });
+
+    // =========================
+    // AÑOS
+    // =========================
+    aniosChecked.forEach((a) => {
+      params.append("anios[]", a);
+    });
+
+    // =========================
+    // MESES
+    // =========================
+
+
+    // si no hay meses, permitir continuar
+    let mesesSeleccionados = obtenerMesesSeleccionados();
+
+    const esVistaAnual = document.getElementById("modoVista").value === "anual";
+
+    if (!esVistaAnual && mesesSeleccionados.length === 0) {
+      if (chart) {
+        chart.destroy();
+        chart = null;
+      }
+      return;
+    }
+
+    mesesSeleccionados.forEach((m) => {
+      params.append("meses[]", m);
+    });
+
+
+    // 🔥 DETONADOR ANUAL
+    if (esAnual) {
+      params.append("meses[]", "13");
+    }
+
+    console.log("PARAMS ENVIADOS:", params.toString());
+
+    // =========================
+    // FETCH
+    // =========================
+    fetch("/grafica/api/indicadores?" + params.toString())
+      .then((r) => r.json())
+      .then((data) => {
+
+        console.log("DATA COMPLETA API:", data);
+
+        if (!data || data.length === 0) {
+          if (chart) chart.destroy();
+          return;
+        }
+
+        const datosAnuales = data.filter(
+          (item) => Number(item.mes) === 13
+        );
+
+        console.log("DATOS ANUALES:", datosAnuales);
+
+        console.log(
+          "INDICADORES SELECCIONADOS:",
+          Array.from(indicadoresSeleccionados)
+        );
+
+        console.log(
+          "INDICADORES RECIBIDOS:",
+          [...new Set(data.map(x => x.indicador))]
+        );
+
+        renderGrafica(data);
+      })
+      .catch((err) => {
+        console.error("Error:", err);
+      });
+  }
+
+
+  function renderGrafica(data) {
+    const indicadoresSolicitados = Array.from(indicadoresSeleccionados);
+    const unidadesSolicitadas = Array.from(unidadesSeleccionadas);
+    const modoVista = document.getElementById("modoVista").value;
+    const esVistaAnual = modoVista === "anual";
+    const mesesSeleccionados = obtenerMesesSeleccionados();
+
+    const norm = (s) =>
+      (s || "")
+        .toString()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, "_");
+
+    const mesesLabels = [
+      "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+      "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"
+    ];
+
+    // =========================
+    // ALERTAS (EQUIPOS / CAMAS)
+    // =========================
+    unidadesSolicitadas.forEach((cluesId) => {
+      const unidadInfo = todasUnidades.find((u) => u.clues === cluesId);
+
+      const nombreU = unidadInfo
+        ? limpiarNombreUnidad(unidadInfo.nombre_unidad)
+        : cluesId;
+
+      indicadoresSolicitados.forEach((indId) => {
+
+        const esEquipo =
+          indId.startsWith("arco_") ||
+          indId.includes("tomografo") ||
+          indId.includes("unidad_rx") ||
+          indId.includes("mastografo_") ||
+          indId.includes("fluoroscopio_") ||
+          indId.includes("resonancia_") ||
+          indId.includes("monitor_") ||
+          indId.includes("incubadora_");
+
+        const esCama =
+          indId.includes("hab_") ||
+          indId.includes("cama") ||
+          indId.includes("tot_otras_areas");
+
+        if (esEquipo || esCama) {
+          const tieneDatos = data.some(
+            (d) =>
+              (d.clues || "").toString().trim().toLowerCase() ===
+              cluesId.toLowerCase() &&
+              norm(d.indicador) === norm(indId) &&
+              parseFloat(d.valor) > 0
+          );
+
+          const clave = `${cluesId}-${indId}`;
+
+          if (!tieneDatos && !alertasMostradas.has(clave)) {
+            setTimeout(() => {
+              alert(`Atención: "${nombreU}" no cuenta con "${indId}"`);
+            }, 500);
+
+            alertasMostradas.add(clave);
+          }
+        }
+      });
+    });
+
+    // =========================
+    // RESET CHART
+    // =========================
+    window.ultimoDataRecibido = data;
+
+    if (chart) {
+      chart.destroy();
+      chart = null;
+    }
+
+    const tipoOriginal = document.getElementById("tipoGrafica").value;
+
+    const tituloElt = document.getElementById("tituloGrafica");
+    if (tituloElt) {
+      tituloElt.innerText = esVistaAnual
+        ? "Comparativo Anual"
+        : "Tendencia Mensual";
+    }
+
+    const tipoChartJS =
+      tipoOriginal === "area" || tipoOriginal === "scatter"
+        ? "line"
+        : tipoOriginal;
+
+    // =========================
+    // ETIQUETAS X
+    // =========================
+    let etiquetasX;
+
+    if (esVistaAnual) {
+      etiquetasX = ["Total Anual"];
+    } else {
+      const mesesBase =
+        mesesSeleccionados.length > 0
+          ? mesesSeleccionados
+          : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+
+      etiquetasX = mesesBase.map((m) => mesesLabels[m - 1]);
+    }
+
+    // =========================
+    // COMBOS (CLAVE DATASETS)
+    // =========================
+    const combos = [
+      ...new Set(
+        data.map((d) => {
+          const u = norm(limpiarNombreUnidad(d.nombre_unidad));
+          return `${norm(d.indicador)}|||${d.anio}|||${u}`;
+        })
+      ),
+    ];
+
+    const mostrarTendencia =
+      document.getElementById("switchTendencia")?.checked || false;
+
+    const mostrarEtiquetas =
+      document.getElementById("switchEtiquetas")?.checked || false;
+
+    // =========================
+    // DATASETS
+    // =========================
+    const datasets = combos.flatMap((c) => {
+      const [indicadorNom, anioNom, unidadLimpia] = c.split("|||");
+
+      let valores = [];
+
+      // =========================
+      // MENSUAL
+      // =========================
+      if (!esVistaAnual) {
+
+
+        const registros = data.filter(
+          (d) =>
+            norm(d.indicador) === norm(indicadorNom) &&
+            String(d.anio) === String(anioNom) &&
+            norm(limpiarNombreUnidad(d.nombre_unidad)) === unidadLimpia &&
+            Number(d.mes) >= 1 &&
+            Number(d.mes) <= 12
+        );
+
+        const mapaMeses = {};
+
+        registros.forEach((r) => {
+          const m = Number(r.mes);
+          mapaMeses[m] = Number(r.valor || 0);
+        });
+
+        const mesesBase =
+          mesesSeleccionados.length > 0
+            ? mesesSeleccionados
+            : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+        valores = mesesBase.map((m) => mapaMeses[m] || 0);
+      }
+
+      else {
+        console.log("ANUAL DATA:", data);
+        console.log("INDICADOR:", indicadorNom);
+        console.log("AÑO:", anioNom);
+        console.log("UNIDAD:", unidadLimpia);
+
+        const registros = data.filter(
+          (d) =>
+            norm(d.indicador) === norm(indicadorNom) &&
+            String(d.anio) === String(anioNom) &&
+            norm(limpiarNombreUnidad(d.nombre_unidad)) === unidadLimpia &&
+            Number(d.mes) === 13
+        );
+
+        console.log(
+          "FILTRADOS:",
+          data.filter(
+            (d) =>
+              norm(d.indicador) === norm(indicadorNom) &&
+              String(d.anio) === String(anioNom) &&
+              norm(limpiarNombreUnidad(d.nombre_unidad)) === unidadLimpia &&
+              Number(d.mes) === 13
+          )
+        );
+
+        valores = [
+          registros.length
+            ? Number(registros[0].valor || 0)
+            : 0
+        ];
+        console.log("meses", mesesSeleccionados);
+        console.log("data anual", data.filter(d => d.mes === 13));
+      }
+      // =========================
+      // COLOR
+      // =========================
+      function generarColor({ unidad, indicador, anio }) {
+
+        // Caso 1: una sola unidad (o múltiples años de la misma unidad)
+        const soloUnaUnidad = Array.from(unidadesSeleccionadas || []).length === 1;
+
+        if (soloUnaUnidad) {
+
+          // 🎯 paleta fuerte de colores (bien separados visualmente)
+          const paleta = [
+            "hsl(0, 70%, 55%)",     // rojo
+            "hsl(35, 80%, 55%)",    // naranja
+            "hsl(60, 70%, 45%)",    // amarillo
+            "hsl(120, 55%, 45%)",   // verde
+            "hsl(180, 60%, 45%)",   // cyan
+            "hsl(220, 65%, 55%)",   // azul
+            "hsl(270, 60%, 55%)",   // morado
+            "hsl(320, 60%, 55%)",   // rosa
+            "hsl(10, 70%, 60%)",    // rojo suave
+            "hsl(90, 55%, 50%)"     // verde lima
+          ];
+
+          const index = parseInt(anio) % paleta.length;
+
+          return paleta[index];
+        }
+
+        // Caso 2: múltiples unidades → color por unidad (tu lógica actual mejorada)
+        const key = `${unidad}-${indicador}`;
+        let hash = 0;
+
+        for (let i = 0; i < key.length; i++) {
+          hash = (hash << 5) - hash + key.charCodeAt(i);
+          hash |= 0;
+        }
+
+        const hue = Math.abs(hash) % 360;
+
+        return `hsl(${hue}, 45%, 55%)`;
+      }
+
+      const colorBase = generarColor({
+        unidad: unidadLimpia,
+        indicador: indicadorNom,
+        anio: anioNom
+      });
+
+
+      const baseDataset = {
+        label: `${unidadLimpia} - ${indicadorNom} (${anioNom})`,
+        data: valores,
+        backgroundColor:
+          tipoOriginal === "area"
+            ? colorBase.replace("hsl", "hsla").replace(")", ",0.4)")
+            : colorBase,
+        borderColor: colorBase,
+        borderWidth: 2,
+        tension: 0.4,
+        fill: tipoOriginal === "area",
+        showLine: tipoOriginal !== "scatter",
+        pointRadius: tipoOriginal === "scatter" ? 6 : 4,
+        pointBackgroundColor: "#fff",
+      };
+
+      if (!mostrarTendencia) return baseDataset;
+
+      const tendencia = calcularTendencia(valores);
+
+      return [
+        baseDataset,
+        {
+          label: `Tendencia - ${unidadLimpia}`,
+          data: tendencia,
+          type: "line",
+          borderColor: "#e74c3c",
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0,
+          fill: false,
+        },
+      ];
+    });
+
+    console.log("DATASETS:", datasets);
+
+    // =========================
+    // CHART
+    // =========================
+    const canvas = document.getElementById("grafica");
+    if (!canvas) return console.error("No canvas");
+
+    const ctx = canvas.getContext("2d");
+
+    chart = new Chart(ctx, {
+      type: tipoChartJS,
+      data: {
+        labels: etiquetasX,
+        datasets,
+      },
+
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {
+          padding: {
+            top: 35,
+            right: 20,
+            bottom: 10,
+            left: 10,
+          },
+        },
+
+        plugins: {
+          // =========================
+          // LEYENDA
+          // =========================
+          legend: {
+            display: true,
+            position: "bottom",
+            labels: {
+              boxWidth: 12,
+              usePointStyle: true,
+              font: {
+                size: 11,
+                weight: "600",
+              },
+            },
+          },
+
+          // =========================
+          // ETIQUETAS (DATALABELS)
+          // =========================
+          datalabels: {
+            display: function (context) {
+              const sw = document.getElementById("switchEtiquetas");
+              if (!sw || !sw.checked) return false;
+
+              // ❌ NO mostrar en tendencia
+              if (context.dataset.label?.includes("Tendencia")) {
+                return false;
+              }
+
+              return true;
+            },
+
+            anchor: "end",
+            align: "top",
+
+            offset: 6,
+
+            clip: false,
+            clamp: false,
+
+            backgroundColor: "rgba(255,255,255,0.95)",
+            borderColor: "#2c3e50",
+            borderWidth: 1,
+            borderRadius: 6,
+
+            color: "#2c3e50",
+
+            padding: 4,
+
+            font: {
+              size: 11,
+              weight: "bold",
+            },
+
+            formatter: (v) => new Intl.NumberFormat("es-MX").format(v),
+          },
+        },
+
+        scales: esVistaAnual
+          ? {}
+          : {
+            x: {
+              ticks: {
+                font: { size: 10 },
+              },
+            },
+            y: {
+              beginAtZero: true,
+            },
+          },
+      },
+    });
+  }
+
+
+  function bindUIEvents() {
+
+    document.getElementById("modoVista")?.addEventListener("change", cargarGrafica);
+
+    document.getElementById("switchTendencia")?.addEventListener("change", cargarGrafica);
+
+    document.getElementById("switchEtiquetas")?.addEventListener("change", cargarGrafica);
+
+    document.getElementById("tipoGrafica")?.addEventListener("change", () => {
+      cargarGrafica();
+    });
+
+    document.addEventListener("change", (e) => {
+      if (e.target.classList.contains("anio-check")) {
+        cargarGrafica();
+      }
+    });
+
+    document.querySelectorAll(".mes-check").forEach(el => {
+      el.addEventListener("change", cargarGrafica);
+    });
+  }
+
+
+
+  function calcularTendencia(data) {
+    if (!data || data.length < 2) return [];
+
+    const n = data.length;
+    const x = data.map((_, i) => i);
+
+    let sumX = 0,
+      sumY = 0,
+      sumXY = 0,
+      sumXX = 0;
+
+    for (let i = 0; i < n; i++) {
+      const y = Number(data[i]) || 0;
+
+      sumX += x[i];
+      sumY += y;
+      sumXY += x[i] * y;
+      sumXX += x[i] * x[i];
+    }
+
+    const denominator = (n * sumXX - sumX * sumX);
+    if (denominator === 0) return [];
+
+    const m = (n * sumXY - sumX * sumY) / denominator;
+    const b = (sumY - m * sumX) / n;
+
+    return x.map(i => m * i + b);
+  }
+
+  function resetBotonExcel() {
+    const btn = document.getElementById("btnExcel");
+    const texto = document.getElementById("textoBtn");
+
+    btn.disabled = false;
+    texto.textContent = "Descargar Excel";
+
+    btn.style.backgroundColor = "";
+    btn.style.borderColor = "";
+    btn.style.color = "";
+  }
+
+
+  async function descargarExcel() {
+    const btn = document.getElementById("btnExcel");
+    const texto = document.getElementById("textoBtn");
+
+    btn.disabled = true;
+    texto.textContent = "Generando Excel...";
+
+    btn.style.backgroundColor = "#ffc107"; // amarillo
+    btn.style.borderColor = "#ffc107";
+    btn.style.color = "#000";
+
+
+    const modoVista = document.getElementById("modoVista").value;
+    const esAnual = modoVista === "anual";
+
+    const mesesLabels = [
+      "Ene",
+      "Feb",
+      "Mar",
+      "Abr",
+      "May",
+      "Jun",
+      "Jul",
+      "Ago",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dic",
+    ];
+
+    let mesesSeleccionados = obtenerMesesSeleccionados();
+
+    const params = new URLSearchParams();
+
+    // =========================
+    // AÑOS
+    // =========================
+    const aniosChecked = Array.from(
+      document.querySelectorAll(".anio-check:checked"),
+    ).map((el) => el.value);
+
+    if (aniosChecked.length === 0) {
+      alert("Selecciona al menos un año.");
+      resetBotonExcel();
+      return;
+    }
+
+    aniosChecked.forEach((a) => params.append("anios[]", a));
+
+    // =========================
+    // UNIDADES
+    // =========================
+    const unidadesSeleccion =
+      typeof unidadesSeleccionadas !== "undefined" &&
+        unidadesSeleccionadas.size > 0
+        ? Array.from(unidadesSeleccionadas)
+        : typeof todasUnidades !== "undefined"
+          ? todasUnidades.map((u) => u.clues)
+          : [];
+
+    unidadesSeleccion.forEach((u) => params.append("clues[]", u));
+
+    // =========================
+    // INDICADORES 🔥 FIX
+    // =========================
+    const indicadoresSeleccion =
+      typeof indicadoresSeleccionados !== "undefined" &&
+        indicadoresSeleccionados.size > 0
+        ? Array.from(indicadoresSeleccionados)
+        : [];
+
+    indicadoresSeleccion.forEach((i) => params.append("indicadores[]", i));
+
+    // =========================
+    // MESES 🔥 FIX CRÍTICO
+    // =========================
+    if (mesesSeleccionados.length === 0) {
+      alert("Selecciona al menos un mes.");
+      resetBotonExcel();
+      return;
+    }
+
+    mesesSeleccionados.forEach((m) => {
+      params.append("meses[]", m);
+    });
+
+    if (esAnual) {
+      params.append("meses[]", "13");
+    }
+
+    // =========================
+    // FETCH
+    // =========================
+    let dataTotal = [];
+    console.log(params.toString());
+
+    try {
+      const res = await fetch("/grafica/api/indicadores?" + params.toString());
+      dataTotal = await res.json();
+      console.log("Ejemplos de registros 2023:");
+      console.log(dataTotal.filter(d => d.anio == 2023).slice(0, 5));
+
+      console.log("Ejemplos de registros 2024:");
+      console.log(dataTotal.filter(d => d.anio == 2024).slice(0, 5));
+
+      if (!dataTotal.length) {
+        alert("No hay datos.");
+        resetBotonExcel();
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error al conectar con el servidor.");
+      resetBotonExcel();
+      return;
+    }
+    console.log("PARAMS:", params.toString());
+    console.log("DATA TOTAL:", dataTotal);
+    console.log("ES ANUAL:", esAnual);
+    console.log("MESES SELECCIONADOS:", mesesSeleccionados);
+
+    // =========================
+    // COLUMNAS
+    // =========================
+    const columnasSet = new Set();
+    dataTotal.forEach((d) => {
+      if (d.indicador) columnasSet.add(d.indicador.trim());
+    });
+
+    const columnasDeseadas = [
+      "especialidad",
+      "especialidad_por_dia",
+      "mental",
+      "bucal",
+      "consultas",
+      "consultas_por_dia",
+      "laboratorio",
+      "rayosx",
+      "ultrasonido",
+      "electro",
+      "encefa",
+      "tac",
+      "rnm",
+      "anatomia",
+      "calificada",
+      "no_calificada",
+      "porcentaje_calificada",
+      "urgencias",
+      "urgencias_por_dia",
+      "medica",
+      "accidentes",
+      "pediatrica",
+      "ginecobstetricia",
+      "nac_eutocico",
+      "nac_distocico",
+      "nac_cesarea",
+      "total_nacimientos",
+      "nacimientos_por_dia",
+      "porcentaje_cesareas",
+      "abortos_lui",
+      "abortos_ameu",
+      "abortos_medicado",
+      "abortos_no_especificado",
+      "abortos_total",
+      "eventos_obstetricos",
+      "total_apeo",
+      "porcentaje_apeo",
+      "eventos_obstetricos_adolescentes",
+      "adolescente_apeo",
+      "porcentaje_adolescente_apeo",
+      "egre_med_interna",
+      "egre_cirugia",
+      "egre_pediatria",
+      "egre_gineco",
+      "egre_otros",
+      "total_egresos",
+      "egre_med_int_48h",
+      "egre_cirugia_48h",
+      "egre_pediatria_48h",
+      "egre_gineco_48h",
+      "egre_otros_48h",
+      "total_egresos_48h",
+      "med_int_dentro",
+      "cirugia_dentro",
+      "gineco_dentro",
+      "pediatria_dentro",
+      "otros_dentro",
+      "total_proced_dentro",
+      "prom_inter_diarias_qx",
+      "med_int_fuera",
+      "cirugia_fuera",
+      "gineco_fuera",
+      "pediatria_fuera",
+      "otros_fuera",
+      "total_proced_fuera",
+      "total_proced_med_int",
+      "total_proced_cirugia",
+      "total_proced_gineco",
+      "total_proced_pediatria",
+      "total_proced_otros",
+      "total_proced",
+      "egre_defunciones",
+      "mortalidad_cruda",
+      "egre_defunciones_48h",
+      "mortalidad_ajustada",
+      "dias_p_med_int",
+      "dias_p_cirugia",
+      "dias_p_gineco",
+      "dias_p_pediatria",
+      "dias_p_otros",
+      "porcentaje_ocupacion_med_interna",
+      "porcentaje_ocupacion_cirugia",
+      "porcentaje_ocupacion_pediatria",
+      "porcentaje_ocupacion_gineco",
+      "porcentaje_ocupacion_otros",
+      "porcentaje_ocupacion",
+      "prom_estancia_med_interna",
+      "prom_estancia_cirugia",
+      "prom_estancia_pediatria",
+      "prom_estancia_gineco",
+      "prom_estancia_otros",
+      "prom_dias_estancia",
+      "indice_rotacion",
+      "interv_sustitucion",
+      "camas_total",
+      "camas_med_int",
+      "camas_cirugia",
+      "camas_gineco",
+      "camas_pediatria",
+      "camas_otros",
+      "quirofanos",
+      "hab_urgencias",
+      "hab_observacion",
+      "hab_quemados",
+      "hab_lab_parto",
+      "hab_recup_pp",
+      "hab_cirug_amb",
+      "hab_recup_pq",
+      "hab_cuid_int",
+      "hab_uci_adulto",
+      "hab_uci_ped",
+      "hab_otras_areas",
+      "total_no_censables",
+    ];
+
+    const columnas = columnasDeseadas.filter((c) => columnasSet.has(c));
+
+    // =========================
+    // FILTRADO FINAL
+    // =========================
+    const filas = dataTotal.filter((d) => {
+      const mes = parseInt(d.mes);
+      return esAnual
+        ? mes === 13
+        : mesesSeleccionados.map(Number).includes(mes);
+    });
+
+    // =========================
+    // MATRIZ
+    // =========================
+    const matriz = {};
+
+    filas.forEach((d) => {
+      const unidad = d.nombre_unidad || "SIN UNIDAD";
+      const anio = d.anio;
+      const mesNum = parseInt(d.mes);
+
+      const mesTexto =
+        mesNum === 13
+          ? formatearRangoMeses(mesesSeleccionados, mesesLabels)
+          : mesesLabels[mesNum - 1];
+
+      const clues = d.clues || "";
+
+      const key = `${unidad}|${anio}|${mesTexto}`;
+
+      if (!matriz[key]) {
+
+        matriz[key] = {
+          clues: clues,
+          unidad,
+          anio,
+          mes: mesTexto,
+          valores: {}
+        };
+
+      }
+      else {
+
+        // si encontramos una CLUES válida reemplaza la vacía
+        if (!matriz[key].clues && clues) {
+          matriz[key].clues = clues;
+        }
+
+      }
+
+      const indicador = d.indicador.trim();
+      const valor = parseFloat(d.valor) || 0;
+
+      matriz[key].valores[indicador] = valor;
+    });
+
+    // =========================
+    // EXPORTAR
+    // =========================
+    exportarXLSX(matriz, columnas);
+    resetBotonExcel();
+  }
+
+  // Formatear los meses para la descarga
+
+  function formatearRangoMeses(mesesSeleccionados, mesesLabels) {
+    const meses = [...mesesSeleccionados].map(Number).sort((a, b) => a - b);
+
+    if (meses.length === 0) return "";
+
+    // Verificar si son consecutivos
+    let consecutivos = true;
+
+    for (let i = 1; i < meses.length; i++) {
+      if (meses[i] !== meses[i - 1] + 1) {
+        consecutivos = false;
+        break;
+      }
+    }
+
+    // Si solo hay un mes
+    if (meses.length === 1) {
+      return mesesLabels[meses[0] - 1];
+    }
+
+    // Si son consecutivos
+    if (consecutivos) {
+      return `${mesesLabels[meses[0] - 1]} - ${mesesLabels[meses.length - 1]}`;
+    }
+
+    // Si NO son consecutivos
+    return meses.map((m) => mesesLabels[m - 1]).join(", ");
+  }
+
+  // =========================
+  // DAR FOR4MATO A LA DESCARGA DE EXCEL
+  // =========================
+  const grupos = {
+    "CONSULTAS": [
+      "especialidad",
+      "especialidad_por_dia",
+      "mental",
+      "bucal",
+      "consultas",
+      "consultas_por_dia"
+    ],
+
+    "ESTUDIOS DE GABINETE": [
+      "laboratorio",
+      "rayosx",
+      "ultrasonido",
+      "electro",
+      "encefa",
+      "tac",
+      "rnm",
+      "anatomia"
+    ],
+
+    "URGENCIAS": [
+      "calificada",
+      "no_calificada",
+      "porcentaje_calificada",
+      "urgencias",
+      "urgencias_por_dia",
+      "medica",
+      "accidentes",
+      "pediatrica",
+      "ginecobstetricia"
+
+    ],
+
+    "NACIMIENTOS": [
+      "nac_eutocico",
+      "nac_distocico",
+      "nac_cesarea",
+      "total_nacimientos",
+      "nacimientos_por_dia",
+      "porcentaje_cesareas"
+    ],
+
+    "ABORTOS": [
+      "abortos_lui",
+      "abortos_ameu",
+      "abortos_medicado",
+      "abortos_no_especificado",
+      "abortos_total"
+    ],
+
+    "APEO": [
+      "eventos_obstetricos",
+      "total_apeo",
+      "porcentaje_apeo",
+      "eventos_obstetricos_adolescentes",
+      "adolescente_apeo",
+      "porcentaje_adolescente_apeo"
+    ],
+
+    "EGRESOS": [
+      "egre_med_interna",
+      "egre_cirugia",
+      "egre_pediatria",
+      "egre_gineco",
+      "egre_otros",
+      "total_egresos"
+    ],
+
+    "EGRESOS + 48 HS": [
+      "egre_med_int_48h",
+      "egre_cirugia_48h",
+      "egre_pediatria_48h",
+      "egre_gineco_48h",
+      "egre_otros_48h",
+      "total_egresos_48h"
+    ],
+
+    "PROCEDIMIENTOS QUIRURGICOS DENTRO DE QUIROFANO": [
+      "med_int_dentro",
+      "cirugia_dentro",
+      "gineco_dentro",
+      "pediatria_dentro",
+      "otros_dentro",
+      "total_proced_dentro",
+      "prom_inter_diarias_qx"
+    ],
+
+    "PROCEDIMIENTOS QUIRURGICOS FUERA DE QUIROFANO": [
+      "med_int_fuera",
+      "cirugia_fuera",
+      "gineco_fuera",
+      "pediatria_fuera",
+      "otros_fuera",
+      "total_proced_fuera"
+    ],
+
+    "TOTAL DE PROCEDIMIENTOS QUIRURGICOS DENTRO Y FUERA DE QUIROFANO": [
+      "total_proced_med_int",
+      "total_proced_cirugia",
+      "total_proced_gineco",
+      "total_proced_pediatria",
+      "total_proced_otros",
+      "total_proced"
+    ],
+
+    "EGRESOS POR DEFUNCIONES": [
+      "egre_defunciones",
+      "mortalidad_cruda",
+      "egre_defunciones_48h",
+      "mortalidad_ajustada"
+    ],
+
+    "PORCENTAJE DE OCUPACION": [
+      "dias_p_med_int",
+      "dias_p_cirugia",
+      "dias_p_gineco",
+      "dias_p_pediatria",
+      "dias_p_otros",
+      "porcentaje_ocupacion_med_interna",
+      "porcentaje_ocupacion_cirugia",
+      "porcentaje_ocupacion_pediatria",
+      "porcentaje_ocupacion_gineco",
+      "porcentaje_ocupacion_otros",
+      "porcentaje_ocupacion"
+    ],
+
+    "INDICADORES DE HOSPITALIZACION": [
+      "prom_estancia_med_interna",
+      "prom_estancia_cirugia",
+      "prom_estancia_pediatria",
+      "prom_estancia_gineco",
+      "prom_estancia_otros",
+      "prom_dias_estancia",
+      "indice_rotacion",
+      "interv_sustitucion"
+    ],
+
+    "INFRAESTRUCTURA (SINERHIAS)": [
+      "camas_total",
+      "camas_med_int",
+      "camas_cirugia",
+      "camas_gineco",
+      "camas_pediatria",
+      "camas_otros",
+      "quirofanos",
+      "hab_urgencias",
+      "hab_observacion",
+      "hab_quemados",
+      "hab_lab_parto",
+      "hab_recup_pp",
+      "hab_cirug_amb",
+      "hab_recup_pq",
+      "hab_cuid_int",
+      "hab_uci_adulto",
+      "hab_uci_ped",
+      "hab_otras_areas",
+      "total_no_censables"
+    ],
+
+  };
+
+  const nombresColumnas = {
+    especialidad: "Especialidad",
+    especialidad_por_dia: "Especialidad Por Dia",
+    mental: "Mental",
+    bucal: "Bucal",
+    consultas: "Total Consultas",
+    consultas_por_dia: "Consultas Por Dia",
+    laboratorio: "Laboratorio",
+    rayosx: "Rayos X",
+    ultrasonido: "Ultrasonido",
+    electro: "Electrocardiogramas",
+    encefa: "Encefalogramas",
+    tac: "TAC",
+    rnm: "RMN",
+    anatomia: "Anatomía Patológica",
+    calificada: "Calificada",
+    no_calificada: "No Calificada",
+    porcentaje_calificada: "Porcentaje Calificada",
+    urgencias: "Urgencias",
+    urgencias_por_dia: "Urgencias Por Dia",
+    medica: "Medica",
+    accidentes: "Accidentes",
+    pediatrica: "Pediátrica",
+    ginecobstetricia: "Ginecobstetricia",
+    nac_eutocico: "Nac Eutocico",
+    nac_distocico: "Nac Distocico",
+    nac_cesarea: "Nac Cesarea",
+    total_nacimientos: "Total Nacimientos",
+    nacimientos_por_dia: "Nacimientos Por Dia",
+    porcentaje_cesareas: "Porcentaje Cesareas",
+    abortos_lui: "Abortos Lui",
+    abortos_ameu: "Abortos Ameu",
+    abortos_medicado: "Abortos Medicado",
+    abortos_no_especificado: "Abortos No Especificado",
+    abortos_total: "Abortos Total",
+    eventos_obstetricos: "Eventos Obstetricos",
+    total_apeo: "Total Apeo",
+    porcentaje_apeo: "Porcentaje Apeo",
+    eventos_obstetricos_adolescentes: "Eventos Obstetricos Adolescentes",
+    adolescente_apeo: "Adolescente Apeo",
+    porcentaje_adolescente_apeo: "Porcentaje Adolescente Apeo",
+    egre_med_interna: "Egre Med Interna",
+    egre_cirugia: "Egre Cirugia",
+    egre_pediatria: "Egre Pediatria",
+    egre_gineco: "Egre Gineco",
+    egre_otros: "Egre Otros",
+    total_egresos: "Total Egresos",
+    egre_med_int_48h: "Egre Med Int 48H",
+    egre_cirugia_48h: "Egre Cirugia 48H",
+    egre_pediatria_48h: "Egre Pediatria 48H",
+    egre_gineco_48h: "Egre Gineco 48H",
+    egre_otros_48h: "Egre Otros 48H",
+    total_egresos_48h: "Total Egresos 48H",
+    med_int_dentro: "Med Int Dentro",
+    cirugia_dentro: "Cirugia Dentro",
+    gineco_dentro: "Gineco Dentro",
+    pediatria_dentro: "Pediatria Dentro",
+    otros_dentro: "Otros Dentro",
+    total_proced_dentro: "Total Proced Dentro",
+    prom_inter_diarias_qx: "Prom Inter Diarias Qx",
+    med_int_fuera: "Med Int Fuera",
+    cirugia_fuera: "Cirugia Fuera",
+    gineco_fuera: "Gineco Fuera",
+    pediatria_fuera: "Pediatria Fuera",
+    otros_fuera: "Otros Fuera",
+    total_proced_fuera: "Total Proced Fuera",
+    total_proced_med_int: "Total Proced Med Int",
+    total_proced_cirugia: "Total Proced Cirugia",
+    total_proced_gineco: "Total Proced Gineco",
+    total_proced_pediatria: "Total Proced Pediatria",
+    total_proced_otros: "Total Proced Otros",
+    total_proced: "Total Proced",
+    egre_defunciones: "Egre Defunciones",
+    mortalidad_cruda: "Mortalidad Cruda",
+    egre_defunciones_48h: "Egre Defunciones 48H",
+    mortalidad_ajustada: "Mortalidad Ajustada",
+    dias_p_med_int: "Dias P Med Int",
+    dias_p_cirugia: "Dias P Cirugia",
+    dias_p_gineco: "Dias P Gineco",
+    dias_p_pediatria: "Dias P Pediatria",
+    dias_p_otros: "Dias P Otros",
+    porcentaje_ocupacion_med_interna: "Porcentaje Ocupacion Med Interna",
+    porcentaje_ocupacion_cirugia: "Porcentaje Ocupacion Cirugia",
+    porcentaje_ocupacion_pediatria: "Porcentaje Ocupacion Pediatria",
+    porcentaje_ocupacion_gineco: "Porcentaje Ocupacion Gineco",
+    porcentaje_ocupacion_otros: "Porcentaje Ocupacion Otros",
+    porcentaje_ocupacion: "Porcentaje Ocupacion Total",
+    prom_estancia_med_interna: "Prom Estancia Med Interna",
+    prom_estancia_cirugia: "Prom Estancia Cirugia",
+    prom_estancia_pediatria: "Prom Estancia Pediatria",
+    prom_estancia_gineco: "Prom Estancia Gineco",
+    prom_estancia_otros: "Prom Estancia Otros",
+    prom_dias_estancia: "Prom Dias Estancia Total",
+    indice_rotacion: "Indice Rotacion",
+    interv_sustitucion: "Interv Sustitucion",
+    camas_total: "Camas Total",
+    camas_med_int: "Camas Med Int",
+    camas_cirugia: "Camas Cirugia",
+    camas_gineco: "Camas Gineco",
+    camas_pediatria: "Camas Pediatria",
+    camas_otros: "Camas Otros",
+    quirofanos: "Quirofanos",
+    hab_urgencias: "Hab Urgencias",
+    hab_observacion: "Hab Observacion",
+    hab_quemados: "Hab Quemados",
+    hab_lab_parto: "Hab Lab Parto",
+    hab_recup_pp: "Hab Recup Pp",
+    hab_cirug_amb: "Hab Cirug Amb",
+    hab_recup_pq: "Hab Recup Pq",
+    hab_cuid_int: "Hab Cuid Int",
+    hab_uci_adulto: "Hab Uci Adulto",
+    hab_uci_ped: "Hab Uci Ped",
+    hab_otras_areas: "Hab Otras Areas",
+    total_no_censables: "Total No Censables"
+  };
+
+  // =========================
+  // EXPORTAR EXCEL PRO
+  // =========================
+
+  function exportarXLSX(matriz, columnas) {
+    const data = [];
+
+    // =========================
+    // CABECERAS
+    // =========================
+    const filaCategorias = ["", "", "", ""];
+    const headers = ["Clues", "Unidad", "Año", "Mes"];
+    const merges = [];
+    const grupoPorColumna = {};
+
+    let colActual = 4;
+
+    Object.entries(grupos).forEach(([nombreGrupo, indicadores]) => {
+      const visibles = indicadores.filter(i => columnas.includes(i));
+      if (!visibles.length) return;
+
+      filaCategorias.push(nombreGrupo);
+
+      for (let i = 1; i < visibles.length; i++) {
+        filaCategorias.push("");
+      }
+
+      visibles.forEach(ind => {
+        headers.push(nombresColumnas[ind] || ind);
+        grupoPorColumna[headers.length - 1] = nombreGrupo;
+      });
+
+      merges.push({
+        s: { r: 0, c: colActual },
+        e: { r: 0, c: colActual + visibles.length - 1 }
+      });
+
+      colActual += visibles.length;
+    });
+
+    data.push(filaCategorias);
+    data.push(headers);
+
+    // =========================
+    // DATOS
+    // =========================
+    Object.values(matriz).forEach((f) => {
+      const row = [
+        f.clues,
+        f.unidad,
+        f.anio,
+        f.mes
+      ];
+
+      columnas.forEach((c) => {
+        row.push(f.valores?.[c] ?? 0);
+      });
+
+      data.push(row);
+    });
+
+    // =========================
+    // SHEET
+    // =========================
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws["!merges"] = merges;
+
+    // =========================
+    // FORMATOS
+    // =========================
+    const columnasSinFormato = [
+      "porcentaje_calificada", "porcentaje_cesareas", "porcentaje_apeo",
+      "porcentaje_adolescente_apeo", "porcentaje_ocupacion", "mortalidad_cruda",
+      "mortalidad_ajustada", "indice_rotacion", "interv_sustitucion"
+    ];
+
+    const columnasPorcentaje = [
+      "porcentaje_calificada", "porcentaje_cesareas", "porcentaje_apeo",
+      "porcentaje_adolescente_apeo", "porcentaje_ocupacion", "porcentaje_ocupacion_med_interna",
+      "porcentaje_ocupacion_cirugia", "porcentaje_ocupacion_pediatria",
+      "porcentaje_ocupacion_gineco", "porcentaje_ocupacion_otros"
+    ];
+
+    const columnasNegritas = [
+      "Unidad", "consultas", "urgencias", "total_nacimientos", "porcentaje_cesareas",
+      "abortos_total", "porcentaje_apeo", "porcentaje_adolescente_apeo", "total_egresos",
+      "total_egresos_48h", "total_proced_dentro", "prom_inter_diarias_qx", "total_proced_fuera",
+      "total_proced", "mortalidad_cruda", "mortalidad_ajustada", "porcentaje_ocupacion_med_interna",
+      "porcentaje_ocupacion_cirugia", "porcentaje_ocupacion_pediatria",
+      "porcentaje_ocupacion_gineco", "porcentaje_ocupacion_otros", "porcentaje_ocupacion"
+    ];
+
+    const coloresGrupos = {
+      "CONSULTAS": { oscuro: "1F4E78", claro: "D9EAF7" },
+      "ESTUDIOS DE GABINETE": { oscuro: "2F75B5", claro: "DDEBF7" },
+      "URGENCIAS": { oscuro: "C55A11", claro: "FCE4D6" },
+      "NACIMIENTOS": { oscuro: "5B9BD5", claro: "DDEBF7" },
+      "ABORTOS": { oscuro: "A64D79", claro: "F4DDE8" },
+      "APEO": { oscuro: "00A6A6", claro: "D9F2F2" },
+      "EGRESOS": { oscuro: "548235", claro: "E2F0D9" },
+      "EGRESOS + 48 HS": { oscuro: "70AD47", claro: "E2F0D9" },
+      "PROCEDIMIENTOS QUIRURGICOS DENTRO DE QUIROFANO": { oscuro: "7030A0", claro: "E4DFEC" },
+      "PROCEDIMIENTOS QUIRURGICOS FUERA DE QUIROFANO": { oscuro: "8E7CC3", claro: "EDE7F6" },
+      "TOTAL DE PROCEDIMIENTOS QUIRURGICOS DENTRO Y FUERA DE QUIROFANO": { oscuro: "5E35B1", claro: "E8EAF6" },
+      "EGRESOS POR DEFUNCIONES": { oscuro: "7F6000", claro: "FFF2CC" },
+      "PORCENTAJE DE OCUPACION": { oscuro: "00838F", claro: "D9F2F2" },
+      "INDICADORES DE HOSPITALIZACION": { oscuro: "0B6E4F", claro: "DDEFE8" },
+      "INFRAESTRUCTURA (SINERHIAS)": { oscuro: "44546A", claro: "D9E2F3" }
+    };
+
+    // -------------------------------------------------------------
+    // AJUSTE AQUÍ: Detectar fila por Columna A (TOTAL) o Columna B (TOTAL GENERAL)
+    // -------------------------------------------------------------
+    const filasTotales = new Set();
+    Object.keys(ws).forEach((cell) => {
+      if (cell.startsWith("!")) return;
+      const pos = XLSX.utils.decode_cell(cell);
+
+      // pos.c === 0 (Columna A - CLUES) || pos.c === 1 (Columna B - Unidad)
+      if (
+        (pos.c === 0 && ws[cell].v === "TOTAL") ||
+        (pos.c === 1 && ws[cell].v === "TOTAL GENERAL")
+      ) {
+        filasTotales.add(pos.r);
+      }
+    });
+    // -------------------------------------------------------------
+
+    Object.keys(ws).forEach((cell) => {
+      if (cell.startsWith("!")) return;
+
+      const pos = XLSX.utils.decode_cell(cell);
+      if (!ws[cell].s) ws[cell].s = {};
+
+      // Centrado general
+      ws[cell].s.alignment = {
+        horizontal: "center",
+        vertical: "center"
+      };
+
+      // Fila categorías (Fila 0)
+      if (pos.r === 0) {
+        const grupo = ws[cell].v;
+        if (coloresGrupos[grupo]) {
+          ws[cell].s.font = { bold: true, color: { rgb: "FFFFFF" } };
+          ws[cell].s.fill = { fgColor: { rgb: coloresGrupos[grupo].oscuro } };
+        }
+      }
+
+      // Encabezados (Fila 1)
+      if (pos.r === 1) {
+        ws[cell].s.font = { bold: true };
+        ws[cell].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
+
+        if (pos.c <= 3) {
+          ws[cell].s.fill = { fgColor: { rgb: "0F243E" } };
+          ws[cell].s.font = { bold: true, color: { rgb: "FFFFFF" } };
+        } else {
+          const grupo = grupoPorColumna[pos.c];
+          if (grupo && coloresGrupos[grupo]) {
+            ws[cell].s.fill = { fgColor: { rgb: coloresGrupos[grupo].claro } };
+            ws[cell].s.font = { bold: true };
+          }
+        }
+      }
+
+      // Alinear texto de la columna unidad a la izquierda (excepto encabezados)
+      if (pos.c === 1 && pos.r > 1) {
+        ws[cell].s.alignment = { horizontal: "left", vertical: "center" };
+      }
+
+      // Fila de Datos General (Filas mayores a 1)
+      if (pos.r > 1) {
+
+        // -------------------------------------------------------------
+        // NUEVO: Si la fila pertenece al conjunto de totales, la pintamos de GRIS
+        // -------------------------------------------------------------
+        if (filasTotales.has(pos.r)) {
+          ws[cell].s.fill = {
+            fgColor: { rgb: "D9D9D9" } // Gris intermedio, resalta excelente sin saturar
+          };
+          ws[cell].s.font = {
+            ...(ws[cell].s.font || {}),
+            bold: true,
+            color: { rgb: "000000" } // Texto negro sobre el fondo gris
+          };
+        }
+        // -------------------------------------------------------------
+
+        // Formatos numéricos y negritas condicionales
+        if (typeof ws[cell].v === "number") {
+          if (pos.c === 2) {
+            ws[cell].z = "0";
+            return;
+          }
+
+          const indicador = columnas[pos.c - 4];
+
+          if (columnasNegritas.includes(indicador)) {
+            ws[cell].s.font = {
+              ...(ws[cell].s.font || {}),
+              bold: true
+            };
+          }
+
+          if (columnasPorcentaje.includes(indicador)) {
+            ws[cell].z = '0.00"%"';
+          } else if (!columnasSinFormato.includes(indicador)) {
+            ws[cell].z = "#,##0";
+          }
+        }
+      }
+    });
+
+    // =========================
+    // ALTURA FILAS
+    // =========================
+    ws["!rows"] = [
+      { hpt: 25 }, // Categorías
+      { hpt: 40 }  // Encabezados
+    ];
+
+    // =========================
+    // ANCHO COLUMNAS
+    // =========================
+    ws["!cols"] = headers.map((h) => ({
+      wch: Math.max(String(h).length + 5, 15)
+    }));
+
+    // =========================
+    // EXPORTAR
+    // =========================
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Reporte IH");
+    XLSX.writeFile(wb, `Reporte_IH_${Date.now()}.xlsx`);
+  }
+
+
+
+  function limpiarTodo() {
+    // 1. Vaciar los Sets de selección
+    unidadesSeleccionadas.clear();
+    indicadoresSeleccionados.clear();
+    avisosMostrados.clear();
+
+    // 2. Limpiar visualmente la Drop Zone
+    const dropZone = document.getElementById("dropZone");
+    const placeholder = dropZone.querySelector(".placeholder-text");
+
+    const badges = dropZone.querySelectorAll(".badge-item");
+    badges.forEach((b) => b.remove());
+
+    if (placeholder) {
+      placeholder.style.display = "block";
+    }
+
+    // 3. Destruir gráfica si existe
+    if (chart) {
+      chart.destroy();
+      chart = null;
+    }
+
+    // 4. Reset años (solo el primero)
+    document.querySelectorAll(".anio-check").forEach((check, index) => {
+      check.checked = index === 0;
+    });
+
+    // 4.1 Reset meses (todos seleccionados)
+    document.querySelectorAll(".mes-check").forEach((check) => {
+      check.checked = true;
+    });
+
+    // 5. Reset switches
+    const swEtiquetas = document.getElementById("switchEtiquetas");
+    if (swEtiquetas) swEtiquetas.checked = false;
+
+    const swTendencia = document.getElementById("switchTendencia");
+    if (swTendencia) swTendencia.checked = false;
+
+    // 6. Limpiar resumen si existe
+    const summary = document.getElementById("selection-summary");
+    if (summary) summary.innerHTML = "";
+
+    // 7. Recarga limpia
+    if (typeof cargarGrafica === "function") {
+      cargarGrafica();
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    bindUIEvents();
+    initDraggableIndicadores();
+  });
+</script>
+
+{% endblock %}

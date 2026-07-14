@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda Estadística ISAPEG</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/viewerjs/1.11.3/viewer.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/viewerjs/1.11.3/viewer.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://unpkg.com/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/agenda.css') }}">
+</head>
+
+<body class="bg-light">
+
+    <div class="d-flex" id="wrapper">
+        <div id="sidebar-wrapper" class="text-white shadow">
+            <div class="p-4">
+                <h5 class="text-info fw-bold">ISAPEG</h5>
+                <a href="{{ url_for('bienvenida.inicio') }}"
+                    class="menu-item {% if request.blueprint == 'bienvenida' %}active{% endif %}">
+                    🏠 Inicio
+                </a>
+
+                <div class="mt-4 px-2">
+                    <input type="text" id="buscadorHojas" class="form-control mb-3" placeholder="Buscar contenido...">
+                </div>
+
+                <div class="accordion accordion-flush" id="indiceAcordeon">
+                </div>
+            </div>
+        </div>
+
+        <div id="page-content-wrapper" class="flex-grow-1">
+
+            <div class="visor-wrapper">
+
+                <div id="tituloVisualizador">
+                    SALUD CON GRANDEZA: COMPROMISO DE TODOS.
+                </div>
+
+                <div id="flipbook-container">
+                    <div id="flipbook"></div>
+                </div>
+
+                <div class="controles-inferiores">
+                    <button id="btn-start" class="btn btn-primary btn-navegacion">Cerrar</button>
+                    <button id="btn-prev" class="btn btn-secondary btn-navegacion">Anterior</button>
+                    <button id="btn-next" class="btn btn-secondary btn-navegacion">Siguiente</button>
+                </div>
+            </div>
+
+            <footer class="footer-global" id="footer">
+                <img src="/static/img/pie_1.png" alt="Gobierno del Estado">
+
+                <svg class="ecg-line" viewBox="0 0 1200 100" preserveAspectRatio="none">
+                    <path
+                        d="M0 50 L150 50 L170 50 L190 20 L210 80 L230 5 L250 95 L270 50 L400 50 L420 50 L440 25 L460 75 L480 50 L1200 50" />
+                </svg>
+            </footer>
+
+        </div>
+
+
+    </div>
+
+
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"></script>
+
+    <script>
+        // 1. Función GLOBAL para navegar y desplegar (Debe estar fuera de $(document).ready o fuera de crearLibro)
+        function navegarYDesplegar(collapseId, numeroPagina, nombreSeccion) {
+            // 1. Saltar a la página
+            $('#flipbook').turn('page', numeroPagina);
+
+            // 2. Cambiar el título dinámico
+            $('#tituloVisualizador').text(nombreSeccion);
+
+            // 3. Desplegar acordeón
+            const el = document.getElementById(collapseId);
+            if (el) {
+                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(el);
+                bsCollapse.toggle();
+            }
+        }
+
+        // Asegúrate de que el visor sepa qué imágenes puede abrir
+        let viewer = null;
+
+        function inicializarVisor() {
+            // Apuntamos al contenedor donde están tus hojas (.page img)
+            const gallery = document.getElementById('flipbook');
+
+            // Configuración profesional: Arrastre, Zoom con rueda, rotación
+            viewer = new Viewer(gallery, {
+                inline: false,
+                viewed() {
+                    viewer.zoomTo(1); // Zoom inicial normal
+                },
+                navbar: false, // Ocultar miniaturas inferiores
+                toolbar: {
+                    zoomIn: 1,
+                    zoomOut: 1,
+                    oneToOne: 1,
+                    reset: 1,
+                    prev: 0,
+                    next: 0,
+                    rotateLeft: 1,
+                    rotateRight: 1,
+                }
+            });
+        }
+
+        // Llama a inicializarVisor() después de que el flipbook esté creado
+
+        $(document).ready(function () {
+            // 1. Obtener archivos del backend
+            $.getJSON('/agenda/api/lista-paginas', function (data) {
+                if (data.paginas && data.paginas.length > 0) {
+                    crearLibro(data.paginas);
+                }
+            });
+
+            function crearLibro(archivos) {
+
+
+                let flipbook = $('#flipbook');
+                let container = $('#flipbook-container');
+                let accordionContainer = $('#indiceAcordeon');
+
+                const titulosHojas = {
+                    "Introduccion.webp": "Introducción",
+                    "Directorio.webp": "Directorio",
+                    "Gpo_Trabajo.webp": "Grupo de Trabajo",
+
+                    "1.webp": "Localidades por municipio según tamaño de la localidad",
+                    "2.webp": "Población por municipio según tamaño de la localidad",
+                    "3.webp": "Estructura de la población en el estado de Guanajuato",
+                    "4.webp": "Población por grupo de edad y sexo",
+                    "5.webp": "Población por sexo y estimación de cobertura por institución, jurisdicción y municipio",
+                    "5B.webp": "Población Estatal 2025",
+                    "6.webp": "Población Nacional 2025",
+                    "6B.webp": "Estimación de población por municipio por derechohabiencia",
+
+                    "7.webp": "Infraestructura de Unidades Médicas por Jurisdicción y tipo en el ISAPEG",
+                    "8.webp": "Infraestructura de Unidades Médicas por Red de servicios de salud y tipo en el ISAPEG",
+                    "9.webp": "Infraestructura y equipo médico en las unidades del ISAPEG",
+                    "10.webp": "Infraestructura y equipo médico por municipio del ISAPEG",
+                    "11.webp": "Infraestructura y equipo médico por nivel de atención",
+                    "12.webp": "Infraestructura y equipo médico por red de servicios de salud",
+                    "13.webp": "Recursos humanos del ISAPEG según tipo de personal",
+                    "14.webp": "Recursos humanos por jurisdicción sanitaria ISAPEG",
+                    "15.webp": "Recursos humanos por Red de servicios de salud ISAPEG",
+                    "16.webp": "Indicadores seleccionados de recursos humanos, infraestructura y equipo médico del ISAPEG",
+                    "17.webp": "Personal operativo de regulación sanitaria por jurisdicción",
+
+                    "18.webp": "Servicio otorgado durante el año en las unidades del ISAPEG",
+                    "19.webp": "Día Típico 2025",
+                    "20.webp": "Servicio otorgado durante el año en las unidades del ISAPEG por Jurisdicción Sanitaria",
+                    "21.webp": "Día típico por Jurisdicción Sanitaria 2025",
+                    "22.webp": "Servicio otorgado durante el año en las unidades del ISAPEG por Red de servicios de salud",
+                    "23.webp": "Día típico por Red de Sericios de Salud 2025",
+                    "24.webp": "Servicio otorgado durante el año en las unidades del ISAPEG por Nivel de Atención",
+                    "25.webp": "Día típico por Nivel de atención 2025",
+                    "26.webp": "Principales servicios otorgados en el ISAPEG 2025",
+                    "27.webp": "Indicadores seleccionados de productividad del ISAPEG 2025",
+                    "28.webp": "Productividad Hospitalaria por unidad ISAPEG",
+                    "29.webp": "Productividad Hospitalaria por Red de servicios de salud del ISAPEG",
+                    "30.webp": "Veinte principales causas de egresos hospitalarios ISAPEG",
+                    "31.webp": "Veinte principales causas de egresos hospitalarios en Ginecología y Obstetricia en el ISAPEG",
+                    "32.webp": "Veinte principales causas de egresos hospitalarios en Pediatría en el ISAPEG",
+                    "33.webp": "Veinte principales causas de egresos hospitalarios en Medicina Interna en el ISAPEG",
+                    "34.webp": "Veinte principales causas de egresos hospitalarios en Cirugía en el ISAPEG",
+                    "35.webp": "Veinte principales causas de egresos hospitalarios en Otras especialidades (Distintas a G.-O., Pediatría, M.I. y Cirugía) en el ISAPEG",
+                    "36.webp": "Veinte principales procedimientos quirúrgicos en los hospitales del ISAPEG",
+                    "37.webp": "Veinte principales procedimientos quirúrgicos de Ginecología y Obstetricia en hospitales del ISAPEG",
+                    "38.webp": "Veinte principales procedimientos quirúrgicos de Pediatría en hospitales del ISAPEG",
+                    "39.webp": "Veinte principales procedimientos quirúrgicos de Medicina Interna en hospitales del ISAPEG",
+                    "40.webp": "Veinte principales procedimientos quirúrgicos de Cirugía en hospitales del ISAPEG",
+                    "41.webp": "Veinte principales procedimientos quirúrgicos de Otras especialidades (Distintas a G.-O., Pediatría, M.I. y Cirugía) en hospitales del ISAPEG",
+                    "42.webp": "Atención de Urgencias calificadas y no calificadas del ISAPEG",
+                    "43.webp": "Verificación sanitaria por Materia y Jurisdicción Estado de Guanajuato",
+
+                    "44.webp": "Nacimientos por municipio e institución",
+                    "45.webp": "Nacimientos por municipio de residencia e institución",
+                    "46.webp": "Nacimientos en el estado de Guanajuato Sectorial (Ocurrencia) 2017-2025",
+                    "47.webp": "Tasas de natalidad y fecundidad por municipio",
+                    "48.webp": "Porcentaje de Cesárea en Unidades ISAPEG Total y Adolescentes 2020-2025",
+                    "49.webp": "Porcentaje de Cesáreas por Institución 2017-2025",
+                    "50.webp": "Nacimientos Nacional y Guanajuato",
+                    "51.webp": "Tasas de natalidad y fecundidad nacional",
+
+                    "52.webp": "Panorama epidemiológico de las enfermedades prevenibles por vacunación",
+                    "53.webp": "Veinte principales causas de morbilidad general sectorial 2025",
+                    "54.webp": "Veinte principales causas de morbilidad general sectorial hombres 2025",
+                    "55.webp": "Veinte principales causas de morbilidad general sectorial mujeres 2025",
+                    "56.webp": "Veinte principales causas de morbilidad infantil 2025 (menor de 1 año)",
+                    "57.webp": "Veinte principales causas de morbilidad infantil 2025 (menor de 1 año) hombres",
+                    "58.webp": "Veinte principales causas de morbilidad infantil 2025 (menor de 1 año) mujeres",
+                    "59.webp": "Veinte principales causas de morbilidad preescolar 2025 (1-4 años)",
+                    "60.webp": "Veinte principales causas de morbilidad preescolar 2025 (1-4 años) hombres",
+                    "61.webp": "Veinte principales causas de morbilidad preescolar 2025 (1-4 años) mujeres",
+                    "62.webp": "Veinte principales causas de morbilidad escolar 2025 (5-14 años)",
+                    "63.webp": "Veinte principales causas de morbilidad escolar 2025 (5-14 años) hombres",
+                    "64.webp": "Veinte principales causas de morbilidad escolar 2025 (5-14 años) mujeres",
+                    "65.webp": "Veinte principales causas de morbilidad productiva 2025 (15-64 años)",
+                    "66.webp": "Veinte principales causas de morbilidad productiva 2025 (15-64 años) hombres",
+                    "67.webp": "Veinte principales causas de morbilidad productiva 2025 (15-64 años) mujeres",
+                    "68.webp": "Veinte principales causas de morbilidad en edad postproductiva 2025 (65 años y más)",
+                    "69.webp": "Veinte principales causas de morbilidad en edad postproductiva 2025 (65 años y más) hombres",
+                    "70.webp": "Principales causas de morbilidad en edad postproductiva 2025 (65 años y más) mujeres",
+                    "71.webp": "Mortalidad por grupos específicos y natalidad 2019-2025",
+                    "72.webp": "Razón de Muerte Materna 2019-2025",
+                    "73.webp": "Principales causas de mortalidad general 2024",
+                    "74.webp": "Principales causas de mortalidad general 2025",
+                    "75.webp": "Principales causas de mortalidad general (hombres)2024",
+                    "76.webp": "Principales causas de mortalidad general (hombres) 2025",
+                    "77.webp": "Principales causas de mortalidad general (mujeres) 2024",
+                    "78.webp": "Principales causas de mortalidad general (mujeres) 2025",
+                    "79.webp": "Principales causas de mortalidad general (no especificado) 2024",
+                    "80.webp": "Principales causas de mortalidad general (no especificado) 2025",
+                    "81.webp": "Principales causas de mortalidad infantil 2024",
+                    "82.webp": "Principales causas de mortalidad infantil 2025",
+                    "83.webp": "Principales causas de mortalidad infantil (hombres) 2024",
+                    "84.webp": "Principales causas de mortalidad infantil (hombres) 2025",
+                    "85.webp": "Principales causas de mortalidad infantil (mujeres) 2024",
+                    "86.webp": "Principales causas de mortalidad infantil (mujeres) 2025",
+                    "87.webp": "Principales causas de mortalidad infantil (sexo no especificado) 2024",
+                    "88.webp": "Principales causas de mortalidad infantil (sexo no especificado) 2025",
+                    "89.webp": "Principales causas de mortalidad preescolar 2024",
+                    "90.webp": "Principales causas de mortalidad preescolar 2025",
+                    "91.webp": "Principales causas de mortalidad preescolar (hombres) 2024",
+                    "92.webp": "Principales causas de mortalidad preescolar (hombres) 2025",
+                    "93.webp": "Principales causas de mortalidad preescolar (mujeres) 2024",
+                    "94.webp": "Principales causas de mortalidad preescolar (mujeres) 2025",
+                    "95.webp": "Principales causas de mortalidad escolar 2024",
+                    "96.webp": "Principales causas de mortalidad escolar 2025",
+                    "97.webp": "Principales causas de mortalidad escolar (hombres) 2024",
+                    "98.webp": "Principales causas de mortalidad escolar (hombres) 2025",
+                    "99.webp": "Principales causas de mortalidad escolar (mujeres) 2024",
+                    "100.webp": "Principales causas de mortalidad escolar (mujeres) 2025",
+                    "101.webp": "Principales causas de mortalidad en edad productiva 2024",
+                    "102.webp": "Principales causas de mortalidad en edad productiva 2025",
+                    "103.webp": "Principales causas de mortalidad en edad productiva (hombres) 2024",
+                    "104.webp": "Principales causas de mortalidad en edad productiva (hombres) 2025",
+                    "105.webp": "Principales causas de mortalidad en edad productiva (mujeres) 2024",
+                    "106.webp": "Principales causas de mortalidad en edad productiva (mujeres) 2025",
+                    "107.webp": "Principales causas de mortalidad en edad postproductiva 2024",
+                    "108.webp": "Principales causas de mortalidad en edad postproductiva 2025",
+                    "109.webp": "Principales causas de mortalidad en edad postproductiva (hombres) 2024",
+                    "110.webp": "Principales causas de mortalidad en edad postproductiva (hombres) 2025",
+                    "111.webp": "Principales causas de mortalidad en edad postproductiva (mujeres) 2024",
+                    "112.webp": "Principales causas de mortalidad en edad postproductiva (mujeres) 2025",
+                    "113.webp": "Principales causas de mortalidad en edad ignorada (hombres) 2024",
+                    "114.webp": "Principales causas de mortalidad en edad ignorada (no especificado) 2024",
+                    "115.webp": "Tasas de mortalidad general comparatio estatal y municipal 2024-2025",
+                    "116.webp": "Tasas de mortalidad infantil comparativo estatal y muncipal 2024-2025",
+                    "117.webp": "Tasas de mortalidad escolar comparativo estatal y municipal 2024-2025",
+                    "118.webp": "Tasas de mortalidad productiva comparativo estatal y municipal 2024-2025",
+                    "119.webp": "Tasas de mortalidad postproductiva comparativo estatal y municipal 2024-2025",
+                    "120.webp": "Razón de muerte materna comparativo estatal y municipal 2024-2025",
+                    "121.webp": "Agentes de la lesión en atenciones de lesión y/o violencia otorgadas en unidades médicas del ISAPEG 2019-2025",
+                    "122.webp": "Registros de atenciones por violencia en Unidades Médicas del ISAPEG 2019-2025",
+                    "123.webp": "Veinte principales afecciones atendidas debido a eventos de lesiones y/o violencia en Unidades Médicas del ISAPEG 2025",
+                    "124.webp": "Veinte principales afecciones atendidas en hombres debido a eventos de lesiones y/o violencia en Unidades Médicas del ISAPEG 2025",
+                    "125.webp": "Veinte principales afecciones atendidas en mujeres debido a eventos de lesiones y/o violencia en Unidades Médicas del ISAPEG 2025",
+                    "126.webp": "Tasa de mortalidad General Nacional y Guanajuato",
+                    "127.webp": "Tasa de Mortalidad Perinatal Nacional y Guanajuato",
+                    "128.webp": "Tasa de Mortalidad Perinatal Ajustada Nacional y Guanajuato",
+                    "129.webp": "Tasa de Mortalidad Neonatal Nacional y Guanajuato",
+                    "130.webp": "Tasa de Mortalidad Infantil Nacional y Guanajuato",
+                    "131.webp": "Tasa de Mortalidad por Cáncer de Mama Nacional y Guanajuato",
+                    "132.webp": "Tasa de Mortalidad por Cáncer Cervicouterino Nacional y Guanajuato",
+                    "133.webp": "Tasa de Mortalidad por Cáncer de Próstata Nacional y Guanajuato",
+                    "134.webp": "Mortalidad y Tasa Nacional por Suicidios",
+                    "135.webp": "Razón de Muerte Materna Nacional y Guanajuato"
+
+
+                }
+
+                flipbook.empty();
+                accordionContainer.empty();
+
+                let archivosOrdenados = [
+                    "Introduccion.webp",
+                    "Directorio.webp",
+                    "Gpo_Trabajo.webp",
+                    "Poblacion_y_Cobertura.webp"
+                ];
+
+                for (let i = 1; i <= 6; i++) archivosOrdenados.push(i + ".webp");
+
+                archivosOrdenados.push("6B.webp");
+
+                archivosOrdenados.push("Recursos_para_la_Salud.webp");
+
+                for (let i = 7; i <= 17; i++) archivosOrdenados.push(i + ".webp");
+
+                archivosOrdenados.push("Servicios_para_la_Salud.webp");
+
+                for (let i = 18; i <= 43; i++) archivosOrdenados.push(i + ".webp");
+
+                archivosOrdenados.push("Nacimientos.webp");
+
+                for (let i = 44; i <= 51; i++) archivosOrdenados.push(i + ".webp");
+
+                archivosOrdenados.push("Danos_a_la_Salud.webp");
+
+                for (let i = 52; i <= 135; i++) archivosOrdenados.push(i + ".webp");
+                // Control de navegación
+                let indiceActual = 0;
+
+                // Mapa archivo → página
+                let mapaPaginas = {};
+
+                archivosOrdenados.forEach((archivo, i) => {
+                    mapaPaginas[archivo] = i + 2; // +2 porque la página 1 es la portada
+                });
+
+
+                flipbook.append(`
+                        <div class="hard small-cover" style="width: 100% !important; height: 100% !important; padding: 0 !important;">
+                            <img src="/static/img/portada_ok.webp" style="width: 100% !important; height: 100% !important; object-fit: fill !important;">
+                        </div>
+                    `);
+
+                archivosOrdenados.forEach((archivo) => {
+                    // Agregamos la clase page-viewport envolviendo la imagen
+                    flipbook.append(`<div class="page"><div class="page-viewport"><img src="/static/img/agenda/${archivo}"></div></div>`);
+                });
+
+                const indiceEstructurado = {
+                    "Introducción": { file: "Introduccion.webp", rango: [137, 137], tipo: "directo" },
+                    "Directorio": { file: "Directorio.webp", rango: [138, 138], tipo: "directo" },
+                    "Gpo. Trabajo": { file: "Gpo_Trabajo.webp", rango: [139, 139], tipo: "directo" },
+                    "Población y Cobertura": { file: "Poblacion_y_Cobertura.webp", rango: [4, 10], tipo: "grupo" },
+                    "Recursos para la Salud": { file: "Recursos_para_la_Salud.webp", rango: [12, 22], tipo: "grupo" },
+                    "Servicios para la Salud": { file: "Servicios_para_la_Salud.webp", rango: [24, 49], tipo: "grupo" },
+                    "Nacimientos": { file: "Nacimientos.webp", rango: [51, 58], tipo: "grupo" },
+                    "Daños a la Salud": { file: "Danos_a_la_Salud.webp", rango: [60, 143], tipo: "grupo" },
+
+                };
+
+                let titulosSecciones = {
+                    5: "Población y Cobertura",
+                    13: "Recursos para la Salud",
+                    25: "Servicios para la Salud",
+                    52: "Nacimientos",
+                    61: "Daños a la Salud"
+                };
+
+                // 5. Crear el acordeón (Limpio)
+                // ... dentro de crearLibro, justo después de definir indiceEstructurado ...
+
+                accordionContainer.empty();
+                Object.entries(indiceEstructurado).forEach(([nombre, config], index) => {
+                    let collapseId = `col_${index}`;
+
+                    // AQUÍ ESTÁ LA MAGIA: Buscamos en qué posición del array está tu archivo
+                    let indiceArchivo = archivosOrdenados.indexOf(config.file);
+                    console.log(config.file, indiceArchivo);
+                    let pag = indiceArchivo + 2; // +2 porque el índice 0 es la pág 2 (tras la portada)
+
+                    if (config.tipo === "directo") {
+                        accordionContainer.append(`
+            <div class="accordion-item bg-dark border-secondary">
+                <button class="btn btn-dark text-white w-100 text-start" onclick="$('#flipbook').turn('page', ${pag})">
+                    ${nombre}
+                </button>
+            </div>`);
+                    } else {
+                        accordionContainer.append(`
+                            <div class="accordion-item bg-dark border-secondary">
+                                <h2 class="accordion-header" id="head_${collapseId}">
+                                    <button class="accordion-button collapsed bg-dark text-white" type="button" 
+                        onclick="navegarYDesplegar('${collapseId}', ${pag}, '${nombre.replace(/'/g, "\\'")}')">
+                    ${nombre}
+                </button>
+                                </h2>
+                                <div id="${collapseId}" class="accordion-collapse collapse" data-bs-parent="#indiceAcordeon">
+                                    <div class="accordion-body bg-dark text-white p-2">
+                                    
+                <ul class="list-unstyled">${generarLinks(config, archivosOrdenados)}</ul>
+
+                                    </div>
+                                </div>
+                            </div>`);
+                    }
+                });
+
+                // La función ahora recibe el objeto config completo de forma segura
+                // Cambia la definición de la función para que acepte el array de archivos
+                function generarLinks(config, listaArchivos) {
+                    let rango = config.rango;
+                    let etiqueta = config.label || "Hoja";
+                    let links = "";
+
+                    for (let i = rango[0]; i <= rango[1]; i++) {
+                        let nombreArchivo = listaArchivos[i]; // Ahora usa el parámetro
+                        if (nombreArchivo) {
+                            let titulo = (typeof titulosHojas !== 'undefined' && titulosHojas[nombreArchivo])
+                                ? titulosHojas[nombreArchivo]
+                                : `${etiqueta} ${i - rango[0] + 1}`;
+
+                            // Escapamos las comillas simples para que el string no se rompa
+                            let tituloLimpio = titulo.replace(/'/g, "\\'");
+
+                            links += `<li>
+                <a href="#" class="text-info text-decoration-none" 
+                   onclick="$('#flipbook').turn('page', ${i + 2}); $('#tituloVisualizador').text('${tituloLimpio}'); return false;">
+                    ${titulo}
+                </a>
+            </li>`;
+                        }
+                    }
+                    return links;
+                }
+
+                function ajustarFlipbook() {
+
+                    const container = document.getElementById("flipbook-container");
+
+                    const newWidth = container.clientWidth;
+                    const newHeight = newWidth * 1.3;
+
+                    $('#flipbook').turn("size", newWidth, newHeight);
+                }
+
+                // 6. Inicializar Turn.js
+                const portada = new Image();
+
+                portada.src = "/static/img/portada_ok.webp";
+
+                portada.onload = function () {
+
+                    const container = document.getElementById("flipbook-container");
+                    const containerWidth = container.clientWidth;
+                    const calculatedHeight = containerWidth * 1.3;
+
+                    flipbook.turn({
+                        width: containerWidth,
+                        height: calculatedHeight,
+                        autoCenter: true,
+                        display: 'single',
+                        acceleration: true,
+                        gradients: false,
+                        elevation: 50,
+                        pages: archivos.length + 1
+                    });
+
+                    flipbook.bind('turning', function (event, page) {
+
+                        let indice = page - 2;
+                        let archivo = archivosOrdenados[indice];
+
+                        // PORTADA
+                        if (page === 1) {
+                            $('#tituloVisualizador').text("SALUD CON GRANDEZA: COMPROMISO DE TODOS.");
+                            return;
+                        }
+
+                        // HOJAS
+                        if (archivo && titulosHojas[archivo]) {
+                            $('#tituloVisualizador').text(titulosHojas[archivo]);
+                            return;
+                        }
+
+                        // SECCIONES
+                        if (titulosSecciones[page]) {
+                            $('#tituloVisualizador').text(titulosSecciones[page]);
+                            return;
+                        }
+
+                        $('#tituloVisualizador').text(`Página ${page}`);
+                    });
+
+                    // Mostrar flipbook ya cargado
+                    document.getElementById("flipbook").classList.add("ready");
+
+                    window.addEventListener("resize", ajustarFlipbook);
+
+                    // =========================
+                    // BOTÓN SIGUIENTE
+                    // =========================
+                    $('#btn-next').off('click').on('click', function () {
+
+                        let paginaActual = $('#flipbook').turn('page');
+                        let totalPaginas = $('#flipbook').turn('pages');
+
+                        if (paginaActual < totalPaginas) {
+                            $('#flipbook').turn('next');
+                        }
+
+                    });
+
+                    // =========================
+                    // BOTÓN ANTERIOR
+                    // =========================
+                    $('#btn-prev').off('click').on('click', function () {
+
+                        let paginaActual = $('#flipbook').turn('page');
+
+                        if (paginaActual > 1) {
+                            $('#flipbook').turn('previous');
+                        }
+
+                    });
+
+                    // =========================
+                    // BOTÓN PORTADA
+                    // =========================
+                    $('#btn-start').off('click').on('click', function () {
+
+                        indiceActual = 0;
+
+                        flipbook.turn('page', 1);
+
+                    });
+
+                };
+            }
+
+
+            // Navegación con flechas del teclado
+            $(document).keydown(function (e) {
+                switch (e.keyCode) {
+                    case 37: // Flecha Izquierda
+                        $('#flipbook').turn('previous');
+                        break;
+                    case 39: // Flecha Derecha
+                        $('#flipbook').turn('next');
+                        break;
+                }
+            });
+
+
+
+            // Borra la función vieja y usa esta lógica de delegación
+            $(document).on('click', '.page img', function (e) {
+                e.preventDefault();
+
+                const imgSrc = $(this).attr('src');
+                const imgTemp = new Image();
+                imgTemp.src = imgSrc;
+
+                const viewer = new Viewer(imgTemp, {
+                    inline: false,
+                    button: true,
+                    navbar: false,
+                    title: false,
+                    toolbar: true,
+                    tooltip: false,
+                    transition: false,
+                    // 1. Evitamos que el usuario haga un zoom infinito que rompa la vista
+                    minZoomRatio: 0.1,
+                    maxZoomRatio: 5,
+
+                    viewed() {
+                        // 2. FORZAR "FIT": Esto hace que la imagen se adapte al tamaño 
+                        // de la pantalla del usuario apenas abre, sin importar la resolución.
+                        viewer.zoomTo(viewer.imageData.ratio);
+
+                        // Si aun así la sientes muy grande, puedes probar un valor fijo como:
+                        // viewer.zoomTo(0.5); 
+                    },
+                    hidden() {
+                        viewer.destroy();
+                    }
+                });
+
+                viewer.show();
+            });
+
+            // Buscador dinámico con filtrado en tiempo real
+            $('#buscadorHojas').on('input', function () {
+                let valor = $(this).val().toLowerCase();
+
+                // --- NUEVA LÓGICA DE RESET ---
+                if (valor === "") {
+                    // 1. Cerramos todos los acordeones usando la API de Bootstrap
+                    $('.accordion-collapse').removeClass('show');
+                    $('.accordion-button').addClass('collapsed').attr('aria-expanded', 'false');
+
+                    // 2. Mostramos todos los ítems y las listas que pudieron ocultarse
+                    $(".accordion-item, .accordion-body li").show();
+                    return; // Detenemos la ejecución aquí
+                }
+                // -----------------------------
+
+                // Tu lógica actual de filtrado (se ejecuta solo si hay texto)
+                $(".accordion-item").each(function () {
+                    let $item = $(this);
+                    let textoSeccion = $item.find('.accordion-button').text().toLowerCase();
+                    let $listaHojas = $item.find('li');
+
+                    let hayCoincidenciaEnHojas = false;
+                    $listaHojas.each(function () {
+                        let textoHoja = $(this).text().toLowerCase();
+                        if (textoHoja.indexOf(valor) > -1) {
+                            $(this).show();
+                            hayCoincidenciaEnHojas = true;
+                        } else {
+                            $(this).hide();
+                        }
+                    });
+
+                    if (textoSeccion.indexOf(valor) > -1 || hayCoincidenciaEnHojas) {
+                        $item.show();
+                        // Al buscar, forzamos la apertura
+                        $item.find('.accordion-collapse').addClass('show');
+                        $item.find('.accordion-button').removeClass('collapsed').attr('aria-expanded', 'true');
+                    } else {
+                        $item.hide();
+                    }
+                });
+            });
+
+
+            window.addEventListener("scroll", function () {
+                const footer = document.getElementById("footer");
+
+                if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 5) {
+                    footer.classList.add("footer-visible");
+                } else {
+                    footer.classList.remove("footer-visible");
+                }
+            });
+
+        });
+    </script>
+
+
+
+    </div>
+
+
+</body>
+
+</body>
+
+</html>

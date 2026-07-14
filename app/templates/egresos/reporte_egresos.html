@@ -1,0 +1,815 @@
+{% extends "layout/base.html" %}
+
+
+{% block content %}
+<div class="main-content">
+    <div class="container-fluid mt-4 ps-4 pe-4">
+
+        <h2 class="mb-3" id="seul-title">
+            🏥 Egresos
+            <span id="seul-meta" style="font-size: 18px;" data-control='{{ control_anual | tojson | safe }}'>
+            </span>
+        </h2>
+        <!-- =======================
+        RESUMEN EGRESOS GRAFICA DE BARRAS
+        ======================= -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted mb-2">Total por Año</h6>
+                        <div class="chart-box">
+                            <canvas id="graficaEgresosPorAnio"></canvas>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted mb-2" id="tituloServicio">Total por Servicio</h6>
+                        <div class="chart-box">
+                            <canvas id="graficaEgresosPorServicio"></canvas>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4 justify-content-center">
+            <div class="col-md-3">
+                <div class="card shadow-sm text-center bg-dark border-secondary">
+                    <div class="card-body">
+                        <h6 class="text-info text-uppercase small font-weight-bold">Mortalidad Cruda</h6>
+                        <h3 id="mortalidadCruda" class="text-white mb-0">--%</h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="card shadow-sm text-center bg-dark border-secondary">
+                    <div class="card-body">
+                        <h6 class="text-warning text-uppercase small font-weight-bold">Mortalidad Ajustada</h6>
+                        <h3 id="MortalidadAjustada" class="text-white mb-0">--%</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="card">
+            <div class="card-body">
+                <ul class="nav nav-tabs mb-3" id="tabsAniosEgre"></ul>
+
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle" id="tablaEgresos">
+                        <thead class="table-dark">
+                            <tr>
+                                <th class="text-nowrap">Año</th>
+                                <th class="text-nowrap">CLUES</th>
+                                <th class="text-nowrap">Unidad</th>
+                                <th class="text-center">Egresos</th>
+                                <th class="text-center">Defunciones</th>
+                                <th class="text-center">Defunciones >48h</th>
+                                <th class="text-center">Nacimientos</th>
+                                <th class="text-center">Abortos</th>
+                                <th class="text-nowrap text-center">Promedio Días Estancia</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+
+                <nav class="mt-3">
+                    <ul class="pagination pagination-sm" id="TablaPagination"></ul>
+                </nav>
+            </div>
+        </div>
+        <!-- =======================
+          GRAFICAS DEBAJO DE LA TABLA 
+        ======================== -->
+
+        <hr>
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="mb-0">📈Total Egresos por mes</h5>
+                    <select id="filtroServicio" class="form-select form-select-sm w-auto mb-2"></select>
+
+                </div>
+                <div style="height:350px">
+                    <canvas id="graficaMensualTotal"></canvas>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+</div>
+
+
+<!-- =======================
+     SCRIPT JS
+======================== -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+
+<script>
+
+    const controlAnual = JSON.parse(
+        document.getElementById("seul-meta").dataset.control || "[]"
+    );
+
+
+    function formatearFechaES(fechaStr) {
+        if (!fechaStr) return "";
+
+        const fecha = new Date(fechaStr); // acepta GMT, ISO, etc.
+
+        if (isNaN(fecha)) return "";
+
+        const meses = [
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+        ];
+
+        return `${fecha.getUTCDate()} de ${meses[fecha.getUTCMonth()]} de ${fecha.getUTCFullYear()}`;
+    }
+
+
+
+    function actualizarEncabezadoSEUL(anio) {
+        const meta = document.getElementById("seul-meta");
+        if (!anio) {
+            meta.textContent = "";
+            return;
+        }
+
+        const anioNum = Number(anio);
+
+        const registro = controlAnual.find(r => Number(r.anio) === anioNum);
+
+        if (!registro) {
+            meta.textContent = "";
+            return;
+        }
+
+        meta.textContent =
+            ` | ${registro.estatus_inicio} al ${formatearFechaES(registro.fecha_actualizacion)} · ${registro.estatus}`;
+    }
+
+
+</script>
+
+
+<script>
+
+    let datosGlobales = [];
+    let anioActual = null;
+    let paginaActual = 1;
+    const filasPorPagina = 10;
+    let datosMensualesGlobales = [];
+    let datosEgresosPermanentes = [];
+
+    function calcularTotalesDinamicos() {
+        // Si la variable está vacía, intentamos usar datosGlobales como respaldo
+        const fuenteDatos = (datosEgresosPermanentes && datosEgresosPermanentes.length > 0)
+            ? datosEgresosPermanentes
+            : datosGlobales;
+
+        if (!fuenteDatos || fuenteDatos.length === 0) return;
+
+        // --- LÍNEA PARA DEPURAR (Mira la consola con F12) ---
+        console.log("Estructura del primer dato:", fuenteDatos[0]);
+
+        let sumaEgresosTotal = 0;
+        let sumaDefuncionesTotal = 0;
+        let sumaEgresos48h = 0;
+        let sumaDefunciones48h = 0;
+
+        const unidadesSeleccionadas = window.getUnidadesSeleccionadas ? window.getUnidadesSeleccionadas() : [];
+
+        const filtrados = fuenteDatos.filter(d => {
+            const coincideAnio = Number(d.anio) === Number(anioActual);
+            const coincideUnidad = unidadesSeleccionadas.length === 0 ||
+                unidadesSeleccionadas.includes(d.Hospital || d.unidad || d.Unidad);
+            return coincideAnio && coincideUnidad;
+        });
+
+        filtrados.forEach(row => {
+            // Probamos todas las combinaciones posibles de nombres que tu SQL podría estar enviando
+            sumaEgresosTotal += parseFloat(row.KPI_Egresos_Totales || row.total_egresos || row.Total || 0);
+            sumaDefuncionesTotal += parseFloat(row.KPI_Defunciones_Totales || row.defunciones || row.Defunciones || 0);
+            sumaEgresos48h += parseFloat(row.KPI_Egresos_48h || row.egresos_48h || 0);
+            sumaDefunciones48h += parseFloat(row.KPI_Defunciones_48h || row.defunciones_48h || 0);
+        });
+
+        const tasaCruda = sumaEgresosTotal > 0 ? (sumaDefuncionesTotal / sumaEgresosTotal) * 1000 : 0;
+        const tasaAjustada = sumaEgresos48h > 0 ? (sumaDefunciones48h / sumaEgresos48h) * 1000 : 0;
+
+        // Forzamos la actualización de los elementos
+        const elCruda = document.getElementById("mortalidadCruda");
+        const elAjustada = document.getElementById("MortalidadAjustada");
+
+        if (elCruda) elCruda.innerText = tasaCruda.toFixed(2);
+        if (elAjustada) elAjustada.innerText = tasaAjustada.toFixed(2);
+    }
+
+
+
+    // =========================
+    //  Obtener valores checkbox
+    // =========================
+    function obtenerCheckbox(clase) {
+        return Array.from(document.querySelectorAll(`.${clase}:checked`))
+            .map(x => x.value)
+            .join(",");
+    }
+
+    document.getElementById("filtroServicio")
+        ?.addEventListener("change", function () {
+            if (datosMensualesGlobales.length > 0) {
+                graficaTotalPorMes(datosMensualesGlobales);
+            }
+        });
+
+
+    // =========================
+    //  Botón Aplicar filtros
+    // =========================
+    document.getElementById("btnFiltrar").addEventListener("click", function () {
+
+
+        const anios = obtenerCheckbox("filtro-anio");
+        const meses = obtenerCheckbox("filtro-mes");
+        const indicador = document.getElementById("filtroIndicadorEgresos").value;
+        const unidades = window.getUnidadesSeleccionadas();
+
+        cargarServicios(indicador);
+
+        // ==========================
+        // 1️⃣ FETCH PRINCIPAL (tabla + gráficas actuales)
+        // ==========================
+        let params = new URLSearchParams();
+
+        if (anios) params.append("anios", anios);
+        if (meses) params.append("meses", meses);
+        if (unidades.length) params.append("unidades", unidades.join(","));
+
+        params.append("indicador", indicador);
+        params.append("modo", "tabla");  // modo tabla
+
+        fetch(`/egresos/api/indicadores?${params.toString()}&modo=grafica`)
+            .then(res => res.json())
+            .then(data => {
+                // --- AQUÍ VA EL CAMBIO ---
+                datosGlobales = data;
+
+                // Guardamos la copia solo si el usuario seleccionó "egresos"
+                if (indicador === "egresos") {
+                    datosEgresosPermanentes = [...data];
+                }
+
+                crearTabsAnios(data);
+
+                // Validación de seguridad por si data viene vacío
+                if (data.length > 0) {
+                    anioActual = data[3].anio;
+                }
+
+                actualizarTabla(data);
+                actualizarGraficas(data);
+                renderTabla();
+
+                // Llamamos a la función de las tarjetas
+                calcularTotalesDinamicos();
+                // -------------------------
+            })
+            .catch(err => console.error(err));
+
+        // ==========================
+        // 2️⃣ FETCH SOLO GRÁFICA MENSUAL
+        // ==========================
+        let paramsMensual = new URLSearchParams();
+
+        if (anios) paramsMensual.append("anios", anios);
+        if (meses) paramsMensual.append("meses", meses);
+        if (unidades.length) paramsMensual.append("unidades", unidades.join(","));
+
+        paramsMensual.append("indicador", indicador); // mismo indicador
+        paramsMensual.append("modo", "grafica");      // modo gráfico mensual
+
+        fetch(`/egresos/api/indicadores?${paramsMensual.toString()}`)
+            .then(res => res.json())
+            .then(dataMensual => {
+                datosMensualesGlobales = dataMensual;
+                graficaTotalPorMes(dataMensual);
+            })
+            .catch(err => console.error(err));
+    });
+
+
+    // ============================
+    //   TABLA (ADAPTADA)
+    // ============================
+    function actualizarTabla(data) {
+        const anioSeleccionado = obtenerCheckbox("filtro-anio");
+        if (anioSeleccionado) {
+            const aniosPermitidos = anioSeleccionado.split(",");
+            data = data.filter(row => aniosPermitidos.includes(String(row.anio)));
+        }
+
+        const tbody = document.querySelector("#tablaEgresos tbody");
+        const thead = document.querySelector("#tablaEgresos thead tr");
+        tbody.innerHTML = "";
+
+        const indicador = document.getElementById("filtroIndicadorEgresos").value;
+        let columnas = ["Año", "CLUES", "Unidad"];
+
+        if (indicador === "egresos") {
+            columnas.push("Med Interna", "Cirugía", "Ginecobstetricia", "Pediatría", "Otros", "Total");
+        } else if (indicador === "defunciones") {
+            columnas.push("Med Interna", "Cirugía", "Ginecobstetricia", "Pediatría", "Otros", "Total", "Tasa Mortalidad Bruta");
+        } else if (indicador === "defunciones48") {
+            columnas.push("Med Interna", "Cirugía", "Ginecobstetricia", "Pediatría", "Otros", "Total", "Tasa Mortalidad Ajustada");
+        } else if (indicador === "nacimientos") {
+            columnas.push("Eutócico", "Distócico", "Cesárea", "Total", "Porcentaje Cesárea");
+        } else {
+            columnas.push("Med Interna", "Cirugía", "Ginecobstetricia", "Pediatría", "Otros", "Total");
+        }
+
+        thead.innerHTML = columnas.map((c, index) => {
+            const className = index >= 3 ? 'class="text-center"' : '';
+            return `<th ${className}>${c}</th>`;
+        }).join("");
+
+        let htmlFinal = "";
+
+        data.forEach(row => {
+
+
+            let tds = `
+            <td>${row.anio || ''}</td>
+            <td>${row.CLUES || ''}</td>
+            <td>${row.Hospital || ''}</td>
+        `;
+
+            columnas.slice(3).forEach(col => {
+                let valorFinal = 0;
+
+                // --- LÓGICA DE CÁLCULO MANUAL BASADA EN TUS COLUMNAS DE BACKEND ---
+                if (col === "Tasa Mortalidad Bruta") {
+                    const egresos = parseFloat(row.KPI_Egresos_Totales || 0);
+                    const defunciones = parseFloat(row.KPI_Defunciones_Totales || 0);
+                    valorFinal = egresos > 0 ? ((defunciones / egresos) * 1000).toFixed(1) : "0.0";
+                }
+                else if (col === "Tasa Mortalidad Ajustada") {
+                    const egresos48 = parseFloat(row.KPI_Egresos_48h || 0);
+                    const defunciones48 = parseFloat(row.KPI_Defunciones_48h || 0);
+                    valorFinal = egresos48 > 0 ? ((defunciones48 / egresos48) * 1000).toFixed(1) : "0.0";
+                }
+                else if (col === "Porcentaje Cesárea") {
+                    const totalNac = parseFloat(row.Total || 0);
+                    const cesareas = parseFloat(row.Cesárea || 0);
+                    valorFinal = totalNac > 0 ? ((cesareas / totalNac) * 100).toFixed(1) + "%" : "0.0%";
+                }
+                else {
+                    // Para las columnas normales (Med Interna, Cirugía, etc.)
+                    const key = col.replace(/ /g, "_");
+                    const valorNum = parseFloat(row[key] || 0);
+                    valorFinal = Math.floor(valorNum).toLocaleString('en-US');
+                }
+
+                tds += `<td class="text-center">${valorFinal}</td>`;
+            });
+
+            htmlFinal += `<tr>${tds}</tr>`;
+        });
+
+        tbody.innerHTML = htmlFinal;
+    }
+
+
+function renderTabla() {
+    // 1. Asegurarnos de tener datos
+    if (!datosGlobales || datosGlobales.length === 0) return;
+
+    // 2. Si anioActual no tiene valor, buscamos el MÁXIMO estrictamente
+    if (!anioActual) {
+        const todosLosAnios = datosGlobales.map(d => Number(d.anio));
+        anioActual = Math.max(...todosLosAnios);
+    }
+
+    // 3. Filtramos los datos globales por el año actual (ya sea el máximo o el clickeado)
+    let filtrados = datosGlobales.filter(
+        d => Number(d.anio) === Number(anioActual)
+    );
+
+    // 4. Paginación
+    const inicio = (paginaActual - 1) * filasPorPagina;
+    const fin = inicio + filasPorPagina;
+    const paginaDatos = filtrados.slice(inicio, fin);
+
+    // 5. Renderizar
+    actualizarTabla(paginaDatos);
+    crearPaginacion(filtrados.length);
+    
+    // Si tienes esta función para el título, asegúrate de pasarle el anioActual
+    if (typeof actualizarEncabezadoSEUL === "function") {
+        actualizarEncabezadoSEUL(anioActual);
+    }
+}
+
+
+
+    // ============================
+    //   TABLA PARA LOS AÑOS
+    // ============================
+
+    function crearTabsAnios(data) {
+        const tabs = document.getElementById("tabsAniosEgre");
+        tabs.innerHTML = "";
+
+        // 1. Ordenamos de mayor a menor
+        const anios = [...new Set(data.map(d => d.anio))].sort((a, b) => b - a);
+
+        anios.forEach((anio, index) => {
+            // 2. Si es el primer elemento (el más alto), actualizamos la variable global
+            if (index === 0) {
+                anioActual = anio;
+                paginaActual = 1;
+            }
+
+            tabs.innerHTML += `
+            <li class="nav-item">
+                <button class="nav-link ${index === 0 ? "active" : ""}" 
+                    data-anio="${anio}">
+                    ${anio}
+                </button>
+            </li>
+        `;
+        });
+
+        // 3. Importante: Llamar a renderizar después de crear las tabs 
+        // para que la tabla use el anioActual que acabamos de setear
+        renderTabla();
+        actualizarGraficas(data);
+        calcularTotalesDinamicos();
+
+        // Eventos click (se mantienen igual)
+        tabs.querySelectorAll(".nav-link").forEach(btn => {
+            btn.addEventListener("click", () => {
+                tabs.querySelectorAll(".nav-link").forEach(b => b.classList.remove("active"));
+                btn.classList.add("active");
+
+                anioActual = btn.dataset.anio;
+                paginaActual = 1;
+
+                renderTabla();
+                actualizarGraficas(data);
+                calcularTotalesDinamicos();
+            });
+        });
+    }
+
+
+    function crearPaginacion(totalFilas) {
+        const totalPaginas = Math.ceil(totalFilas / filasPorPagina);
+        const pag = document.getElementById("TablaPagination");
+        pag.innerHTML = "";
+
+        for (let i = 1; i <= totalPaginas; i++) {
+            pag.innerHTML += `
+            <li class="page-item ${i === paginaActual ? "active" : ""}">
+                <button class="page-link">${i}</button>
+            </li>
+        `;
+        }
+
+        pag.querySelectorAll(".page-link").forEach((btn, index) => {
+            btn.addEventListener("click", () => {
+                paginaActual = index + 1;
+                renderTabla();
+            });
+        });
+    }
+
+
+
+
+
+    // ============================
+    //   GRAFICAS (igual que antes)
+    // ============================
+    let chartEgresos = null;
+    let chartServicios = null;
+
+
+
+    function actualizarGraficas(data) {
+
+        if (!data || data.length === 0) return;
+
+        const indicador = document.getElementById("filtroIndicadorEgresos").value;
+
+        const coloresBase1 = [
+            "#4E2F82", "#822F45", "#2c2c2c"
+
+        ];
+
+        const coloresBase = [
+            "#3B82F6", "#10B981", "#F59E0B",
+            "#EF4444", "#8B5CF6", "#EC4899"
+        ];
+
+        // ============================
+        // 🔹 GRAFICA 1: TOTAL POR AÑO
+        // ============================
+        const resumenPorAnio = {};
+
+        data.forEach(r => {
+            if (!resumenPorAnio[r.anio]) resumenPorAnio[r.anio] = 0;
+
+            if (indicador === "egresos") {
+                resumenPorAnio[r.anio] += Number(r.Total || r.Total_Egresos || 0);
+            }
+            else if (indicador === "defunciones") {
+                resumenPorAnio[r.anio] += Number(r.Total || 0);
+            }
+            else {
+                resumenPorAnio[r.anio] += Number(r.Total || 0);
+            }
+        });
+
+        const labelsAnios = Object.keys(resumenPorAnio);
+        const dataTotales = labelsAnios.map(a => resumenPorAnio[a]);
+
+        if (chartEgresos) chartEgresos.destroy();
+
+        chartEgresos = new Chart(
+            document.getElementById("graficaEgresosPorAnio"),
+            {
+                type: "bar",
+                data: {
+                    labels: labelsAnios,
+                    datasets: [{
+                        label: "Total",
+                        data: dataTotales,
+                        backgroundColor: labelsAnios.map(
+                            (_, i) => coloresBase1[i % coloresBase1.length]
+                        ),
+                        borderRadius: 6
+                    }]
+
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            }
+        );
+
+        // ===================================
+        // 🔹 GRAFICA 2: POR SERVICIO (ACTUALIZADA)
+        // ===================================
+
+        // 1. FILTRAR los datos por el año seleccionado en los tabs antes de calcular nada
+        const datosFiltrados = data.filter(r => r.anio == anioActual);
+
+        let categorias = [];
+        let etiquetas = [];
+
+        if (indicador === "nacimientos") {
+            categorias = ["Eutócico", "Distócico", "Cesárea"];
+            etiquetas = ["Eutócico", "Distócico", "Cesárea"];
+        } else {
+            categorias = ["Med_Interna", "Cirugía", "Pediatría", "Ginecobstetricia", "Otros"];
+            etiquetas = ["Med Interna", "Cirugía", "Pediatría", "Ginecobstetricia", "Otros"];
+        }
+
+        const resumenServicios = {};
+        categorias.forEach(c => resumenServicios[c] = 0);
+
+        // 2. USAR 'datosFiltrados' para que la suma solo corresponda al año activo
+        datosFiltrados.forEach(r => {
+            categorias.forEach(c => {
+                resumenServicios[c] += Number(r[c] || 0);
+            });
+        });
+
+        if (chartServicios) chartServicios.destroy();
+
+        const txtServicio = document.getElementById("tituloServicio");
+        if (txtServicio) {
+            txtServicio.innerHTML = `Total por Servicio <strong>${anioActual}</strong>`;
+        }
+
+        chartServicios = new Chart(
+            document.getElementById("graficaEgresosPorServicio"),
+            {
+                type: "bar",
+                data: {
+                    labels: etiquetas,
+                    datasets: [{
+                        // Agregamos el año al label para confirmar visualmente el cambio
+                        label: `Total por servicio (${anioActual})`,
+                        data: categorias.map(c => resumenServicios[c]),
+                        backgroundColor: categorias.map(
+                            (_, i) => coloresBase[i % coloresBase.length]
+                        ),
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        // Añadimos un título dinámico para mayor claridad profesional
+                        title: {
+                            display: true,
+                            font: { size: 14 }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { precision: 0 } // Evita decimales si son conteos enteros
+                        }
+                    }
+                }
+            }
+        );
+
+    }
+
+    // ===================================
+    // 🔹 GRAFICA 3:  DED LÑINEAS POR MES Y TIPO DE SERVICIO
+    // ===================================
+
+    function cargarServicios(indicador) {
+
+        const select = document.getElementById("filtroServicio");
+        select.innerHTML = "";
+
+        let opciones = [];
+
+        if (indicador === "egresos" || indicador === "defunciones" || indicador === "defunciones48" || indicador === "proc_dentro" || indicador === "proc_fuera") {
+            opciones = [
+                { value: "Total", label: "Total" },
+                { value: "Med_Interna", label: "Med Interna" },
+                { value: "Cirugía", label: "Cirugía" },
+                { value: "Pediatría", label: "Pediatría" },
+                { value: "Ginecobstetricia", label: "Ginecobstetricia" },
+                { value: "Otros", label: "Otros" }
+            ];
+        }
+
+        if (indicador === "nacimientos") {
+            opciones = [
+                { value: "Total", label: "Total" },
+                { value: "Eutócico", label: "Eutócico" },
+                { value: "Distócico", label: "Distócico" },
+                { value: "Cesárea", label: "Cesárea" }
+            ];
+        }
+
+        opciones.forEach(o => {
+            const opt = document.createElement("option");
+            opt.value = o.value;
+            opt.textContent = o.label;
+            select.appendChild(opt);
+        });
+    }
+
+
+
+
+
+    let chartMensualTotal = null;
+
+    function graficaTotalPorMes(data) {
+        const unidadesSeleccionadas = window.getUnidadesSeleccionadas?.() || [];
+
+        if (!data || data.length === 0) {
+            if (window.chartMensualTotal) window.chartMensualTotal.destroy();
+            return;
+        }
+
+        const mesesNombres = {
+            1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+            5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+            9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+        };
+
+        const meses = Array.from({ length: 12 }, (_, i) => i + 1);
+        const labels = meses.map(m => mesesNombres[m]);
+
+        const servicioSeleccionado = document.getElementById("filtroServicio")?.value;
+        const resumenGrafica = {};
+
+        data.forEach(r => {
+            const mes = Number(r.mes);
+            const anio = r.anio;
+            const unidad = r.unidad || r.Hospital || "Sin unidad";
+
+            let valor = 0;
+            if (servicioSeleccionado && r[servicioSeleccionado] !== undefined)
+                valor = Number(r[servicioSeleccionado]);
+            else if (r.Total !== undefined) valor = Number(r.Total);
+            else if (r.total !== undefined) valor = Number(r.total);
+            else if (r.egresos !== undefined) valor = Number(r.egresos);
+
+            const key = unidadesSeleccionadas.length === 0
+                ? `Total general ${anio}`
+                : `${unidad} - ${anio}`;
+
+            if (!resumenGrafica[key]) resumenGrafica[key] = {};
+            resumenGrafica[key][mes] = (resumenGrafica[key][mes] || 0) + valor;
+        });
+
+        const colores = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
+
+        const datasets = Object.keys(resumenGrafica)
+            .sort()
+            .map((key, i) => ({
+                label: key,
+                data: meses.map(m => resumenGrafica[key][m] || 0),
+                borderColor: colores[i % colores.length],
+                backgroundColor: colores[i % colores.length],
+                tension: 0.35,
+                pointRadius: 4,
+                fill: false
+            }));
+
+        const ctx = document.getElementById("graficaMensualTotal");
+        if (!ctx) return;
+
+        if (window.chartMensualTotal) window.chartMensualTotal.destroy();
+
+        window.chartMensualTotal = new Chart(ctx, {
+            type: "line",
+            data: { labels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                // Quitamos cualquier padding extra
+                layout: { padding: { top: 10, bottom: 20 } },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: "bottom", // Leyenda abajo: solo nombres de unidad y año
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true,
+                            font: { size: 12 }
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: v => Number(v).toLocaleString() }
+                    }
+                }
+            }
+        });
+    }
+
+
+    document.addEventListener("DOMContentLoaded", function () {
+
+        // 🔥 Asegurar indicador por default
+        const indicadorSelect = document.getElementById("filtroIndicadorEgresos");
+
+        indicadorSelect.value = "egresos";
+
+        // 🔥 Ejecutar consulta inicial
+
+        document.getElementById("btnFiltrar").click();
+
+    });
+
+    document.getElementById("filtroIndicadorEgresos")
+        ?.addEventListener("change", function () {
+            cargarServicios(this.value);
+        });
+
+
+</script>
+
+{% endblock %}

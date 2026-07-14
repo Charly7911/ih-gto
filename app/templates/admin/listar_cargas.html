@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Historial de cargas ZIP</title>
+</head>
+<body>
+    <h1>Historial de cargas de archivos ZIP</h1>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <ul style="color: green;">
+                {% for msg in messages %}
+                    <li>{{ msg }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+
+    <table border="1" cellpadding="8">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Archivo ZIP</th>
+                <th>Fecha</th>
+                <th>Estado</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for carga in cargas %}
+            <tr>
+                <td>{{ carga.id }}</td>
+                <td>{{ carga.nombre_zip }}</td>
+                <td>{{ carga.fecha_carga }}</td>
+                <td>{{ carga.estado }}</td>
+                <td>
+                    {% if carga.estado != 'activa' %}
+                        <form method="post" action="{{ url_for('admin.activar_carga', carga_id=carga.id) }}">
+                            <button type="submit">Activar</button>
+                        </form>
+                    {% else %}
+                        <em>Activa</em>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <br>
+    <a href="{{ url_for('admin.subir_zip') }}">⬅ Volver a subir ZIP</a>
+</body>
+</html>

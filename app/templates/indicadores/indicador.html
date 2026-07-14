@@ -1,0 +1,676 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+
+<div class="main-content">
+    <div class="container-fluid mt-4 ps-4 pe-4">
+
+        <h2 class="mb-4">
+            📊 Indicadores
+            <span id="indicadores-meta" style="font-size: 18px;" data-control='{{ control_anual | tojson | safe }}'>
+            </span>
+        </h2>
+
+        <!-- ===============================
+            GRÁFICA PRINCIPAL
+        ================================ -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5>📊 Tendencia de Ocupación Hospitalaria (Comparativo Anual)</h5>
+                <div style="height: 300px; width: 100%;">
+                    <canvas id="graficaComparativoAnual"></canvas>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ===============================
+            KPI PRINCIPALES
+        ================================ -->
+        <div class="row mb-4">
+
+            <div class="col-md-3">
+                <div class="card shadow-sm text-center">
+                    <div class="card-body">
+                        <h6 class="text-muted">% Ocupación</h6>
+                        <h3 id="kpiOcupacion">--%</h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="card shadow-sm text-center">
+                    <div class="card-body">
+                        <h6 class="text-muted">Prom. Estancia</h6>
+                        <h3 id="kpiEstancia">-- días</h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="card shadow-sm text-center">
+                    <div class="card-body">
+                        <h6 class="text-muted">Índice Rotación</h6>
+                        <h3 id="kpiRotacion">--</h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="card shadow-sm text-center">
+                    <div class="card-body">
+                        <h6 class="text-muted">Intervalo Sustitución</h6>
+                        <h3 id="kpiIntervalo">-- días</h3>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+
+
+
+        <!-- ===============================
+            TABLA RESUMEN
+        ================================ -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <ul class="nav nav-tabs mb-3" id="tabsAniosIndicadores"></ul>
+
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm table-bordered" id="tablaIndicadores"
+                        style="table-layout: fixed; width: 100%; min-width: 1400px;">
+                        <thead class="table-dark">
+                            <tr style="font-size: 0.75rem; text-align: center;">
+                                <th style="width: 60px;">Año</th>
+                                <th style="width: 350px; text-align: left;">Unidad</th>
+                                <th style="width: 90px;">Camas<br>Censables</th>
+                                <th style="width: 90px;">Quirofanos</th>
+                                <th style="width: 90px;">Salas<br>Expulsión</th>
+                                <th style="width: 90px;">Consultas <br>Por Día</th>
+                                <th style="width: 90px;">Especialidad<br>Por Día</th>
+                                <th style="width: 90px;">Urgencias<br>Por Día</th>
+                                <th style="width: 90px;">%<br>Calificada</th>
+                                <th style="width: 90px;">Nacimientos<br>Por Día</th>
+                                <th style="width: 90px;">%<br>Cesareas</th>
+                                <th style="width: 90px;">Prom. Inter.<br>Diarias x Qx</th>
+                                <th style="width: 90px;">%<br>Apeo</th>
+                                <th style="width: 90px;">%<br>Ocupación</th>
+                                <th style="width: 90px;">Prom. Días<br>Estancia</th>
+                                <th style="width: 90px;">Indice<br>Rotación</th>
+                                <th style="width: 90px;">Interv.<br>Sustitución</th>
+                                <th style="width: 90px;">Mortalidad<br>Cruda</th>
+                                <th style="width: 90px;">Mortalidad<br>Ajustada</th>
+
+                            </tr>
+                        </thead>
+                        <tbody style="font-size: 0.8rem;"></tbody>
+                    </table>
+                </div>
+
+                <nav class="mt-2">
+                    <ul class="pagination pagination-sm" id="paginacionIndicadores"></ul>
+                </nav>
+            </div>
+        </div>
+
+        <!-- ===============================
+            COMPARATIVO ANUAL
+        ================================ -->
+
+        <div class="card mb-4">
+            <div class="card-body">
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+
+                    <h5 class="mb-0" id="tituloGraficaIndicador">
+                        📈 Tendencia - % Ocupación
+                    </h5>
+
+                    <select id="selectorIndicadorGrafica" class="form-select w-auto">
+                        <option value="ocupacion">% Ocupación</option>
+                        <option value="estancia">Promedio de Estancia</option>
+                        <option value="rotacion">Índice de Rotación</option>
+                        <option value="intervalo">Intervalo de Sustitución</option>
+                        <option value="mortalidad_cruda">Mortalidad Cruda</option>
+                        <option value="mortalidad_ajustada">Mortalidad Ajustada</option>
+                        <option value="porcentaje_cesareas">Porcentaje Cesareas</option>
+                        <option value="porcentaje_apeo">Porcentaje Apeo</option>
+                        <option value="porcentaje_calificadas">% Urg. Calificadas</option>
+                        <option value="prom_inter_qx">Prom. Inter QX</option>
+
+
+                    </select>
+
+                </div>
+
+                <div style="height: 360px;">
+                    <canvas id="graficaIndicadorPrincipal"></canvas>
+                </div>
+
+            </div>
+        </div>
+
+
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // ==========================================
+    // 1. VARIABLES GLOBALES Y ESTADO
+    // ==========================================
+    let chartIndicadorPrincipal = null;
+    let chartComparativoAnual = null;
+    let indicadorActivo = "ocupacion";
+    let window_dataFullGlobal = []; // Mantiene toda la data para las gráficas
+
+    // ==========================================
+    // 2. INICIALIZACIÓN Y EVENTOS
+    // ==========================================
+    document.addEventListener("DOMContentLoaded", () => {
+        cargarReporteIndicadores(new URLSearchParams());
+
+        document.getElementById("btnFiltrarIndicadores")?.addEventListener("click", () => {
+            const anios = obtenerSeleccionados(".ind-filtro-anio");
+            const meses = obtenerSeleccionados(".ind-filtro-mes");
+            const unidades = window.getUnidadesSeleccionadas ? window.getUnidadesSeleccionadas() : [];
+
+            let params = new URLSearchParams();
+            if (anios.length) params.append("anios", anios.join(","));
+            if (meses.length) params.append("meses", meses.join(","));
+            if (unidades.length) params.append("unidades", unidades.join(","));
+
+            cargarReporteIndicadores(params);
+        });
+
+        document.getElementById("selectorIndicadorGrafica")?.addEventListener("change", function () {
+            indicadorActivo = this.value;
+            const tituloElem = document.getElementById("tituloGraficaIndicador");
+            if (tituloElem) tituloElem.textContent = `📈 Tendencia - ${this.options[this.selectedIndex].text}`;
+            renderTendenciaIndicador(window_dataFullGlobal);
+        });
+    });
+
+    // ==========================================
+    // 3. CORE: CARGA DE DATOS (API)
+    // ==========================================
+    function cargarReporteIndicadores(params) {
+        fetch(`/indicadores/api/tabla_base?${params.toString()}`)
+            .then(res => res.json())
+            .then(data => {
+                if (!data || !data.length) {
+                    limpiarGraficas();
+                    return;
+                }
+
+                window_dataFullGlobal = data;
+
+                // 1. Renderizar Gráficas (usan TODA la data)
+                renderTendenciaIndicador(data);
+                renderComparativoAnualIndicador(data);
+
+                // 2. Renderizar Pestañas de Años (basado en la data cargada)
+                generarTabsAnios(data);
+            })
+            .catch(err => console.error("Error al cargar datos:", err));
+    }
+
+    // ==========================================
+    // 4. GENERACIÓN DE PESTAÑAS (TABS)
+    // ==========================================
+    function generarTabsAnios(data) {
+        const tabsAnios = document.getElementById("tabsAniosIndicadores");
+        if (!tabsAnios) return;
+
+        const aniosUnicos = [...new Set(data.map(r => r.anio))].sort((a, b) => b - a);
+
+        tabsAnios.innerHTML = "";
+        aniosUnicos.forEach((anio, i) => {
+            const li = document.createElement("li");
+            li.className = "nav-item";
+            li.innerHTML = `<a class="nav-link ${i === 0 ? 'active' : ''}" href="#" data-anio="${anio}">${anio}</a>`;
+            tabsAnios.appendChild(li);
+        });
+
+        // Configurar el evento de click para las pestañas
+        tabsAnios.onclick = e => {
+            const link = e.target.closest(".nav-link");
+            if (!link) return;
+            e.preventDefault();
+
+            tabsAnios.querySelectorAll(".nav-link").forEach(t => t.classList.remove("active"));
+            link.classList.add("active");
+
+            const anioSel = link.dataset.anio;
+            const dataFiltrada = data.filter(r => r.anio == anioSel);
+
+            // Actualizar solo Tabla y KPIs sin tocar las gráficas ni los tabs
+            actualizarVistaFiltrada(dataFiltrada);
+        };
+
+        // Carga inicial con el año más reciente
+        if (aniosUnicos.length > 0) {
+            actualizarVistaFiltrada(data.filter(r => r.anio == aniosUnicos[0]));
+        }
+    }
+
+    function actualizarVistaFiltrada(dataFiltrada) {
+        renderKPIsIndicadores(dataFiltrada);
+        renderTablaSoloCuerpo(dataFiltrada);
+    }
+
+    // ==========================================
+    // 5. COMPONENTE: TABLA (SOLO CUERPO Y PAGINACIÓN)
+    // ==========================================
+    function renderTablaSoloCuerpo(dataFiltrada) {
+        const filasPorPagina = 10;
+        let paginaActual = 1;
+        const tbody = document.querySelector("#tablaIndicadores tbody");
+        const paginacion = document.getElementById("paginacionIndicadores");
+        if (!tbody) return;
+
+        // --- 1. AGRUPACIÓN: Mapeo exacto con los nombres del SQL ---
+        const agrupado = {};
+        dataFiltrada.forEach(r => {
+            const key = `${r.clues}-${r.anio}`;
+            if (!agrupado[key]) {
+                agrupado[key] = {
+                    ...r,
+                    mesesVistos: new Set(),
+                    total_egresos: 0,
+                    egresos_48h: 0,
+                    total_defunciones: 0,
+                    defunciones_48h: 0,
+                    total_dias_estancia: 0,
+                    total_nacimientos: 0,
+                    total_cesareas: 0,
+                    total_consultas: 0,
+                    total_especialidad: 0,
+                    total_urgencias: 0,
+                    total_urgencias_calificadas: 0,
+                    total_cirugias_quirofano: 0,
+                    total_apeo: 0,
+                    total_abortos: 0,
+                    total_dias_paciente: 0
+                };
+            }
+
+            agrupado[key].mesesVistos.add(Number(r.mes));
+
+            // Sumatorias
+            agrupado[key].total_egresos += Number(r.total_egresos || 0);
+            agrupado[key].egresos_48h += Number(r.egresos_48h || 0);
+            agrupado[key].total_defunciones += Number(r.total_defunciones || 0);
+            agrupado[key].defunciones_48h += Number(r.defunciones_48h || 0);
+            agrupado[key].total_dias_estancia += Number(r.total_dias_estancia || 0);
+            agrupado[key].total_nacimientos += Number(r.total_nacimientos || 0);
+            agrupado[key].total_cesareas += Number(r.total_cesareas || 0);
+            agrupado[key].total_consultas += Number(r.total_consultas || 0);
+            agrupado[key].total_especialidad += Number(r.total_especialidad || 0);
+            agrupado[key].total_urgencias += Number(r.total_urgencias || 0);
+            agrupado[key].total_urgencias_calificadas += Number(r.total_urgencias_calificadas || 0);
+            agrupado[key].total_cirugias_quirofano += Number(r.total_cirugias_quirofano || 0);
+            agrupado[key].total_apeo += Number(r.total_apeo || 0);
+            agrupado[key].total_abortos += Number(r.total_abortos || 0);
+            agrupado[key].total_dias_paciente += Number(r.total_dias_paciente || 0);
+        });
+
+        const dataParaTabla = Object.values(agrupado);
+
+        const pintar = () => {
+            const inicio = (paginaActual - 1) * filasPorPagina;
+            const paginaData = dataParaTabla.slice(inicio, inicio + filasPorPagina);
+            const totalPaginas = Math.ceil(dataParaTabla.length / filasPorPagina);
+
+            tbody.innerHTML = "";
+            paginaData.forEach(r => {
+                // Lógica de tiempo
+                const dictDias = { 1: 31, 2: 28, 3: 31, 4: 30, 5: 31, 6: 30, 7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31 };
+                if (r.anio % 4 === 0) dictDias[2] = 29;
+                const listaMeses = Array.from(r.mesesVistos);
+                const diasNaturales = listaMeses.reduce((acc, m) => acc + (dictDias[m] || 0), 0) || 365;
+                const diasHabiles = listaMeses.length > 0 ? listaMeses.length * 21 : 252;
+
+                // --- CÁLCULOS FORMATEADOS (A 1 DECIMAL) ---
+                const mortalidadCruda = r.total_egresos > 0
+                    ? ((r.total_defunciones / r.total_egresos) * 1000).toFixed(1)
+                    : "0.0";
+
+                const mortalidadAjustada = r.egresos_48h > 0
+                    ? ((r.defunciones_48h / r.egresos_48h) * 1000).toFixed(1)
+                    : "0.0";
+
+                const ocupacion = (r.camas_censables * diasNaturales) > 0
+                    ? ((r.total_dias_paciente / (r.camas_censables * diasNaturales)) * 100).toFixed(1)
+                    : "0.0";
+
+                // Intervalo de Sustitución: Evitamos negativos y corregimos la precisión decimal
+                const interSustRaw = r.total_egresos > 0
+                    ? (((r.camas_censables * diasNaturales) - r.total_dias_paciente) / r.total_egresos)
+                    : 0;
+                const interSust = Math.max(0, interSustRaw).toFixed(1);
+
+                const promEstancia = r.total_egresos > 0
+                    ? (r.total_dias_estancia / r.total_egresos).toFixed(1)
+                    : "0.0";
+
+                const indiceRotacion = r.camas_censables > 0
+                    ? (r.total_egresos / r.camas_censables).toFixed(1)
+                    : "0.0";
+
+                const cesareas = r.total_nacimientos > 0
+                    ? ((r.total_cesareas / r.total_nacimientos) * 100).toFixed(1)
+                    : "0.0";
+
+                tbody.innerHTML += `
+            <tr>
+                <td class="text-center">${r.anio}</td>
+                <td class="text-start text-wrap small" style="width: 200px;">${r.nombre_unidad}</td>
+                <td class="text-center">${r.camas_censables}</td>
+                <td class="text-center">${r.quirofanos}</td>
+                <td class="text-center">${r.salas_expulsion}</td>
+                <td class="text-center">${Math.round(r.total_consultas / diasHabiles)}</td>
+                <td class="text-center">${Math.round(r.total_especialidad / diasHabiles)}</td>
+                <td class="text-center">${Math.round(r.total_urgencias / diasNaturales)}</td>
+                <td class="text-center">${r.total_urgencias > 0 ? ((r.total_urgencias_calificadas / r.total_urgencias) * 100).toFixed(1) : 0}%</td>
+                <td class="text-center">${Math.round(r.total_nacimientos / diasNaturales)}</td>
+                <td class="text-center">${cesareas}%</td>
+                <td class="text-center">${(r.total_cirugias_quirofano / (r.quirofanos * diasNaturales || 1)).toFixed(1)}</td>
+                <td class="text-center">${(r.total_nacimientos + r.total_abortos) > 0 ? ((r.total_apeo / (r.total_nacimientos + r.total_abortos)) * 100).toFixed(1) : 0}%</td>
+                <td class="text-center">${ocupacion}%</td>
+                <td class="text-center">${promEstancia}</td>
+                <td class="text-center">${indiceRotacion}</td>
+                <td class="text-center">${interSust}</td>
+                <td class="text-center">${mortalidadCruda}</td>
+                <td class="text-center">${mortalidadAjustada}</td>
+            </tr>`;
+            });
+
+            // --- PAGINACIÓN ---
+            if (paginacion) {
+                paginacion.innerHTML = "";
+                if (totalPaginas > 1) {
+                    for (let i = 1; i <= totalPaginas; i++) {
+                        paginacion.innerHTML += `
+                        <li class="page-item ${i === paginaActual ? "active" : ""}">
+                            <a class="page-link" href="#">${i}</a>
+                        </li>`;
+                    }
+                }
+            }
+        };
+
+        if (paginacion) {
+            paginacion.onclick = e => {
+                e.preventDefault();
+                const link = e.target.closest(".page-link");
+                if (link) {
+                    paginaActual = Number(link.textContent);
+                    pintar();
+                }
+            };
+        }
+        pintar();
+    }
+
+    // ==========================================
+    // 6. COMPONENTE: GRÁFICAS (TENDENCIA Y COMPARATIVO)
+    // ==========================================
+    function renderTendenciaIndicador(data) {
+        const resumen = {};
+        const unidadesSeleccionadas = window.getUnidadesSeleccionadas ? window.getUnidadesSeleccionadas() : [];
+
+        data.forEach(r => {
+            const anio = r.anio, mes = Number(r.mes);
+            if (!resumen[anio]) resumen[anio] = {};
+            if (!resumen[anio][mes]) {
+                resumen[anio][mes] = {
+                    egresos: 0, egresos_48h: 0, estancia: 0, pacientes_dias: 0, camas: 0,
+                    nacimientos: 0, cesareas: 0, defunciones: 0, defunciones_48h: 0, qx: 0, quirofanos: 0,
+                    urgencias: 0, calificadas: 0, apeo: 0, abortos: 0
+                };
+            }
+            const d = resumen[anio][mes];
+            d.egresos += Number(r.total_egresos || 0);
+            d.egresos_48h += Number(r.egresos_48h || 0);
+            d.estancia += Number(r.total_dias_estancia || 0);
+            d.pacientes_dias += Number(r.total_dias_paciente || 0);
+            // IMPORTANTE: Aquí sumamos las camas de todas las unidades del mes
+            d.camas += Number(r.camas_censables || 0);
+            d.nacimientos += Number(r.total_nacimientos || 0);
+            d.cesareas += Number(r.total_cesareas || 0);
+            d.defunciones += Number(r.total_defunciones || 0);
+            d.defunciones_48h += Number(r.defunciones_48h || 0);
+            d.qx += Number(r.total_cirugias_quirofano || 0);
+            d.quirofanos += Number(r.quirofanos || 0);
+            d.urgencias += Number(r.total_urgencias || 0);
+            d.calificadas += Number(r.total_urgencias_calificadas || 0);
+            d.apeo += Number(r.total_apeo || 0);
+            d.abortos += Number(r.total_abortos || 0);
+        });
+
+        const datasets = Object.keys(resumen).sort().map(anio => {
+            const valores = [];
+            for (let m = 1; m <= 12; m++) {
+                const d = resumen[anio][m];
+                let valor = null;
+                if (d && (d.egresos > 0 || d.camas > 0 || d.urgencias > 0)) {
+                    const dictD = { 1: 31, 2: 28, 3: 31, 4: 30, 5: 31, 6: 30, 7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31 };
+                    if (anio % 4 === 0) dictD[2] = 29;
+                    const diasMes = dictD[m];
+
+                    switch (indicadorActivo) {
+                        case "ocupacion":
+                            // Cálculo exacto: (Suma Días Paciente / (Suma Camas * Días Mes))
+                            valor = (d.pacientes_dias / (d.camas * diasMes)) * 100; break;
+                        case "estancia":
+                            valor = d.estancia / d.egresos; break;
+                        case "rotacion":
+                            valor = d.egresos / d.camas; break;
+                        case "intervalo":
+                            valor = ((d.camas * diasMes) - d.pacientes_dias) / d.egresos; break;
+                        case "mortalidad_cruda":
+                            valor = (d.defunciones / d.egresos) * 1000; break;
+                        case "mortalidad_ajustada":
+                            valor = (d.defunciones_48h / d.egresos_48h) * 1000; break;
+                        case "porcentaje_cesareas":
+                            valor = (d.cesareas / d.nacimientos) * 100; break;
+                        case "porcentaje_calificadas":
+                            valor = (d.calificadas / d.urgencias) * 100; break;
+                        case "porcentaje_apeo":
+                            valor = (d.apeo / (d.nacimientos + d.abortos)) * 100; break;
+                        case "prom_inter_qx":
+                            valor = d.qx / (d.quirofanos * diasMes); break;
+                        default: valor = 0;
+                    }
+                }
+                // Si el valor es negativo (por error de datos), forzamos 0. Redondeamos a 1 decimal para limpieza
+                valores.push(valor !== null ? Math.max(0, Number(valor.toFixed(1))) : null);
+            }
+
+            const colores = {
+                "2020": "#64748b", // Slate (Gris neutro)
+                "2021": "#94a3b8", // Slate light
+                "2022": "#6366f1", // Indigo
+                "2023": "#8b5cf6", // Violet (Tu 2023 anterior era gris, este resalta más)
+                "2024": "#0ea5e9", // Sky (Azul brillante - Actual)
+                "2025": "#10b981", // Emerald (Verde)
+                "2026": "#f59e0b", // Amber (Naranja/Dorado)
+                "2027": "#ef4444", // Red (Rojo)
+                "2028": "#ec4899", // Pink
+                "2029": "#8b5cf6", // Purple
+                "2030": "#14b8a6"  // Teal
+            };
+
+            return {
+                label: `Total ${anio}`,
+                data: valores,
+                borderColor: colores[anio] || "#6366f1",
+                backgroundColor: "transparent",
+                tension: 0.3,
+                spanGaps: true
+            };
+        });
+
+        const ctx = document.getElementById("graficaIndicadorPrincipal")?.getContext("2d");
+        if (!ctx) return;
+        if (chartIndicadorPrincipal) chartIndicadorPrincipal.destroy();
+        chartIndicadorPrincipal = new Chart(ctx, {
+            type: "line",
+            data: { labels: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"], datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true } },
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+
+    function renderComparativoAnualIndicador(data) {
+        const resumenAnual = {};
+        const dictDias = { 1: 31, 2: 28, 3: 31, 4: 30, 5: 31, 6: 30, 7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31 };
+
+        data.forEach(r => {
+            const anio = r.anio;
+            if (!resumenAnual[anio]) {
+                resumenAnual[anio] = { sumaDiasPaciente: 0, sumaDisponibilidadCamas: 0 };
+            }
+
+            // Calculamos disponibilidad: camas de la unidad * días del mes que se está sumando
+            const diasDelMes = dictDias[Number(r.mes)] || 30;
+            resumenAnual[anio].sumaDiasPaciente += Number(r.total_dias_paciente || 0);
+            resumenAnual[anio].sumaDisponibilidadCamas += (Number(r.camas_censables || 0) * diasDelMes);
+        });
+
+        const labels = Object.keys(resumenAnual).sort();
+        const valores = labels.map(anio => {
+            const d = resumenAnual[anio];
+            return d.sumaDisponibilidadCamas > 0
+                ? ((d.sumaDiasPaciente / d.sumaDisponibilidadCamas) * 100).toFixed(1)
+                : "0.0";
+        });
+
+        const canvas = document.getElementById("graficaComparativoAnual");
+        if (!canvas) return;
+
+        const ctx = canvas.getContext("2d");
+
+        // --- CREACIÓN DEL DEGRADADO AZUL ---
+        // Definimos el degradado de arriba (0) hacia abajo (400)
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, "rgba(59, 130, 246, 0.5)");   // Azul brillante (Blue 500) con 50% opacidad
+        gradient.addColorStop(1, "rgba(59, 130, 246, 0.0)");   // Totalmente transparente al final
+
+        if (chartComparativoAnual) chartComparativoAnual.destroy();
+
+        chartComparativoAnual = new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: "Ocupación % Anual Real",
+                    data: valores,
+                    borderColor: "#3b82f6",          // Color de la línea (Azul sólido)
+                    backgroundColor: gradient,       // Aplicamos el degradado al fondo
+                    fill: true,                      // Habilitamos el relleno
+                    tension: 0.4,                    // Suavizado de curva
+                    borderWidth: 3,                  // Grosor de la línea
+                    pointRadius: 4,                  // Tamaño de los puntos
+                    pointBackgroundColor: "#3b82f6", // Color de los puntos
+                    pointHoverRadius: 6              // Tamaño del punto al pasar el mouse
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: { color: '#f3f4f6' } // Texto de leyenda claro
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            color: '#9ca3af',
+                            callback: function (value) { return value + "%"; } // Agrega el símbolo %
+                        },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                    },
+                    x: {
+                        ticks: { color: '#9ca3af' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
+    // ==========================================
+    // 7. KPIs SUPERIORES (CORRECCIÓN ÍNDICE ROTACIÓN)
+    // ==========================================
+    function renderKPIsIndicadores(data) {
+        let totDP = 0, totE = 0, totDE = 0, totDispCamas = 0;
+
+        // Para el Índice de Rotación: Necesitamos las camas promedio por unidad
+        const camasPorUnidad = {};
+        const dict = { 1: 31, 2: 28, 3: 31, 4: 30, 5: 31, 6: 30, 7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31 };
+
+        data.forEach(r => {
+            const diasMes = dict[Number(r.mes)] || 30;
+            const anio = r.anio;
+            const unidad = r.clues;
+
+            totDP += Number(r.total_dias_paciente || 0);
+            totE += Number(r.total_egresos || 0);
+            totDE += Number(r.total_dias_estancia || 0);
+            totDispCamas += (Number(r.camas_censables || 0) * diasMes);
+
+            // Agrupamos camas para sacar un promedio real y no una suma infinita
+            if (!camasPorUnidad[unidad]) {
+                camasPorUnidad[unidad] = [];
+            }
+            camasPorUnidad[unidad].push(Number(r.camas_censables || 0));
+        });
+
+        // Calculamos el promedio de camas totales del sistema
+        let promedioCamasSistema = 0;
+        Object.values(camasPorUnidad).forEach(mediciones => {
+            const promedioUnidad = mediciones.reduce((a, b) => a + b, 0) / mediciones.length;
+            promedioCamasSistema += promedioUnidad;
+        });
+
+        // --- CÁLCULOS FINALES ---
+        const ocupacion = totDispCamas > 0 ? (totDP / totDispCamas * 100).toFixed(1) : "0.0";
+        const estancia = totE > 0 ? (totDE / totE).toFixed(1) : "0.0";
+
+        // Aquí es donde obtendrás el ~89.9
+        const rotacion = promedioCamasSistema > 0 ? (totE / promedioCamasSistema).toFixed(1) : "0.0";
+
+        const intervalo = totE > 0 ? ((totDispCamas - totDP) / totE).toFixed(1) : "0.0";
+
+        // Inyectar en el HTML
+        document.getElementById("kpiOcupacion").textContent = `${ocupacion}%`;
+        document.getElementById("kpiEstancia").textContent = `${estancia} días`;
+        document.getElementById("kpiRotacion").textContent = rotacion;
+        document.getElementById("kpiIntervalo").textContent = `${intervalo} días`;
+    }
+
+    function obtenerSeleccionados(selector) {
+        return Array.from(document.querySelectorAll(selector + ":checked")).map(el => el.value);
+    }
+
+    function limpiarGraficas() {
+        if (chartIndicadorPrincipal) chartIndicadorPrincipal.destroy();
+        if (chartComparativoAnual) chartComparativoAnual.destroy();
+    }
+</script>
+
+{% endblock %}

@@ -1,0 +1,86 @@
+<header class="admin-header-modern">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_encabezado_admin.css') }}">
+    <div class="logo-container">
+        <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo" class="logo">
+        <h1>Indicador Hospitalario</h1>
+    </div>
+
+
+    <style>
+        /* Estilos para menú principal */
+        .nav {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+        }
+
+        .nav li {
+            position: relative;
+        }
+
+        .nav>li {
+            margin-right: 20px;
+        }
+
+        /* Estilo del submenú (oculto por defecto) */
+        .nav li ul {
+            display: none;
+            position: absolute;
+            background-color: #fff;
+            padding: 0;
+            margin: 0;
+            border: 1px solid #ccc;
+            z-index: 1000;
+        }
+
+        .nav li:hover ul {
+            display: block;
+        }
+
+        /* Estilo para los ítems del submenú */
+        .nav li ul li {
+            list-style: none;
+            padding: 8px 12px;
+            white-space: nowrap;
+        }
+
+        .nav li ul li a {
+            text-decoration: none;
+            color: #333;
+        }
+
+        .nav li ul li:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+
+    <nav class="modern-nav">
+        <ul class="nav">
+            <li><a href="{{ url_for('admin.crear_usuario') }}">👤 Alta Usuario</a></li>
+            <li>
+                <a href="#">Cargas ▾</a>
+                <ul>
+                    <li><a href="{{ url_for('admin.subir_zip_urgencias') }}"> Urgencias</a></li>
+                    <li><a href="{{ url_for('admin.subir_zip_egresos') }}"> Egresos</a></li>
+                    <li><a href="{{ url_for('admin.subir_sinerhias') }}"> Sinerhias</a></li>
+                     <li><a href="{{ url_for('admin.subir_csv_sis') }}"> SIS</a></li>
+                     
+                </ul>
+            </li>
+
+            <li> <a href="{{ url_for('urgencias.reporte_urgencias') }}">Urgencias</a></li>
+
+
+
+            <li><a href="{{ url_for('main.login') }}">🔒 Cerrar sesión</a></li>
+
+             <li><a href="{{ url_for('admin.vista_reportes') }}">Reportes</a></li>
+        </ul>
+    </nav>
+
+    <div class="usuario-badge">
+        <img src="{{ url_for('static', filename='img/usuario.png') }}" alt="Usuario" class="usuario-img">
+        <span>{{ session['nombre_usuario'] }}</span>
+    </div>
+</header>

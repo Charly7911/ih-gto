@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title if title else "Dashboard Hospitalario" }}</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+        integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+
+    <link rel="shortcut icon" href="{{ url_for('static', filename='salud_favicon.ico') }}">
+</head>
+
+<body>
+
+    {% include 'layout/menu.html' %}
+
+    <div id="page-wrapper">
+
+        <div id="barra-filtros">
+            {% block barra_filtros %}{% endblock %}
+        </div>
+
+        <main id="main-content">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- FOOTER GLOBAL -->
+        <footer class="footer-global" id="footer">
+            <img src="/static/img/pie_1.png" alt="Gobierno del Estado">
+
+            <svg class="ecg-line" viewBox="0 0 1200 100" preserveAspectRatio="none">
+                <path
+                    d="M0 50 L150 50 L170 50 L190 20 L210 80 L230 5 L250 95 L270 50 L400 50 L420 50 L440 25 L460 75 L480 50 L1200 50" />
+            </svg>
+        </footer>
+
+    </div>
+
+    <script>
+        window.addEventListener("scroll", function () {
+            const footer = document.getElementById("footer");
+
+            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 5) {
+                footer.classList.add("footer-visible");
+            } else {
+                footer.classList.remove("footer-visible");
+            }
+        });
+    </script>
+
+</body>
+
+</html>
