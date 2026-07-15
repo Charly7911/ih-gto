@@ -1989,7 +1989,7 @@ def subir_csv_afecciones_morta():
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
 
             if modo in ["actualizar", "reemplazar"]:
-                cursor.execute("DELETE FROM afecciones_morbi WHERE anio = %s", (anio,))
+                cursor.execute("DELETE FROM afecciones_morta WHERE anio = %s", (anio,))
 
             # ============================
             # 🚀 Insertar en bloques

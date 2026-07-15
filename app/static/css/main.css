@@ -91,10 +91,20 @@ canvas {
  flex-direction:column;
 }
 
+#sidebar *{
+    max-width:100%;
+    box-sizing:border-box;
+}
+
+#sidebar{
+    overflow-x:hidden;
+}
+
 
 #main-content{
  margin-left:var(--sidebar-width);
- width:calc(100% - var(--sidebar-width));
+ box-sizing:border-box;
+ width:auto;
  padding:25px;
  flex:1;
  transition:.3s ease;
@@ -1278,14 +1288,20 @@ html,
 body {
   height: 100%;
   margin: 0;
+  overflow-x: hidden !important;
+  width:100%;
 }
 
 #page-wrapper {
   min-height: 100vh;
   display: flex;
+  overflow-x: hidden;
   flex-direction: column;
 }
 
+#main-content{
+    overflow-x: hidden;
+}
 
 
 body {
@@ -1435,7 +1451,7 @@ body {
   /* 4. Tablas: El corazón del ajuste */
   .table-responsive {
     border-radius: 8px;
-    overflow-x: auto !important;
+    overflow-x: hidden !important;
   }
 
   .table {
