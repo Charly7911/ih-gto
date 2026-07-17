@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import pymysql
 pymysql.install_as_MySQLdb()  # ⚡ IMPORTANTE: llamar la función
 import MySQLdb
@@ -17,6 +19,8 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     app.secret_key = Config.SECRET_KEY
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)  # Sesión expira después de 30 minutos de inactividad
+    app.config['SESSION_PERMANENT'] = True
     
     # Tamaño máximo para cargas
     app.config['MAX_CONTENT_LENGTH'] = 250 * 1024 * 1024  # 250 MB

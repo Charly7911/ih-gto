@@ -73,7 +73,7 @@ def login():
                 )
 
 
-            login_user(user)
+            login_user(user, remember=False)
 
             session['user_id'] = user.id
             session['user_rol'] = user.rol_id
