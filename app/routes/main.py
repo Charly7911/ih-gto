@@ -20,7 +20,7 @@ main = Blueprint('main', __name__)
 def login():
 
     if current_user.is_authenticated:
-        return redirect(url_for('egresos.indicadores_page', home=1))
+        return redirect(url_for('bienvenida.inicio'))
 
     form = LoginForm()
 
@@ -41,7 +41,11 @@ def login():
 
             if not user_data:
                 flash('Usuario no encontrado.', 'danger')
-                return render_template('login.html', form=form)
+                return render_template(
+                    'bienvenida/bienvenida.html',
+                    form=form, mostrar_login=True
+                )
+
 
             user = User(
                 id=user_data['id'],
@@ -58,41 +62,80 @@ def login():
                 nombre_oculto=user_data['nombre_oculto']
             )
 
+
             if not user.check_password(password):
+
                 flash('Contraseña incorrecta.', 'danger')
-                return render_template('login.html', form=form)
+
+                return render_template(
+                    'bienvenida/bienvenida.html',
+                    form=form, mostrar_login=True
+                )
+
 
             login_user(user)
 
             session['user_id'] = user.id
             session['user_rol'] = user.rol_id
 
+            current_app.logger.info(
+                f"LOGIN OK: {current_user.username} - autenticado: {current_user.is_authenticated}"
+            )
+
+
+            # Administrador
             if user.rol_id == 6:
-                return redirect(url_for('admin.dashboard', home=1))
+                return redirect(
+                    url_for('bienvenida.inicio')
+                )
 
+
+            # Usuario normal
             if user.rol_id == 1:
-                return redirect(url_for('usuarios.dashboard', home=1))
+                return redirect(
+                    url_for('bienvenida.inicio')
+                )
 
-            return redirect(url_for('egresos.indicadores_page', home=1))
+
+            return redirect(
+                url_for('bienvenida.inicio')
+            )
+
 
         except Exception as e:
+
             current_app.logger.error(e)
-            flash('Error interno del servidor.', 'danger')
+
+            flash(
+                'Error interno del servidor.',
+                'danger'
+            )
+
 
         finally:
             cursor.close()
 
-    return render_template('login.html', form=form)
+
+    return render_template(
+        'bienvenida/bienvenida.html',
+        form=form, mostrar_login=True
+    )
 
 
 
 @main.route('/logout')
 @login_required
 def logout():
-    logout_user()  # Cierra sesión en Flask-Login
-    session.clear()  # Limpia variables de sesión
-    flash("Sesión cerrada correctamente.", "success")
-    return redirect(url_for('main.login'))
+
+    logout_user()
+    session.clear()
+
+    flash(
+        "Sesión cerrada correctamente.",
+        "success"
+    )
+
+    return redirect(url_for('bienvenida.inicio'))
 
 
 @main.route('/acceso-admin')

@@ -8,6 +8,7 @@ from app import mysql
 indicador = Blueprint('indicador', __name__, url_prefix='/indicadores')
 
 @indicador.route("/")
+@login_required
 def dashboard_indicadores():
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
@@ -45,6 +46,7 @@ def dashboard_indicadores():
 
 
 @indicador.route('/api/tabla_base')
+@login_required
 def api_tabla_base():
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     anios = [a for a in request.args.get('anios', '').split(',') if a]

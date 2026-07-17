@@ -13,7 +13,7 @@
     <link rel="shortcut icon" href="{{ url_for('static', filename='salud_favicon.ico') }}">
 </head>
 
-<body>
+<body data-login="{{ 'true' if mostrar_login else 'false' }}">
 
     {% include 'layout/menu.html' %}
 

@@ -9,6 +9,7 @@ urgencias = Blueprint('urgencias', __name__, url_prefix='/urgencias')
 # RUTA PRINCIPAL AL DAR CLIC EN "URGECIAS" DEL MENÚ
 # ------------------------------------------------------
 @urgencias.route('/')
+@login_required
 def inicio_urgencias():
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -47,11 +48,13 @@ def inicio_urgencias():
 
 
 
+
 # ------------------------------------------------------
 # API PARA TABLAS Y GRÁFICAS
 # ------------------------------------------------------
 
 @urgencias.route('/api/reporte_urgencias')
+@login_required 
 def obtener_datos_urgencias():
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -112,6 +115,7 @@ def obtener_datos_urgencias():
 
 
 @urgencias.route('/api/urgencias_por_mes')
+@login_required 
 def urgencias_por_mes():
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)

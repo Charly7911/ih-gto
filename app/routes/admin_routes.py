@@ -1665,6 +1665,7 @@ def subir_imagenes_agenda():
 
 
 @admin.route('/eliminar-imagenes-agenda', methods=['POST'])
+@login_required
 def eliminar_imagenes_agenda():
     # Esto detecta automáticamente /var/www/html/indicador_hospitalario/static/img/agenda
     base_dir = current_app.root_path

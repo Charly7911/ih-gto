@@ -6,6 +6,7 @@ from flask import send_file
 from openpyxl.styles import Font, Alignment
 import re
 from collections import defaultdict
+from flask_login import login_required
 
 reportes = Blueprint('reportes', __name__, url_prefix='/reportes')
 
@@ -14,6 +15,7 @@ reportes = Blueprint('reportes', __name__, url_prefix='/reportes')
 # 1. VISTA (HTML)
 # =========================
 @reportes.route('/<tipo>/reporte')
+@login_required
 def reporte(tipo):
 
     if tipo not in ("morbi", "morta"):
@@ -91,6 +93,7 @@ def reporte(tipo):
 # 2. API JSON (REPORTE)
 # =========================
 @reportes.route('/<tipo>/data')
+@login_required
 def data_reporte(tipo):
 
     if tipo not in ("morbi", "morta"):
@@ -360,6 +363,7 @@ def data_reporte(tipo):
 
 
 @reportes.route('/<tipo>/excel')
+@login_required
 def excel_reporte(tipo):
 
     if tipo not in ("morbi", "morta"):

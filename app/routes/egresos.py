@@ -7,6 +7,7 @@ from app import mysql
 egresos = Blueprint('egresos', __name__, url_prefix='/egresos')
 
 @egresos.route('/indicadores')
+@login_required
 def indicadores_page():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -49,6 +50,7 @@ def indicadores_page():
 
 # Endpoint universal para consultar cualquier indicador:
 @egresos.route('/indicador/<nombre>', methods=['GET'])
+@login_required
 def indicador_egresos(nombre):
     meses = request.args.get('meses')     # ej: "1,2,3"
     tipologias = request.args.get('tipologias')  # ej: "1,2"
@@ -59,6 +61,7 @@ def indicador_egresos(nombre):
 
 # Endpoint universal basado en indicador seleccionado
 @egresos.route('/api/indicadores')
+@login_required
 def api_indicadores():
 
     indicador = request.args.get("indicador")
@@ -84,6 +87,7 @@ def api_indicadores():
 
 
 @egresos.route('/api/camas_censables')
+@login_required
 def camas_censables():
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)

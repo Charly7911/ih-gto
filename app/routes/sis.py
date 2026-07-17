@@ -151,6 +151,7 @@ def dashboard_sis():
     '''
 
 @sis.route("/")
+@login_required
 def dashboard_sis():
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 

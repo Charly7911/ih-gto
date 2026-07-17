@@ -289,8 +289,11 @@
 
 
 
-<div class="modal fade" id="modalBienvenida" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
-    aria-hidden="true">
+{% if mostrar_login %}
+
+<div class="modal fade show" id="modalBienvenida" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
+    aria-hidden="true" style="display:block;">
+
     <div class="modal-dialog modal-fullscreen">
         <div class="modal-content modal-content-full border-0">
             <div class="row g-0 h-100">
@@ -332,23 +335,67 @@
 
                             <div class="row g-4 mb-4 border-top pt-4">
                                 <div class="col-6">
-                                    <h6 class="fw-bold"><i class="bi bi-shield-check text-primary"></i> Confidencialidad
+                                    <h6 class="fw-bold">
+                                        <i class="bi bi-shield-check text-primary"></i> Confidencialidad
                                     </h6>
                                     <p class="small text-muted mb-0">Uso exclusivo institucional.</p>
                                 </div>
+
                                 <div class="col-6">
-                                    <h6 class="fw-bold"><i class="bi bi-database-check text-success"></i> Sincronización
+                                    <h6 class="fw-bold">
+                                        <i class="bi bi-database-check text-success"></i> Sincronización
                                     </h6>
                                     <p class="small text-muted mb-0">Datos validados DGIS.</p>
                                 </div>
                             </div>
 
-                            <div class="d-grid mt-5">
-                                <button type="button" class="btn btn-lg text-white p-3 fs-4 fw-bold btn-pulse"
-                                    data-bs-dismiss="modal" style="background-color: #004a80; border-radius: 15px;">
-                                    INGRESAR AHORA <i class="bi bi-arrow-right-circle ms-2"></i>
+                            {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                            {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show mb-4" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert">
                                 </button>
                             </div>
+                            {% endfor %}
+                            {% endif %}
+                            {% endwith %}
+                            <!-- LOGIN -->
+                            <form method="POST" action="{{ url_for('main.login') }}">
+
+                                {{ form.hidden_tag() }}
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">
+                                        <i class="bi bi-person-fill me-2"></i>Usuario
+                                    </label>
+
+                                    <input type="text" class="form-control form-control-lg" name="username" required>
+                                </div>
+
+
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">
+                                        <i class="bi bi-key-fill me-2"></i>Contraseña
+                                    </label>
+
+                                    <input type="password" class="form-control form-control-lg" name="password"
+                                        required>
+                                </div>
+
+
+                                <div class="d-grid mt-4">
+                                    <button type="submit" class="btn btn-lg text-white p-3 fs-4 fw-bold btn-pulse"
+                                        style="background-color:#004a80; border-radius:15px;">
+
+                                        INGRESAR AHORA
+                                        <i class="bi bi-arrow-right-circle ms-2"></i>
+
+                                    </button>
+                                </div>
+
+                            </form>
+
                         </div>
                     </div>
                 </div>
@@ -356,35 +403,50 @@
         </div>
     </div>
 </div>
+<div class="modal-backdrop fade show"></div>
 
+{% endif %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+
+        setTimeout(function () {
+
+            document.querySelectorAll('.alert').forEach(function (alerta) {
+
+                alerta.classList.remove('show');
+
+                setTimeout(function () {
+                    alerta.remove();
+                }, 300);
+
+            });
+
+        }, 5000);
+
+    });
+</script>
 <script>
     (function () {
-        // Ejecución inmediata: Verificamos antes de que se pinte el DOM si es posible
-        const modalId = 'modalBienvenida';
 
         document.addEventListener("DOMContentLoaded", function () {
-            // 1. Verificar si ya se mostró en esta sesión
-            if (sessionStorage.getItem("bienvenidaVistaSesion") === "true") {
-                // Si ya se vio, nos aseguramos de que el modal no se abra y salimos
+
+            const mostrarLogin = document.body.dataset.login === "true";
+
+            if (!mostrarLogin) {
                 return;
             }
 
-            // 2. Si no se ha visto, procedemos a mostrarlo
-            const modalElement = document.getElementById(modalId);
+            const modalElement = document.getElementById('modalBienvenida');
 
             if (modalElement && typeof bootstrap !== 'undefined') {
+
                 const miModal = new bootstrap.Modal(modalElement);
                 miModal.show();
 
-                // 3. Marcamos como visto INMEDIATAMENTE
-                sessionStorage.setItem("bienvenidaVistaSesion", "true");
-
-                // 4. Refuerzo: Si el usuario cierra el modal manualmente, aseguramos la marca
-                modalElement.addEventListener('hidden.bs.modal', function () {
-                    sessionStorage.setItem("bienvenidaVistaSesion", "true");
-                });
             }
+
         });
+
     })();
 </script>
 

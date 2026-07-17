@@ -11,6 +11,7 @@ grafica = Blueprint("grafica", __name__, url_prefix="/grafica")
 
 
 @grafica.route("/")
+@login_required
 def grafica_home():
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
@@ -221,7 +222,7 @@ def generar_total_general(
 
 
 @grafica.route("/api/indicadores")
-   
+@login_required
 def indicadores():
 
 
@@ -1403,6 +1404,7 @@ def procesar_tabla_estatica(
 
 
 @grafica.route("/api/unidades")
+@login_required
 def unidades():
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     # Hacemos JOIN con el catálogo para traer el nombre real

@@ -83,7 +83,7 @@
 
         ---
 
-        {% if current_user.is_authenticated and es_home %}
+        {% if current_user.is_authenticated and current_user.rol_id == 6 and es_home %}
         <p class="menu-section">⚙️ Administración</p>
         <a href="{{ url_for('admin.crear_usuario') }}" class="menu-item">👤 Crear usuario</a>
         <a href="{{ url_for('admin.subir_zip_egresos') }}" class="menu-item">📦 Cargar BD Egresos</a>
@@ -97,12 +97,17 @@
         <a href="{{ url_for('admin.subir_equipo_medico') }}" class="menu-item">📦 Cargar BD EQUIPO MEDICO</a>
         <a href="{{ url_for('admin.subir_imagenes_agenda') }}" class="menu-item">📦 Cargar JPG Agenda</a>
         <div class="menu-divider"></div>
-        <a href="/logout" class="menu-item logout">🚪 Cerrar sesión</a>
+
         {% endif %}
 
-        {# Botón de salir si no es home #}
-        {% if not es_home and current_user.is_authenticated %}
-        <a href="/logout" class="menu-item logout" style="margin-top: 20px; opacity: 0.5;">🚪 Cerrar Sesión</a>
+        {# CERRAR SESIÓN PARA TODOS LOS USUARIOS AUTENTICADOS #}
+
+        {% if current_user.is_authenticated %}
+
+        <a href="{{ url_for('main.logout') }}" class="menu-item logout" style="margin-top:20px;">
+            🚪 Cerrar Sesión
+        </a>
+
         {% endif %}
     </nav>
 
