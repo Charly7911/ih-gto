@@ -1572,7 +1572,7 @@ def subir_csv_sis():
                     SUM(CASE WHEN sr.variable = 'HOS03' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
                     SUM(CASE WHEN sr.variable = 'HOS05' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
                     SUM(CASE WHEN sr.variable = 'HPH12' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
-                    SUM(CASE WHEN sr.variable = 'LAB01' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+                    SUM(CASE WHEN sr.variable IN ('LAB01', 'LAB03', 'LAB05','LAB07') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
                     SUM(CASE WHEN sr.variable = 'LRX01' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
                     SUM(CASE WHEN sr.variable = 'LAP01' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
                     SUM(CASE WHEN sr.variable = 'LOE01' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
