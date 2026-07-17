@@ -1300,7 +1300,7 @@ body {
 }
 
 #main-content{
-    overflow-x: hidden;
+    overflow-x: auto;
 }
 
 
@@ -1451,7 +1451,7 @@ body {
   /* 4. Tablas: El corazón del ajuste */
   .table-responsive {
     border-radius: 8px;
-    overflow-x: hidden !important;
+    overflow-x: auto !important;
   }
 
   .table {
@@ -1672,6 +1672,17 @@ body {
         transform: scale(1);
     }
 
+}
+
+/* Corrección scroll tabla indicadores en laptops */
+.table-responsive {
+    overflow-x: auto !important;
+    overflow-y: hidden;
+    width: 100%;
+}
+
+#tablaIndicadores {
+    min-width: 1200px;
 }
 
 

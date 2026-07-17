@@ -72,9 +72,9 @@ def login():
                     form=form, mostrar_login=True
                 )
 
-
+            
             login_user(user, remember=False)
-
+            session.permanent = False
             session['user_id'] = user.id
             session['user_rol'] = user.rol_id
 

@@ -21,6 +21,9 @@ def create_app():
     app.secret_key = Config.SECRET_KEY
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)  # Sesión expira después de 30 minutos de inactividad
     app.config['SESSION_PERMANENT'] = False  # La sesión no es permanente por defecto
+    # Seguridad cookies
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['REMEMBER_COOKIE_DURATION'] = timedelta(seconds=0)
     
     # Tamaño máximo para cargas
     app.config['MAX_CONTENT_LENGTH'] = 250 * 1024 * 1024  # 250 MB

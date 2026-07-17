@@ -14,7 +14,7 @@
     ================================ -->
         <div class="row mb-4">
             <!-- CALIFICADAS VS NO -->
-            <div class="col-md-6">
+            <div class="col-xl-6 col-lg-6 col-md-12">
                 <div class="card h-100">
                     <div class="card-body text-center">
                         <h6 class="text-muted mb2" id="tituloClasificacion">Calificadas vs No Calificadas</h6>
@@ -28,7 +28,7 @@
             </div>
 
             <!-- TIPO DE ATENCIÓN -->
-            <div class="col-md-6">
+            <div class="col-xl-6 col-lg-6 col-md-12">
                 <div class="card h-100">
                     <div class="card-body text-center">
                         <h6 class="text-muted mb2" id="tituloMotivo">Motivo de Atención</h6>
@@ -87,42 +87,48 @@
         <div class="card mb-4">
             <div class="card-body">
                 <h5>📊 Calificadas vs No Calificadas por Año</h5>
-                <div style="height: 450px;">
+                <div class="chart-large-container">
                     <canvas id="graficaPorAnio"></canvas>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- ===============================
+    <!-- ===============================
          GRÁFICA LINEAS
     ================================ -->
 
-        <div class="card mb-4">
-            <div class="card-body">
+    <div class="card mb-4">
+        <div class="card-body">
 
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h5 class="mb-0">📈 Total Urgencias por Mes</h5>
+            <div class="d-flex justify-content-between align-items-center mb-3">
 
-                    <select id="selectMotivo" class="form-select form-select-sm" style="width: 200px;">
-                        <option value="">Todos</option>
-                        <option value="Medica">Médica</option>
-                        <option value="Pediatrica">Pediátrica</option>
-                        <option value="Ginecobstetricia">Ginecobstetricia</option>
-                        <option value="Accidentes">Accidentes</option>
-                    </select>
-                </div>
+                <h6 class="text-muted mb-0">
+                    📈 Total Urgencias por Mes
+                </h6>
 
-                <div style="height: 360px;">
-                    <canvas id="graficaLineaMeses"></canvas>
-                </div>
+                <select id="selectMotivo" class="form-select form-select-sm" style="width:200px;">
+                    <option value="">Todos</option>
+                    <option value="Medica">Médica</option>
+                    <option value="Pediatrica">Pediátrica</option>
+                    <option value="Ginecobstetricia">Ginecobstetricia</option>
+                    <option value="Accidentes">Accidentes</option>
+                </select>
 
             </div>
+
+
+            <div class="chart-container chart-linea">
+                <canvas id="graficaLineaMeses"></canvas>
+            </div>
+
         </div>
-
-
-
-
     </div>
+
+
+
+
+</div>
 </div>
 
 <!-- ===============================
