@@ -1,0 +1,265 @@
+/* =====================================================
+   BIENVENIDA / LOGIN SIH
+===================================================== */
+
+:root{
+    --salud-primary:#004a80;
+    --salud-dark:#002e50;
+}
+
+/* =====================================================
+   MODAL LOGIN
+===================================================== */
+
+#modalBienvenida{
+    z-index:99999!important;
+}
+
+.modal-backdrop{
+    z-index:99998!important;
+}
+
+.modal-fullscreen{
+    margin:0!important;
+    padding:0!important;
+}
+
+.modal-content-full{
+    height:100vh!important;
+    min-height:100vh;
+    border-radius:0!important;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+}
+
+.modal-content-full>.row{
+    height:100%;
+    margin:0;
+}
+
+.login-panel{
+    overflow:hidden;
+}
+
+/* =====================================================
+   TITULOS DINAMICOS
+===================================================== */
+
+.titulo-sih{
+    font-size:clamp(3rem,12vh,8rem)!important;
+    line-height:.9;
+    letter-spacing:-3px;
+}
+
+.titulo-centro{
+    font-size:clamp(1.8rem,5vh,3.5rem)!important;
+    line-height:1.1;
+}
+
+.titulo-panel{
+    font-size:clamp(1.8rem,4vw,3.5rem)!important;
+    line-height:1.1;
+}
+
+.texto-descripcion{
+    font-size:clamp(1rem,2vh,1.5rem)!important;
+}
+
+.subtitulo-panel{
+    width:100%!important;
+    max-width:600px;
+    font-size:clamp(.9rem,1.5vw,1.25rem)!important;
+}
+
+/* =====================================================
+   LOGO
+===================================================== */
+
+.logo-container img{
+    width:auto;
+    height:auto;
+    max-height:25vh!important;
+}
+
+/* =====================================================
+   COLORES INSTITUCIONALES
+===================================================== */
+
+.bg-institucional{
+    background:linear-gradient(
+        135deg,
+        var(--salud-primary),
+        var(--salud-dark)
+    );
+}
+
+/* =====================================================
+   BOTON ANIMADO
+===================================================== */
+
+.btn-pulse{
+    animation:pulse-blue 2s infinite;
+}
+
+@keyframes pulse-blue{
+
+    0%{
+        box-shadow:0 0 0 0 rgba(0,74,128,.7);
+    }
+
+    70%{
+        box-shadow:0 0 0 15px rgba(0,74,128,0);
+    }
+
+    100%{
+        box-shadow:0 0 0 0 rgba(0,74,128,0);
+    }
+
+}
+
+/* =====================================================
+   PANEL PRINCIPAL
+===================================================== */
+
+.hero-gradient{
+    width:100%;
+}
+
+.card-subsistema{
+    display:flex;
+    flex-direction:column;
+    height:100%;
+    min-height:280px;
+}
+
+/* =====================================================
+   AJUSTES LAPTOP
+===================================================== */
+
+@media(max-height:850px) and (min-width:992px){
+
+    .p-4.p-md-5{
+        padding:2rem!important;
+    }
+
+    .titulo-centro{
+        font-size:2.3rem!important;
+    }
+
+    .texto-descripcion{
+        margin-bottom:2rem!important;
+    }
+
+    .logo-container img{
+        max-height:18vh!important;
+    }
+
+}
+
+/* =====================================================
+   TABLETS Y LAPTOPS PEQUEÑAS
+===================================================== */
+
+@media(max-width:992px){
+
+    .hero-gradient{
+        padding-top:2rem!important;
+        padding-bottom:2rem!important;
+    }
+
+    .titulo-panel{
+        font-size:2rem!important;
+    }
+
+    .subtitulo-panel{
+        font-size:1rem!important;
+    }
+
+    .card-subsistema{
+        min-height:240px;
+    }
+
+    .card-subsistema .icon-box{
+        width:45px;
+        height:45px;
+        font-size:1.2rem;
+    }
+
+    .card-subsistema h4{
+        font-size:1rem;
+    }
+
+    .card-subsistema p{
+        font-size:.85rem!important;
+    }
+
+    .btn-modulo{
+        padding:8px 12px;
+        font-size:.75rem;
+    }
+
+    /* Login en tablet */
+
+    #modalBienvenida .login-panel{
+        overflow-y:auto;
+        align-items:flex-start!important;
+    }
+
+}
+
+
+/* =====================================================
+   AJUSTE DE MODULOS
+===================================================== */
+
+.home-modulos .card-subsistema{
+    border-radius:14px;
+}
+
+.home-modulos .btn-modulo{
+    margin-top:auto;
+}
+
+
+/* =====================================================
+   ALTURA REDUCIDA EN LAPTOP
+===================================================== */
+
+@media(max-height:750px) and (min-width:768px){
+
+    .hero-gradient{
+        padding-top:1.5rem!important;
+        padding-bottom:1.5rem!important;
+    }
+
+    .card-subsistema{
+        min-height:230px;
+    }
+
+    .titulo-panel{
+        font-size:1.8rem!important;
+    }
+
+    .subtitulo-panel{
+        font-size:.9rem!important;
+    }
+
+    .card-subsistema p{
+        margin-bottom:1rem!important;
+    }
+
+}
+
+
+/* =====================================================
+   TABLET HORIZONTAL
+===================================================== */
+
+@media(max-width:1200px) and (min-width:768px){
+
+    .home-modulos .col-md-4{
+        width:50%!important;
+    }
+
+}
