@@ -20,7 +20,7 @@ def create_app():
     app.config.from_object(Config)
     app.secret_key = Config.SECRET_KEY
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)  # Sesión expira después de 30 minutos de inactividad
-    app.config['SESSION_PERMANENT'] = True
+    app.config['SESSION_PERMANENT'] = False  # La sesión no es permanente por defecto
     
     # Tamaño máximo para cargas
     app.config['MAX_CONTENT_LENGTH'] = 250 * 1024 * 1024  # 250 MB
@@ -28,6 +28,7 @@ def create_app():
     # Inicializar extensiones
     mysql.init_app(app)
     login_manager.init_app(app)
+    login_manager.session_protection = "strong"
     csrf.init_app(app)
 
         
