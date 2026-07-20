@@ -662,8 +662,25 @@
     // FETCH
     // =========================
     fetch("/grafica/api/indicadores?" + params.toString())
-      .then((r) => r.json())
+      .then((r) => {
+
+        // Si Flask redirige al login porque se perdió la sesión
+        if (r.redirected) {
+          window.location.href = r.url;
+          return null;
+        }
+
+        // Si la ruta responde sin autorización
+        if (r.status === 401) {
+          window.location.href = "/login";
+          return null;
+        }
+
+        return r.json();
+      })
       .then((data) => {
+
+        if (!data) return;
 
         console.log("DATA COMPLETA API:", data);
 
@@ -689,6 +706,7 @@
         );
 
         renderGrafica(data);
+
       })
       .catch((err) => {
         console.error("Error:", err);
