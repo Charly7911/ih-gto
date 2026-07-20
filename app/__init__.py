@@ -20,8 +20,6 @@ def create_app():
     app.config.from_object(Config)
     app.secret_key = Config.SECRET_KEY
     app.config['SESSION_PERMANENT'] = False  # La sesión no es permanente por defecto
-    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)  # Sesión expira después de 30 minutos de inactividad
-    app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=7)
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     
     

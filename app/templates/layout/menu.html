@@ -2220,9 +2220,18 @@
 
         });
 
-        document.getElementById("btnUnidades").addEventListener("click", function () {
-            document.querySelector(".popover-unidades").classList.toggle("open");
-        });
+        const btnUnidadesFinal = document.getElementById("btnUnidades");
+        const popoverUnidadesFinal = document.querySelector(".popover-unidades");
+
+        if (btnUnidadesFinal && popoverUnidadesFinal) {
+
+            btnUnidadesFinal.addEventListener("click", function () {
+
+                popoverUnidadesFinal.classList.toggle("open");
+
+            });
+
+        }
 
         document.querySelectorAll('.acordeon-indicadores').forEach((el) => {
             el.addEventListener('toggle', (e) => {
