@@ -19,9 +19,11 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     app.secret_key = Config.SECRET_KEY
+
     app.config['SESSION_PERMANENT'] = False  # La sesión no es permanente por defecto
     app.config['SESSION_COOKIE_HTTPONLY'] = True
-    
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config.pop('PERMANENT_SESSION_LIFETIME', None)
     
     # Tamaño máximo para cargas
     app.config['MAX_CONTENT_LENGTH'] = 250 * 1024 * 1024  # 250 MB
