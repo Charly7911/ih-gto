@@ -964,6 +964,11 @@
         anio: anioNom
       });
 
+      // Evitar líneas vacías
+      if (valores.every(v => Number(v) === 0)) {
+        return [];
+      }
+
 
       const baseDataset = {
         label: `${unidadLimpia} - ${indicadorNom} (${anioNom})`,
