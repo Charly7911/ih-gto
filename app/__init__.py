@@ -29,7 +29,7 @@ def create_app():
     # Inicializar extensiones
     mysql.init_app(app)
     login_manager.init_app(app)
-    login_manager.session_protection = "strong"
+    login_manager.session_protection = "basic"
     csrf.init_app(app)
 
         
