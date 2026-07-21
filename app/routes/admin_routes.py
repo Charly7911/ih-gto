@@ -1,13 +1,9 @@
-from collections import defaultdict
 
-from datetime import datetime
-import sqlite3
 import numpy as np
 import pandas as pd
 import zipfile
 import os
 import shutil
-import zipfile
 import MySQLdb
 from flask import Blueprint, current_app, render_template, request, redirect, session, url_for, flash
 from flask_login import login_required, current_user
@@ -492,7 +488,8 @@ def subir_zip_egresos():
 
 
 def procesar_txt_detallado_egresos(carga_id, carpeta_destino, anio, modo_carga='agregar', bloque_size=10000):
-    import csv, os
+    import csv
+    import os
     print(f"➡️ Iniciando Procesamiento Inteligente. Año: {anio}")
     
     conn = mysql.connection

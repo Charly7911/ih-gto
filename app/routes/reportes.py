@@ -377,7 +377,6 @@ def excel_reporte(tipo):
     if not tabla:
         abort(404)
 
-    import mysql
     datos = data_reporte(tipo).get_json()
 
     meses_nombre = {

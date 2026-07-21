@@ -1,7 +1,6 @@
 # app/routes/main.py
-import traceback
 import MySQLdb
-from flask import Blueprint, current_app, flash, render_template, redirect, request, session, url_for
+from flask import Blueprint, current_app, flash, render_template, redirect, session, url_for
 from flask_login import login_required, login_user, current_user, logout_user
 from app import mysql
 from app.models import User

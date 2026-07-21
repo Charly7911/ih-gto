@@ -1,7 +1,6 @@
 import MySQLdb
 from flask import Blueprint, request, jsonify, render_template
 from flask_login import login_required
-from app.controllers.egresos_controller import obtener_indicador
 from app import mysql
 
 

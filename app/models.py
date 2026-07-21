@@ -1,6 +1,5 @@
 from flask_login import UserMixin, AnonymousUserMixin
 from werkzeug.security import check_password_hash
-from datetime import datetime
 
 
 class User(UserMixin):

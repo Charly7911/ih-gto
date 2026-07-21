@@ -1,5 +1,4 @@
 # utils/egresos_queries.py
-import MySQLdb
 
 def _csv_to_list(param):
     if isinstance(param, list):

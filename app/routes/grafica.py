@@ -1,11 +1,9 @@
 import MySQLdb
-from flask import Blueprint, current_app, request, jsonify, render_template
+from flask import Blueprint, request, jsonify, render_template
 from flask_login import login_required, current_user
-from app.controllers.egresos_controller import obtener_indicador
 from app import mysql
 import calendar
 from collections import defaultdict
-import sys
 
 grafica = Blueprint("grafica", __name__, url_prefix="/grafica")
 
