@@ -834,10 +834,10 @@ def indicadores():
             return float(value or 0)
         
         
-        def calcular_ocupacion(dias_estancia, dias_cama):
-            dias_estancia = float(dias_estancia or 0)
+        def calcular_ocupacion(dias_paciente, dias_cama):
+            dias_paciente = float(dias_paciente or 0)
             dias_cama = float(dias_cama or 0)
-            return (dias_estancia / dias_cama) * 100 if dias_cama else 0
+            return (dias_paciente / dias_cama) * 100 if dias_cama else 0
         
 
         
@@ -859,6 +859,12 @@ def indicadores():
             dias_est_ped = f(data["dias_est_ped"])
             dias_est_gin = f(data["dias_est_gin"])
             dias_est_otr = f(data["dias_est_otros"])
+
+            dias_p_med = f(data["dias_p_med_int"])
+            dias_p_cir = f(data["dias_p_cirugia"])
+            dias_p_ped = f(data["dias_p_pediatria"])
+            dias_p_gin = f(data["dias_p_gineco"])
+            dias_p_otr = f(data["dias_p_otros"])
 
             egresos_med = f(data["egre_med_interna"])
             egresos_cir = f(data["egre_cirugia"])
@@ -911,17 +917,35 @@ def indicadores():
                     else 0
                 ),
 
-                "porcentaje_ocupacion": calcular_ocupacion(f(data["dias_p"]), f(data["dias_cama_total"])),
+                "porcentaje_ocupacion": calcular_ocupacion(
+                    f(data["dias_p"]),
+                    f(data["dias_cama_total"])
+                ),
 
-                "porcentaje_ocupacion_med_interna": calcular_ocupacion(dias_est_med, f(data["dias_cama_med"])),
+                "porcentaje_ocupacion_med_interna": calcular_ocupacion(
+                    f(data["dias_p_med_int"]),
+                    f(data["dias_cama_med"])
+                ),
 
-                "porcentaje_ocupacion_cirugia": calcular_ocupacion(dias_est_cir, f(data["dias_cama_cir"])),
+                "porcentaje_ocupacion_cirugia": calcular_ocupacion(
+                    f(data["dias_p_cirugia"]),
+                    f(data["dias_cama_cir"])
+                ),
 
-                "porcentaje_ocupacion_pediatria": calcular_ocupacion(dias_est_ped, f(data["dias_cama_ped"])),
+                "porcentaje_ocupacion_pediatria": calcular_ocupacion(
+                    f(data["dias_p_pediatria"]),
+                    f(data["dias_cama_ped"])
+                ),
 
-                "porcentaje_ocupacion_gineco": calcular_ocupacion(dias_est_gin, f(data["dias_cama_gin"])),
+                "porcentaje_ocupacion_gineco": calcular_ocupacion(
+                    f(data["dias_p_gineco"]),
+                    f(data["dias_cama_gin"])
+                ),
 
-                "porcentaje_ocupacion_otros": calcular_ocupacion(dias_est_otr, f(data["dias_cama_otros"])),
+                "porcentaje_ocupacion_otros": calcular_ocupacion(
+                    f(data["dias_p_otros"]),
+                    f(data["dias_cama_otros"])
+                ),
 
 
                 "prom_dias_estancia": (
