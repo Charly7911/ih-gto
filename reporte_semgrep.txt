@@ -1,0 +1,469 @@
+                    
+                    
+┌──────────────────┐
+│ 43 Code Findings │
+└──────────────────┘
+                                             
+  [36m[22m[24m  app/routes/admin_routes.py[0m
+   ❯❯❱ [1mpython.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query[0m
+          Avoiding SQL string concatenation: untrusted input concatenated with raw SQL query can result in SQL
+          Injection. In order to execute raw query safely, prepared statement should be used. SQLAlchemy      
+          provides TextualSQL to easily used prepared statement with named parameters. For complex SQL        
+          composition, use SQL Expression Language or Schema Definition Language. In most cases, SQLAlchemy   
+          ORM will be a better option.                                                                        
+          Details: https://sg.run/2b1L                                                                        
+                                                                                                              
+          1334┆ cursor.execute(query, tuple(valores))
+                                        
+  [36m[22m[24m  app/routes/grafica.py[0m
+   ❯❯❱ [1mpython.django.security.injection.tainted-sql-string.tainted-sql-string[0m
+          Detected user input used to manually construct a SQL string. This is usually bad practice because 
+          manual construction could accidentally result in a SQL injection. An attacker could use a SQL     
+          injection to steal or modify contents of the database. Instead, use a parameterized query which is
+          available by default in most database engines. Alternatively, consider using the Django object-   
+          relational mappers (ORM) instead of raw SQL queries.                                              
+          Details: https://sg.run/PbZp                                                                      
+                                                                                                            
+          567┆ query_e = f"""
+          568┆         SELECT
+          569┆             e.anio,
+          570┆             {select_mes}
+          571┆             e.clues,
+          572┆             e.nombre_unidad,
+          573┆
+          574┆             -- EGRESOS Y NACIMIENTOS (TABLA PRINCIPAL)
+          575┆             SUM(e.total_egresos) AS total_egresos,
+          576┆             SUM(e.defunciones) AS egre_defunciones,
+             [hid 248 additional lines, adjust with --max-lines-per-finding] 
+   
+   ❯❯❱ [1mpython.flask.security.injection.tainted-sql-string.tainted-sql-string[0m
+          Detected user input used to manually construct a SQL string. This is usually bad practice because 
+          manual construction could accidentally result in a SQL injection. An attacker could use a SQL     
+          injection to steal or modify contents of the database. Instead, use a parameterized query which is
+          available by default in most database engines. Alternatively, consider using an object-relational 
+          mapper (ORM) such as SQLAlchemy which will protect your queries.                                  
+          Details: https://sg.run/JxZj                                                                      
+                                                                                                            
+          567┆ query_e = f"""
+          568┆         SELECT
+          569┆             e.anio,
+          570┆             {select_mes}
+          571┆             e.clues,
+          572┆             e.nombre_unidad,
+          573┆
+          574┆             -- EGRESOS Y NACIMIENTOS (TABLA PRINCIPAL)
+          575┆             SUM(e.total_egresos) AS total_egresos,
+          576┆             SUM(e.defunciones) AS egre_defunciones,
+             [hid 248 additional lines, adjust with --max-lines-per-finding] 
+   
+   ❯❯❱ [1mpython.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query[0m
+          Avoiding SQL string concatenation: untrusted input concatenated with raw SQL query can result in SQL
+          Injection. In order to execute raw query safely, prepared statement should be used. SQLAlchemy      
+          provides TextualSQL to easily used prepared statement with named parameters. For complex SQL        
+          composition, use SQL Expression Language or Schema Definition Language. In most cases, SQLAlchemy   
+          ORM will be a better option.                                                                        
+          Details: https://sg.run/2b1L                                                                        
+                                                                                                              
+          826┆ cur.execute(query_e, params_e)
+            ⋮┆----------------------------------------
+          1410┆ cur.execute(query, params)
+                                          
+  [36m[22m[24m  app/routes/indicador.py[0m
+   ❯❯❱ [1mpython.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query[0m
+          Avoiding SQL string concatenation: untrusted input concatenated with raw SQL query can result in SQL
+          Injection. In order to execute raw query safely, prepared statement should be used. SQLAlchemy      
+          provides TextualSQL to easily used prepared statement with named parameters. For complex SQL        
+          composition, use SQL Expression Language or Schema Definition Language. In most cases, SQLAlchemy   
+          ORM will be a better option.                                                                        
+          Details: https://sg.run/2b1L                                                                        
+                                                                                                              
+          190┆ cursor.execute(query, valores_totales)
+                                         
+  [36m[22m[24m  app/routes/reportes.py[0m
+    ❯❱ [1mpython.lang.security.audit.formatted-sql-query.formatted-sql-query[0m
+          Detected possible formatted SQL query. Use parameterized queries instead.
+          Details: https://sg.run/EkWw                                             
+                                                                                   
+           47┆ cur.execute(f"""
+           48┆     SELECT DISTINCT grupo
+           49┆     FROM {tabla}
+           50┆     ORDER BY grupo
+           51┆ """)
+   
+   ❯❯❱ [1mpython.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query[0m
+          Avoiding SQL string concatenation: untrusted input concatenated with raw SQL query can result in SQL
+          Injection. In order to execute raw query safely, prepared statement should be used. SQLAlchemy      
+          provides TextualSQL to easily used prepared statement with named parameters. For complex SQL        
+          composition, use SQL Expression Language or Schema Definition Language. In most cases, SQLAlchemy   
+          ORM will be a better option.                                                                        
+          Details: https://sg.run/2b1L                                                                        
+                                                                                                              
+           47┆ cur.execute(f"""
+           48┆     SELECT DISTINCT grupo
+           49┆     FROM {tabla}
+           50┆     ORDER BY grupo
+           51┆ """)
+   
+   ❯❯❱ [1mpython.flask.security.injection.tainted-sql-string.tainted-sql-string[0m
+          Detected user input used to manually construct a SQL string. This is usually bad practice because 
+          manual construction could accidentally result in a SQL injection. An attacker could use a SQL     
+          injection to steal or modify contents of the database. Instead, use a parameterized query which is
+          available by default in most database engines. Alternatively, consider using an object-relational 
+          mapper (ORM) such as SQLAlchemy which will protect your queries.                                  
+          Details: https://sg.run/JxZj                                                                      
+                                                                                                            
+           47┆ cur.execute(f"""
+           48┆     SELECT DISTINCT grupo
+           49┆     FROM {tabla}
+           50┆     ORDER BY grupo
+           51┆ """)
+   
+    ❯❱ [1mpython.lang.security.audit.formatted-sql-query.formatted-sql-query[0m
+          Detected possible formatted SQL query. Use parameterized queries instead.
+          Details: https://sg.run/EkWw                                             
+                                                                                   
+           57┆ cur.execute(f"""
+           58┆     SELECT DISTINCT especialidad
+           59┆     FROM {tabla}
+           60┆     WHERE especialidad IS NOT NULL
+           61┆     AND especialidad <> ''
+           62┆     ORDER BY especialidad
+           63┆ """)
+   
+   ❯❯❱ [1mpython.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query[0m
+          Avoiding SQL string concatenation: untrusted input concatenated with raw SQL query can result in SQL
+          Injection. In order to execute raw query safely, prepared statement should be used. SQLAlchemy      
+          provides TextualSQL to easily used prepared statement with named parameters. For complex SQL        
+          composition, use SQL Expression Language or Schema Definition Language. In most cases, SQLAlchemy   
+          ORM will be a better option.                                                                        
+          Details: https://sg.run/2b1L                                                                        
+                                                                                                              
+           57┆ cur.execute(f"""
+           58┆     SELECT DISTINCT especialidad
+           59┆     FROM {tabla}
+           60┆     WHERE especialidad IS NOT NULL
+           61┆     AND especialidad <> ''
+           62┆     ORDER BY especialidad
+           63┆ """)
+   
+   ❯❯❱ [1mpython.flask.security.injection.tainted-sql-string.tainted-sql-string[0m
+          Detected user input used to manually construct a SQL string. This is usually bad practice because 
+          manual construction could accidentally result in a SQL injection. An attacker could use a SQL     
+          injection to steal or modify contents of the database. Instead, use a parameterized query which is
+          available by default in most database engines. Alternatively, consider using an object-relational 
+          mapper (ORM) such as SQLAlchemy which will protect your queries.                                  
+          Details: https://sg.run/JxZj                                                                      
+                                                                                                            
+           57┆ cur.execute(f"""
+           58┆     SELECT DISTINCT especialidad
+           59┆     FROM {tabla}
+           60┆     WHERE especialidad IS NOT NULL
+           61┆     AND especialidad <> ''
+           62┆     ORDER BY especialidad
+           63┆ """)
+   
+    ❯❱ [1mpython.lang.security.audit.formatted-sql-query.formatted-sql-query[0m
+          Detected possible formatted SQL query. Use parameterized queries instead.
+          Details: https://sg.run/EkWw                                             
+                                                                                   
+           70┆ cur.execute(f"""
+           71┆     SELECT DISTINCT c.nombre_unidad AS unidad
+           72┆     FROM {tabla} m
+           73┆     LEFT JOIN catalogo_unidades c
+           74┆         ON m.clues = c.clues
+           75┆     WHERE c.nombre_unidad IS NOT NULL
+           76┆     ORDER BY unidad ASC
+           77┆ """)
+   
+   ❯❯❱ [1mpython.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query[0m
+          Avoiding SQL string concatenation: untrusted input concatenated with raw SQL query can result in SQL
+          Injection. In order to execute raw query safely, prepared statement should be used. SQLAlchemy      
+          provides TextualSQL to easily used prepared statement with named parameters. For complex SQL        
+          composition, use SQL Expression Language or Schema Definition Language. In most cases, SQLAlchemy   
+          ORM will be a better option.                                                                        
+          Details: https://sg.run/2b1L                                                                        
+                                                                                                              
+           70┆ cur.execute(f"""
+           71┆     SELECT DISTINCT c.nombre_unidad AS unidad
+           72┆     FROM {tabla} m
+           73┆     LEFT JOIN catalogo_unidades c
+           74┆         ON m.clues = c.clues
+           75┆     WHERE c.nombre_unidad IS NOT NULL
+           76┆     ORDER BY unidad ASC
+           77┆ """)
+   
+   ❯❯❱ [1mpython.flask.security.injection.tainted-sql-string.tainted-sql-string[0m
+          Detected user input used to manually construct a SQL string. This is usually bad practice because 
+          manual construction could accidentally result in a SQL injection. An attacker could use a SQL     
+          injection to steal or modify contents of the database. Instead, use a parameterized query which is
+          available by default in most database engines. Alternatively, consider using an object-relational 
+          mapper (ORM) such as SQLAlchemy which will protect your queries.                                  
+          Details: https://sg.run/JxZj                                                                      
+                                                                                                            
+           70┆ cur.execute(f"""
+           71┆     SELECT DISTINCT c.nombre_unidad AS unidad
+           72┆     FROM {tabla} m
+           73┆     LEFT JOIN catalogo_unidades c
+           74┆         ON m.clues = c.clues
+           75┆     WHERE c.nombre_unidad IS NOT NULL
+           76┆     ORDER BY unidad ASC
+           77┆ """)
+            ⋮┆----------------------------------------
+          123┆ query = f"""
+          124┆     SELECT
+          125┆         a.anio,
+          126┆         a.grupo AS causa,
+          127┆         SUM(a.total) AS total
+          128┆     FROM {tabla} a
+          129┆     LEFT JOIN catalogo_unidades c
+          130┆         ON a.clues = c.clues
+          131┆     WHERE 1=1
+          132┆ """
+   
+   ❯❯❱ [1mpython.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query[0m
+          Avoiding SQL string concatenation: untrusted input concatenated with raw SQL query can result in SQL
+          Injection. In order to execute raw query safely, prepared statement should be used. SQLAlchemy      
+          provides TextualSQL to easily used prepared statement with named parameters. For complex SQL        
+          composition, use SQL Expression Language or Schema Definition Language. In most cases, SQLAlchemy   
+          ORM will be a better option.                                                                        
+          Details: https://sg.run/2b1L                                                                        
+                                                                                                              
+          168┆ cur.execute(query, params)
+   
+   ❯❯❱ [1mpython.flask.security.injection.tainted-sql-string.tainted-sql-string[0m
+          Detected user input used to manually construct a SQL string. This is usually bad practice because 
+          manual construction could accidentally result in a SQL injection. An attacker could use a SQL     
+          injection to steal or modify contents of the database. Instead, use a parameterized query which is
+          available by default in most database engines. Alternatively, consider using an object-relational 
+          mapper (ORM) such as SQLAlchemy which will protect your queries.                                  
+          Details: https://sg.run/JxZj                                                                      
+                                                                                                            
+          177┆ query_unidades = f"""
+          178┆     SELECT
+          179┆         a.anio,
+          180┆         c.nombre_unidad,
+          181┆         a.grupo,
+          182┆         SUM(a.total) AS total
+          183┆     FROM {tabla} a
+          184┆     LEFT JOIN catalogo_unidades c
+          185┆         ON a.clues = c.clues
+          186┆     WHERE a.grupo = %s
+             [hid 1 additional lines, adjust with --max-lines-per-finding] 
+   
+   ❯❯❱ [1mpython.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query[0m
+          Avoiding SQL string concatenation: untrusted input concatenated with raw SQL query can result in SQL
+          Injection. In order to execute raw query safely, prepared statement should be used. SQLAlchemy      
+          provides TextualSQL to easily used prepared statement with named parameters. For complex SQL        
+          composition, use SQL Expression Language or Schema Definition Language. In most cases, SQLAlchemy   
+          ORM will be a better option.                                                                        
+          Details: https://sg.run/2b1L                                                                        
+                                                                                                              
+          213┆ cur.execute(query_unidades, params_unidades)
+                                          
+  [36m[22m[24m  app/routes/urgencias.py[0m
+   ❯❯❱ [1mpython.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query[0m
+          Avoiding SQL string concatenation: untrusted input concatenated with raw SQL query can result in SQL
+          Injection. In order to execute raw query safely, prepared statement should be used. SQLAlchemy      
+          provides TextualSQL to easily used prepared statement with named parameters. For complex SQL        
+          composition, use SQL Expression Language or Schema Definition Language. In most cases, SQLAlchemy   
+          ORM will be a better option.                                                                        
+          Details: https://sg.run/2b1L                                                                        
+                                                                                                              
+          171┆ cursor.execute(query, valores)
+                                         
+  [36m[22m[24m  app/services/loader.py[0m
+    ❯❱ [1mpython.lang.security.audit.non-literal-import.non-literal-import[0m
+          Untrusted user input in `importlib.import_module()` function allows an attacker to load arbitrary
+          code. Avoid dynamic values in `importlib.import_module()` or use a whitelist to prevent running  
+          untrusted code.                                                                                  
+          Details: https://sg.run/y6Jk                                                                     
+                                                                                                           
+            5┆ module = importlib.import_module(module_path)
+                                                         
+  [36m[22m[24m  app/templates/admin/crear_usuario.html[0m
+    ❯❱ [1mpython.django.security.django-no-csrf-token.django-no-csrf-token[0m
+          Manually-created forms in django templates should specify a csrf_token to prevent CSRF attacks.
+          Details: https://sg.run/N0Bp                                                                   
+                                                                                                         
+          189┆ <form action="{{ url_for('admin.eliminar_usuario', id=user.id) }}" method="POST"
+          190┆     style="display:inline;"
+          191┆     onsubmit="return confirm('¿Estás seguro de que deseas eliminar este usuario?');">
+          192┆     <button type="submit" class="btn btn-link"
+          193┆         style="padding: 0; border: none; background: none; color: #007bff; cursor:
+               pointer;">Eliminar</button>                                                       
+          194┆ </form>
+   
+    ❯❱ [1mhtml.security.audit.missing-integrity.missing-integrity[0m
+          This tag is missing an 'integrity' subresource integrity attribute. The 'integrity' attribute allows
+          for the browser to verify that externally hosted files (for example from a CDN) are delivered       
+          without unexpected manipulation. Without this attribute, if an attacker can modify the externally   
+          hosted resource, this could lead to XSS and other types of attacks. To prevent this, include the    
+          base64-encoded cryptographic hash of the resource (file) you’re telling the browser to fetch in the 
+          'integrity' attribute for all externally hosted files.                                              
+          Details: https://sg.run/krXA                                                                        
+                                                                                                              
+          212┆ <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+                                                         
+  [36m[22m[24m  app/templates/admin/listar_cargas.html[0m
+    ❯❱ [1mpython.django.security.django-no-csrf-token.django-no-csrf-token[0m
+          Manually-created forms in django templates should specify a csrf_token to prevent CSRF attacks.
+          Details: https://sg.run/N0Bp                                                                   
+                                                                                                         
+           39┆ <form method="post" action="{{ url_for('admin.activar_carga', carga_id=carga.id) }}">
+           40┆     <button type="submit">Activar</button>
+           41┆ </form>
+                                                                 
+  [36m[22m[24m  app/templates/admin/subir_imagenes_agenda.html[0m
+    ❯❱ [1mpython.django.security.django-no-csrf-token.django-no-csrf-token[0m
+          Manually-created forms in django templates should specify a csrf_token to prevent CSRF attacks.
+          Details: https://sg.run/N0Bp                                                                   
+                                                                                                         
+           18┆ <form action="{{ url_for('admin.subir_imagenes_agenda') }}" method="POST"
+           19┆     enctype="multipart/form-data" id="uploadForm">
+           20┆
+           21┆     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+           22┆
+           23┆     <div class="mb-4">
+           24┆         <label for="carpeta_imagenes" class="form-label fw-bold">Seleccionar carpeta con
+           25┆             Imágenes</label>
+           26┆         <input class="form-control" type="file" id="carpeta_imagenes"
+               name="carpeta_imagenes"                                              
+           27┆             accept="image/*" webkitdirectory directory multiple required>
+             [hid 8 additional lines, adjust with --max-lines-per-finding] 
+           44┆ <form action="{{ url_for('admin.eliminar_imagenes_agenda') }}" method="POST"
+           45┆     onsubmit="return confirm('¿Estás seguro de que deseas eliminar todas las imágenes
+               actuales?');">                                                                       
+           46┆
+           47┆     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+           48┆
+           49┆     <button type="submit" class="btn btn-outline-danger btn-sm">
+           50┆         <i class="bi bi-trash"></i> Eliminar Imágenes Existentes
+           51┆     </button>
+           52┆ </form>
+                                                    
+  [36m[22m[24m  app/templates/agendas/agenda.html[0m
+    ❯❱ [1mhtml.security.audit.missing-integrity.missing-integrity[0m
+          This tag is missing an 'integrity' subresource integrity attribute. The 'integrity' attribute allows
+          for the browser to verify that externally hosted files (for example from a CDN) are delivered       
+          without unexpected manipulation. Without this attribute, if an attacker can modify the externally   
+          hosted resource, this could lead to XSS and other types of attacks. To prevent this, include the    
+          base64-encoded cryptographic hash of the resource (file) you’re telling the browser to fetch in the 
+          'integrity' attribute for all externally hosted files.                                              
+          Details: https://sg.run/krXA                                                                        
+                                                                                                              
+            8┆ <link rel="stylesheet"                                                       
+               href="https://cdnjs.cloudflare.com/ajax/libs/viewerjs/1.11.3/viewer.min.css">
+            ⋮┆----------------------------------------
+            9┆ <script                                                                             
+               src="https://cdnjs.cloudflare.com/ajax/libs/viewerjs/1.11.3/viewer.min.js"></script>
+            ⋮┆----------------------------------------
+           10┆ <link rel="stylesheet"                                                         
+               href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+            ⋮┆----------------------------------------
+           11┆ <script src="https://unpkg.com/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
+            ⋮┆----------------------------------------
+           70┆ <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+            ⋮┆----------------------------------------
+           71┆ <script                                                                                    
+               src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script
+               >                                                                                          
+            ⋮┆----------------------------------------
+           72┆ <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"></script>
+                                                           
+  [36m[22m[24m  app/templates/bienvenida/bienvenida.html[0m
+    ❯❱ [1mhtml.security.audit.missing-integrity.missing-integrity[0m
+          This tag is missing an 'integrity' subresource integrity attribute. The 'integrity' attribute allows
+          for the browser to verify that externally hosted files (for example from a CDN) are delivered       
+          without unexpected manipulation. Without this attribute, if an attacker can modify the externally   
+          hosted resource, this could lead to XSS and other types of attacks. To prevent this, include the    
+          base64-encoded cryptographic hash of the resource (file) you’re telling the browser to fetch in the 
+          'integrity' attribute for all externally hosted files.                                              
+          Details: https://sg.run/krXA                                                                        
+                                                                                                              
+            4┆ <script                                                                                    
+               src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script
+               >                                                                                          
+            ⋮┆----------------------------------------
+            5┆ <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-
+               icons@1.11.3/font/bootstrap-icons.min.css">                         
+                                                             
+  [36m[22m[24m  app/templates/egresos/reporte_egresos.html[0m
+    ❯❱ [1mhtml.security.audit.missing-integrity.missing-integrity[0m
+          This tag is missing an 'integrity' subresource integrity attribute. The 'integrity' attribute allows
+          for the browser to verify that externally hosted files (for example from a CDN) are delivered       
+          without unexpected manipulation. Without this attribute, if an attacker can modify the externally   
+          hosted resource, this could lead to XSS and other types of attacks. To prevent this, include the    
+          base64-encoded cryptographic hash of the resource (file) you’re telling the browser to fetch in the 
+          'integrity' attribute for all externally hosted files.                                              
+          Details: https://sg.run/krXA                                                                        
+                                                                                                              
+          122┆ <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                                                        
+  [36m[22m[24m  app/templates/grafica/grafica_by.html[0m
+    ❯❱ [1mhtml.security.audit.missing-integrity.missing-integrity[0m
+          This tag is missing an 'integrity' subresource integrity attribute. The 'integrity' attribute allows
+          for the browser to verify that externally hosted files (for example from a CDN) are delivered       
+          without unexpected manipulation. Without this attribute, if an attacker can modify the externally   
+          hosted resource, this could lead to XSS and other types of attacks. To prevent this, include the    
+          base64-encoded cryptographic hash of the resource (file) you’re telling the browser to fetch in the 
+          'integrity' attribute for all externally hosted files.                                              
+          Details: https://sg.run/krXA                                                                        
+                                                                                                              
+          128┆ <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            ⋮┆----------------------------------------
+          129┆ <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+            ⋮┆----------------------------------------
+          130┆ <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js"></script>
+                                                           
+  [36m[22m[24m  app/templates/indicadores/indicador.html[0m
+    ❯❱ [1mhtml.security.audit.missing-integrity.missing-integrity[0m
+          This tag is missing an 'integrity' subresource integrity attribute. The 'integrity' attribute allows
+          for the browser to verify that externally hosted files (for example from a CDN) are delivered       
+          without unexpected manipulation. Without this attribute, if an attacker can modify the externally   
+          hosted resource, this could lead to XSS and other types of attacks. To prevent this, include the    
+          base64-encoded cryptographic hash of the resource (file) you’re telling the browser to fetch in the 
+          'integrity' attribute for all externally hosted files.                                              
+          Details: https://sg.run/krXA                                                                        
+                                                                                                              
+          158┆ <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                                           
+  [36m[22m[24m  app/templates/login.html[0m
+    ❯❱ [1mpython.django.security.django-no-csrf-token.django-no-csrf-token[0m
+          Manually-created forms in django templates should specify a csrf_token to prevent CSRF attacks.
+          Details: https://sg.run/N0Bp                                                                   
+                                                                                                         
+           25┆ <form method="POST">
+           26┆
+           27┆     {{ form.hidden_tag() }}
+           28┆
+           29┆     <div class="mb-3">
+           30┆         <label>Usuario</label>
+           31┆         {{ form.username(class="form-control") }}
+           32┆     </div>
+           33┆
+           34┆     <div class="mb-3">
+             [hid 11 additional lines, adjust with --max-lines-per-finding] 
+                                                     
+  [36m[22m[24m  app/templates/sis/reporte_sis.html[0m
+    ❯❱ [1mhtml.security.audit.missing-integrity.missing-integrity[0m
+          This tag is missing an 'integrity' subresource integrity attribute. The 'integrity' attribute allows
+          for the browser to verify that externally hosted files (for example from a CDN) are delivered       
+          without unexpected manipulation. Without this attribute, if an attacker can modify the externally   
+          hosted resource, this could lead to XSS and other types of attacks. To prevent this, include the    
+          base64-encoded cryptographic hash of the resource (file) you’re telling the browser to fetch in the 
+          'integrity' attribute for all externally hosted files.                                              
+          Details: https://sg.run/krXA                                                                        
+                                                                                                              
+           92┆ <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                                                                 
+  [36m[22m[24m  app/templates/urgencias/reporte_urgencias.html[0m
+    ❯❱ [1mhtml.security.audit.missing-integrity.missing-integrity[0m
+          This tag is missing an 'integrity' subresource integrity attribute. The 'integrity' attribute allows
+          for the browser to verify that externally hosted files (for example from a CDN) are delivered       
+          without unexpected manipulation. Without this attribute, if an attacker can modify the externally   
+          hosted resource, this could lead to XSS and other types of attacks. To prevent this, include the    
+          base64-encoded cryptographic hash of the resource (file) you’re telling the browser to fetch in the 
+          'integrity' attribute for all externally hosted files.                                              
+          Details: https://sg.run/krXA                                                                        
+                                                                                                              
+          138┆ <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
