@@ -143,6 +143,7 @@
   let todasUnidades = [];
 
   let timeoutRender = null;
+  let indicadoresSinDatos = new Set();
 
   Chart.register(ChartDataLabels);
 
@@ -519,19 +520,29 @@
       // INDICADORES
       // =========================
       if (data.type === "indicador") {
+
         if (!indicadoresSeleccionados.has(data.value)) {
+
           indicadoresSeleccionados.add(data.value);
+
+          // Guardamos solamente el último indicador arrastrado
+          window.ultimoIndicadorArrastrado = data.value;
+
 
           const el = document.querySelector(
             `.indicador-item[data-ind="${data.value}"]`
           );
 
+
           const texto = el
             ? el.innerText.trim()
             : data.nombre || data.value;
 
+
           addBadge(texto, "indicador", data.value);
+
         }
+
       }
 
       cargarGrafica();
@@ -550,6 +561,16 @@
     span.className = "badge-item";
     span.dataset.tipo = tipo;
     span.dataset.value = value;
+    span.dataset.sinDatos = "false";
+
+    if (
+      tipo === "indicador" &&
+      indicadoresSinDatos.has(value)
+    ) {
+      span.classList.add("indicador-sin-datos");
+    }
+
+
 
     const icono =
       tipo === "unidad"
@@ -621,6 +642,7 @@
       params.append("indicadores[]", i);
     });
 
+
     // =========================
     // AÑOS
     // =========================
@@ -678,11 +700,18 @@
 
         return r.json();
       })
+
       .then((data) => {
 
         if (!data) return;
 
         console.log("DATA COMPLETA API:", data);
+        console.log("PRIMER REGISTRO:", data[0]);
+        console.log(
+          data.filter(
+            x => x.indicador === "total_egresos"
+          )
+        );
 
         if (!data || data.length === 0) {
           if (chart) chart.destroy();
@@ -705,7 +734,19 @@
           [...new Set(data.map(x => x.indicador))]
         );
 
+        //window.ultimoDataRecibido = data;
+
         renderGrafica(data);
+
+        if (window.ultimoIndicadorArrastrado) {
+
+          validarDatosIndicadorIndividual(
+            data,
+            window.ultimoIndicadorArrastrado
+          );
+          restaurarEstadosBadges();
+
+        }
 
       })
       .catch((err) => {
@@ -713,6 +754,110 @@
       });
   }
 
+
+  function validarDatosIndicadorIndividual(data, indicadorId) {
+
+
+    unidadesSeleccionadas.forEach((cluesId) => {
+
+
+      const unidadInfo = todasUnidades.find(
+        u => u.clues === cluesId
+      );
+
+
+      const nombreU = unidadInfo
+        ? limpiarNombreUnidad(unidadInfo.nombre_unidad)
+        : cluesId;
+
+
+
+      const registros = data.filter(
+        d =>
+          norm(limpiarNombreUnidad(d.nombre_unidad)) ===
+          norm(nombreU)
+          &&
+          norm(d.indicador) === norm(indicadorId)
+      );
+
+
+
+      console.log("VALIDANDO:", {
+        unidad: nombreU,
+        indicador: indicadorId,
+        registros
+      });
+
+
+
+      const tieneDatos = registros.some(
+        r => Number(r.valor) > 0
+      );
+
+
+
+      const clave = `${cluesId}-${indicadorId}`;
+
+
+
+      if (!tieneDatos) {
+
+
+        // ================================
+        // PINTAR BADGE SIN DATOS
+        // ================================
+
+        const badge = document.querySelector(
+          `.badge-item[data-tipo="indicador"][data-value="${indicadorId}"]`
+        );
+
+        console.log("BUSCANDO BADGE:", indicadorId);
+        console.log("BADGE ENCONTRADO:", badge);
+
+
+        if (badge) {
+
+          indicadoresSinDatos.add(indicadorId);
+
+          badge.classList.add("indicador-sin-datos");
+
+          badge.dataset.sinDatos = "true";
+
+        }
+
+
+
+        if (!alertasMostradas.has(clave)) {
+          alertasMostradas.add(clave);
+          setTimeout(() => {
+            alert(
+              `Atención:\n\n"${nombreU}" no cuenta con datos para "${indicadorId}"`
+            );
+          }, 300);
+        }
+
+
+      }
+
+
+    });
+
+
+  }
+
+  function restaurarEstadosBadges() {
+
+    document.querySelectorAll(".badge-item").forEach(badge => {
+
+      if (badge.dataset.sinDatos === "true") {
+
+        badge.classList.add("indicador-sin-datos");
+
+      }
+
+    });
+
+  }
 
 
   function renderGrafica(data) {
@@ -736,59 +881,12 @@
       "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"
     ];
 
-    // =========================
-    // ALERTAS (EQUIPOS / CAMAS)
-    // =========================
-    unidadesSolicitadas.forEach((cluesId) => {
-      const unidadInfo = todasUnidades.find((u) => u.clues === cluesId);
 
-      const nombreU = unidadInfo
-        ? limpiarNombreUnidad(unidadInfo.nombre_unidad)
-        : cluesId;
-
-      indicadoresSolicitados.forEach((indId) => {
-
-        const esEquipo =
-          indId.startsWith("arco_") ||
-          indId.includes("tomografo") ||
-          indId.includes("unidad_rx") ||
-          indId.includes("mastografo_") ||
-          indId.includes("fluoroscopio_") ||
-          indId.includes("resonancia_") ||
-          indId.includes("monitor_") ||
-          indId.includes("incubadora_");
-
-        const esCama =
-          indId.includes("hab_") ||
-          indId.includes("cama") ||
-          indId.includes("tot_otras_areas");
-
-        if (esEquipo || esCama) {
-          const tieneDatos = data.some(
-            (d) =>
-              (d.clues || "").toString().trim().toLowerCase() ===
-              cluesId.toLowerCase() &&
-              norm(d.indicador) === norm(indId) &&
-              parseFloat(d.valor) > 0
-          );
-
-          const clave = `${cluesId}-${indId}`;
-
-          if (!tieneDatos && !alertasMostradas.has(clave)) {
-            setTimeout(() => {
-              alert(`Atención: "${nombreU}" no cuenta con "${indId}"`);
-            }, 500);
-
-            alertasMostradas.add(clave);
-          }
-        }
-      });
-    });
 
     // =========================
     // RESET CHART
     // =========================
-    window.ultimoDataRecibido = data;
+    //window.ultimoDataRecibido = data;
 
     if (chart) {
       chart.destroy();
@@ -2042,6 +2140,9 @@
     unidadesSeleccionadas.clear();
     indicadoresSeleccionados.clear();
     avisosMostrados.clear();
+    alertasMostradas.clear();
+    indicadoresSinDatos.clear();
+    window.ultimoIndicadorArrastrado = null;
 
     // 2. Limpiar visualmente la Drop Zone
     const dropZone = document.getElementById("dropZone");
@@ -2085,7 +2186,14 @@
     if (typeof cargarGrafica === "function") {
       cargarGrafica();
     }
+
+    document.querySelectorAll(".badge-item").forEach(badge => {
+      badge.dataset.sinDatos = "false";
+      badge.classList.remove("indicador-sin-datos");
+    });
   }
+
+
 
   document.addEventListener("DOMContentLoaded", () => {
     bindUIEvents();

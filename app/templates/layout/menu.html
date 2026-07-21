@@ -637,7 +637,7 @@
 
 
                 <!-- GENERALES -->
-                <details class="sub-acordeon" open>
+                <details class="sub-acordeon">
 
                     <summary>
                         <i class="bi bi-hospital"></i>
@@ -767,7 +767,7 @@
                 <!-- ========================= -->
                 <!-- PRODUCTIVIDAD DIARIA -->
                 <!-- ========================= -->
-                <details class="sub-acordeon" open>
+                <details class="sub-acordeon">
                     <summary>
                         <i class="bi bi-calendar-week"></i>
                         📅 Productividad diaria
@@ -2242,6 +2242,30 @@
                 }
             });
         });
+
+
+        // NUEVO
+        document.querySelectorAll('.sub-acordeon').forEach((el) => {
+
+            el.addEventListener('toggle', function () {
+
+                if (!this.open) return;
+
+                const padre = this.parentElement;
+
+                padre.querySelectorAll(':scope > .sub-acordeon')
+                    .forEach((otro) => {
+
+                        if (otro !== this) {
+                            otro.open = false;
+                        }
+
+                    });
+
+            });
+
+        });
+
 
         window.getUnidadesSeleccionadas = () => unidadesSeleccionadas;
 
