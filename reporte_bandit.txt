@@ -1,0 +1,676 @@
+Run started:2026-07-21 20:21:10.593979+00:00
+
+Test results:
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/admin_routes.py:333:16
+332	        columnas_sql = ', '.join(columnas_db)
+333	        sql = f"INSERT INTO urgencias_registros ({columnas_sql}) VALUES ({placeholders})"
+334	
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/admin_routes.py:539:29
+538	
+539	                sql_egre = f"INSERT INTO egresos_registros ({', '.join(columnas_sql)}) VALUES ({', '.join(['%s']*len(columnas_sql))}) ON DUPLICATE KEY UPDATE carga_id = VALUES(carga_id)"
+540	
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: ./app/routes/admin_routes.py:555:28
+554	                                elif 500 <= c_srv <= 599 or 800 <= c_srv <= 999: val = '500'
+555	                            except: pass
+556	                        valores.append(val)
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/admin_routes.py:589:29
+588	
+589	                sql_proc = f"INSERT INTO procedimientos_registros ({', '.join(cols_p_sql)}) VALUES ({', '.join(['%s']*len(cols_p_sql))})"
+590	
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/admin_routes.py:1333:30
+1332	
+1333	                    query = f"INSERT INTO equipo_medico ({nombres_cols}) VALUES ({placeholders})"
+1334	                    cursor.execute(query, tuple(valores))
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/admin_routes.py:1528:24
+1527	            
+1528	            sql_ins = f"INSERT INTO sis_registros ({', '.join(columnas_db)}) VALUES ({', '.join(['%s']*len(columnas_db))})"
+1529	            
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/admin_routes.py:1782:22
+1781	
+1782	            sql = f"""
+1783	                INSERT INTO abortos ({', '.join(columnas_db)})
+1784	                VALUES ({', '.join(['%s'] * len(columnas_db))})
+1785	            """
+1786	
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/admin_routes.py:1897:22
+1896	
+1897	            sql = f"""
+1898	                INSERT INTO afecciones_morbi ({', '.join(columnas_db)})
+1899	                VALUES ({', '.join(['%s'] * len(columnas_db))})
+1900	            """
+1901	
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/admin_routes.py:2012:22
+2011	
+2012	            sql = f"""
+2013	                INSERT INTO afecciones_morta ({', '.join(columnas_db)})
+2014	                VALUES ({', '.join(['%s'] * len(columnas_db))})
+2015	            """
+2016	
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/grafica.py:567:22
+566	        
+567	        query_e = f"""
+568	                SELECT 
+569	                    e.anio,
+570	                    {select_mes}
+571	                    e.clues,
+572	                    e.nombre_unidad,
+573	
+574	                    -- EGRESOS Y NACIMIENTOS (TABLA PRINCIPAL)
+575	                    SUM(e.total_egresos) AS total_egresos,        
+576	                    SUM(e.defunciones) AS egre_defunciones,
+577	                    SUM(e.defunciones_48h) AS egre_defunciones_48h,
+578	                    SUM(e.dias_estancia_sum) AS dias_estancia,
+579	                    SUM(e.dias_estancia_med_interna) AS dias_est_med,
+580	                    SUM(e.dias_estancia_cirugia) AS dias_est_cir,
+581	                    SUM(e.dias_estancia_pediatria) AS dias_est_ped,
+582	                    SUM(e.dias_estancia_ginecobstetricia) AS dias_est_gin,
+583	                    SUM(e.dias_estancia_otros) AS dias_est_otros,
+584	                    SUM(e.nacimientos) AS total_nacimientos,
+585	                    SUM(e.nac_distocico) AS nac_distocico,
+586	                    SUM(e.nac_eutocico) AS nac_eutocico,
+587	                    SUM(e.cesareas) AS nac_cesarea,
+588	                    SUM(e.apeo) AS apeo,
+589	                    SUM(e.abortos) AS abortos,
+590	                    SUM(e.abortos + e.nacimientos) AS eventos_obstetricos,
+591	                    SUM(e.apeo) AS total_apeo,
+592	                    
+593	                    SUM(e.med_interna) AS egre_med_interna,
+594	                    SUM(e.cirugia) AS egre_cirugia,
+595	                    SUM(e.pediatria) AS egre_pediatria,
+596	                    SUM(e.ginecobstetricia) AS egre_gineco,
+597	                    SUM(e.otros) AS egre_otros,
+598	
+599	                    -- EGRESOS >48H POR SERVICIO
+600	                    SUM(e.egresos_med_interna_48h) AS egre_med_int_48h,
+601	                    SUM(e.egresos_cirugia_48h) AS egre_cirugia_48h,
+602	                    SUM(e.egresos_pediatria_48h) AS egre_pediatria_48h,
+603	                    SUM(e.egresos_ginecobstetricia_48h) AS egre_gineco_48h,
+604	                    SUM(e.egresos_otros_48h) AS egre_otros_48h,
+605	                    SUM(e.egresos_48h) AS total_egresos_48h,
+606	
+607	                    -- DETALLE ABORTOS
+608	                    SUM(IFNULL(ab.abortos_lui, 0)) AS abortos_lui,
+609	                    SUM(IFNULL(ab.abortos_ameu, 0)) AS abortos_ameu,
+610	                    SUM(IFNULL(ab.abortos_medicado, 0)) AS abortos_medicado,
+611	                    SUM(IFNULL(ab.abortos_no_especificado, 0)) AS abortos_no_especificado,
+612	                    SUM(IFNULL(ab.abortos_total, 0)) AS abortos_total,
+613	
+614	                   -- SIS (SERVICIOS DE SALUD)
+615	                    SUM(IFNULL(sis.dias_p, 0)) AS dias_p,
+616	                    SUM(IFNULL(sis.consultas, 0)) AS consultas,
+617	                    SUM(IFNULL(sis.especialidad, 0)) AS especialidad,
+618	                    SUM(IFNULL(sis.mental, 0)) AS mental,
+619	                    SUM(IFNULL(sis.bucal, 0)) AS bucal,
+620	                    SUM(IFNULL(sis.laboratorio, 0)) AS laboratorio,
+621	                    SUM(IFNULL(sis.rayosx, 0)) AS rayosx,
+622	                    SUM(IFNULL(sis.anatomia, 0)) AS anatomia,
+623	                    SUM(IFNULL(sis.electro, 0)) AS electro,
+624	                    SUM(IFNULL(sis.encefa, 0)) AS encefa,
+625	                    SUM(IFNULL(sis.ultrasonido, 0)) AS ultrasonido,
+626	                    SUM(IFNULL(sis.tac, 0)) AS tac,
+627	                    SUM(IFNULL(sis.rnm, 0)) AS rnm,
+628	                    SUM(IFNULL(sis.med_interna, 0)) AS dias_p_med_int,
+629	                    SUM(IFNULL(sis.cirugia, 0)) AS dias_p_cirugia,
+630	                    SUM(IFNULL(sis.gineco, 0)) AS dias_p_gineco,
+631	                    SUM(IFNULL(sis.pediatria, 0)) AS dias_p_pediatria,
+632	                    SUM(IFNULL(sis.otros, 0)) AS dias_p_otros,
+633	
+634	                    -- URGENCIAS
+635	                    SUM(IFNULL(urg.total_u, 0)) AS urgencias,
+636	                    SUM(IFNULL(urg.calificada, 0)) AS calificada,
+637	                    SUM(IFNULL(urg.no_calificada, 0)) AS no_calificada,
+638	                    SUM(IFNULL(urg.medica, 0)) AS medica,
+639	                    SUM(IFNULL(urg.accidentes, 0)) AS accidentes,
+640	                    SUM(IFNULL(urg.pediatrica, 0)) AS pediatrica,
+641	                    SUM(IFNULL(urg.ginecobstetricia, 0)) AS ginecobstetricia,
+642	
+643	                    -- PROCEDIMIENTOS DENTRO DE QUIRÓFANO
+644	                    SUM(IFNULL(p.med_int_dentro, 0)) AS med_int_dentro,
+645	                    SUM(IFNULL(p.cirugia_dentro, 0)) AS cirugia_dentro,
+646	                    SUM(IFNULL(p.gineco_dentro, 0)) AS gineco_dentro,
+647	                    SUM(IFNULL(p.pediatria_dentro, 0)) AS pediatria_dentro,
+648	                    SUM(IFNULL(p.otros_dentro, 0)) AS otros_dentro,
+649	                    SUM(IFNULL(p.total_proced_dentro, 0)) AS total_proced_dentro,
+650	
+651	                    -- PROCEDIMIENTOS FUERA DE QUIRÓFANO
+652	                    SUM(IFNULL(p.med_int_fuera, 0)) AS med_int_fuera,
+653	                    SUM(IFNULL(p.cirugia_fuera, 0)) AS cirugia_fuera,
+654	                    SUM(IFNULL(p.gineco_fuera, 0)) AS gineco_fuera,
+655	                    SUM(IFNULL(p.pediatria_fuera, 0)) AS pediatria_fuera,
+656	                    SUM(IFNULL(p.otros_fuera, 0)) AS otros_fuera,
+657	                    SUM(IFNULL(p.total_proced_fuera, 0)) AS total_proced_fuera,
+658	
+659	                    -- TOTAL PROCEDIMIENTOS
+660	                    SUM(IFNULL(p.total_proced_med_int, 0)) AS total_proced_med_int,
+661	                    SUM(IFNULL(p.total_proced_cirugia, 0)) AS total_proced_cirugia,
+662	                    SUM(IFNULL(p.total_proced_gineco, 0)) AS total_proced_gineco,
+663	                    SUM(IFNULL(p.total_proced_pediatria, 0)) AS total_proced_pediatria,
+664	                    SUM(IFNULL(p.total_proced_otros, 0)) AS total_proced_otros,
+665	                    SUM(IFNULL(p.total_proced, 0)) AS total_proced,
+666	
+667	                    -- ADOLESCENTES
+668	                    SUM(e.adolescente_apeo) AS adolescente_apeo,
+669	                    SUM(e.eventos_obstetricos_adolescentes) AS eventos_obstetricos_adolescentes,
+670	
+671	                    -- RECURSOS FISICOS (KPIs)
+672	                    SUM(IFNULL(p.total_proced_dentro, 0)) AS cirugias,
+673	                    {agg_camas}(IFNULL(sin.camas_total, 0)) AS camas_total,
+674	                    {agg_camas}(IFNULL(sin.quirofanos, 0)) AS quirofanos,
+675	                    {agg_camas}(IFNULL(sin.camas_med_int, 0)) AS camas_med_int,
+676	                    {agg_camas}(IFNULL(sin.camas_cirugia, 0)) AS camas_cirugia,
+677	                    {agg_camas}(IFNULL(sin.camas_gineco, 0)) AS camas_gineco,
+678	                    {agg_camas}(IFNULL(sin.camas_pediatria, 0)) AS camas_pediatria,
+679	                    {agg_camas}(IFNULL(sin.camas_otros, 0)) AS camas_otros,
+680	
+681	                    -- DÍAS CAMA
+682	
+683	                    SUM(IFNULL(sin.camas_total,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_total,
+684	                    SUM(IFNULL(sin.camas_med_int,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_med,
+685	                    SUM(IFNULL(sin.camas_cirugia,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_cir,
+686	                    SUM(IFNULL(sin.camas_gineco,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_gin,
+687	                    SUM(IFNULL(sin.camas_pediatria,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_ped,
+688	                    SUM(IFNULL(sin.camas_otros,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_otros,
+689	
+690	                    -- CAMAS NO CENSABLES
+691	                    MAX(IFNULL(cnc.hab_urgencias, 0)) AS hab_urgencias,
+692	                    MAX(IFNULL(cnc.hab_observacion, 0)) AS hab_observacion,
+693	                    MAX(IFNULL(cnc.hab_cuid_int, 0)) AS hab_cuid_int,
+694	                    MAX(IFNULL(cnc.hab_cirug_amb, 0)) AS hab_cirug_amb,
+695	                    MAX(IFNULL(cnc.hab_quemados, 0)) AS hab_quemados,
+696	                    MAX(IFNULL(cnc.hab_lab_parto, 0)) AS hab_lab_parto,
+697	                    MAX(IFNULL(cnc.hab_recup_pp, 0)) AS hab_recup_pp,
+698	                    MAX(IFNULL(cnc.hab_recup_pq, 0)) AS hab_recup_pq,
+699	                    MAX(IFNULL(cnc.hab_uci_adulto, 0)) AS hab_uci_adulto,
+700	                    MAX(IFNULL(cnc.hab_uci_ped, 0)) AS hab_uci_ped,
+701	                    MAX(IFNULL(cnc.hab_otras_areas, 0)) AS hab_otras_areas,
+702	                    MAX(IFNULL(cnc.total_no_censables, 0)) AS total_no_censables
+703	
+704	                FROM egresos_agregado e
+705	
+706	                -- JOIN ABORTOS (GRUPAL POR MES)
+707	                LEFT JOIN (
+708	                    SELECT anio, mes, clues,
+709	                        SUM(lui) AS abortos_lui, SUM(ameu) AS abortos_ameu,
+710	                        SUM(medicamento) AS abortos_medicado, SUM(no_especificado) AS abortos_no_especificado,
+711	                        SUM(total) AS abortos_total
+712	                    FROM abortos GROUP BY anio, mes, clues
+713	                ) ab ON e.clues = ab.clues AND e.anio = ab.anio AND e.mes = ab.mes
+714	
+715	                -- JOIN SIS (GRUPAL POR MES)
+716	                LEFT JOIN (
+717	                    SELECT anio, mes, clues,
+718	                        SUM(diasPaciente) AS dias_p, SUM(consultas) AS consultas,
+719	                        SUM(especialidad) AS especialidad, SUM(mental) AS mental,
+720	                        SUM(bucal) AS bucal, SUM(laboratorio) AS laboratorio,
+721	                        SUM(rayosx) AS rayosx, SUM(anatomia) AS anatomia,
+722	                        SUM(electro) AS electro, SUM(encefa) AS encefa,
+723	                        SUM(ultrasonido) AS ultrasonido, SUM(tac) AS tac,
+724	                        SUM(rnm) AS rnm, SUM(med_interna) AS med_interna,
+725	                        SUM(cirugia) AS cirugia, SUM(gineco) AS gineco,
+726	                        SUM(pediatria) AS pediatria, SUM(otros) AS otros
+727	                    FROM sis_registros_agregados GROUP BY anio, mes, clues
+728	                ) sis ON e.clues = sis.clues AND e.anio = sis.anio AND e.mes = sis.mes
+729	
+730	                -- JOIN URGENCIAS (GRUPAL POR MES)
+731	                LEFT JOIN (
+732	                    SELECT anio, mes_estadistico, clues,
+733	                        SUM(total) AS total_u, SUM(calificada) AS calificada,
+734	                        SUM(no_calificada) AS no_calificada, SUM(medica) AS medica,
+735	                        SUM(accidentes) AS accidentes, SUM(pediatrica) AS pediatrica,
+736	                        SUM(ginecobstetricia) AS ginecobstetricia
+737	                    FROM urgencias_agregado GROUP BY anio, mes_estadistico, clues
+738	                ) urg ON e.clues = urg.clues AND e.anio = urg.anio AND e.mes = urg.mes_estadistico
+739	
+740	                -- JOIN PROCEDIMIENTOS (GRUPAL POR MES)
+741	                LEFT JOIN (
+742	                    SELECT anio, mes, clues,
+743	                        SUM(med_int_proced_dentro) AS med_int_dentro,
+744	                        SUM(cirugia_proced_dentro) AS cirugia_dentro,
+745	                        SUM(gineco_proced_dentro) AS gineco_dentro,
+746	                        SUM(pediatra_proced_dentro) AS pediatria_dentro,
+747	                        SUM(otros_proced_dentro) AS otros_dentro,
+748	                        SUM(total_proced_dentro) AS total_proced_dentro,
+749	                        SUM(med_int_proced_fuera) AS med_int_fuera,
+750	                        SUM(cirugia_proced_fuera) AS cirugia_fuera,
+751	                        SUM(gineco_proced_fuera) AS gineco_fuera,
+752	                        SUM(pediatra_proced_fuera) AS pediatria_fuera,
+753	                        SUM(otros_proced_fuera) AS otros_fuera,
+754	                        SUM(total_proced_fuera) AS total_proced_fuera,
+755	                        SUM(
+756	                            IFNULL(med_int_proced_dentro,0) +
+757	                            IFNULL(med_int_proced_fuera,0)
+758	                        ) AS total_proced_med_int,
+759	
+760	                        SUM(
+761	                            IFNULL(cirugia_proced_dentro,0) +
+762	                            IFNULL(cirugia_proced_fuera,0)
+763	                        ) AS total_proced_cirugia,
+764	
+765	                        SUM(
+766	                            IFNULL(gineco_proced_dentro,0) +
+767	                            IFNULL(gineco_proced_fuera,0)
+768	                        ) AS total_proced_gineco,
+769	
+770	                        SUM(
+771	                            IFNULL(pediatra_proced_dentro,0) +
+772	                            IFNULL(pediatra_proced_fuera,0)
+773	                        ) AS total_proced_pediatria,
+774	
+775	                        SUM(
+776	                            IFNULL(otros_proced_dentro,0) +
+777	                            IFNULL(otros_proced_fuera,0)
+778	                        ) AS total_proced_otros,
+779	
+780	                        -- TOTAL GENERAL
+781	                        SUM(
+782	                            IFNULL(total_proced_dentro,0) +
+783	                            IFNULL(total_proced_fuera,0)
+784	                        ) AS total_proced
+785	                    FROM procedimiento_agregado GROUP BY anio, mes, clues
+786	                ) p ON e.clues = p.clues AND e.anio = p.anio AND e.mes = p.mes
+787	
+788	                -- JOIN SINERHIAS (ANUAL)
+789	               LEFT JOIN (
+790	                    SELECT
+791	                        anio,
+792	                        mes,
+793	                        clues,
+794	                        total AS camas_total,
+795	                        quirofanos,
+796	                        med_int AS camas_med_int,
+797	                        cirugia AS camas_cirugia,
+798	                        gineco AS camas_gineco,
+799	                        pediatria AS camas_pediatria,
+800	                        otros AS camas_otros
+801	                    FROM sinerhias
+802	                ) sin
+803	                ON e.clues = sin.clues
+804	                AND e.anio = sin.anio
+805	                AND e.mes = sin.mes
+806	
+807	                -- JOIN CAMAS NO CENSABLES (ANUAL)
+808	                LEFT JOIN (
+809	                    SELECT anio, clues,
+810	                        MAX(hab_urgencias) AS hab_urgencias, MAX(hab_observacion) AS hab_observacion,
+811	                        MAX(hab_cuid_int) AS hab_cuid_int, MAX(hab_cirug_amb) AS hab_cirug_amb,
+812	                        MAX(hab_quemados) AS hab_quemados, MAX(hab_lab_parto) AS hab_lab_parto,
+813	                        MAX(hab_recup_pp) AS hab_recup_pp, MAX(hab_recup_pq) AS hab_recup_pq,
+814	                        MAX(hab_uci_adulto) AS hab_uci_adulto, MAX(hab_uci_ped) AS hab_uci_ped,
+815	                        MAX(hab_otras_areas) AS hab_otras_areas,
+816	                        (IFNULL(MAX(hab_urgencias),0)+IFNULL(MAX(hab_observacion),0)+IFNULL(MAX(hab_cuid_int),0)+IFNULL(MAX(hab_cirug_amb),0)+IFNULL(MAX(hab_quemados),0)+IFNULL(MAX(hab_lab_parto),0)+IFNULL(MAX(hab_recup_pp),0)+IFNULL(MAX(hab_recup_pq),0)+IFNULL(MAX(hab_uci_adulto),0)+IFNULL(MAX(hab_uci_ped),0)+IFNULL(MAX(hab_otras_areas),0)) AS total_no_censables
+817	                    FROM camas_no_censables GROUP BY anio, clues
+818	                ) cnc ON e.clues = cnc.clues AND e.anio = cnc.anio
+819	
+820	                {where_e}
+821	
+822	                GROUP BY {group_by}
+823	
+824	                """
+825	
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/grafica.py:1386:16
+1385	
+1386	    query = f"""
+1387	    SELECT
+1388	        {alias}.anio,
+1389	        {alias}.clues,
+1390	        c.nombre_unidad,
+1391	        {columnas_sql}
+1392	    FROM {tabla} {alias}
+1393	    LEFT JOIN catalogo_unidades c
+1394	        ON {alias}.clues = c.clues
+1395	    WHERE 1=1
+1396	    """
+1397	
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/indicador.py:81:16
+80	
+81	    query = f"""
+82	        SELECT
+83	            e.anio, e.mes, e.clues, e.nombre_unidad,
+84	            SUM(e.dias_estancia_med_interna) AS dias_estancia_med_interna,
+85	            SUM(e.dias_estancia_cirugia) AS dias_estancia_cirugia,
+86	            SUM(e.dias_estancia_pediatria) AS dias_estancia_pediatria,
+87	            SUM(e.dias_estancia_ginecobstetricia) AS dias_estancia_gineco,
+88	            SUM(e.dias_estancia_otros) AS dias_estancia_otros,
+89	            AVG(e.prom_estancia_med_interna) AS prom_estancia_med_interna,
+90	            AVG(e.prom_estancia_cirugia) AS prom_estancia_cirugia,
+91	            AVG(e.prom_estancia_pediatria) AS prom_estancia_pediatria,
+92	            AVG(e.prom_estancia_ginecobstetricia) AS prom_estancia_gineco,
+93	            AVG(e.prom_estancia_otros) AS prom_estancia_otros,
+94	            SUM(e.total_egresos) AS total_egresos,
+95	            SUM(e.egresos_48h) AS egresos_48h,
+96	            SUM(e.defunciones) AS total_defunciones,
+97	            SUM(e.defunciones_48h) AS defunciones_48h,
+98	            SUM(e.dias_estancia_sum) AS total_dias_estancia,
+99	            SUM(e.nacimientos) AS total_nacimientos,
+100	            SUM(e.cesareas) AS total_cesareas,
+101	            SUM(e.abortos) AS total_abortos,
+102	            SUM(e.apeo) AS total_apeo,
+103	            IFNULL(SUM(p.total_cirugias), 0) AS total_cirugias_quirofano,
+104	            IFNULL(SUM(sis.total_dias_paciente), 0) AS total_dias_paciente,
+105	            IFNULL(SUM(sis.consultas), 0) AS total_consultas,
+106	            IFNULL(SUM(sis.especialidad), 0) AS total_especialidad,
+107	            IFNULL(SUM(urg.total_urgencias), 0) AS total_urgencias,
+108	            IFNULL(SUM(urg.urgencias_calificadas), 0) AS total_urgencias_calificadas,
+109	            MAX(sin.camas_total) AS camas_censables,
+110	            MAX(sin.quirofanos) AS quirofanos,
+111	            MAX(sin.camas_med_int) AS camas_med_int,
+112	            MAX(sin.camas_cirugia) AS camas_cirugia,
+113	            MAX(sin.camas_gineco) AS camas_gineco,
+114	            MAX(sin.camas_pediatria) AS camas_pediatria,
+115	            MAX(sin.camas_otros) AS camas_otros,
+116	            MAX(sin.salas_expulsion) AS salas_expulsion,
+117	            MAX(sin.quirofanos) AS quirofanos
+118	            
+119	        FROM (
+120	            SELECT
+121	                anio,
+122	                mes,
+123	                clues,
+124	                nombre_unidad,
+125	
+126	                total_egresos,
+127	                egresos_48h,
+128	
+129	                defunciones,
+130	                defunciones_48h,
+131	
+132	                dias_estancia_sum,
+133	
+134	                dias_estancia_med_interna,
+135	                dias_estancia_cirugia,
+136	                dias_estancia_pediatria,
+137	                dias_estancia_ginecobstetricia,
+138	                dias_estancia_otros,
+139	
+140	                prom_estancia_med_interna,
+141	                prom_estancia_cirugia,
+142	                prom_estancia_pediatria,
+143	                prom_estancia_ginecobstetricia,
+144	                prom_estancia_otros,
+145	
+146	                nacimientos,
+147	                cesareas,
+148	                abortos,
+149	                apeo
+150	
+151	            FROM egresos_agregado
+152	            {where_e}
+153	        ) e
+154	        LEFT JOIN (
+155	            SELECT anio, mes, clues, SUM(total_proced_dentro) AS total_cirugias 
+156	            FROM procedimiento_agregado {where_mov} GROUP BY anio, mes, clues
+157	        ) p ON e.clues = p.clues AND e.anio = p.anio AND e.mes = p.mes
+158	        LEFT JOIN (
+159	            SELECT anio, mes, clues, SUM(diasPaciente) AS total_dias_paciente, 
+160	                   SUM(consultas) AS consultas, SUM(especialidad) AS especialidad
+161	            FROM sis_registros_agregados {where_mov} GROUP BY anio, mes, clues
+162	        ) sis ON e.clues = sis.clues AND e.anio = sis.anio AND e.mes = sis.mes
+163	        LEFT JOIN (
+164	            SELECT anio, mes_estadistico, clues, SUM(total) AS total_urgencias, 
+165	                   SUM(calificada) AS urgencias_calificadas
+166	            FROM urgencias_agregado {where_urg} GROUP BY anio, mes_estadistico, clues
+167	        ) urg ON e.clues = urg.clues AND e.anio = urg.anio AND e.mes = urg.mes_estadistico
+168	       LEFT JOIN (
+169	            SELECT
+170	                anio,
+171	                clues,
+172	
+173	                MAX(total) AS camas_total,
+174	                MAX(med_int) AS camas_med_int,
+175	                MAX(cirugia) AS camas_cirugia,
+176	                MAX(gineco) AS camas_gineco,
+177	                MAX(pediatria) AS camas_pediatria,
+178	                MAX(otros) AS camas_otros,
+179	                MAX(quirofanos) AS quirofanos,
+180	                MAX(salas_expulsion) AS salas_expulsion
+181	
+182	            FROM sinerhias
+183	            GROUP BY anio, clues
+184	        ) sin
+185	        ON e.clues = sin.clues
+186	        AND e.anio = sin.anio
+187	        GROUP BY e.anio, e.mes, e.clues, e.nombre_unidad
+188	    """
+189	    
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/reportes.py:47:20
+46	    # =========================
+47	    cur.execute(f"""
+48	        SELECT DISTINCT grupo
+49	        FROM {tabla}
+50	        ORDER BY grupo
+51	    """)
+52	    grupos = [r[0] for r in cur.fetchall()]
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/reportes.py:57:20
+56	    # =========================
+57	    cur.execute(f"""
+58	        SELECT DISTINCT especialidad
+59	        FROM {tabla}
+60	        WHERE especialidad IS NOT NULL
+61	        AND especialidad <> ''
+62	        ORDER BY especialidad
+63	    """)
+64	
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/reportes.py:70:20
+69	    # =========================
+70	    cur.execute(f"""
+71	        SELECT DISTINCT c.nombre_unidad AS unidad
+72	        FROM {tabla} m
+73	        LEFT JOIN catalogo_unidades c
+74	            ON m.clues = c.clues
+75	        WHERE c.nombre_unidad IS NOT NULL
+76	        ORDER BY unidad ASC
+77	    """)
+78	
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/reportes.py:123:16
+122	
+123	    query = f"""
+124	        SELECT
+125	            a.anio,
+126	            a.grupo AS causa,
+127	            SUM(a.total) AS total
+128	        FROM {tabla} a
+129	        LEFT JOIN catalogo_unidades c
+130	            ON a.clues = c.clues
+131	        WHERE 1=1
+132	    """
+133	
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/reportes.py:177:29
+176	
+177	        query_unidades = f"""
+178	            SELECT
+179	                a.anio,
+180	                c.nombre_unidad,
+181	                a.grupo,
+182	                SUM(a.total) AS total
+183	            FROM {tabla} a
+184	            LEFT JOIN catalogo_unidades c
+185	                ON a.clues = c.clues
+186	            WHERE a.grupo = %s
+187	        """
+188	
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/routes/urgencias.py:154:16
+153	
+154	    query = f"""
+155	        SELECT
+156	            nombre_unidad AS Unidad,
+157	            anio AS Anio,
+158	            mes_estadistico AS Mes,
+159	            SUM({campo_suma}) AS Total
+160	        FROM urgencias_agregado
+161	    """
+162	
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/utils/egresos_queries.py:85:31
+84	        if unidades:
+85	            where_kpi.append(f"clues IN (SELECT clues FROM catalogo_unidades WHERE nombre_unidad IN ({','.join(['%s']*len(unidades))}))")
+86	            params_kpi.extend(unidades)
+
+--------------------------------------------------
+>> Issue: [B608:hardcoded_sql_expressions] Possible SQL injection vector through string-based query construction.
+   Severity: Medium   Confidence: Low
+   CWE: CWE-89 (https://cwe.mitre.org/data/definitions/89.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html
+   Location: ./app/utils/egresos_queries.py:92:18
+91	        # Multiplicamos params_kpi * 4 porque el filtro se repite en las 4 subconsultas
+92	        sql = f"""
+93	            SELECT 
+94	                p.clues AS CLUES, 
+95	                c.nombre_unidad AS Hospital, 
+96	                p.anio,
+97	                (SELECT SUM(total_egresos) FROM egresos_agregado {filtro_kpi_str}) AS KPI_Egresos_Totales,
+98	                (SELECT SUM(defunciones) FROM egresos_agregado {filtro_kpi_str}) AS KPI_Defunciones_Totales,
+99	                (SELECT SUM(egresos_48h) FROM egresos_agregado {filtro_kpi_str}) AS KPI_Egresos_48h,
+100	                (SELECT SUM(defunciones_48h) FROM egresos_agregado {filtro_kpi_str}) AS KPI_Defunciones_48h
+101	        """
+102	        
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: '*(Chichin)$'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: ./config.py:2:17
+1	class Config:
+2	    SECRET_KEY = '*(Chichin)$'
+3	    MYSQL_USER = 'oficios_dgp'
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: '$Estadistic4#'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: ./config.py:4:21
+3	    MYSQL_USER = 'oficios_dgp'
+4	    MYSQL_PASSWORD = '$Estadistic4#'
+5	    MYSQL_HOST = 'localhost'
+
+--------------------------------------------------
+
+Code scanned:
+	Total lines of code: 3996
+	Total lines skipped (#nosec): 0
+	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 0
+
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 3
+		Medium: 19
+		High: 0
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 16
+		Medium: 5
+		High: 1
+Files skipped (0):

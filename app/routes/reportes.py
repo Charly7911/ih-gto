@@ -8,6 +8,12 @@ import re
 from collections import defaultdict
 from flask_login import login_required
 
+
+TABLAS_AFECCIONES = {
+    "morbi": "afecciones_morbi",
+    "morta": "afecciones_morta"
+}
+
 reportes = Blueprint('reportes', __name__, url_prefix='/reportes')
 
 
@@ -18,10 +24,10 @@ reportes = Blueprint('reportes', __name__, url_prefix='/reportes')
 @login_required
 def reporte(tipo):
 
-    if tipo not in ("morbi", "morta"):
-        abort(404, description="Tipo de reporte no válido. Debe ser 'morbi' o 'morta'.")
+    tabla = TABLAS_AFECCIONES.get(tipo)
 
-    tabla = "afecciones_morbi" if tipo == "morbi" else "afecciones_morta"
+    if not tabla:
+        abort(404, description="Tipo de reporte no válido.")
 
     titulo = "Reporte de Morbilidad" if tipo == "morbi" else "Reporte de Mortalidad"
 
@@ -96,10 +102,10 @@ def reporte(tipo):
 @login_required
 def data_reporte(tipo):
 
-    if tipo not in ("morbi", "morta"):
-        abort(404)
+    tabla = TABLAS_AFECCIONES.get(tipo)
 
-    tabla = "afecciones_morbi" if tipo == "morbi" else "afecciones_morta"
+    if not tabla:
+        abort(404)
 
 
     def obtener_codigo(texto):
@@ -366,7 +372,9 @@ def data_reporte(tipo):
 @login_required
 def excel_reporte(tipo):
 
-    if tipo not in ("morbi", "morta"):
+    tabla = TABLAS_AFECCIONES.get(tipo)
+
+    if not tabla:
         abort(404)
 
     import mysql
