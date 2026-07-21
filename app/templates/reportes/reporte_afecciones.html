@@ -292,12 +292,7 @@
         .getElementById(`btnDescargar${sufijo}`)
         ?.addEventListener("click", () => {
 
-            console.log("CLICK");
-
-            console.log(
-                [...document.querySelectorAll(".filtro-anio-morbi:checked")]
-                    .map(x => x.value)
-            );
+           
 
             const anios = Array.from(
                 document.querySelectorAll(`.filtro-anio-${tipo}:checked`)
@@ -360,15 +355,7 @@
                 );
             }
 
-            console.log({
-                anios,
-                meses,
-                top,
-                unidades,
-                afecciones,
-                servicios
-            });
-
+        
 
             window.location.href =
                 `/reportes/${tipo}/excel?${params.toString()}`;

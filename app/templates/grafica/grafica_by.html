@@ -253,7 +253,7 @@
       document.querySelectorAll(".mes-check:checked")
     ).map(el => parseInt(el.value));
 
-    console.log("MESES CHECKED:", meses);
+
 
     return meses;
   }
@@ -274,7 +274,7 @@
   function initDraggableIndicadores() {
     const items = document.querySelectorAll(".indicador-item");
 
-    console.log("Indicadores encontrados:", items.length);
+
 
     items.forEach((el) => {
       el.draggable = true;
@@ -299,7 +299,7 @@
           JSON.stringify(data)
         );
 
-        console.log("DRAG INDICADOR:", data);
+
       });
     });
   }
@@ -678,7 +678,7 @@
       params.append("meses[]", "13");
     }
 
-    console.log("PARAMS ENVIADOS:", params.toString());
+
 
     // =========================
     // FETCH
@@ -705,13 +705,7 @@
 
         if (!data) return;
 
-        console.log("DATA COMPLETA API:", data);
-        console.log("PRIMER REGISTRO:", data[0]);
-        console.log(
-          data.filter(
-            x => x.indicador === "total_egresos"
-          )
-        );
+
 
         if (!data || data.length === 0) {
           if (chart) chart.destroy();
@@ -722,17 +716,7 @@
           (item) => Number(item.mes) === 13
         );
 
-        console.log("DATOS ANUALES:", datosAnuales);
 
-        console.log(
-          "INDICADORES SELECCIONADOS:",
-          Array.from(indicadoresSeleccionados)
-        );
-
-        console.log(
-          "INDICADORES RECIBIDOS:",
-          [...new Set(data.map(x => x.indicador))]
-        );
 
         //window.ultimoDataRecibido = data;
 
@@ -782,14 +766,6 @@
 
 
 
-      console.log("VALIDANDO:", {
-        unidad: nombreU,
-        indicador: indicadorId,
-        registros
-      });
-
-
-
       const tieneDatos = registros.some(
         r => Number(r.valor) > 0
       );
@@ -810,9 +786,6 @@
         const badge = document.querySelector(
           `.badge-item[data-tipo="indicador"][data-value="${indicadorId}"]`
         );
-
-        console.log("BUSCANDO BADGE:", indicadorId);
-        console.log("BADGE ENCONTRADO:", badge);
 
 
         if (badge) {
@@ -981,10 +954,7 @@
       }
 
       else {
-        console.log("ANUAL DATA:", data);
-        console.log("INDICADOR:", indicadorNom);
-        console.log("AÑO:", anioNom);
-        console.log("UNIDAD:", unidadLimpia);
+
 
         const registros = data.filter(
           (d) =>
@@ -994,24 +964,14 @@
             Number(d.mes) === 13
         );
 
-        console.log(
-          "FILTRADOS:",
-          data.filter(
-            (d) =>
-              norm(d.indicador) === norm(indicadorNom) &&
-              String(d.anio) === String(anioNom) &&
-              norm(limpiarNombreUnidad(d.nombre_unidad)) === unidadLimpia &&
-              Number(d.mes) === 13
-          )
-        );
+
 
         valores = [
           registros.length
             ? Number(registros[0].valor || 0)
             : 0
         ];
-        console.log("meses", mesesSeleccionados);
-        console.log("data anual", data.filter(d => d.mes === 13));
+
       }
       // =========================
       // COLOR
@@ -1103,7 +1063,7 @@
       ];
     });
 
-    console.log("DATASETS:", datasets);
+
 
     // =========================
     // CHART
@@ -1369,16 +1329,12 @@
     // FETCH
     // =========================
     let dataTotal = [];
-    console.log(params.toString());
+
 
     try {
       const res = await fetch("/grafica/api/indicadores?" + params.toString());
       dataTotal = await res.json();
-      console.log("Ejemplos de registros 2023:");
-      console.log(dataTotal.filter(d => d.anio == 2023).slice(0, 5));
 
-      console.log("Ejemplos de registros 2024:");
-      console.log(dataTotal.filter(d => d.anio == 2024).slice(0, 5));
 
       if (!dataTotal.length) {
         alert("No hay datos.");
@@ -1391,10 +1347,7 @@
       resetBotonExcel();
       return;
     }
-    console.log("PARAMS:", params.toString());
-    console.log("DATA TOTAL:", dataTotal);
-    console.log("ES ANUAL:", esAnual);
-    console.log("MESES SELECCIONADOS:", mesesSeleccionados);
+
 
     // =========================
     // COLUMNAS
