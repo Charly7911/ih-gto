@@ -1134,12 +1134,12 @@ def subir_camas_no_censables():
 
         if 'file' not in request.files:
             flash('No hay archivo en la solicitud', 'danger')
-            return redirect(url_for('subir_camas_no_censables'))
+            return redirect(url_for('admin.subir_camas_no_censables'))
 
         file = request.files['file']
         if file.filename == '' or not file.filename.endswith('.xlsx'):
             flash('Seleccione un archivo .xlsx válido', 'danger')
-            return redirect(url_for('subir_camas_no_censables'))
+            return redirect(url_for('admin.subir_camas_no_censables'))
 
         filename = secure_filename(file.filename)
         carpeta_destino = os.path.join(current_app.root_path, 'uploads', f"camas_{anio}")
@@ -1168,6 +1168,7 @@ def subir_camas_no_censables():
 
             for _, row in df.iterrows():
                 clues = str(row['clues']).strip().upper()
+                mes = int(row['mes'])
 
                 # Validar que la CLUES exista en tu catálogo para evitar error de Llave Foránea
                 cursor.execute("SELECT 1 FROM catalogo_unidades WHERE clues = %s LIMIT 1", (clues,))
@@ -1175,7 +1176,7 @@ def subir_camas_no_censables():
                 if cursor.fetchone():
                     cursor.execute("""
                         INSERT INTO camas_no_censables (
-                            anio, clues, 
+                            anio, clues, mes, 
                             hab_urgencias, inh_urgencias, tot_urgencias,
                             hab_observacion, inh_observacion, tot_observacion,
                             hab_cuid_int, inh_cuid_int, tot_cuid_int,
@@ -1188,9 +1189,9 @@ def subir_camas_no_censables():
                             hab_uci_ped, inh_uci_ped, tot_uci_ped,
                             hab_otras_areas, inh_otras_areas, tot_otras_areas
                         )
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """, (
-                        anio, clues,
+                        anio, clues, mes, 
                         row.get('hab_urgencias', 0), row.get('inh_urgencias', 0), row.get('tot_urgencias', 0),
                         row.get('hab_observacion', 0), row.get('inh_observacion', 0), row.get('tot_observacion', 0),
                         row.get('hab_cuid_int', 0), row.get('inh_cuid_int', 0), row.get('tot_cuid_int', 0),
@@ -1226,11 +1227,11 @@ def subir_camas_no_censables():
                 mensaje += f" ⚠ {len(omitidos)} CLUES no se encontraron en el catálogo."
 
             flash(mensaje, 'success')
-            return redirect(url_for('subir_camas_no_censables'))
+            return redirect(url_for('admin.subir_camas_no_censables'))
 
         except Exception as e:
             flash(f'Error crítico al procesar: {e}', 'danger')
-            return redirect(url_for('subir_camas_no_censables'))
+            return redirect(url_for('admin.subir_camas_no_censables'))
 
     return render_template('admin/subir_camas_no_censables.html')
 
@@ -1251,12 +1252,12 @@ def subir_equipo_medico():
 
         if 'file' not in request.files:
             flash('No hay archivo en la solicitud', 'danger')
-            return redirect(url_for('subir_equipo_medico'))
+            return redirect(url_for('admin.subir_equipo_medico'))
 
         file = request.files['file']
         if file.filename == '' or not file.filename.endswith('.xlsx'):
             flash('Seleccione un archivo .xlsx válido', 'danger')
-            return redirect(url_for('subir_equipo_medico'))
+            return redirect(url_for('admin.subir_equipo_medico'))
 
         filename = secure_filename(file.filename)
         carpeta_destino = os.path.join(current_app.root_path, 'uploads', f"equipo_{anio}")
@@ -1356,7 +1357,7 @@ def subir_equipo_medico():
 
         except Exception as e:
             flash(f'Error al procesar el Excel: {e}', 'danger')
-            return redirect(url_for('subir_equipo_medico'))
+            return redirect(url_for('admin.subir_equipo_medico'))
 
     return render_template('admin/subir_equipo_medico.html')
 
@@ -1569,7 +1570,7 @@ def subir_csv_sis():
                     SUM(CASE WHEN sr.variable = 'HOS03' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
                     SUM(CASE WHEN sr.variable = 'HOS05' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
                     SUM(CASE WHEN sr.variable = 'HPH12' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
-                    SUM(CASE WHEN sr.variable IN ('LAB01', 'LAB03', 'LAB05','LAB07') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+                    SUM(CASE WHEN sr.variable IN ('LAB01', 'LAB03', 'LAB05','LAB07','LAB09') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
                     SUM(CASE WHEN sr.variable = 'LRX01' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
                     SUM(CASE WHEN sr.variable = 'LAP01' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
                     SUM(CASE WHEN sr.variable = 'LOE01' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),

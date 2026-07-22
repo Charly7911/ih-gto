@@ -64,158 +64,328 @@ def generar_total_general(
     es_descarga_masiva,
     indicadores_solicitados
 ):
-    
+
     # ==========================================
-    # IDENTIFICAR UNIDADES Y CONDICIÓN ANUAL
+    # RECURSOS FISICOS (NO SE SUMAN POR MES)
+    # ==========================================
+    RECURSOS_FISICOS = [
+        "camas_total",
+        "quirofanos",
+        "camas_med_int",
+        "camas_cirugia",
+        "camas_gineco",
+        "camas_pediatria",
+        "camas_otros",
+        "hab_urgencias",
+        "hab_observacion",
+        "hab_quemados",
+        "hab_lab_parto",
+        "hab_recup_pp",
+        "hab_cirug_amb",
+        "hab_recup_pq",
+        "hab_cuid_int",
+        "hab_uci_adulto",
+        "hab_uci_ped",
+        "hab_otras_areas",
+        "total_no_censables",
+    ]
+
+
+    # ==========================================
+    # IDENTIFICAR UNIDADES
     # ==========================================
     unidades = {
         r["nombre_unidad"]
         for r in data_acumulada
         if r["nombre_unidad"] != "TOTAL GENERAL"
     }
-    
-    # Detectamos si es formato anual
-    es_anual = len(meses_validos) == 12 or any(r["mes"] == 13 for r in data_acumulada)
+
+
+    # Solo es anual cuando existe mes 13
+    es_anual = any(r["mes"] == 13 for r in data_acumulada)
+
 
     if not data_acumulada:
         return []
 
-    # REGLA ANUAL: Si la descarga es ANUAL y solo hay UNA unidad, NO se genera Total General
+
+    # ==========================================
+    # ANUAL + UNA UNIDAD
+    # NO GENERAR TOTAL
+    # ==========================================
     if len(unidades) == 1 and es_anual:
         return []
 
+
     resultados = []
-    
+
+
     # ==========================================
-    # CASO 1: UNA SOLA UNIDAD - DESCARGA MENSUAL
+    # FUNCION PARA ARMAR BASE
+    # ==========================================
+    def construir_base(registros, sumar_recursos = False):
+
+        base = {}
+
+        # Campos acumulables
+        for campo in SUM_FIELDS:
+            base[campo] = sum(
+                float(x["valor"])
+                for x in registros
+                if x["indicador"] == campo
+            )
+
+
+        # Recursos físicos
+        for campo in MAX_FIELDS:
+
+            valores = [
+                float(x["valor"])
+                for x in registros
+                if x["indicador"] == campo
+            ]
+
+
+            if campo in RECURSOS_FISICOS:
+
+                if sumar_recursos:
+                    base[campo] = sum(valores) if valores else 0
+                else:
+                    base[campo] = max(valores) if valores else 0
+
+            else:
+                base[campo] = sum(valores) if valores else 0
+
+
+        return base
+
+
+
+    # ==========================================
+    # CASO 1
+    # UNA UNIDAD - MENSUAL
     # ==========================================
     if len(unidades) == 1 and not es_anual:
-        anios_presentes = {r["anio"] for r in data_acumulada}
-        
+
+        anios_presentes = {
+            r["anio"]
+            for r in data_acumulada
+        }
+
+
         for anio in anios_presentes:
+
             registros_anio = [
-                r for r in data_acumulada 
-                if r["anio"] == anio 
-                and r["nombre_unidad"] != "TOTAL GENERAL" 
+                r
+                for r in data_acumulada
+                if r["anio"] == anio
+                and r["nombre_unidad"] != "TOTAL GENERAL"
                 and r["mes"] != 13
             ]
-            
+
+
             if not registros_anio:
                 continue
-                
-            base = {}
-            for campo in SUM_FIELDS:
-                base[campo] = sum(float(x["valor"]) for x in registros_anio if x["indicador"] == campo)
 
-            for campo in MAX_FIELDS:
-                valores = [float(x["valor"]) for x in registros_anio if x["indicador"] == campo]
-                base[campo] = sum(valores) if valores else 0  # <--- Suma acumulada de la unidad
 
-            meses_en_registro = {r["mes"] for r in registros_anio}
-            dias = sum(calendar.monthrange(anio, m)[1] for m in meses_en_registro)
+            base = construir_base(registros_anio, sumar_recursos=False)
+
+
+            meses_en_registro = {
+                r["mes"]
+                for r in registros_anio
+            }
+
+
+            dias = sum(
+                calendar.monthrange(anio, m)[1]
+                for m in meses_en_registro
+            )
+
 
             kpis = calcular_kpis(base, dias)
-            dataset = {**base, **kpis}
 
-            nombre_meses = {1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 
-                            7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic"}
+            dataset = {
+                **base,
+                **kpis
+            }
+
+
+            nombre_meses = {
+                1:"Ene",
+                2:"Feb",
+                3:"Mar",
+                4:"Abr",
+                5:"May",
+                6:"Jun",
+                7:"Jul",
+                8:"Ago",
+                9:"Sep",
+                10:"Oct",
+                11:"Nov",
+                12:"Dic"
+            }
+
+
             min_m = min(meses_en_registro)
             max_m = max(meses_en_registro)
-            texto_mes = f"{nombre_meses[min_m]} - {nombre_meses[max_m]}" if min_m != max_m else nombre_meses[min_m]
+
+
+            texto_mes = (
+                f"{nombre_meses[min_m]} - {nombre_meses[max_m]}"
+                if min_m != max_m
+                else nombre_meses[min_m]
+            )
+
 
             for indicador, valor in dataset.items():
+
                 indicador = indicador.lower()
+
                 if es_descarga_masiva or indicador in indicadores_solicitados:
+
                     resultados.append({
                         "anio": anio,
-                        "mes": texto_mes,  
+                        "mes": texto_mes,
                         "clues": "TOTAL",
                         "nombre_unidad": "TOTAL GENERAL",
                         "indicador": indicador,
-                        "valor": round(float(valor), 2)
+                        "valor": round(float(valor),2)
                     })
-                    
+
+
         return resultados
-    
+
+
+
     # ==========================================
-    # CASO 2: VARIAS UNIDADES - DESCARGA ANUAL
+    # CASO 2
+    # VARIAS UNIDADES - ANUAL
     # ==========================================
     if len(unidades) > 1 and es_anual:
-        anios_presentes = {r["anio"] for r in data_acumulada}
+
+
+        anios_presentes = {
+            r["anio"]
+            for r in data_acumulada
+        }
+
 
         for anio in anios_presentes:
+
+
             registros_anio = [
-                r for r in data_acumulada
+                r
+                for r in data_acumulada
                 if r["anio"] == anio
                 and r["nombre_unidad"] != "TOTAL GENERAL"
             ]
 
-            base = {}
-            for campo in SUM_FIELDS:
-                base[campo] = sum(float(x["valor"]) for x in registros_anio if x["indicador"] == campo)
 
-            for campo in MAX_FIELDS:
-                valores = [float(x["valor"]) for x in registros_anio if x["indicador"] == campo]
-                base[campo] = sum(valores) if valores else 0 # <--- Suma acumulada anual de todas las unidades
+            base = construir_base(registros_anio, sumar_recursos=False)
 
-            dias = sum(calendar.monthrange(anio, m)[1] for m in meses_validos)
-            kpis = calcular_kpis(base, dias)
-            dataset = {**base, **kpis}
+
+            dias = sum(
+                calendar.monthrange(anio,m)[1]
+                for m in meses_validos
+            )
+
+
+            kpis = calcular_kpis(base,dias)
+
+            dataset = {
+                **base,
+                **kpis
+            }
+
 
             for indicador, valor in dataset.items():
+
                 indicador = indicador.lower()
+
+
                 if es_descarga_masiva or indicador in indicadores_solicitados:
+
                     resultados.append({
                         "anio": anio,
-                        "mes": 13,
-                        "clues": "TOTAL",
-                        "nombre_unidad": "TOTAL GENERAL",
-                        "indicador": indicador,
-                        "valor": round(float(valor), 2)
+                        "mes":13,
+                        "clues":"TOTAL",
+                        "nombre_unidad":"TOTAL GENERAL",
+                        "indicador":indicador,
+                        "valor":round(float(valor),2)
                     })
+
 
         return resultados
 
+
+
     # ==========================================
-    # CASO 3: VARIAS UNIDADES - DESCARGA MENSUAL
-    # (Comportamiento normal por cada mes/año)
+    # CASO 3
+    # VARIAS UNIDADES - MENSUAL
     # ==========================================
     grupos = defaultdict(list)
-    for r in data_acumulada:
-        if r["nombre_unidad"] != "TOTAL GENERAL":
-            grupos[(r["anio"], r["mes"])].append(r)
 
-    for (anio, mes), registros in grupos.items():
+
+    for r in data_acumulada:
+
+        if r["nombre_unidad"] != "TOTAL GENERAL":
+
+            grupos[
+                (
+                    r["anio"],
+                    r["mes"]
+                )
+            ].append(r)
+
+
+
+    for (anio,mes), registros in grupos.items():
+
+
         if mes == 13:
             continue
 
-        base = {}
-        for campo in SUM_FIELDS:
-            base[campo] = sum(float(x["valor"]) for x in registros if x["indicador"] == campo)
 
-        # ¡CORRECCIÓN CLAVE AQUÍ!
-        # Se cambió max(valores) por sum(valores) para que los totales de cada mes también sumen
-        for campo in MAX_FIELDS:
-            valores = [float(x["valor"]) for x in registros if x["indicador"] == campo]
-            base[campo] = sum(valores) if valores else 0  # <--- Cambiado de max() a sum()
+        base = construir_base(registros)
 
-        dias = calendar.monthrange(anio, mes)[1]
-        kpis = calcular_kpis(base, dias)
-        dataset = {**base, **kpis}
 
-        for indicador, valor in dataset.items():
+        dias = calendar.monthrange(
+            anio,
+            mes
+        )[1]
+
+
+        kpis = calcular_kpis(base,dias)
+
+
+        dataset = {
+            **base,
+            **kpis
+        }
+
+
+        for indicador,valor in dataset.items():
+
             indicador = indicador.lower()
+
+
             if es_descarga_masiva or indicador in indicadores_solicitados:
+
                 resultados.append({
-                    "anio": anio,
-                    "mes": mes,
-                    "clues": "TOTAL",
-                    "nombre_unidad": "TOTAL GENERAL",
-                    "indicador": indicador,
-                    "valor": round(float(valor), 2)
+
+                    "anio":anio,
+                    "mes":mes,
+                    "clues":"TOTAL",
+                    "nombre_unidad":"TOTAL GENERAL",
+                    "indicador":indicador,
+                    "valor":round(float(valor),2)
+
                 })
 
+
     return resultados
+
 
 
 
@@ -457,6 +627,7 @@ def indicadores():
         "total_no_censables",
     ]
 
+   
     # ==========================================================
     # PARAMETROS
     # ==========================================================
@@ -686,17 +857,17 @@ def indicadores():
                     SUM(IFNULL(sin.camas_otros,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_otros,
 
                     -- CAMAS NO CENSABLES
-                    MAX(IFNULL(cnc.hab_urgencias, 0)) AS hab_urgencias,
-                    MAX(IFNULL(cnc.hab_observacion, 0)) AS hab_observacion,
-                    MAX(IFNULL(cnc.hab_cuid_int, 0)) AS hab_cuid_int,
-                    MAX(IFNULL(cnc.hab_cirug_amb, 0)) AS hab_cirug_amb,
-                    MAX(IFNULL(cnc.hab_quemados, 0)) AS hab_quemados,
-                    MAX(IFNULL(cnc.hab_lab_parto, 0)) AS hab_lab_parto,
-                    MAX(IFNULL(cnc.hab_recup_pp, 0)) AS hab_recup_pp,
-                    MAX(IFNULL(cnc.hab_recup_pq, 0)) AS hab_recup_pq,
-                    MAX(IFNULL(cnc.hab_uci_adulto, 0)) AS hab_uci_adulto,
-                    MAX(IFNULL(cnc.hab_uci_ped, 0)) AS hab_uci_ped,
-                    MAX(IFNULL(cnc.hab_otras_areas, 0)) AS hab_otras_areas,
+                    {agg_camas}(IFNULL(cnc.hab_urgencias, 0)) AS hab_urgencias,
+                    {agg_camas}(IFNULL(cnc.hab_observacion, 0)) AS hab_observacion,
+                    {agg_camas}(IFNULL(cnc.hab_cuid_int, 0)) AS hab_cuid_int,
+                    {agg_camas}(IFNULL(cnc.hab_cirug_amb, 0)) AS hab_cirug_amb,
+                    {agg_camas}(IFNULL(cnc.hab_quemados, 0)) AS hab_quemados,
+                    {agg_camas}(IFNULL(cnc.hab_lab_parto, 0)) AS hab_lab_parto,
+                    {agg_camas}(IFNULL(cnc.hab_recup_pp, 0)) AS hab_recup_pp,
+                    {agg_camas}(IFNULL(cnc.hab_recup_pq, 0)) AS hab_recup_pq,
+                    {agg_camas}(IFNULL(cnc.hab_uci_adulto, 0)) AS hab_uci_adulto,
+                    {agg_camas}(IFNULL(cnc.hab_uci_ped, 0)) AS hab_uci_ped,
+                    {agg_camas}(IFNULL(cnc.hab_otras_areas, 0)) AS hab_otras_areas,
                     MAX(IFNULL(cnc.total_no_censables, 0)) AS total_no_censables
 
                 FROM egresos_agregado e
@@ -802,18 +973,43 @@ def indicadores():
                 AND e.anio = sin.anio
                 AND e.mes = sin.mes
 
-                -- JOIN CAMAS NO CENSABLES (ANUAL)
+                -- JOIN CAMAS NO CENSABLES
                 LEFT JOIN (
-                    SELECT anio, clues,
-                        MAX(hab_urgencias) AS hab_urgencias, MAX(hab_observacion) AS hab_observacion,
-                        MAX(hab_cuid_int) AS hab_cuid_int, MAX(hab_cirug_amb) AS hab_cirug_amb,
-                        MAX(hab_quemados) AS hab_quemados, MAX(hab_lab_parto) AS hab_lab_parto,
-                        MAX(hab_recup_pp) AS hab_recup_pp, MAX(hab_recup_pq) AS hab_recup_pq,
-                        MAX(hab_uci_adulto) AS hab_uci_adulto, MAX(hab_uci_ped) AS hab_uci_ped,
-                        MAX(hab_otras_areas) AS hab_otras_areas,
-                        (IFNULL(MAX(hab_urgencias),0)+IFNULL(MAX(hab_observacion),0)+IFNULL(MAX(hab_cuid_int),0)+IFNULL(MAX(hab_cirug_amb),0)+IFNULL(MAX(hab_quemados),0)+IFNULL(MAX(hab_lab_parto),0)+IFNULL(MAX(hab_recup_pp),0)+IFNULL(MAX(hab_recup_pq),0)+IFNULL(MAX(hab_uci_adulto),0)+IFNULL(MAX(hab_uci_ped),0)+IFNULL(MAX(hab_otras_areas),0)) AS total_no_censables
-                    FROM camas_no_censables GROUP BY anio, clues
-                ) cnc ON e.clues = cnc.clues AND e.anio = cnc.anio
+                    SELECT
+                        anio,
+                        mes,
+                        clues,
+                        hab_urgencias,
+                        hab_observacion,
+                        hab_cuid_int,
+                        hab_cirug_amb,
+                        hab_quemados,
+                        hab_lab_parto,
+                        hab_recup_pp,
+                        hab_recup_pq,
+                        hab_uci_adulto,
+                        hab_uci_ped,
+                        hab_otras_areas,
+
+                        (
+                            IFNULL(hab_urgencias,0)+
+                            IFNULL(hab_observacion,0)+
+                            IFNULL(hab_cuid_int,0)+
+                            IFNULL(hab_cirug_amb,0)+
+                            IFNULL(hab_quemados,0)+
+                            IFNULL(hab_lab_parto,0)+
+                            IFNULL(hab_recup_pp,0)+
+                            IFNULL(hab_recup_pq,0)+
+                            IFNULL(hab_uci_adulto,0)+
+                            IFNULL(hab_uci_ped,0)+
+                            IFNULL(hab_otras_areas,0)
+                        ) AS total_no_censables
+
+                    FROM camas_no_censables
+                ) cnc
+                ON e.clues = cnc.clues
+                AND e.anio = cnc.anio
+                AND e.mes = cnc.mes
 
                 {where_e}
 
