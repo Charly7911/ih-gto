@@ -47,6 +47,7 @@
                 <div class="card-body" id="formulario" style="display: none;">
                     <form method="POST" action="{{ url_for('admin.crear_usuario') }}" enctype="multipart/form-data"
                         autocomplete="off">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <!-- Campos Básicos del Usuario -->
 
                         <div class="md-3">
@@ -189,6 +190,7 @@
                                     <form action="{{ url_for('admin.eliminar_usuario', id=user.id) }}" method="POST"
                                         style="display:inline;"
                                         onsubmit="return confirm('¿Estás seguro de que deseas eliminar este usuario?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn btn-link"
                                             style="padding: 0; border: none; background: none; color: #007bff; cursor: pointer;">Eliminar</button>
                                     </form>
