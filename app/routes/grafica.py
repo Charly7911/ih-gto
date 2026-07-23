@@ -90,6 +90,15 @@ def generar_total_general(
         "total_no_censables",
     ]
 
+    if not data_acumulada:
+        return []
+
+    # Normalización de indicadores solicitados en minúsculas
+    indicadores_solic_set = (
+        {ind.lower() for ind.lower in indicadores_solicitados}
+        if isinstance(indicadores_solicitados, (list, set, tuple)) and indicadores_solicitados
+        else set()
+    )
 
     # ==========================================
     # IDENTIFICAR UNIDADES
@@ -100,136 +109,90 @@ def generar_total_general(
         if r["nombre_unidad"] != "TOTAL GENERAL"
     }
 
-
     # Solo es anual cuando existe mes 13
     es_anual = any(r["mes"] == 13 for r in data_acumulada)
 
-
-    if not data_acumulada:
-        return []
-
-
     # ==========================================
-    # ANUAL + UNA UNIDAD
-    # NO GENERAR TOTAL
+    # ANUAL + UNA UNIDAD -> NO GENERAR TOTAL
     # ==========================================
     if len(unidades) == 1 and es_anual:
         return []
 
-
     resultados = []
-
 
     # ==========================================
     # FUNCION PARA ARMAR BASE
     # ==========================================
-    def construir_base(registros, sumar_recursos = False):
-
+    def construir_base(registros, sumar_recursos=False):
         base = {}
+
+        recursos_set = {r.lower() for r in RECURSOS_FISICOS}
 
         # Campos acumulables
         for campo in SUM_FIELDS:
             base[campo] = sum(
                 float(x["valor"])
                 for x in registros
-                if x["indicador"] == campo
+                if x["indicador"].lower() == campo.lower()
             )
 
-
-        # Recursos físicos
+        # Recursos físicos y otros campos MAX
         for campo in MAX_FIELDS:
-
             valores = [
                 float(x["valor"])
                 for x in registros
-                if x["indicador"] == campo
+                if x["indicador"].lower() == campo.lower()
             ]
 
-
-            if campo in RECURSOS_FISICOS:
-
+            if campo.lower() in recursos_set:
                 if sumar_recursos:
                     base[campo] = sum(valores) if valores else 0
                 else:
                     base[campo] = max(valores) if valores else 0
-
             else:
                 base[campo] = sum(valores) if valores else 0
 
-
         return base
 
-
-
     # ==========================================
-    # CASO 1
-    # UNA UNIDAD - MENSUAL
+    # CASO 1: UNA UNIDAD - MENSUAL
     # ==========================================
     if len(unidades) == 1 and not es_anual:
 
-        anios_presentes = {
-            r["anio"]
-            for r in data_acumulada
-        }
-
+        anios_presentes = {r["anio"] for r in data_acumulada}
 
         for anio in anios_presentes:
-
             registros_anio = [
-                r
-                for r in data_acumulada
+                r for r in data_acumulada
                 if r["anio"] == anio
                 and r["nombre_unidad"] != "TOTAL GENERAL"
                 and r["mes"] != 13
             ]
 
-
             if not registros_anio:
                 continue
 
+            # Para consolidar el rango de meses de esta unidad
+            base = construir_base(registros_anio, sumar_recursos=True)
 
-            base = construir_base(registros_anio, sumar_recursos=False)
-
-
-            meses_en_registro = {
-                r["mes"]
-                for r in registros_anio
-            }
-
+            meses_en_registro = {r["mes"] for r in registros_anio}
 
             dias = sum(
                 calendar.monthrange(anio, m)[1]
                 for m in meses_en_registro
             )
 
-
             kpis = calcular_kpis(base, dias)
-
-            dataset = {
-                **base,
-                **kpis
-            }
-
+            dataset = {**base, **kpis}
 
             nombre_meses = {
-                1:"Ene",
-                2:"Feb",
-                3:"Mar",
-                4:"Abr",
-                5:"May",
-                6:"Jun",
-                7:"Jul",
-                8:"Ago",
-                9:"Sep",
-                10:"Oct",
-                11:"Nov",
-                12:"Dic"
+                1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr",
+                5: "May", 6: "Jun", 7: "Jul", 8: "Ago",
+                9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic"
             }
-
 
             min_m = min(meses_en_registro)
             max_m = max(meses_en_registro)
-
 
             texto_mes = (
                 f"{nombre_meses[min_m]} - {nombre_meses[max_m]}"
@@ -237,152 +200,91 @@ def generar_total_general(
                 else nombre_meses[min_m]
             )
 
-
             for indicador, valor in dataset.items():
-
-                indicador = indicador.lower()
-
-                if es_descarga_masiva or indicador in indicadores_solicitados:
-
+                ind_lower = indicador.lower()
+                if es_descarga_masiva or ind_lower in indicadores_solic_set:
                     resultados.append({
                         "anio": anio,
                         "mes": texto_mes,
                         "clues": "TOTAL",
                         "nombre_unidad": "TOTAL GENERAL",
-                        "indicador": indicador,
-                        "valor": round(float(valor),2)
+                        "indicador": ind_lower,
+                        "valor": round(float(valor), 2)
                     })
-
 
         return resultados
 
-
-
     # ==========================================
-    # CASO 2
-    # VARIAS UNIDADES - ANUAL
+    # CASO 2: VARIAS UNIDADES - ANUAL
     # ==========================================
     if len(unidades) > 1 and es_anual:
 
-
-        anios_presentes = {
-            r["anio"]
-            for r in data_acumulada
-        }
-
+        anios_presentes = {r["anio"] for r in data_acumulada}
 
         for anio in anios_presentes:
-
-
             registros_anio = [
-                r
-                for r in data_acumulada
+                r for r in data_acumulada
                 if r["anio"] == anio
                 and r["nombre_unidad"] != "TOTAL GENERAL"
             ]
 
-
-            base = construir_base(registros_anio, sumar_recursos=False)
-
+            # Sumar las distintas unidades
+            base = construir_base(registros_anio, sumar_recursos=True)
 
             dias = sum(
-                calendar.monthrange(anio,m)[1]
+                calendar.monthrange(anio, m)[1]
                 for m in meses_validos
             )
 
-
-            kpis = calcular_kpis(base,dias)
-
-            dataset = {
-                **base,
-                **kpis
-            }
-
+            kpis = calcular_kpis(base, dias)
+            dataset = {**base, **kpis}
 
             for indicador, valor in dataset.items():
-
-                indicador = indicador.lower()
-
-
-                if es_descarga_masiva or indicador in indicadores_solicitados:
-
+                ind_lower = indicador.lower()
+                if es_descarga_masiva or ind_lower in indicadores_solic_set:
                     resultados.append({
                         "anio": anio,
-                        "mes":13,
-                        "clues":"TOTAL",
-                        "nombre_unidad":"TOTAL GENERAL",
-                        "indicador":indicador,
-                        "valor":round(float(valor),2)
+                        "mes": 13,
+                        "clues": "TOTAL",
+                        "nombre_unidad": "TOTAL GENERAL",
+                        "indicador": ind_lower,
+                        "valor": round(float(valor), 2)
                     })
-
 
         return resultados
 
-
-
     # ==========================================
-    # CASO 3
-    # VARIAS UNIDADES - MENSUAL
+    # CASO 3: VARIAS UNIDADES - MENSUAL (Sin filtro de unidad)
     # ==========================================
     grupos = defaultdict(list)
 
-
     for r in data_acumulada:
-
         if r["nombre_unidad"] != "TOTAL GENERAL":
+            grupos[(r["anio"], r["mes"])].append(r)
 
-            grupos[
-                (
-                    r["anio"],
-                    r["mes"]
-                )
-            ].append(r)
-
-
-
-    for (anio,mes), registros in grupos.items():
-
-
+    for (anio, mes), registros in grupos.items():
         if mes == 13:
             continue
 
+        # ✅ CORREGIDO: sumar_recursos=True suma los recursos de todas las unidades del mismo mes
+        base = construir_base(registros, sumar_recursos=True)
 
-        base = construir_base(registros)
+        dias = calendar.monthrange(anio, mes)[1]
 
+        kpis = calcular_kpis(base, dias)
+        dataset = {**base, **kpis}
 
-        dias = calendar.monthrange(
-            anio,
-            mes
-        )[1]
-
-
-        kpis = calcular_kpis(base,dias)
-
-
-        dataset = {
-            **base,
-            **kpis
-        }
-
-
-        for indicador,valor in dataset.items():
-
-            indicador = indicador.lower()
-
-
-            if es_descarga_masiva or indicador in indicadores_solicitados:
-
+        for indicador, valor in dataset.items():
+            ind_lower = indicador.lower()
+            if es_descarga_masiva or ind_lower in indicadores_solic_set:
                 resultados.append({
-
-                    "anio":anio,
-                    "mes":mes,
-                    "clues":"TOTAL",
-                    "nombre_unidad":"TOTAL GENERAL",
-                    "indicador":indicador,
-                    "valor":round(float(valor),2)
-
+                    "anio": anio,
+                    "mes": mes,
+                    "clues": "TOTAL",
+                    "nombre_unidad": "TOTAL GENERAL",
+                    "indicador": ind_lower,
+                    "valor": round(float(valor), 2)
                 })
-
 
     return resultados
 
