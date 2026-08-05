@@ -2548,6 +2548,7 @@
 
 
   function exportarXLSX(matriz, columnas) {
+    
     const data = [];
 
     // =========================
@@ -2661,6 +2662,8 @@
     Object.keys(ws).forEach((cell) => {
       if (cell.startsWith("!")) return;
       const pos = XLSX.utils.decode_cell(cell);
+
+      const valorStr = String(ws[cell].v || "").trim().toUpperCase();
 
       // pos.c === 0 (Columna A - CLUES) || pos.c === 1 (Columna B - Unidad)
       if (

@@ -33,116 +33,258 @@
     </div>
 </div>
 
-<div class="container pb-5">
+<div class="container py-5">
+    <style>
+        /* Estilos para hacer toda la tarjeta cliqueable */
+        .card-modulo-link {
+            text-decoration: none !important;
+            color: inherit !important;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            border-radius: 18px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+
+        .card-modulo-link:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 14px 28px rgba(0, 0, 0, 0.08) !important;
+        }
+
+        /* Efecto sutil en la flecha indicadora al hacer hover */
+        .card-modulo-link:hover .arrow-indicator {
+            transform: translateX(4px);
+        }
+
+        .arrow-indicator {
+            transition: transform 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .icon-wrapper {
+            width: 46px;
+            height: 46px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            background: #ffffff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+        }
+
+        .badge-nature {
+            font-size: 0.68rem;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            font-weight: 700;
+            padding: 5px 12px;
+            border-radius: 20px;
+        }
+
+        /* Paleta de Fondos Claros / Pastel */
+        .bg-soft-info {
+            background-color: #f0f9ff;
+        }
+
+        .bg-soft-primary {
+            background-color: #f0f4ff;
+        }
+
+        .bg-soft-danger {
+            background-color: #fff2f2;
+        }
+
+        .bg-soft-dark {
+            background-color: #f8f9fa;
+        }
+
+        .bg-soft-warning {
+            background-color: #fffbe6;
+        }
+
+        .bg-soft-success {
+            background-color: #f0fdf4;
+        }
+
+        .bg-soft-secondary {
+            background-color: #f4f4f6;
+        }
+
+        /* Tarjeta Destacada de Análisis Comparativo */
+        .card-dynamic-light {
+            background: linear-gradient(135deg, #e0f2fe 0%, #e0e7ff 100%);
+            border: 1.5px solid #93c5fd !important;
+        }
+    </style>
+
     <div class="row g-4">
-        <div class="col-md-4">
-            <div class="card card-subsistema p-4 h-100">
-                <div class="icon-box bg-info-soft">
-                    <i class="bi bi-activity"></i>
+        <!-- Indicadores Operativos -->
+        <div class="col-md-6 col-lg-4">
+            <a href="/indicadores" class="card-modulo-link bg-soft-info p-4 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-wrapper text-info">
+                        <i class="bi bi-activity"></i>
+                    </div>
+                    <span class="badge bg-white text-secondary border badge-nature">Datos Acumulativos</span>
                 </div>
-                <h4 class="fw-bold h5">Indicadores Operativos</h4>
-                <p class="text-secondary small mb-4">Análisis de eficiencia: días estancia, ocupación y mortalidad
-                    hospitalaria.</p>
-                <a href="/indicadores" class="btn btn-modulo btn-outline-info mt-auto">Explorar Módulo</a>
-            </div>
-        </div>
-
-        <div class="col-md-4">
-            <div class="card card-subsistema p-4 h-100">
-                <div class="icon-box bg-primary-soft">
-                    <i class="bi bi-person-up"></i>
-                </div>
-                <h4 class="fw-bold h5">Egresos</h4>
-                <p class="text-secondary small mb-4">Control de altas clínicos, eventos quirúrgicos y estadísticas de
-                    natalidad.</p>
-                <a href="/egresos/indicadores" class="btn btn-modulo btn-outline-primary mt-auto">Explorar Módulo</a>
-            </div>
-        </div>
-
-        <div class="col-md-4">
-            <div class="card card-subsistema p-4 h-100">
-                <div class="icon-box bg-danger-soft">
-                    <i class="bi bi-clipboard2-pulse"></i>
-                </div>
-
-                <h4 class="fw-bold h5">Morbilidad</h4>
-
-                <p class="text-secondary small mb-4">
-                    Consulta y análisis de las principales causas de morbilidad por unidad médica, periodo, servicio y
-                    grupo de afecciones.
+                <h3 class="h5 fw-bold text-dark mb-2">Indicadores Operativos</h3>
+                <p class="text-secondary small mb-4 flex-grow-1">
+                    Consolidado acumulado de métricas clave: días estancia, niveles de ocupación y mortalidad
+                    hospitalaria.
                 </p>
-
-                <a href="/reportes/morbi/reporte" class="btn btn-modulo btn-outline-danger mt-auto">
-                    Explorar módulo
-                </a>
-            </div>
+                <div class="d-flex align-items-center text-info fw-semibold small mt-auto">
+                    <span>Ingresar al módulo</span>
+                    <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
+                </div>
+            </a>
         </div>
 
-        <div class="col-md-4">
-            <div class="card card-subsistema p-4 h-100">
-                <div class="icon-box bg-dark-subtle">
-                    <i class="bi bi-heart-pulse"></i>
+        <!-- Egresos -->
+        <div class="col-md-6 col-lg-4">
+            <a href="/egresos/indicadores" class="card-modulo-link bg-soft-primary p-4 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-wrapper text-primary">
+                        <i class="bi bi-person-up"></i>
+                    </div>
+                    <span class="badge bg-white text-secondary border badge-nature">Datos Acumulativos</span>
                 </div>
-
-                <h4 class="fw-bold h5">Mortalidad</h4>
-
-                <p class="text-secondary small mb-4">
-                    Consulta y análisis de las principales causas de mortalidad por unidad médica, periodo, servicio y
-                    grupo de afecciones.
+                <h3 class="h5 fw-bold text-dark mb-2">Egresos</h3>
+                <p class="text-secondary small mb-4 flex-grow-1">
+                    Registro acumulado y totalizado de altas clínicas, procedimientos quirúrgicos y estadísticas de
+                    natalidad.
                 </p>
-
-                <a href="/reportes/morta/reporte" class="btn btn-modulo btn-outline-dark mt-auto">
-                    Explorar módulo
-                </a>
-            </div>
+                <div class="d-flex align-items-center text-primary fw-semibold small mt-auto">
+                    <span>Ingresar al módulo</span>
+                    <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
+                </div>
+            </a>
         </div>
 
-        <div class="col-md-4">
-            <div class="card card-subsistema p-4 h-100">
-                <div class="icon-box bg-danger-soft">
-                    <i class="bi bi-heart-pulse"></i>
+        <!-- Morbilidad -->
+        <div class="col-md-6 col-lg-4">
+            <a href="/reportes/morbi/reporte" class="card-modulo-link bg-soft-danger p-4 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-wrapper text-danger">
+                        <i class="bi bi-clipboard2-pulse"></i>
+                    </div>
+                    <span class="badge bg-white text-secondary border badge-nature">Datos Acumulativos</span>
                 </div>
-                <h4 class="fw-bold h5">Urgencias</h4>
-                <p class="text-secondary small mb-4">Análisis de demanda por motivo de atención, distinguiendo entre
-                    urgencias calificadas (riesgo vital) y no calificadas, orientado a la eficiencia del triage.</p>
-                <a href="/urgencias" class="btn btn-modulo btn-outline-danger mt-auto">Explorar Módulo</a>
-            </div>
+                <h3 class="h5 fw-bold text-dark mb-2">Morbilidad</h3>
+                <p class="text-secondary small mb-4 flex-grow-1">
+                    Volumen acumulado de las principales causas de morbilidad por unidad médica, periodo y diagnósticos.
+                </p>
+                <div class="d-flex align-items-center text-danger fw-semibold small mt-auto">
+                    <span>Ingresar al módulo</span>
+                    <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
+                </div>
+            </a>
         </div>
 
-        <div class="col-md-4">
-            <div class="card card-subsistema p-4 h-100">
-                <div class="icon-box bg-success-soft">
-                    <i class="bi bi-hospital-fill"></i>
+        <!-- Mortalidad -->
+        <div class="col-md-6 col-lg-4">
+            <a href="/reportes/morta/reporte" class="card-modulo-link bg-soft-dark p-4 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-wrapper text-dark">
+                        <i class="bi bi-heart-pulse"></i>
+                    </div>
+                    <span class="badge bg-white text-secondary border badge-nature">Datos Acumulativos</span>
                 </div>
-                <h4 class="fw-bold h5">Sistema (SIS)</h4>
-                <p class="text-secondary small mb-4">Consolidado de producción de servicios médicos y auxiliares
-                    diagnósticos.</p>
-                <a href="/sis" class="btn btn-modulo btn-outline-success mt-auto">Explorar Módulo</a>
-            </div>
+                <h3 class="h5 fw-bold text-dark mb-2">Mortalidad</h3>
+                <p class="text-secondary small mb-4 flex-grow-1">
+                    Conteo general acumulado de causas de defunción clasificadas por unidad médica, periodos y
+                    afecciones.
+                </p>
+                <div class="d-flex align-items-center text-dark fw-semibold small mt-auto">
+                    <span>Ingresar al módulo</span>
+                    <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
+                </div>
+            </a>
         </div>
 
-        <div class="col-md-4">
-            <div class="card card-subsistema p-4 h-100">
-                <div class="icon-box bg-warning-soft">
-                    <i class="bi bi-calendar3-event"></i>
+        <!-- Urgencias -->
+        <div class="col-md-6 col-lg-4">
+            <a href="/urgencias" class="card-modulo-link bg-soft-warning p-4 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-wrapper text-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                    </div>
+                    <span class="badge bg-white text-secondary border badge-nature">Datos Acumulativos</span>
                 </div>
-                <h4 class="fw-bold h5">Agenda Estadística</h4>
-                <p class="text-secondary small mb-4">Planeación de recursos asistenciales y visualización del panorama
-                    de salud.</p>
-                <a href="/agenda/visor" class="btn btn-modulo btn-outline-warning mt-auto">Explorar Módulo</a>
-            </div>
+                <h3 class="h5 fw-bold text-dark mb-2">Urgencias</h3>
+                <p class="text-secondary small mb-4 flex-grow-1">
+                    Acumulado de atenciones por triage, desglosado entre urgencias calificadas y no calificadas.
+                </p>
+                <div class="d-flex align-items-center text-warning text-darken fw-semibold small mt-auto">
+                    <span>Ingresar al módulo</span>
+                    <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
+                </div>
+            </a>
         </div>
 
-        <div class="col-md-4">
-            <div class="card card-subsistema p-4 h-100 shadow-highlight">
-                <div class="icon-box bg-dark-soft">
-                    <i class="bi bi-cpu"></i>
+        <!-- Sistema (SIS) -->
+        <div class="col-md-6 col-lg-4">
+            <a href="/sis" class="card-modulo-link bg-soft-success p-4 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-wrapper text-success">
+                        <i class="bi bi-hospital"></i>
+                    </div>
+                    <span class="badge bg-white text-secondary border badge-nature">Datos Acumulativos</span>
                 </div>
-                <h4 class="fw-bold h5">Análisis Dinámico</h4>
-                <p class="text-secondary small mb-4">Minería de datos avanzada y exportación masiva de inteligencia
-                    estadística.</p>
-                <a href="/grafica" class="btn btn-modulo btn-dark mt-auto">Explorar Módulo</a>
-            </div>
+                <h3 class="h5 fw-bold text-dark mb-2">Sistema (SIS)</h3>
+                <p class="text-secondary small mb-4 flex-grow-1">
+                    Consolidado cuantitativo total de la producción de servicios médicos y auxiliares diagnósticos.
+                </p>
+                <div class="d-flex align-items-center text-success fw-semibold small mt-auto">
+                    <span>Ingresar al módulo</span>
+                    <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
+                </div>
+            </a>
+        </div>
+
+        <!-- Agenda Estadística -->
+        <div class="col-md-6 col-lg-4">
+            <a href="/agenda/visor" class="card-modulo-link bg-soft-secondary p-4 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-wrapper text-secondary">
+                        <i class="bi bi-calendar3"></i>
+                    </div>
+                    <span class="badge bg-white text-secondary border badge-nature"></span>
+                </div>
+                <h3 class="h5 fw-bold text-dark mb-2">Agenda Estadística</h3>
+                <p class="text-secondary small mb-4 flex-grow-1">
+                    Visualización sobre la distribución de recursos asistenciales y panorama
+                    general.
+                </p>
+                <div class="d-flex align-items-center text-secondary fw-semibold small mt-auto">
+                    <span>Ingresar al módulo</span>
+                    <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
+                </div>
+            </a>
+        </div>
+
+        <!-- Análisis Dinámico (Módulo Comparativo Resaltado) -->
+        <div class="col-md-6 col-lg-4">
+            <a href="/grafica" class="card-modulo-link card-dynamic-light p-4 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icon-wrapper bg-primary text-white shadow-sm">
+                        <i class="bi bi-cpu"></i>
+                    </div>
+                    <span class="badge bg-primary text-white badge-nature shadow-sm">
+                        <i class="bi bi-arrow-left-right me-1"></i> Análisis Comparativo
+                    </span>
+                </div>
+                <h3 class="h5 fw-bold text-dark mb-2">Análisis Dinámico</h3>
+                <p class="text-secondary small mb-4 flex-grow-1">
+                    Herramienta interactiva para minería de datos, cruzamiento de variables, comparativas temporales y
+                    gráficos.
+                </p>
+                <div class="d-flex align-items-center text-primary fw-bold small mt-auto">
+                    <span>Ingresar al módulo</span>
+                    <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
+                </div>
+            </a>
         </div>
     </div>
 </div>
