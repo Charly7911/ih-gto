@@ -127,20 +127,28 @@
                         📈 Tendencia - % Ocupación
                     </h5>
 
-                    <select id="selectorIndicadorGrafica" class="form-select w-auto">
-                        <option value="ocupacion">% Ocupación</option>
-                        <option value="estancia">Promedio de Estancia</option>
-                        <option value="rotacion">Índice de Rotación</option>
-                        <option value="intervalo">Intervalo de Sustitución</option>
-                        <option value="mortalidad_cruda">Mortalidad Cruda</option>
-                        <option value="mortalidad_ajustada">Mortalidad Ajustada</option>
-                        <option value="porcentaje_cesareas">Porcentaje Cesareas</option>
-                        <option value="porcentaje_apeo">Porcentaje Apeo</option>
-                        <option value="porcentaje_calificadas">% Urg. Calificadas</option>
-                        <option value="prom_inter_qx">Prom. Inter QX</option>
+                    <!-- Contenedor con Selector + Botón de Etiquetas -->
+                    <div class="d-flex align-items-center gap-2">
 
+                        <select id="selectorIndicadorGrafica" class="form-select w-auto form-select-sm">
+                            <option value="ocupacion">% Ocupación</option>
+                            <option value="estancia">Promedio de Estancia</option>
+                            <option value="rotacion">Índice de Rotación</option>
+                            <option value="intervalo">Intervalo de Sustitución</option>
+                            <option value="mortalidad_cruda">Mortalidad Cruda</option>
+                            <option value="mortalidad_ajustada">Mortalidad Ajustada</option>
+                            <option value="porcentaje_cesareas">Porcentaje Cesareas</option>
+                            <option value="porcentaje_apeo">Porcentaje Apeo</option>
+                            <option value="porcentaje_calificadas">% Urg. Calificadas</option>
+                            <option value="prom_inter_qx">Prom. Inter QX</option>
+                        </select>
 
-                    </select>
+                        <button type="button" id="btnToggleValoresIndicador"
+                            class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1">
+                            <i class="bi bi-tag-fill"></i>
+                            <span id="textoToggleValores">Mostrar Valores</span>
+                        </button>
+                    </div>
 
                 </div>
 
@@ -155,7 +163,11 @@
     </div>
 </div>
 
+
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Plugin Datalabels -->
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 
 <script>
     // ==========================================
@@ -165,31 +177,89 @@
     let chartComparativoAnual = null;
     let indicadorActivo = "ocupacion";
     let window_dataFullGlobal = []; // Mantiene toda la data para las gráficas
+    let mostrarValoresIndicador = false; // Controla la visibilidad de etiquetas de datos
+
+    // ==========================================
+    // EXPOSICIÓN GLOBAL DE FUNCIONES (PUNTOS DE ENTRADA PARA menu.html)
+    // ==========================================
+    window.ejecutarFiltradoIndicadores = function () {
+        const anios = obtenerSeleccionados(".ind-filtro-anio");
+        const meses = obtenerSeleccionados(".ind-filtro-mes");
+        const unidades = window.getUnidadesSeleccionadas ? window.getUnidadesSeleccionadas() : [];
+
+        let params = new URLSearchParams();
+        if (anios.length) params.append("anios", anios.join(","));
+        if (meses.length) params.append("meses", meses.join(","));
+        if (unidades.length) params.append("unidades", unidades.join(","));
+
+        cargarReporteIndicadores(params);
+    };
+
+    // Alias globales por si menu.html los llama directamente
+    window.cargarDatosIndicadores = window.ejecutarFiltradoIndicadores;
+    window.cargarTablaIndicadores = window.ejecutarFiltradoIndicadores;
+    window.ejecutarGraficasIndicadores = window.ejecutarFiltradoIndicadores;
 
     // ==========================================
     // 2. INICIALIZACIÓN Y EVENTOS
     // ==========================================
     document.addEventListener("DOMContentLoaded", () => {
+        // Carga inicial sin filtros
         cargarReporteIndicadores(new URLSearchParams());
 
+        // Evento Botón Filtrar local
         document.getElementById("btnFiltrarIndicadores")?.addEventListener("click", () => {
-            const anios = obtenerSeleccionados(".ind-filtro-anio");
-            const meses = obtenerSeleccionados(".ind-filtro-mes");
-            const unidades = window.getUnidadesSeleccionadas ? window.getUnidadesSeleccionadas() : [];
-
-            let params = new URLSearchParams();
-            if (anios.length) params.append("anios", anios.join(","));
-            if (meses.length) params.append("meses", meses.join(","));
-            if (unidades.length) params.append("unidades", unidades.join(","));
-
-            cargarReporteIndicadores(params);
+            window.ejecutarFiltradoIndicadores();
         });
 
+        // Evento Selector de Indicador
         document.getElementById("selectorIndicadorGrafica")?.addEventListener("change", function () {
             indicadorActivo = this.value;
             const tituloElem = document.getElementById("tituloGraficaIndicador");
             if (tituloElem) tituloElem.textContent = `📈 Tendencia - ${this.options[this.selectedIndex].text}`;
             renderTendenciaIndicador(window_dataFullGlobal);
+        });
+
+        // Evento Botón Mostrar / Ocultar Valores en Gráfica Principal
+        const btnToggle = document.getElementById("btnToggleValoresIndicador");
+        if (btnToggle) {
+            btnToggle.addEventListener("click", function () {
+                mostrarValoresIndicador = !mostrarValoresIndicador;
+                const textoToggle = document.getElementById("textoToggleValores");
+
+                if (mostrarValoresIndicador) {
+                    this.classList.remove("btn-outline-dark", "btn-outline-primary", "btn-primary");
+                    this.classList.add("btn-dark");
+                    if (textoToggle) textoToggle.textContent = "Ocultar Valores";
+                } else {
+                    this.classList.remove("btn-dark", "btn-primary");
+                    this.classList.add("btn-outline-dark");
+                    if (textoToggle) textoToggle.textContent = "Mostrar Valores";
+                }
+
+                if (chartIndicadorPrincipal) {
+                    chartIndicadorPrincipal.update();
+                }
+            });
+        }
+
+        // ==========================================
+        // ESCUCHADORES DE EVENTOS GLOBALES (DESDE EL MENÚ LATERAL)
+        // ==========================================
+        document.addEventListener("aplicarFiltroUnidades", () => {
+            window.ejecutarFiltradoIndicadores();
+        });
+
+        document.addEventListener("unidadesSeleccionadasCambiadas", () => {
+            window.ejecutarFiltradoIndicadores();
+        });
+
+        document.addEventListener("solicitarResetFiltros", () => {
+            window.resetearVistaIndicadores();
+        });
+
+        document.addEventListener("limpiarFiltrosGlobales", () => {
+            window.resetearVistaIndicadores();
         });
     });
 
@@ -207,11 +277,8 @@
 
                 window_dataFullGlobal = data;
 
-                // 1. Renderizar Gráficas (usan TODA la data)
                 renderTendenciaIndicador(data);
                 renderComparativoAnualIndicador(data);
-
-                // 2. Renderizar Pestañas de Años (basado en la data cargada)
                 generarTabsAnios(data);
             })
             .catch(err => console.error("Error al cargar datos:", err));
@@ -234,7 +301,6 @@
             tabsAnios.appendChild(li);
         });
 
-        // Configurar el evento de click para las pestañas
         tabsAnios.onclick = e => {
             const link = e.target.closest(".nav-link");
             if (!link) return;
@@ -246,11 +312,9 @@
             const anioSel = link.dataset.anio;
             const dataFiltrada = data.filter(r => r.anio == anioSel);
 
-            // Actualizar solo Tabla y KPIs sin tocar las gráficas ni los tabs
             actualizarVistaFiltrada(dataFiltrada);
         };
 
-        // Carga inicial con el año más reciente
         if (aniosUnicos.length > 0) {
             actualizarVistaFiltrada(data.filter(r => r.anio == aniosUnicos[0]));
         }
@@ -271,7 +335,6 @@
         const paginacion = document.getElementById("paginacionIndicadores");
         if (!tbody) return;
 
-        // --- 1. AGRUPACIÓN: Mapeo exacto con los nombres del SQL ---
         const agrupado = {};
         dataFiltrada.forEach(r => {
             const key = `${r.clues}-${r.anio}`;
@@ -299,7 +362,6 @@
 
             agrupado[key].mesesVistos.add(Number(r.mes));
 
-            // Sumatorias
             agrupado[key].total_egresos += Number(r.total_egresos || 0);
             agrupado[key].egresos_48h += Number(r.egresos_48h || 0);
             agrupado[key].total_defunciones += Number(r.total_defunciones || 0);
@@ -326,43 +388,20 @@
 
             tbody.innerHTML = "";
             paginaData.forEach(r => {
-                // Lógica de tiempo
                 const dictDias = { 1: 31, 2: 28, 3: 31, 4: 30, 5: 31, 6: 30, 7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31 };
                 if (r.anio % 4 === 0) dictDias[2] = 29;
                 const listaMeses = Array.from(r.mesesVistos);
                 const diasNaturales = listaMeses.reduce((acc, m) => acc + (dictDias[m] || 0), 0) || 365;
                 const diasHabiles = listaMeses.length > 0 ? listaMeses.length * 21 : 252;
 
-                // --- CÁLCULOS FORMATEADOS (A 1 DECIMAL) ---
-                const mortalidadCruda = r.total_egresos > 0
-                    ? ((r.total_defunciones / r.total_egresos) * 1000).toFixed(1)
-                    : "0.0";
-
-                const mortalidadAjustada = r.egresos_48h > 0
-                    ? ((r.defunciones_48h / r.egresos_48h) * 1000).toFixed(1)
-                    : "0.0";
-
-                const ocupacion = (r.camas_censables * diasNaturales) > 0
-                    ? ((r.total_dias_paciente / (r.camas_censables * diasNaturales)) * 100).toFixed(1)
-                    : "0.0";
-
-                // Intervalo de Sustitución: Evitamos negativos y corregimos la precisión decimal
-                const interSustRaw = r.total_egresos > 0
-                    ? (((r.camas_censables * diasNaturales) - r.total_dias_paciente) / r.total_egresos)
-                    : 0;
+                const mortalidadCruda = r.total_egresos > 0 ? ((r.total_defunciones / r.total_egresos) * 1000).toFixed(1) : "0.0";
+                const mortalidadAjustada = r.egresos_48h > 0 ? ((r.defunciones_48h / r.egresos_48h) * 1000).toFixed(1) : "0.0";
+                const ocupacion = (r.camas_censables * diasNaturales) > 0 ? ((r.total_dias_paciente / (r.camas_censables * diasNaturales)) * 100).toFixed(1) : "0.0";
+                const interSustRaw = r.total_egresos > 0 ? (((r.camas_censables * diasNaturales) - r.total_dias_paciente) / r.total_egresos) : 0;
                 const interSust = Math.max(0, interSustRaw).toFixed(1);
-
-                const promEstancia = r.total_egresos > 0
-                    ? (r.total_dias_estancia / r.total_egresos).toFixed(1)
-                    : "0.0";
-
-                const indiceRotacion = r.camas_censables > 0
-                    ? (r.total_egresos / r.camas_censables).toFixed(1)
-                    : "0.0";
-
-                const cesareas = r.total_nacimientos > 0
-                    ? ((r.total_cesareas / r.total_nacimientos) * 100).toFixed(1)
-                    : "0.0";
+                const promEstancia = r.total_egresos > 0 ? (r.total_dias_estancia / r.total_egresos).toFixed(1) : "0.0";
+                const indiceRotacion = r.camas_censables > 0 ? (r.total_egresos / r.camas_censables).toFixed(1) : "0.0";
+                const cesareas = r.total_nacimientos > 0 ? ((r.total_cesareas / r.total_nacimientos) * 100).toFixed(1) : "0.0";
 
                 tbody.innerHTML += `
             <tr>
@@ -388,7 +427,6 @@
             </tr>`;
             });
 
-            // --- PAGINACIÓN ---
             if (paginacion) {
                 paginacion.innerHTML = "";
                 if (totalPaginas > 1) {
@@ -420,7 +458,6 @@
     // ==========================================
     function renderTendenciaIndicador(data) {
         const resumen = {};
-        const unidadesSeleccionadas = window.getUnidadesSeleccionadas ? window.getUnidadesSeleccionadas() : [];
 
         data.forEach(r => {
             const anio = r.anio, mes = Number(r.mes);
@@ -437,7 +474,6 @@
             d.egresos_48h += Number(r.egresos_48h || 0);
             d.estancia += Number(r.total_dias_estancia || 0);
             d.pacientes_dias += Number(r.total_dias_paciente || 0);
-            // IMPORTANTE: Aquí sumamos las camas de todas las unidades del mes
             d.camas += Number(r.camas_censables || 0);
             d.nacimientos += Number(r.total_nacimientos || 0);
             d.cesareas += Number(r.total_cesareas || 0);
@@ -463,7 +499,6 @@
 
                     switch (indicadorActivo) {
                         case "ocupacion":
-                            // Cálculo exacto: (Suma Días Paciente / (Suma Camas * Días Mes))
                             valor = (d.pacientes_dias / (d.camas * diasMes)) * 100; break;
                         case "estancia":
                             valor = d.estancia / d.egresos; break;
@@ -486,22 +521,14 @@
                         default: valor = 0;
                     }
                 }
-                // Si el valor es negativo (por error de datos), forzamos 0. Redondeamos a 1 decimal para limpieza
                 valores.push(valor !== null ? Math.max(0, Number(valor.toFixed(1))) : null);
             }
 
             const colores = {
-                "2020": "#64748b", // Slate (Gris neutro)
-                "2021": "#94a3b8", // Slate light
-                "2022": "#6366f1", // Indigo
-                "2023": "#8b5cf6", // Violet (Tu 2023 anterior era gris, este resalta más)
-                "2024": "#0ea5e9", // Sky (Azul brillante - Actual)
-                "2025": "#10b981", // Emerald (Verde)
-                "2026": "#f59e0b", // Amber (Naranja/Dorado)
-                "2027": "#ef4444", // Red (Rojo)
-                "2028": "#ec4899", // Pink
-                "2029": "#8b5cf6", // Purple
-                "2030": "#14b8a6"  // Teal
+                "2020": "#64748b", "2021": "#94a3b8", "2022": "#6366f1",
+                "2023": "#8b5cf6", "2024": "#0ea5e9", "2025": "#10b981",
+                "2026": "#f59e0b", "2027": "#ef4444", "2028": "#ec4899",
+                "2029": "#8b5cf6", "2030": "#14b8a6"
             };
 
             return {
@@ -517,15 +544,50 @@
         const ctx = document.getElementById("graficaIndicadorPrincipal")?.getContext("2d");
         if (!ctx) return;
         if (chartIndicadorPrincipal) chartIndicadorPrincipal.destroy();
+
+        const pluginsArr = (typeof ChartDataLabels !== 'undefined') ? [ChartDataLabels] : [];
+
         chartIndicadorPrincipal = new Chart(ctx, {
             type: "line",
-            data: { labels: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"], datasets: datasets },
+            data: {
+                labels: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"],
+                datasets: datasets
+            },
+            plugins: pluginsArr,
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                scales: { y: { beginAtZero: true } },
+                layout: {
+                    padding: { top: 25 }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grace: '5%',
+                        ticks: { color: '#000000', font: { weight: 'bold' } }
+                    },
+                    x: {
+                        ticks: { color: '#000000', font: { weight: 'bold' } }
+                    }
+                },
                 plugins: {
-                    legend: { position: 'bottom' }
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#000000', font: { weight: 'bold' } }
+                    },
+                    datalabels: {
+                        display: function () {
+                            return mostrarValoresIndicador;
+                        },
+                        align: 'top',
+                        anchor: 'end',
+                        offset: 4,
+                        color: '#000000',
+                        font: { weight: 'bold', size: 11 },
+                        formatter: function (value) {
+                            return value !== null ? value : '';
+                        }
+                    }
                 }
             }
         });
@@ -541,7 +603,6 @@
                 resumenAnual[anio] = { sumaDiasPaciente: 0, sumaDisponibilidadCamas: 0 };
             }
 
-            // Calculamos disponibilidad: camas de la unidad * días del mes que se está sumando
             const diasDelMes = dictDias[Number(r.mes)] || 30;
             resumenAnual[anio].sumaDiasPaciente += Number(r.total_dias_paciente || 0);
             resumenAnual[anio].sumaDisponibilidadCamas += (Number(r.camas_censables || 0) * diasDelMes);
@@ -551,8 +612,8 @@
         const valores = labels.map(anio => {
             const d = resumenAnual[anio];
             return d.sumaDisponibilidadCamas > 0
-                ? ((d.sumaDiasPaciente / d.sumaDisponibilidadCamas) * 100).toFixed(1)
-                : "0.0";
+                ? Number(((d.sumaDiasPaciente / d.sumaDisponibilidadCamas) * 100).toFixed(1))
+                : 0.0;
         });
 
         const canvas = document.getElementById("graficaComparativoAnual");
@@ -560,13 +621,13 @@
 
         const ctx = canvas.getContext("2d");
 
-        // --- CREACIÓN DEL DEGRADADO AZUL ---
-        // Definimos el degradado de arriba (0) hacia abajo (400)
         const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-        gradient.addColorStop(0, "rgba(59, 130, 246, 0.5)");   // Azul brillante (Blue 500) con 50% opacidad
-        gradient.addColorStop(1, "rgba(59, 130, 246, 0.0)");   // Totalmente transparente al final
+        gradient.addColorStop(0, "rgba(59, 130, 246, 0.5)");
+        gradient.addColorStop(1, "rgba(59, 130, 246, 0.0)");
 
         if (chartComparativoAnual) chartComparativoAnual.destroy();
+
+        const pluginsArr = (typeof ChartDataLabels !== 'undefined') ? [ChartDataLabels] : [];
 
         chartComparativoAnual = new Chart(ctx, {
             type: "line",
@@ -575,37 +636,53 @@
                 datasets: [{
                     label: "Ocupación % Anual Real",
                     data: valores,
-                    borderColor: "#3b82f6",          // Color de la línea (Azul sólido)
-                    backgroundColor: gradient,       // Aplicamos el degradado al fondo
-                    fill: true,                      // Habilitamos el relleno
-                    tension: 0.4,                    // Suavizado de curva
-                    borderWidth: 3,                  // Grosor de la línea
-                    pointRadius: 4,                  // Tamaño de los puntos
-                    pointBackgroundColor: "#3b82f6", // Color de los puntos
-                    pointHoverRadius: 6              // Tamaño del punto al pasar el mouse
+                    borderColor: "#3b82f6",
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointBackgroundColor: "#3b82f6",
+                    pointHoverRadius: 6
                 }]
             },
+            plugins: pluginsArr,
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: {
+                    padding: { top: 25 }
+                },
                 plugins: {
                     legend: {
                         display: true,
-                        labels: { color: '#f3f4f6' } // Texto de leyenda claro
+                        labels: { color: '#000000', font: { weight: 'bold' } }
+                    },
+                    datalabels: {
+                        display: true,
+                        align: 'top',
+                        anchor: 'end',
+                        offset: 4,
+                        color: '#000000',
+                        font: { weight: 'bold', size: 11 },
+                        formatter: function (value) {
+                            return value + '%';
+                        }
                     }
                 },
                 scales: {
                     y: {
                         beginAtZero: true,
-                        max: 100,
+                        grace: '10%',
                         ticks: {
-                            color: '#9ca3af',
-                            callback: function (value) { return value + "%"; } // Agrega el símbolo %
+                            color: '#000000',
+                            font: { weight: 'bold' },
+                            callback: function (value) { return value + "%"; }
                         },
-                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        grid: { color: 'rgba(0, 0, 0, 0.1)' }
                     },
                     x: {
-                        ticks: { color: '#9ca3af' },
+                        ticks: { color: '#000000', font: { weight: 'bold' } },
                         grid: { display: false }
                     }
                 }
@@ -614,18 +691,16 @@
     }
 
     // ==========================================
-    // 7. KPIs SUPERIORES (CORRECCIÓN ÍNDICE ROTACIÓN)
+    // 7. KPIs SUPERIORES
     // ==========================================
     function renderKPIsIndicadores(data) {
         let totDP = 0, totE = 0, totDE = 0, totDispCamas = 0;
 
-        // Para el Índice de Rotación: Necesitamos las camas promedio por unidad
         const camasPorUnidad = {};
         const dict = { 1: 31, 2: 28, 3: 31, 4: 30, 5: 31, 6: 30, 7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31 };
 
         data.forEach(r => {
             const diasMes = dict[Number(r.mes)] || 30;
-            const anio = r.anio;
             const unidad = r.clues;
 
             totDP += Number(r.total_dias_paciente || 0);
@@ -633,34 +708,27 @@
             totDE += Number(r.total_dias_estancia || 0);
             totDispCamas += (Number(r.camas_censables || 0) * diasMes);
 
-            // Agrupamos camas para sacar un promedio real y no una suma infinita
             if (!camasPorUnidad[unidad]) {
                 camasPorUnidad[unidad] = [];
             }
             camasPorUnidad[unidad].push(Number(r.camas_censables || 0));
         });
 
-        // Calculamos el promedio de camas totales del sistema
         let promedioCamasSistema = 0;
         Object.values(camasPorUnidad).forEach(mediciones => {
             const promedioUnidad = mediciones.reduce((a, b) => a + b, 0) / mediciones.length;
             promedioCamasSistema += promedioUnidad;
         });
 
-        // --- CÁLCULOS FINALES ---
         const ocupacion = totDispCamas > 0 ? (totDP / totDispCamas * 100).toFixed(1) : "0.0";
         const estancia = totE > 0 ? (totDE / totE).toFixed(1) : "0.0";
-
-        // Aquí es donde obtendrás el ~89.9
         const rotacion = promedioCamasSistema > 0 ? (totE / promedioCamasSistema).toFixed(1) : "0.0";
-
         const intervalo = totE > 0 ? ((totDispCamas - totDP) / totE).toFixed(1) : "0.0";
 
-        // Inyectar en el HTML
-        document.getElementById("kpiOcupacion").textContent = `${ocupacion}%`;
-        document.getElementById("kpiEstancia").textContent = `${estancia} días`;
-        document.getElementById("kpiRotacion").textContent = rotacion;
-        document.getElementById("kpiIntervalo").textContent = `${intervalo} días`;
+        if (document.getElementById("kpiOcupacion")) document.getElementById("kpiOcupacion").textContent = `${ocupacion}%`;
+        if (document.getElementById("kpiEstancia")) document.getElementById("kpiEstancia").textContent = `${estancia} días`;
+        if (document.getElementById("kpiRotacion")) document.getElementById("kpiRotacion").textContent = rotacion;
+        if (document.getElementById("kpiIntervalo")) document.getElementById("kpiIntervalo").textContent = `${intervalo} días`;
     }
 
     function obtenerSeleccionados(selector) {
@@ -671,6 +739,36 @@
         if (chartIndicadorPrincipal) chartIndicadorPrincipal.destroy();
         if (chartComparativoAnual) chartComparativoAnual.destroy();
     }
+
+    // ==========================================
+    // FUNCIÓN GLOBAL DE RESET (EXPUESTA EN WINDOW)
+    // ==========================================
+    window.resetearVistaIndicadores = function () {
+        document.querySelectorAll(".ind-filtro-anio, .ind-filtro-mes").forEach(chk => {
+            chk.checked = false;
+        });
+
+        const selector = document.getElementById("selectorIndicadorGrafica");
+        if (selector) {
+            selector.value = "ocupacion";
+            indicadorActivo = "ocupacion";
+            const tituloElem = document.getElementById("tituloGraficaIndicador");
+            if (tituloElem) tituloElem.textContent = "📈 Tendencia - Ocupación Hospitalaria (%)";
+        }
+
+        mostrarValoresIndicador = false;
+        const btnToggle = document.getElementById("btnToggleValoresIndicador");
+        const textoToggle = document.getElementById("textoToggleValores");
+        if (btnToggle) {
+            btnToggle.classList.remove("btn-dark", "btn-primary");
+            btnToggle.classList.add("btn-outline-dark");
+        }
+        if (textoToggle) {
+            textoToggle.textContent = "Mostrar Valores";
+        }
+
+        cargarReporteIndicadores(new URLSearchParams());
+    };
 </script>
 
 {% endblock %}

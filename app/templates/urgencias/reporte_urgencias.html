@@ -10,19 +10,17 @@
         </h2>
 
         <!-- ===============================
-         GRÁFICA ANILLOS
-    ================================ -->
+            GRÁFICAS ANILLOS
+        ================================ -->
         <div class="row mb-4">
             <!-- CALIFICADAS VS NO -->
             <div class="col-xl-6 col-lg-6 col-md-12">
                 <div class="card h-100">
                     <div class="card-body text-center">
-                        <h6 class="text-muted mb2" id="tituloClasificacion">Calificadas vs No Calificadas</h6>
-
-                        <div class="chart-container">
+                        <h6 class="text-muted mb-2" id="tituloClasificacion">Calificadas vs No Calificadas</h6>
+                        <div class="chart-container" style="position: relative; height: 260px;">
                             <canvas id="graficaClasificacion"></canvas>
                         </div>
-
                     </div>
                 </div>
             </div>
@@ -31,25 +29,20 @@
             <div class="col-xl-6 col-lg-6 col-md-12">
                 <div class="card h-100">
                     <div class="card-body text-center">
-                        <h6 class="text-muted mb2" id="tituloMotivo">Motivo de Atención</h6>
-
-                        <div class="chart-container">
+                        <h6 class="text-muted mb-2" id="tituloMotivo">Motivo de Atención</h6>
+                        <div class="chart-container" style="position: relative; height: 260px;">
                             <canvas id="graficaTipoAtencion"></canvas>
                         </div>
-
                     </div>
                 </div>
             </div>
-
         </div>
 
         <!-- ===============================
-         TABLA DE RESULTADOS
+            TABLA DE RESULTADOS
         ================================ -->
-
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-body">
-
                 <ul class="nav nav-tabs mb-3" id="tabsAnios"></ul>
 
                 <div class="table-responsive">
@@ -76,59 +69,58 @@
                 <nav class="mt-2">
                     <ul class="pagination pagination-sm" id="paginacionTabla"></ul>
                 </nav>
-
             </div>
         </div>
 
         <!-- ===============================
-         GRÁFICA BARRAS HORIZONTALES
-    ================================ -->
-
+            GRÁFICA BARRAS HORIZONTALES
+        ================================ -->
         <div class="card mb-4">
             <div class="card-body">
-                <h5>📊 Calificadas vs No Calificadas por Año</h5>
-                <div class="chart-large-container">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">📊 Calificadas vs No Calificadas por Año</h5>
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnToggleValoresBarras">
+                        Mostrar valores
+                    </button>
+                </div>
+                <div class="chart-large-container" style="position: relative; height: 350px;">
                     <canvas id="graficaPorAnio"></canvas>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- ===============================
-         GRÁFICA LINEAS
-    ================================ -->
+        <!-- ===============================
+            GRÁFICA LÍNEAS
+        ================================ -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h6 class="text-muted mb-0">
+                        📈 Total Urgencias por Mes
+                    </h6>
 
-    <div class="card mb-4">
-        <div class="card-body">
+                    <div class="d-flex gap-2 align-items-center">
+                        <select id="selectMotivo" class="form-select form-select-sm" style="width:180px;">
+                            <option value="">Todos los motivos</option>
+                            <option value="Medica">Médica</option>
+                            <option value="Pediatrica">Pediátrica</option>
+                            <option value="Ginecobstetricia">Ginecobstetricia</option>
+                            <option value="Accidentes">Accidentes</option>
+                        </select>
 
-            <div class="d-flex justify-content-between align-items-center mb-3">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="btnToggleTablaLinea">
+                            Mostrar valores
+                        </button>
+                    </div>
+                </div>
 
-                <h6 class="text-muted mb-0">
-                    📈 Total Urgencias por Mes
-                </h6>
-
-                <select id="selectMotivo" class="form-select form-select-sm" style="width:200px;">
-                    <option value="">Todos</option>
-                    <option value="Medica">Médica</option>
-                    <option value="Pediatrica">Pediátrica</option>
-                    <option value="Ginecobstetricia">Ginecobstetricia</option>
-                    <option value="Accidentes">Accidentes</option>
-                </select>
-
+                <div class="chart-container chart-linea" style="position: relative; height: 350px;">
+                    <canvas id="graficaLineaMeses"></canvas>
+                </div>
             </div>
-
-
-            <div class="chart-container chart-linea">
-                <canvas id="graficaLineaMeses"></canvas>
-            </div>
-
         </div>
+
     </div>
-
-
-
-
-</div>
 </div>
 
 <!-- ===============================
@@ -138,17 +130,13 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-
     const controlAnual = JSON.parse(
-        document.getElementById("urgencias-meta").dataset.control || "[]"
+        document.getElementById("urgencias-meta")?.dataset.control || "[]"
     );
-
 
     function formatearFechaES(fechaStr) {
         if (!fechaStr) return "";
-
-        const fecha = new Date(fechaStr); // acepta GMT, ISO, etc.
-
+        const fecha = new Date(fechaStr);
         if (isNaN(fecha)) return "";
 
         const meses = [
@@ -159,17 +147,16 @@
         return `${fecha.getUTCDate()} de ${meses[fecha.getUTCMonth()]} de ${fecha.getUTCFullYear()}`;
     }
 
-
-
     function actualizarEncabezadoURG(anio) {
         const meta = document.getElementById("urgencias-meta");
+        if (!meta) return;
+
         if (!anio) {
             meta.textContent = "";
             return;
         }
 
         const anioNum = Number(anio);
-
         const registro = controlAnual.find(r => Number(r.anio) === anioNum);
 
         if (!registro) {
@@ -180,76 +167,105 @@
         meta.textContent =
             ` | ${registro.estatus_inicio} al ${formatearFechaES(registro.fecha_actualizacion)} · ${registro.estatus}`;
     }
-
-
 </script>
 
 <script>
     /* =====================================================
-       VARIABLES GLOBALES DE GRÁFICAS
+        ESTADOS DE VISIBILIDAD DE DATOS EN GRÁFICAS
     ===================================================== */
-    let chartClasificacion = null;
-    let chartTipoAtencion = null;
+    let mostrarValoresBarras = false;
+    let mostrarValoresLinea = false;
+
     let chartPorAnio = null;
-    let chartLineaMeses = null;
     let paramsActualesUrgencias = new URLSearchParams();
 
+    /* =====================================================
+        PLUGIN REUTILIZABLE: DIBUJAR VALORES CENTRADOS EN BARRAS / PUNTOS
+    ===================================================== */
+    const pluginMostrarValores = {
+        id: "pluginMostrarValores",
+        afterDraw(chart) {
+            if (!chart.config.options.plugins.mostrarValoresActivo) return;
+
+            const { ctx } = chart;
+            ctx.save();
+            ctx.font = "bold 11px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            chart.data.datasets.forEach((dataset, datasetIndex) => {
+                const meta = chart.getDatasetMeta(datasetIndex);
+                if (meta.hidden) return;
+
+                meta.data.forEach((element, index) => {
+                    const valor = dataset.data[index];
+                    if (valor === null || valor === undefined || valor === 0) return;
+
+                    let posX, posY;
+
+                    if (chart.config.type === "bar") {
+                        const center = element.getCenterPoint();
+                        posX = center.x;
+                        posY = center.y;
+                        ctx.fillStyle = (datasetIndex === 0) ? "#000000" : "#FFFFFF";
+                    } else {
+                        const pos = element.tooltipPosition();
+                        posX = pos.x;
+                        posY = pos.y - 12;
+                        ctx.fillStyle = "#1F2937";
+                    }
+
+                    ctx.fillText(
+                        valor.toLocaleString("es-MX"),
+                        posX,
+                        posY
+                    );
+                });
+            });
+
+            ctx.restore();
+        }
+    };
+
+    Chart.register(pluginMostrarValores);
 
     /* =====================================================
-       UTILIDADES
+        UTILIDADES & ABREVIACIÓN DE HOSPITALES
     ===================================================== */
+    function abreviarNombreHospital(nombre) {
+        if (!nombre) return "";
+        return nombre
+            .replace(/Hospital General/gi, "HG")
+            .replace(/Hospital Comunitario/gi, "HC")
+            .replace(/Hospital Especializado/gi, "HE")
+            .replace(/Hospital Materno/gi, "HM")
+            .replace(/Centro de Salud/gi, "CS")
+            .replace(/Unidad Médica de Alta Especialidad/gi, "UMAE")
+            .replace(/Unidad de Médica de Alta Especialidad/gi, "UMAE");
+    }
+
     function obtenerUrgCheckbox(clase) {
         return Array.from(document.querySelectorAll(`.${clase}:checked`))
             .map(x => x.value)
             .join(",");
     }
 
-    document.getElementById("selectMotivo").addEventListener("change", (e) => {
-
+    document.getElementById("selectMotivo")?.addEventListener("change", (e) => {
         const motivo = e.target.value;
-
-        // 🔹 copiar filtros actuales
         const params = new URLSearchParams(paramsActualesUrgencias.toString());
 
-        // 🔹 aplicar SOLO el motivo
         if (motivo && motivo !== "todas") {
             params.set("motivo", motivo);
         } else {
             params.delete("motivo");
         }
 
-        // 🔥 SOLO se actualiza la gráfica de líneas
         renderLineaUrgenciasPorMes(params);
     });
 
-
-
-    function armarParamsUrgencias() {
-
-        const params = new URLSearchParams();
-
-        const motivo = document.getElementById("selectMotivo")?.value;
-        const unidades = document.getElementById("selectUnidad")?.value;
-
-        if (motivo && motivo !== "todas") {
-            params.append("motivo", motivo);
-        }
-
-        if (unidades) {
-            params.append("unidades", unidades);
-        }
-
-        return params;
-    }
-
-
-
-
     /* =====================================================
-       PLUGIN: TOTAL POR MES (DEBAJO DE LOS MESES)
+        TABLA RESULTADOS Y CONTROL DE AÑO SELECCIONADO
     ===================================================== */
-
-
     function renderTablaUrgencias(data) {
         const filasPorPagina = 10;
         let paginaActual = 1;
@@ -263,32 +279,29 @@
 
         const fN = (val) => Number(val || 0).toLocaleString('en-US');
 
-        // --- CAMBIO 1: Ordenar de mayor a menor ---
         const aniosUnicos = [...new Set(data.map(r => r.Anio))].sort((a, b) => b - a);
 
         tabsAnios.innerHTML = "";
         aniosUnicos.forEach((anio, i) => {
-            // El index 0 ahora es el año más alto por el sort anterior
             tabsAnios.innerHTML += `
             <li class="nav-item">
                 <a class="nav-link ${i === 0 ? "active" : ""}" href="#" data-anio="${anio}">
                     ${anio}
                 </a>
-            </li>
-        `;
+            </li>`;
         });
 
-        // --- CAMBIO 2: Asignar el primer valor (el mayor) como activo ---
         anioActivo = aniosUnicos[0];
-        actualizarEncabezadoURG(anioActivo);
+        if (typeof actualizarEncabezadoURG === "function") {
+            actualizarEncabezadoURG(anioActivo);
+        }
 
         function render() {
-            // Usamos == para evitar problemas si uno es String y otro Number
             const filtrados = data.filter(r => r.Anio == anioActivo);
 
             renderAnillos(filtrados);
 
-            const totalPaginas = Math.ceil(filtrados.length / filasPorPagina);
+            const totalPaginas = Math.ceil(filtrados.length / filasPorPagina) || 1;
             const inicio = (paginaActual - 1) * filasPorPagina;
             const paginaData = filtrados.slice(inicio, inicio + filasPorPagina);
 
@@ -299,7 +312,7 @@
                 <tr>
                     <td class="text-center">${r.Anio}</td>
                     <td>${String(r.CLUES || "").toUpperCase()}</td>
-                    <td>${r.Hospital}</td>               
+                    <td>${r.Hospital}</td>
                     <td class="text-center">${fN(r.Calificada)}</td>
                     <td class="text-center">${fN(r.No_Calificada)}</td>
                     <td class="text-center">${fN(r.Accidentes)}</td>
@@ -308,8 +321,7 @@
                     <td class="text-center">${fN(r.Pediatrica)}</td>
                     <td class="text-center">${fN(r.Total)}</td>
                     <td class="text-center">${r.Porcentaje_Calificada}%</td>
-                </tr>
-            `;
+                </tr>`;
             });
 
             paginacion.innerHTML = "";
@@ -317,24 +329,23 @@
                 paginacion.innerHTML += `
                 <li class="page-item ${i === paginaActual ? "active" : ""}">
                     <a class="page-link" href="#">${i}</a>
-                </li>
-            `;
+                </li>`;
             }
         }
 
-        // --- EVENTOS ---
         tabsAnios.onclick = e => {
             if (!e.target.dataset.anio) return;
             e.preventDefault();
 
-            // Actualizamos anioActivo con el click
             anioActivo = Number(e.target.dataset.anio);
             paginaActual = 1;
 
             tabsAnios.querySelectorAll(".nav-link").forEach(t => t.classList.remove("active"));
             e.target.classList.add("active");
 
-            actualizarEncabezadoURG(anioActivo);
+            if (typeof actualizarEncabezadoURG === "function") {
+                actualizarEncabezadoURG(anioActivo);
+            }
             render();
         };
 
@@ -345,73 +356,35 @@
             render();
         };
 
-        // Lanzamos el primer renderizado con el año más alto
         render();
     }
 
-
-
-    // Chart.register(totalMesUrgenciasPlugin);
-
     /* =====================================================
-       BOTÓN FILTRAR
-    ===================================================== */
-    document.getElementById("btnFiltrarUrgencias")
-        ?.addEventListener("click", () => {
-
-            const anios = obtenerUrgCheckbox("urg-filtro-anio");
-            const meses = obtenerUrgCheckbox("urg-filtro-mes");
-            const tipoAtencion = document.getElementById("filtroTipoAtencion")?.value;
-
-            let params = new URLSearchParams();
-
-            if (anios) params.append("anios", anios);
-            if (meses) params.append("meses", meses);
-            if (tipoAtencion && tipoAtencion !== "todas")
-                params.append("tipo_atencion", tipoAtencion);
-
-            const unidades = window.getUnidadesSeleccionadas?.() || [];
-            if (unidades.length)
-                params.append("unidades", unidades.join(","));
-
-
-            // conservar motivo si está seleccionado
-            const motivoActual = document.getElementById("selectMotivo")?.value;
-
-            if (motivoActual && motivoActual !== "todas") {
-                params.append("motivo", motivoActual);
-            }
-
-            // guardar filtros completos
-            paramsActualesUrgencias = new URLSearchParams(params.toString());
-
-            cargarReporteUrgencias(params);
-
-        });
-
-
-
-    /* =====================================================
-       FUNCIÓN PRINCIPAL
+        CARGAR REPORTES
     ===================================================== */
     function cargarReporteUrgencias(params) {
-
         fetch(`/urgencias/api/reporte_urgencias?${params.toString()}`)
             .then(res => res.json())
             .then(data => {
-
-                if (!data || !data.length) return;
+                if (!data || !data.length) {
+                    // Si no hay datos, limpiar gráficas y tabla
+                    if (window.chartClasificacion) window.chartClasificacion.destroy();
+                    if (window.chartTipoAtencion) window.chartTipoAtencion.destroy();
+                    if (chartPorAnio) chartPorAnio.destroy();
+                    const tbody = document.querySelector("#tablaResultados tbody");
+                    if (tbody) tbody.innerHTML = `<tr><td colspan="11" class="text-center">No hay datos disponibles</td></tr>`;
+                    return;
+                }
 
                 renderTablaUrgencias(data);
-                renderAnillos(data);
                 renderBarrasPorAnio(data);
                 renderLineaUrgenciasPorMes(params);
-            });
+            })
+            .catch(err => console.error("Error al cargar reportes:", err));
     }
 
-
     /* =====================================================
-       GRÁFICAS ANILLO
+        GRÁFICAS ANILLO CON TOTAL DINÁMICO EN EL CENTRO
     ===================================================== */
     function renderAnillos(data) {
         const anioParaTitulo = data.length > 0 ? data[0].Anio : "";
@@ -434,55 +407,34 @@
             totPedi += Number(r.Pediatrica || 0);
         });
 
-        // --- PLUGIN PARA DIBUJAR EL TOTAL EN EL CENTRO ---
-        const pluginCentro = {
-            id: 'textoCentro',
+        const pluginCentroDinamico = {
+            id: 'textoCentroDinamico',
             beforeDraw: function (chart) {
-                if (chart.config.options.plugins.centro) {
-                    const { ctx, chartArea: { top, bottom, left, right, width, height } } = chart;
-                    ctx.save();
+                const { ctx, chartArea: { top, height, left, width } } = chart;
+                ctx.save();
 
-                    // Configuración del texto
-                    const texto = chart.config.options.plugins.centro.texto;
-                    ctx.font = "bold 20px sans-serif"; // Puedes cambiar el tamaño aquí
-                    ctx.fillStyle = "#374151"; // Color del texto (gris oscuro)
-                    ctx.textAlign = "center";
-                    ctx.textBaseline = "middle";
+                let totalVisibles = 0;
+                const dataset = chart.data.datasets[0];
 
-                    // Posición (Centro del canvas)
-                    ctx.fillText(texto, left + width / 2, top + height / 2);
-                    ctx.restore();
+                if (dataset && dataset.data) {
+                    dataset.data.forEach((val, index) => {
+                        if (chart.getDataVisibility(index)) {
+                            totalVisibles += Number(val || 0);
+                        }
+                    });
                 }
+
+                const texto = Math.round(totalVisibles).toLocaleString('es-MX');
+
+                ctx.font = "bold 18px sans-serif";
+                ctx.fillStyle = "#374151";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(texto, left + width / 2, top + height / 2);
+                ctx.restore();
             }
         };
 
-        // --- Render de Gráfica Clasificación ---
-        if (window.chartClasificacion) window.chartClasificacion.destroy();
-        window.chartClasificacion = new Chart(document.getElementById("graficaClasificacion"), {
-            type: "doughnut",
-            data: {
-                labels: ["Calificadas", "No Calificadas"],
-                datasets: [{
-                    data: [totCalificada, totNoCalificada],
-                    backgroundColor: ["#10B981", "#EF4444"]
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: "75%", // Un poco más delgado para que luzca el número
-                plugins: {
-                    legend: { position: "bottom" },
-                    centro: {
-                        texto: (totCalificada + totNoCalificada).toLocaleString() // Suma total
-                    }
-                }
-            },
-            plugins: [pluginCentro]
-        });
-
-
-        // --- Render de Gráfica Clasificación ---
         if (window.chartClasificacion) window.chartClasificacion.destroy();
         window.chartClasificacion = new Chart(document.getElementById("graficaClasificacion"), {
             type: "doughnut",
@@ -498,17 +450,12 @@
                 maintainAspectRatio: false,
                 cutout: "75%",
                 plugins: {
-                    legend: { position: "bottom" },
-                    centro: {
-                        // Math.round elimina decimales y toLocaleString añade separador de miles
-                        texto: Math.round(totCalificada + totNoCalificada).toLocaleString('es-MX')
-                    }
+                    legend: { position: "bottom" }
                 }
             },
-            plugins: [pluginCentro]
+            plugins: [pluginCentroDinamico]
         });
 
-        // --- Render de Gráfica Motivo de Atención ---
         if (window.chartTipoAtencion) window.chartTipoAtencion.destroy();
         window.chartTipoAtencion = new Chart(document.getElementById("graficaTipoAtencion"), {
             type: "doughnut",
@@ -524,30 +471,25 @@
                 maintainAspectRatio: false,
                 cutout: "75%",
                 plugins: {
-                    legend: { position: "bottom" },
-                    centro: {
-                        // Sumamos todos y aplicamos el formato
-                        texto: Math.round(totAccidentes + totMedica + totGine + totPedi).toLocaleString('es-MX')
-                    }
+                    legend: { position: "bottom" }
                 }
             },
-            plugins: [pluginCentro]
+            plugins: [pluginCentroDinamico]
         });
     }
 
     /* =====================================================
-       GRÁFICA BARRAS POR AÑO
+        GRÁFICA 2: BARRAS POR AÑO
     ===================================================== */
     function renderBarrasPorAnio(data) {
-
         const unidades = window.getUnidadesSeleccionadas?.() || [];
         const comparativo = unidades.length > 0;
-
         const resumen = {};
 
         data.forEach(r => {
+            const nombreAbreviado = abreviarNombreHospital(r.Hospital);
             const key = comparativo
-                ? `${r.Hospital} (${r.Anio})`
+                ? `${nombreAbreviado} (${r.Anio})`
                 : `${r.Anio}`;
 
             if (!resumen[key]) {
@@ -592,7 +534,8 @@
                         y: { stacked: true }
                     },
                     plugins: {
-                        legend: { position: "bottom" }
+                        legend: { position: "bottom" },
+                        mostrarValoresActivo: mostrarValoresBarras
                     }
                 }
             }
@@ -600,72 +543,12 @@
     }
 
     /* =====================================================
-       GRÁFICA LINEAL POR MES + TOTAL ABAJO
+        GRÁFICA 3: LÍNEA MESES
     ===================================================== */
-
-    const pluginValoresPorAnio = {
-        id: "valoresPorAnio",
-        afterDraw(chart) {
-
-            if (!chart.chartArea) return;
-
-            const { ctx, scales: { x, y } } = chart;
-            const datasets = chart.data.datasets;
-
-            // ⚠️ si hay demasiadas líneas, no dibujar (UX)
-            if (datasets.length > 3) return;
-
-            const baseY = y.bottom + 40;
-            const lineHeight = 18;
-
-            ctx.save();
-            ctx.font = "11px Arial";
-            ctx.textBaseline = "top";
-            ctx.textAlign = "left";
-
-            chart.data.labels.forEach((_, mesIndex) => {
-
-                const xCenter = x.getPixelForTick(mesIndex);
-
-                datasets.forEach((ds, dsIndex) => {
-
-                    const valor = ds.data[mesIndex];
-                    if (!valor) return;
-
-                    const yBase = baseY + (dsIndex * lineHeight);
-
-                    // ▪ cuadro de color (perfectamente centrado)
-                    ctx.fillStyle = ds.borderColor;
-                    ctx.fillRect(
-                        xCenter - 24,
-                        yBase - 5,   // centro del cuadro
-                        10,
-                        10
-                    );
-
-                    // texto (ajuste visual fino)
-                    ctx.fillStyle = "#111827";
-                    ctx.textBaseline = "middle";
-                    ctx.fillText(
-                        valor.toLocaleString(),
-                        xCenter - 10,
-                        yBase - 1   // 👈 ESTE -1 es la clave
-                    );
-                });
-            });
-
-
-            ctx.restore();
-        }
-    };
-
-
-
     function renderLineaUrgenciasPorMes(params) {
         fetch(`/urgencias/api/urgencias_por_mes?${params.toString()}`)
             .then(res => res.json())
             .then(dataLinea => {
-
                 if (!dataLinea || !dataLinea.length) {
                     if (window.chartLineaMeses) window.chartLineaMeses.destroy();
                     return;
@@ -677,7 +560,6 @@
                     9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
                 };
 
-                // Obtenemos los meses presentes en los datos
                 const meses = [...new Set(dataLinea.map(r => r.Mes))].sort((a, b) => a - b);
                 const labels = meses.map(m => mesesNombres[m]);
 
@@ -685,8 +567,9 @@
                 const hayUnidad = params.has("unidades");
 
                 dataLinea.forEach(r => {
+                    const nombreUnidadAbrev = abreviarNombreHospital(r.Unidad);
                     const key = hayUnidad
-                        ? `${r.Unidad} - ${r.Anio}`
+                        ? `${nombreUnidadAbrev} - ${r.Anio}`
                         : `Total ${r.Anio}`;
 
                     if (!resumen[key]) resumen[key] = {};
@@ -707,9 +590,6 @@
 
                 if (window.chartLineaMeses) window.chartLineaMeses.destroy();
 
-                // Calculamos el espacio inferior según cuántos años/unidades hay (aprox 15px por línea)
-                const paddingDinamico = 40 + (datasets.length * 1);
-
                 window.chartLineaMeses = new Chart(
                     document.getElementById("graficaLineaMeses"),
                     {
@@ -718,29 +598,15 @@
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            layout: {
-                                padding: {
-                                    bottom: paddingDinamico // Reserva espacio para los números
-                                }
-                            },
                             plugins: {
                                 legend: {
                                     display: true,
-                                    position: "bottom", // 👈 Cambiado de 'right' a 'bottom'
-                                    labels: {
-                                        usePointStyle: true,
-                                        padding: 20
-                                    }
+                                    position: "bottom"
                                 },
-                                tooltip: {
-                                    mode: "index",
-                                    intersect: false
-                                }
+                                mostrarValoresActivo: mostrarValoresLinea
                             },
                             scales: {
-                                x: {
-                                    grid: { display: false }
-                                },
+                                x: { grid: { display: false } },
                                 y: {
                                     beginAtZero: true,
                                     ticks: {
@@ -748,22 +614,189 @@
                                     }
                                 }
                             }
-                        },
-                        // 👈 IMPORTANTE: Aquí activas el dibujo de los datos debajo
-                        plugins: [pluginValoresPorAnio]
+                        }
                     }
                 );
-            });
+            })
+            .catch(err => console.error("Error en datos por mes:", err));
     }
 
     /* =====================================================
-       CARGA INICIAL
+        MÉTODO GLOBAL DE FILTRADO (Para llamado desde menú)
+    ===================================================== */
+    window.ejecutarFiltroUrgencias = function () {
+        const anios = obtenerUrgCheckbox("urg-filtro-anio");
+        const meses = obtenerUrgCheckbox("urg-filtro-mes");
+        const tipoAtencion = document.getElementById("filtroTipoAtencion")?.value;
+
+        let params = new URLSearchParams();
+
+        if (anios) params.append("anios", anios);
+        if (meses) params.append("meses", meses);
+        if (tipoAtencion && tipoAtencion !== "todas")
+            params.append("tipo_atencion", tipoAtencion);
+
+        // Toma unidades globales desde menu.html
+        const unidades = window.getUnidadesSeleccionadas?.() || [];
+        if (unidades.length)
+            params.append("unidades", unidades.join(","));
+
+        const motivoActual = document.getElementById("selectMotivo")?.value;
+        if (motivoActual && motivoActual !== "todas") {
+            params.append("motivo", motivoActual);
+        }
+
+        paramsActualesUrgencias = new URLSearchParams(params.toString());
+        cargarReporteUrgencias(params);
+    };
+
+    /* =====================================================
+        RECEPTOR DEL EVENTO RESET GLOBAL (MENÚ LATERAL)
+    ===================================================== */
+    document.addEventListener("solicitarResetFiltros", () => {
+        // 1. Desmarcar todos los Checkboxes propios de Urgencias
+        document.querySelectorAll(".urg-filtro-anio, .urg-filtro-mes").forEach(chk => {
+            chk.checked = false;
+        });
+
+        // 2. Resetear Selects
+        const selectMotivo = document.getElementById("selectMotivo");
+        if (selectMotivo) selectMotivo.selectedIndex = 0;
+
+        const filtroTipoAtencion = document.getElementById("filtroTipoAtencion");
+        if (filtroTipoAtencion) filtroTipoAtencion.selectedIndex = 0;
+
+        // 3. Resetear botones "Mostrar valores"
+        mostrarValoresBarras = false;
+        mostrarValoresLinea = false;
+
+        const btnToggleBarras = document.getElementById("btnToggleValoresBarras");
+        if (btnToggleBarras) {
+            btnToggleBarras.innerHTML = "Mostrar valores";
+            btnToggleBarras.classList.remove("btn-primary");
+            btnToggleBarras.classList.add("btn-outline-primary");
+        }
+
+        const btnToggleLinea = document.getElementById("btnToggleTablaLinea");
+        if (btnToggleLinea) {
+            btnToggleLinea.innerHTML = "Mostrar valores";
+            btnToggleLinea.classList.remove("btn-primary");
+            btnToggleLinea.classList.add("btn-outline-primary");
+        }
+
+        // 4. Limpiar los parámetros y recargar datos limpios
+        paramsActualesUrgencias = new URLSearchParams();
+        cargarReporteUrgencias(paramsActualesUrgencias);
+    });
+
+    /* =====================================================
+        EVENTOS E INICIALIZACIÓN
+    ===================================================== */
+    /* =====================================================
+         EVENTOS DE INTEGRACIÓN GLOBAL (MENÚ LATERAL)
+     ===================================================== */
+    // Escuchar cuando el menú aplique o cambie filtros de unidades
+    document.addEventListener("aplicarFiltroUnidades", () => {
+        window.ejecutarFiltroUrgencias();
+    });
+
+    document.addEventListener("unidadesSeleccionadasCambiadas", () => {
+        window.ejecutarFiltroUrgencias();
+    });
+
+    // Escuchar el evento de limpieza global
+    document.addEventListener("limpiarFiltrosGlobales", () => {
+        resetearFiltrosUrgencias();
+    });
+
+    /* =====================================================
+        LÓGICA DE RESETEO REUTILIZABLE
+    ===================================================== */
+    function resetearFiltrosUrgencias() {
+        // 1. Desmarcar todos los Checkboxes propios de Urgencias
+        document.querySelectorAll(".urg-filtro-anio, .urg-filtro-mes").forEach(chk => {
+            chk.checked = false;
+        });
+
+        // 2. Resetear Selects
+        const selectMotivo = document.getElementById("selectMotivo");
+        if (selectMotivo) selectMotivo.selectedIndex = 0;
+
+        const filtroTipoAtencion = document.getElementById("filtroTipoAtencion");
+        if (filtroTipoAtencion) filtroTipoAtencion.selectedIndex = 0;
+
+        // 3. Resetear botones "Mostrar valores"
+        mostrarValoresBarras = false;
+        mostrarValoresLinea = false;
+
+        const btnToggleBarras = document.getElementById("btnToggleValoresBarras");
+        if (btnToggleBarras) {
+            btnToggleBarras.innerHTML = "Mostrar valores";
+            btnToggleBarras.classList.remove("btn-primary");
+            btnToggleBarras.classList.add("btn-outline-primary");
+        }
+
+        const btnToggleLinea = document.getElementById("btnToggleTablaLinea");
+        if (btnToggleLinea) {
+            btnToggleLinea.innerHTML = "Mostrar valores";
+            btnToggleLinea.classList.remove("btn-primary");
+            btnToggleLinea.classList.add("btn-outline-primary");
+        }
+
+        // 4. Limpiar los parámetros y recargar datos limpios
+        paramsActualesUrgencias = new URLSearchParams();
+        cargarReporteUrgencias(paramsActualesUrgencias);
+    }
+
+    /* =====================================================
+        RECEPTOR DEL EVENTO RESET LOCAL
+    ===================================================== */
+    document.addEventListener("solicitarResetFiltros", () => {
+        resetearFiltrosUrgencias();
+    });
+
+    /* =====================================================
+        INICIALIZACIÓN AL CARGAR EL DOM
     ===================================================== */
     document.addEventListener("DOMContentLoaded", () => {
-        document.getElementById("btnFiltrarUrgencias")?.click();
+        // Carga inicial (tomando unidades por defecto si las hubiera en el menú)
+        window.ejecutarFiltroUrgencias();
+
+        // Botón principal de filtrar de la vista
+        document.getElementById("btnFiltrarUrgencias")?.addEventListener("click", () => {
+            window.ejecutarFiltroUrgencias();
+        });
+
+        // Botón Toggle Valores Barras
+        const btnToggleBarras = document.getElementById("btnToggleValoresBarras");
+        btnToggleBarras?.addEventListener("click", () => {
+            mostrarValoresBarras = !mostrarValoresBarras;
+
+            btnToggleBarras.innerHTML = mostrarValoresBarras ? "Ocultar valores" : "Mostrar valores";
+            btnToggleBarras.classList.toggle("btn-primary", mostrarValoresBarras);
+            btnToggleBarras.classList.toggle("btn-outline-primary", !mostrarValoresBarras);
+
+            if (chartPorAnio) {
+                chartPorAnio.options.plugins.mostrarValoresActivo = mostrarValoresBarras;
+                chartPorAnio.update();
+            }
+        });
+
+        // Botón Toggle Valores Línea
+        const btnToggleLinea = document.getElementById("btnToggleTablaLinea");
+        btnToggleLinea?.addEventListener("click", () => {
+            mostrarValoresLinea = !mostrarValoresLinea;
+
+            btnToggleLinea.innerHTML = mostrarValoresLinea ? "Ocultar valores" : "Mostrar valores";
+            btnToggleLinea.classList.toggle("btn-primary", mostrarValoresLinea);
+            btnToggleLinea.classList.toggle("btn-outline-primary", !mostrarValoresLinea);
+
+            if (window.chartLineaMeses) {
+                window.chartLineaMeses.options.plugins.mostrarValoresActivo = mostrarValoresLinea;
+                window.chartLineaMeses.update();
+            }
+        });
     });
 </script>
-
-
 
 {% endblock %}

@@ -275,6 +275,8 @@ def generar_total_general(
 @login_required
 def indicadores():
 
+    cols_equipo_medico = []
+
     if not current_user.is_authenticated:
         return jsonify({
             "error": "sesion_expirada"
@@ -509,6 +511,63 @@ def indicadores():
         "total_no_censables",
     ]
 
+    indicadores_equipo_medico = {
+        "arco_c_analogo",
+        "arco_c_digital",
+        "bascula_estadimetro",
+        "bascula_bebe",
+        "camilla_radiotransp",
+        "cardiotocografo",
+        "carro_rojo_reanim",
+        "cuna_calor_rad",
+        "cuna_calor_rad_foto",
+        "defibrilador_monit",
+        "ecocardiografo",
+        "electrocardiografo",
+        "estuche_diag",
+        "incubadora_fototer",
+        "incubadora_trasl",
+        "incubadora_cuidados",
+        "lampara_quirurgica_doble",
+        "lampara_quir_port",
+        "lampara_quir_senc",
+        "mesa_quir_obs",
+        "mesa_exploracion",
+        "mesa_quir_gral",
+        "microscopio_rutina",
+        "monitor_radiacion",
+        "monitor_signos_vit_avanz",
+        "monitor_signos_neo",
+        "monitor_signos_bas",
+        "monitor_traslado",
+        "monitor_signos_int",
+        "monitor_signos_vit_neona",
+        "monitor_anestesia",
+        "negatoscopio",
+        "refrige_lab",
+        "sierra_yesos",
+        "ultrasonido_diag",
+        "unidad_anestesia_bas",
+        "ultrasonido_terap",
+        "unidad_dental",
+        "unidad_rx_analogo",
+        "unidad_rx_dental",
+        "unidad_rx_digital",
+        "unidad_rx_port_ana",
+        "unidad_rx_port_dig",
+        "fluoroscopio_dig",
+        "fluoroscopio_dig_analog",
+        "mastografo_digital",
+        "mastografo_estereo",
+        "mastografo_estereo_tomosin",
+        "microscopio_cirugia",
+        "resonancia_mag",
+        "tomografo_128",
+        "tomografo_16",
+        "tomografo_32",
+        "tomografo_64",
+        }
+
    
     # ==========================================================
     # PARAMETROS
@@ -529,6 +588,8 @@ def indicadores():
     )
 
     indicadores_solicitados = [i.strip().lower() for i in indicadores_solicitados]
+
+    tipologia = request.args.get("tipologia", "TODAS")
 
     # ==========================================================
     # NORMALIZAR
@@ -555,7 +616,9 @@ def indicadores():
     es_descarga_masiva = len(indicadores_solicitados) == 0
 
     quiere_kpis = es_descarga_masiva or any(
-        i in kpis_calculados for i in indicadores_solicitados
+        i in kpis_calculados
+        or i in indicadores_equipo_medico
+        for i in indicadores_solicitados
     )
 
     quiere_vistas = es_descarga_masiva or any(
@@ -573,6 +636,7 @@ def indicadores():
         "e.anio",
         "e.clues",
         "e.nombre_unidad",
+        "c.tipologia",
     ]
 
     if not quiere_anual:
@@ -606,6 +670,10 @@ def indicadores():
             where_e += " AND e.mes IN ({})".format(",".join(["%s"] * len(meses_calculo)))
             params_e.extend(meses_calculo)
 
+        if tipologia != "TODAS":
+            where_e += " AND c.tipologia = %s"
+            params_e.append(tipologia)
+
         # ======================================================
         # QUERY PRINCIPAL
         # ======================================================
@@ -621,6 +689,7 @@ def indicadores():
                     {select_mes}
                     e.clues,
                     e.nombre_unidad,
+                    c.tipologia,
 
                     -- EGRESOS Y NACIMIENTOS (TABLA PRINCIPAL)
                     SUM(e.total_egresos) AS total_egresos,        
@@ -729,6 +798,7 @@ def indicadores():
                     {agg_camas}(IFNULL(sin.camas_pediatria, 0)) AS camas_pediatria,
                     {agg_camas}(IFNULL(sin.camas_otros, 0)) AS camas_otros,
 
+                   
                     -- DÍAS CAMA
 
                     SUM(IFNULL(sin.camas_total,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_total,
@@ -750,9 +820,70 @@ def indicadores():
                     {agg_camas}(IFNULL(cnc.hab_uci_adulto, 0)) AS hab_uci_adulto,
                     {agg_camas}(IFNULL(cnc.hab_uci_ped, 0)) AS hab_uci_ped,
                     {agg_camas}(IFNULL(cnc.hab_otras_areas, 0)) AS hab_otras_areas,
-                    MAX(IFNULL(cnc.total_no_censables, 0)) AS total_no_censables
+                    MAX(IFNULL(cnc.total_no_censables, 0)) AS total_no_censables,
+
+                    -- EQUIPO MÉDICO
+                    {agg_camas}(IFNULL(em.arco_c_analogo, 0)) AS arco_c_analogo,
+                    {agg_camas}(IFNULL(em.arco_c_digital, 0)) AS arco_c_digital,
+                    {agg_camas}(IFNULL(em.bascula_estadimetro, 0)) AS bascula_estadimetro,
+                    {agg_camas}(IFNULL(em.bascula_bebe, 0)) AS bascula_bebe,
+                    {agg_camas}(IFNULL(em.camilla_radiotransp, 0)) AS camilla_radiotransp,
+                    {agg_camas}(IFNULL(em.cardiotocografo, 0)) AS cardiotocografo,
+                    {agg_camas}(IFNULL(em.carro_rojo_reanim, 0)) AS carro_rojo_reanim,
+                    {agg_camas}(IFNULL(em.cuna_calor_rad, 0)) AS cuna_calor_rad,
+                    {agg_camas}(IFNULL(em.cuna_calor_rad_foto, 0)) AS cuna_calor_rad_foto,
+                    {agg_camas}(IFNULL(em.defibrilador_monit, 0)) AS defibrilador_monit,
+                    {agg_camas}(IFNULL(em.ecocardiografo, 0)) AS ecocardiografo,
+                    {agg_camas}(IFNULL(em.electrocardiografo, 0)) AS electrocardiografo,
+                    {agg_camas}(IFNULL(em.estuche_diag, 0)) AS estuche_diag,
+                    {agg_camas}(IFNULL(em.incubadora_fototer, 0)) AS incubadora_fototer,
+                    {agg_camas}(IFNULL(em.incubadora_trasl, 0)) AS incubadora_trasl,
+                    {agg_camas}(IFNULL(em.incubadora_cuidados, 0)) AS incubadora_cuidados,
+                    {agg_camas}(IFNULL(em.lampara_quirurgica_doble, 0)) AS lampara_quirurgica_doble,
+                    {agg_camas}(IFNULL(em.lampara_quir_port, 0)) AS lampara_quir_port,
+                    {agg_camas}(IFNULL(em.lampara_quir_senc, 0)) AS lampara_quir_senc,
+                    {agg_camas}(IFNULL(em.mesa_quir_obs, 0)) AS mesa_quir_obs,
+                    {agg_camas}(IFNULL(em.mesa_exploracion, 0)) AS mesa_exploracion,
+                    {agg_camas}(IFNULL(em.mesa_quir_gral, 0)) AS mesa_quir_gral,
+                    {agg_camas}(IFNULL(em.microscopio_rutina, 0)) AS microscopio_rutina,
+                    {agg_camas}(IFNULL(em.monitor_radiacion, 0)) AS monitor_radiacion,
+                    {agg_camas}(IFNULL(em.monitor_signos_vit_avanz, 0)) AS monitor_signos_vit_avanz,
+                    {agg_camas}(IFNULL(em.monitor_signos_neo, 0)) AS monitor_signos_neo,
+                    {agg_camas}(IFNULL(em.monitor_signos_bas, 0)) AS monitor_signos_bas,
+                    {agg_camas}(IFNULL(em.monitor_traslado, 0)) AS monitor_traslado,
+                    {agg_camas}(IFNULL(em.monitor_signos_int, 0)) AS monitor_signos_int,
+                    {agg_camas}(IFNULL(em.monitor_signos_vit_neona, 0)) AS monitor_signos_vit_neona,
+                    {agg_camas}(IFNULL(em.monitor_anestesia, 0)) AS monitor_anestesia,
+                    {agg_camas}(IFNULL(em.negatoscopio, 0)) AS negatoscopio,
+                    {agg_camas}(IFNULL(em.refrige_lab, 0)) AS refrige_lab,
+                    {agg_camas}(IFNULL(em.sierra_yesos, 0)) AS sierra_yesos,
+                    {agg_camas}(IFNULL(em.ultrasonido_diag, 0)) AS ultrasonido_diag,
+                    {agg_camas}(IFNULL(em.unidad_anestesia_bas, 0)) AS unidad_anestesia_bas,
+                    {agg_camas}(IFNULL(em.ultrasonido_terap, 0)) AS ultrasonido_terap,
+                    {agg_camas}(IFNULL(em.unidad_dental, 0)) AS unidad_dental,
+                    {agg_camas}(IFNULL(em.unidad_rx_analogo, 0)) AS unidad_rx_analogo,
+                    {agg_camas}(IFNULL(em.unidad_rx_dental, 0)) AS unidad_rx_dental,
+                    {agg_camas}(IFNULL(em.unidad_rx_digital, 0)) AS unidad_rx_digital,
+                    {agg_camas}(IFNULL(em.unidad_rx_port_ana, 0)) AS unidad_rx_port_ana,
+                    {agg_camas}(IFNULL(em.unidad_rx_port_dig, 0)) AS unidad_rx_port_dig,
+                    {agg_camas}(IFNULL(em.fluoroscopio_dig, 0)) AS fluoroscopio_dig,
+                    {agg_camas}(IFNULL(em.fluoroscopio_dig_analog, 0)) AS fluoroscopio_dig_analog,
+                    {agg_camas}(IFNULL(em.mastografo_digital, 0)) AS mastografo_digital,
+                    {agg_camas}(IFNULL(em.mastografo_estereo, 0)) AS mastografo_estereo,
+                    {agg_camas}(IFNULL(em.mastografo_estereo_tomosin, 0)) AS mastografo_estereo_tomosin,
+                    {agg_camas}(IFNULL(em.microscopio_cirugia, 0)) AS microscopio_cirugia,
+                    {agg_camas}(IFNULL(em.resonancia_mag, 0)) AS resonancia_mag,
+                    {agg_camas}(IFNULL(em.tomografo_128, 0)) AS tomografo_128,
+                    {agg_camas}(IFNULL(em.tomografo_16, 0)) AS tomografo_16,
+                    {agg_camas}(IFNULL(em.tomografo_32, 0)) AS tomografo_32,
+                    {agg_camas}(IFNULL(em.tomografo_64, 0)) AS tomografo_64
+
 
                 FROM egresos_agregado e
+
+                -- JOIN CATALOGO UNIDADES
+                LEFT JOIN catalogo_unidades c
+                ON e.clues = c.clues
 
                 -- JOIN ABORTOS (GRUPAL POR MES)
                 LEFT JOIN (
@@ -762,6 +893,8 @@ def indicadores():
                         SUM(total) AS abortos_total
                     FROM abortos GROUP BY anio, mes, clues
                 ) ab ON e.clues = ab.clues AND e.anio = ab.anio AND e.mes = ab.mes
+
+                
 
                 -- JOIN SIS (GRUPAL POR MES)
                 LEFT JOIN (
@@ -855,6 +988,8 @@ def indicadores():
                 AND e.anio = sin.anio
                 AND e.mes = sin.mes
 
+               
+
                 -- JOIN CAMAS NO CENSABLES
                 LEFT JOIN (
                     SELECT
@@ -893,16 +1028,106 @@ def indicadores():
                 AND e.anio = cnc.anio
                 AND e.mes = cnc.mes
 
+                -- JOIN EQUIPO MÉDICO
+                LEFT JOIN equipo_medico em
+                ON e.clues = em.clues
+                AND e.anio = em.anio
+                AND e.mes = em.mes
+
                 {where_e}
 
                 GROUP BY {group_by}
 
                 """
-
+       
         cur.execute(query_e, params_e)
         rows_e = cur.fetchall()    
+       
+        # ==========================================================
+        # CAMPOS EQUIPO MEDICO
+        # ==========================================================
+
+        cols_equipo_medico = [
+            "arco_c_analogo",
+            "arco_c_digital",
+            "bascula_estadimetro",
+            "bascula_bebe",
+            "camilla_radiotransp",
+            "cardiotocografo",
+            "carro_rojo_reanim",
+            "cuna_calor_rad",
+            "cuna_calor_rad_foto",
+            "defibrilador_monit",
+            "ecocardiografo",
+            "electrocardiografo",
+            "estuche_diag",
+            "incubadora_fototer",
+            "incubadora_trasl",
+            "incubadora_cuidados",
+            "lampara_quirurgica_doble",
+            "lampara_quir_port",
+            "lampara_quir_senc",
+            "mesa_quir_obs",
+            "mesa_exploracion",
+            "mesa_quir_gral",
+            "microscopio_rutina",
+            "monitor_radiacion",
+            "monitor_signos_vit_avanz",
+            "monitor_signos_neo",
+            "monitor_signos_bas",
+            "monitor_traslado",
+            "monitor_signos_int",
+            "monitor_signos_vit_neona",
+            "monitor_anestesia",
+            "negatoscopio",
+            "refrige_lab",
+            "sierra_yesos",
+            "ultrasonido_diag",
+            "unidad_anestesia_bas",
+            "ultrasonido_terap",
+            "unidad_dental",
+            "unidad_rx_analogo",
+            "unidad_rx_dental",
+            "unidad_rx_digital",
+            "unidad_rx_port_ana",
+            "unidad_rx_port_dig",
+            "fluoroscopio_dig",
+            "fluoroscopio_dig_analog",
+            "mastografo_digital",
+            "mastografo_estereo",
+            "mastografo_estereo_tomosin",
+            "microscopio_cirugia",
+            "resonancia_mag",
+            "tomografo_128",
+            "tomografo_16",
+            "tomografo_32",
+            "tomografo_64",
+        ]
+
+        indicadores_max = {
+            "camas_cirugia",
+            "camas_gineco",
+            "camas_med_int",
+            "camas_otros",
+            "camas_pediatria",
+            "camas_total",
+            "quirofanos",
+            "hab_cirug_amb",
+            "hab_cuid_int",
+            "hab_lab_parto",
+            "hab_observacion",
+            "hab_otras_areas",
+            "hab_quemados",
+            "hab_recup_pp",
+            "hab_recup_pq",
+            "hab_uci_adulto",
+            "hab_uci_ped",
+            "hab_urgencias",
+            }
 
        
+
+             
         # ==========================================================
         # FUNCIONES
         # ==========================================================
@@ -1076,6 +1301,12 @@ def indicadores():
             anio = int(r["anio"])
             mes = int(r["mes"]) if r.get("mes") else 13
             unidad = r["nombre_unidad"]
+            print(
+                "UNIDAD:",
+                unidad,
+                "TIPOLOGIA:",
+                r.get("tipologia")
+            )
             
 
             base = {
@@ -1111,6 +1342,7 @@ def indicadores():
                         "anio": anio,
                         "mes": mes,
                         "nombre_unidad": unidad,
+                        "tipologia": r.get("tipologia", "SIN_TIPOLOGIA"),
                         "indicador": indicador_norm,
                         "valor": round(valor, 2),
                     })
@@ -1120,26 +1352,7 @@ def indicadores():
 
     indicadores_ya_calculados = {field.lower() for field in SUM_FIELDS + MAX_FIELDS}
 
-    indicadores_max = {
-        "camas_cirugia",
-        "camas_gineco",
-        "camas_med_int",
-        "camas_otros",
-        "camas_pediatria",
-        "camas_total",
-        "quirofanos",
-        "hab_cirug_amb",
-        "hab_cuid_int",
-        "hab_lab_parto",
-        "hab_observacion",
-        "hab_otras_areas",
-        "hab_quemados",
-        "hab_recup_pp",
-        "hab_recup_pq",
-        "hab_uci_adulto",
-        "hab_uci_ped",
-        "hab_urgencias",
-    }
+   
 
     if quiere_vistas:
 
@@ -1157,6 +1370,7 @@ def indicadores():
             v.anio,
             v.clues,
             COALESCE(c.nombre_unidad, v.nombre_unidad) AS nombre_unidad,
+            c.tipologia,
             v.valor
         FROM vw_indicadores_unificados v
         LEFT JOIN catalogo_unidades c
@@ -1209,6 +1423,7 @@ def indicadores():
                 row["anio"],
                 row["clues"],
                 row["nombre_unidad"],
+                row["tipologia"],
                 indicador,
             )
 
@@ -1242,6 +1457,7 @@ def indicadores():
                         "mes": mes,
                         "clues": row["clues"],
                         "nombre_unidad": row["nombre_unidad"],
+                        "tipologia": row.get("tipologia", "SIN_TIPOLOGIA"),
                         "indicador": indicador,
                         "valor": round(valor, 2),
                     }
@@ -1253,7 +1469,7 @@ def indicadores():
 
         if es_anual:
 
-            for (anio, clues, unidad, indicador), valor in vista_cache.items():
+            for (anio, clues, unidad, tipologia, indicador), valor in vista_cache.items():
 
                 if indicador in indicadores_ya_calculados:
                     continue
@@ -1264,6 +1480,7 @@ def indicadores():
                         "mes": 13,
                         "clues": clues,
                         "nombre_unidad": unidad,
+                        "tipologia": tipologia,
                         "indicador": indicador,
                         "valor": round(valor, 2),
                     }
@@ -1305,62 +1522,9 @@ def indicadores():
         "tot_otras_areas",
     ]
 
-    cols_equipo_medico = [
-        "arco_c_analogo",
-        "arco_c_digital",
-        "bascula_estadimetro",
-        "bascula_bebe",
-        "camilla_radiotransp",
-        "cardiotocografo",
-        "carro_rojo_reanim",
-        "cuna_calor_rad",
-        "cuna_calor_rad_foto",
-        "defibrilador_monit",
-        "ecocardiografo",
-        "electrocardiografo",
-        "estuche_diag",
-        "incubadora_fototer",
-        "incubadora_trasl",
-        "incubadora_cuidados",
-        "lampara_quirurgica_doble",
-        "lampara_quir_port",
-        "lampara_quir_senc",
-        "mesa_quir_obs",
-        "mesa_exploracion",
-        "mesa_quir_gral",
-        "microscopio_rutina",
-        "monitor_radiacion",
-        "monitor_signos_vit_avanz",
-        "monitor_signos_neo",
-        "monitor_signos_bas",
-        "monitor_traslado",
-        "monitor_signos_int",
-        "monitor_signos_vit_neona",
-        "monitor_anestesia",
-        "negatoscopio",
-        "refrige_lab",
-        "sierra_yesos",
-        "ultrasonido_diag",
-        "unidad_anestesia_bas",
-        "ultrasonido_terap",
-        "unidad_dental",
-        "unidad_rx_analogo",
-        "unidad_rx_dental",
-        "unidad_rx_digital",
-        "unidad_rx_port_ana",
-        "unidad_rx_port_dig",
-        "fluoroscopio_dig",
-        "fluoroscopio_dig_analog",
-        "mastografo_digital",
-        "mastografo_estereo",
-        "mastografo_estereo_tomosin",
-        "microscopio_cirugia",
-        "resonancia_mag",
-        "tomografo_128",
-        "tomografo_16",
-        "tomografo_32",
-        "tomografo_64",
-    ]
+    
+
+  
 
     # ==========================================================
     # PARTE 3 Y 4
@@ -1398,18 +1562,18 @@ def indicadores():
     # TOTAL GENERAL
     # ==========================================================
 
-    data_acumulada.extend(
-        generar_total_general(
-            data_acumulada=data_acumulada,
-            meses_validos=meses_validos,
-            SUM_FIELDS=SUM_FIELDS,
-            MAX_FIELDS=MAX_FIELDS,
-            indicadores_max=indicadores_max,
-            calcular_kpis=calcular_kpis,
-            es_descarga_masiva=es_descarga_masiva,
-            indicadores_solicitados=indicadores_solicitados,
-        )
-    )
+    # data_acumulada.extend(
+#     generar_total_general(
+#         data_acumulada=data_acumulada,
+#         meses_validos=meses_validos,
+#         SUM_FIELDS=SUM_FIELDS,
+#         MAX_FIELDS=MAX_FIELDS,
+#         indicadores_max=indicadores_max,
+#         calcular_kpis=calcular_kpis,
+#         es_descarga_masiva=es_descarga_masiva,
+#         indicadores_solicitados=indicadores_solicitados,
+#     )
+# )
 
 
 
@@ -1482,6 +1646,10 @@ def procesar_tabla_estatica(
     if anios:
         query += " AND {0}.anio IN ({1})".format(alias, ",".join(["%s"] * len(anios)))
         params.extend(anios)
+
+    print("TABLA:", tabla)
+    print("SOLICITADOS:", solicitados)
+    print("COLUMNAS SQL:", columnas_sql)
 
     cur.execute(query, params)
 

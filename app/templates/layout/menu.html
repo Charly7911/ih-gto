@@ -1,15 +1,16 @@
 <div id="sidebar">
     {% set meses = {
-    1:"Enero",2:"Febrero",3:"Marzo",4:"Abril",5:"Mayo",6:"Junio",
-    7:"Julio",8:"Agosto",9:"Septiembre",10:"Octubre",11:"Noviembre",12:"Diciembre"
+    1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio",
+    7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"
     } %}
 
+    {% set es_home = (request.blueprint == 'bienvenida' or request.args.get('home') == '1') %}
+    {% set ruta = request.path %}
 
-
-    <!-- MENÚ PRINCIPAL -->
+    <!-- =========================================
+         MENÚ PRINCIPAL DE NAVEGACIÓN
+    ========================================= -->
     <nav class="menu">
-
-
         {# 0. INICIO #}
         <a href="{{ url_for('bienvenida.inicio') }}"
             class="menu-item {% if request.blueprint == 'bienvenida' %}active{% endif %}">
@@ -17,12 +18,7 @@
         </a>
         <div class="menu-divider"></div>
 
-        {# ACTUALIZACIÓN: Ahora 'es_home' es verdadero si estás en el blueprint de bienvenida #}
-        {% set es_home = (request.blueprint == 'bienvenida' or request.args.get('home') == '1') %}
-        {% set ruta = request.path %}
-
-
-        {# 1. INDICADORES: Evita activarse con /egresos/indicadores usando startswith #}
+        {# 1. INDICADORES #}
         {% if es_home or ruta.startswith('/indicadores') %}
         <a href="{{ url_for('indicador.dashboard_indicadores') }}"
             class="menu-item {% if ruta.startswith('/indicadores') %}active{% endif %}">
@@ -30,15 +26,19 @@
         </a>
         {% endif %}
 
-        {# 2. URGENCIAS: Solo activo si la ruta empieza exactamente con /urgencias #}
+        {# 2. URGENCIAS #}
         {% if es_home or ruta.startswith('/urgencias') %}
-        <a href="/urgencias" class="menu-item {% if ruta.startswith('/urgencias') %}active{% endif %}">🚑 Urgencias</a>
+        <a href="{{ url_for('urgencias.inicio') if 'urgencias.inicio' in config else '/urgencias' }}"
+            class="menu-item {% if ruta.startswith('/urgencias') %}active{% endif %}">
+            🚑 Urgencias
+        </a>
         {% endif %}
 
-        {# 3. EGRESOS: Activo solo si estamos en egresos y NO es el home #}
+        {# 3. EGRESOS #}
         {% if es_home or ('/egresos' in ruta and not es_home) %}
-        <a href="/egresos/indicadores" class="menu-item {% if '/egresos' in ruta and not es_home %}active{% endif %}">🏥
-            Egresos</a>
+        <a href="/egresos/indicadores" class="menu-item {% if '/egresos' in ruta and not es_home %}active{% endif %}">
+            🏥 Egresos
+        </a>
         {% endif %}
 
         {# 4. MORBILIDAD #}
@@ -57,13 +57,13 @@
         </a>
         {% endif %}
 
-
-
         {# 6. SIS #}
         {% if es_home or ruta.startswith('/sis') %}
-        <a href="/sis" class="menu-item {% if ruta.startswith('/sis') %}active{% endif %}">🏨 Sistema (SIS)</a>
+        <a href="{{ url_for('sis.inicio') if 'sis.inicio' in config else '/sis' }}"
+            class="menu-item {% if ruta.startswith('/sis') %}active{% endif %}">
+            🏨 Sistema (SIS)
+        </a>
         {% endif %}
-
 
         {# 7. GRAFICAR #}
         {% if es_home or '/grafica' in ruta %}
@@ -72,8 +72,6 @@
         </a>
         {% endif %}
 
-
-
         {# 8. AGENDAS #}
         {% if es_home or '/agenda' in ruta %}
         <a href="{{ url_for('agenda.visor') }}" class="menu-item {% if '/agenda' in ruta %}active{% endif %}">
@@ -81,9 +79,9 @@
         </a>
         {% endif %}
 
-        ---
-
+        <!-- ADMINISTRACIÓN -->
         {% if current_user.is_authenticated and current_user.rol_id == 6 and es_home %}
+        <div class="menu-divider"></div>
         <p class="menu-section">⚙️ Administración</p>
         <a href="{{ url_for('admin.crear_usuario') }}" class="menu-item">👤 Crear usuario</a>
         <a href="{{ url_for('admin.subir_zip_egresos') }}" class="menu-item">📦 Cargar BD Egresos</a>
@@ -96,100 +94,73 @@
         <a href="{{ url_for('admin.subir_camas_no_censables') }}" class="menu-item">📦 Cargar BD CAMAS NO CENSABLES</a>
         <a href="{{ url_for('admin.subir_equipo_medico') }}" class="menu-item">📦 Cargar BD EQUIPO MEDICO</a>
         <a href="{{ url_for('admin.subir_imagenes_agenda') }}" class="menu-item">📦 Cargar JPG Agenda</a>
-        <div class="menu-divider"></div>
-
         {% endif %}
 
-        {# CERRAR SESIÓN PARA TODOS LOS USUARIOS AUTENTICADOS #}
-
+        {# CERRAR SESIÓN #}
         {% if current_user.is_authenticated %}
-
         <a href="{{ url_for('main.logout') }}" class="menu-item logout" style="margin-top:20px;">
             🚪 Cerrar Sesión
         </a>
-
         {% endif %}
     </nav>
 
-    <!-- ===============================
-         FILTROS SOLO PARA EGRESOS
-    =============================== -->
-    {% if request.path.startswith('/egresos') %}
-    <div class="menu-filtros">
+    <!-- =========================================
+         SECCIÓN DINÁMICA DE FILTROS SEGÚN RUTA
+    ========================================= -->
 
+    {# FILTROS: EGRESOS #}
+    {% if ruta.startswith('/egresos') %}
+    <div class="menu-filtros">
         <div class="header-filtros">
             <p class="menu-section">🔍 FILTROS</p>
-            <button type="button" id="btnResetAll" class="btn-reset-link">
-                Limpiar
-            </button>
+            <button type="button" id="btnResetAll" class="btn-reset-link">Limpiar</button>
         </div>
 
-        <!-- AÑOS -->
         <div class="filter-block">
-            <label class="filter-label" id="labelAnioEgresos">
-                Años
-            </label>
-
+            <label class="filter-label" id="labelAnioEgresos">Años</label>
             <div class="checklist checklist-years">
                 {% for a in anios_disponibles %}
                 <label class="check-item">
-                    <input type="checkbox" class="filtro-anio" value="{{ a }}">
-                    {{ a }}
+                    <input type="checkbox" class="filtro-anio" value="{{ a }}"> {{ a }}
                 </label>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- UNIDAD -->
         <div class="filter-block">
             <label class="filter-label">Unidad</label>
-            <button type="button" class="btn-selector" id="btnUnidades">
-                🔍 Seleccionar unidades
-            </button>
+            <button type="button" class="btn-selector" id="btnUnidades">🔍 Seleccionar unidades</button>
         </div>
 
-        <!-- POPUP UNIDADES -->
         <div class="popover-unidades" id="popoverUnidades">
             <label class="filter-label">Buscar unidad</label>
             <input type="text" id="buscarUnidad" class="input-text" placeholder="Escribe para filtrar...">
-
             <div class="popover-list">
                 {% for u in unidades_disponibles %}
                 <label class="popover-item">
-                    <input type="checkbox" name="unidades" value="{{ u }}">
-                    {{ u }}
+                    <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
                 </label>
                 {% endfor %}
             </div>
-
             <div class="popover-actions">
                 <button type="button" id="limpiarUnidades">Limpiar</button>
                 <button type="button" id="aplicarUnidades">Aplicar</button>
             </div>
         </div>
 
-        <!-- MESES -->
         <div class="filter-block">
-            <label class="filter-label">
-                Meses
-            </label>
-
+            <label class="filter-label">Meses</label>
             <div class="checklist grid-3">
                 {% for id, nombre in meses.items() %}
                 <label class="check-item">
-                    <input type="checkbox" class="filtro-mes" value="{{ id }}">
-                    {{ nombre[:3] }}
+                    <input type="checkbox" class="filtro-mes" value="{{ id }}"> {{ nombre[:3] }}
                 </label>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- INDICADOR -->
         <div class="filter-block">
-            <label class="filter-label" for="filtroIndicadorEgresos">
-                Indicador
-            </label>
-
+            <label class="filter-label" for="filtroIndicadorEgresos">Indicador</label>
             <select id="filtroIndicadorEgresos" class="input-text">
                 <option value="egresos">Egresos</option>
                 <option value="defunciones">Defunciones</option>
@@ -200,64 +171,45 @@
             </select>
         </div>
 
-        <button class="btn-apply" id="btnFiltrar">
-            Aplicar filtros
-        </button>
-
+        <button class="btn-apply" id="btnFiltrar">Aplicar filtros</button>
     </div>
     {% endif %}
 
-
-
-    {% if request.path.startswith('/reportes') %}
-    {% set sufijo = tipo|capitalize %}
+    {# FILTROS: REPORTES (MORBILIDAD / MORTALIDAD) #}
+    {% if ruta.startswith('/reportes') %}
+    {% set sufijo = tipo|capitalize if tipo else '' %}
     {% set titulo_menu = "MORBILIDAD" if tipo == "morbi" else "MORTALIDAD" %}
 
-
     <div class="menu-filtros">
-
         <div class="header-filtros">
-            <p class="menu-section">
-                📊 {{ titulo_menu }}
-            </p>
-
-            <button type="button" id="btnReset{{ sufijo }}" class="btn-reset-link">
-                Limpiar
-            </button>
+            <p class="menu-section">📊 {{ titulo_menu }}</p>
+            <button type="button" id="btnReset{{ sufijo }}" class="btn-reset-link">Limpiar</button>
         </div>
 
-        <!-- AÑOS (opcional si ya existe anio) -->
         <div class="filter-block">
             <label class="filter-label">Años</label>
-
             <div class="checklist checklist-years">
                 {% for a in anios_disponibles %}
                 <label class="check-item">
-                    <input type="checkbox" class="filtro-anio-{{tipo}} " value="{{ a }}">
-                    {{ a }}
+                    <input type="checkbox" class="filtro-anio-{{tipo}}" value="{{ a }}"> {{ a }}
                 </label>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- MES -->
         <div class="filter-block">
             <label class="filter-label">Meses</label>
-
             <div class="checklist grid-3">
                 {% for id, nombre in meses.items() %}
                 <label class="check-item">
-                    <input type="checkbox" class="filtro-mes-{{tipo}}" value="{{ id }}">
-                    {{ nombre[:3] }}
+                    <input type="checkbox" class="filtro-mes-{{tipo}}" value="{{ id }}"> {{ nombre[:3] }}
                 </label>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- TOP -->
         <div class="filter-block">
             <label class="filter-label">Top resultados</label>
-
             <select id="filtroTop{{ sufijo }}" class="input-text">
                 <option value="">Todos</option>
                 <option value="10">Top 10</option>
@@ -266,347 +218,262 @@
             </select>
         </div>
 
-        <!-- UNIDAD -->
         <div class="filter-block">
             <label class="filter-label">Unidad</label>
-            <button type="button" class="btn-selector" id="btnUnidades{{ sufijo }}">
-                🔍 Seleccionar unidades
-            </button>
+            <button type="button" class="btn-selector" id="btnUnidades{{ sufijo }}">🔍 Seleccionar unidades</button>
         </div>
 
-        <!-- POPUP UNIDADES -->
         <div class="popover-unidades" id="popoverUnidades{{ sufijo }}">
             <label class="filter-label">Buscar unidad</label>
             <input type="text" id="buscarUnidad{{ sufijo }}" class="input-text" placeholder="Escribe para filtrar...">
-
             <div class="popover-list">
                 {% for u in unidades_disponibles %}
                 <label class="popover-item">
-                    <input type="checkbox" name="unidades" value="{{ u }}">
-                    {{ u }}
+                    <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
                 </label>
                 {% endfor %}
             </div>
-
             <div class="popover-actions">
                 <button type="button" id="limpiarUnidades{{ sufijo }}">Limpiar</button>
                 <button type="button" id="aplicarUnidades{{ sufijo }}">Aplicar</button>
             </div>
         </div>
 
-
-
-        <!-- SERVICIO EGRESO -->
         <div class="filter-block">
             <label class="filter-label">Servicio de egreso</label>
-
-            <button type="button" class="btn-selector" id="btnServicio{{ sufijo }}">
-                🔍 Seleccionar Egreso
-            </button>
+            <button type="button" class="btn-selector" id="btnServicio{{ sufijo }}">🔍 Seleccionar Egreso</button>
         </div>
 
-        <!-- POPUP SERVICIO -->
         <div class="popover-unidades" id="popoverServicio{{ sufijo }}">
             <label class="filter-label">Buscar Servicio</label>
             <input type="text" id="buscarServicio{{ sufijo }}" class="input-text" placeholder="Escribe para filtrar...">
-
             <div class="popover-list">
                 {% for a in servicio_disponibles %}
                 <label class="popover-item">
-                    <input type="checkbox" name="servicios" value="{{ a }}">
-                    {{ a }}
+                    <input type="checkbox" name="servicios" value="{{ a }}"> {{ a }}
                 </label>
                 {% endfor %}
             </div>
-
             <div class="popover-actions">
                 <button type="button" id="limpiarServicios{{ sufijo }}">Limpiar</button>
                 <button type="button" id="aplicarServicios{{ sufijo }}">Aplicar</button>
             </div>
         </div>
 
-
-
-        <!-- AFECCIONES PRINCIPALES -->
         <div class="filter-block">
             <label class="filter-label">Afecciones principales</label>
-
-            <button type="button" class="btn-selector" id="btnAfecciones{{ sufijo}}">
-                🔍 Seleccionar afecciones
-            </button>
+            <button type="button" class="btn-selector" id="btnAfecciones{{ sufijo }}">🔍 Seleccionar afecciones</button>
         </div>
 
-        <!-- POPUP AFECCIONES -->
         <div class="popover-unidades" id="popoverAfecciones{{ sufijo }}">
             <label class="filter-label">Buscar afección</label>
             <input type="text" id="buscarAfeccion{{ sufijo }}" class="input-text" placeholder="Escribe para filtrar...">
-
             <div class="popover-list">
                 {% for a in afecciones_disponibles %}
                 <label class="popover-item">
-                    <input type="checkbox" name="afecciones" value="{{ a }}">
-                    {{ a }}
+                    <input type="checkbox" name="afecciones" value="{{ a }}"> {{ a }}
                 </label>
                 {% endfor %}
             </div>
-
             <div class="popover-actions">
                 <button type="button" id="limpiarAfecciones{{ sufijo }}">Limpiar</button>
                 <button type="button" id="aplicarAfecciones{{ sufijo }}">Aplicar</button>
             </div>
         </div>
 
-        <!-- BOTÓN -->
-        <button class="btn-apply" id="btnFiltrar{{ sufijo }}">
-            Aplicar filtros
-        </button>
-
-        <button class="btn-apply" id="btnDescargar{{ sufijo }}">
-            📥 Descargar Excel
-        </button>
-
+        <button class="btn-apply" id="btnFiltrar{{ sufijo }}">Aplicar filtros</button>
+        <button class="btn-apply" id="btnDescargar{{ sufijo }}">📥 Descargar Excel</button>
     </div>
     {% endif %}
 
-
-
-
-    {% if request.path.startswith('/urgencias') %}
+    {# FILTROS: URGENCIAS #}
+    {% if ruta.startswith('/urgencias') %}
     <div class="menu-filtros">
-
         <div class="header-filtros">
             <p class="menu-section">🔍 FILTROS</p>
-            <button type="button" id="btnResetAll" class="btn-reset-link">
-                Limpiar
-            </button>
+            <button type="button" id="btnResetAll" class="btn-reset-link">Limpiar</button>
         </div>
 
-        <!-- AÑOS -->
         <div class="filter-block">
             <label class="filter-label">Años</label>
             <div class="checklist checklist-years">
                 {% for a in anios_disponibles %}
                 <label class="check-item">
-                    <input type="checkbox" class="urg-filtro-anio" value="{{ a }}">
-                    {{ a }}
+                    <input type="checkbox" class="urg-filtro-anio" value="{{ a }}"> {{ a }}
                 </label>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- UNIDAD (Egresos y Urgencias) -->
         <div class="filter-block">
             <label class="filter-label">Unidad</label>
-            <button type="button" class="btn-selector" id="btnUnidades">
-                🔍 Seleccionar unidades
-            </button>
+            <button type="button" class="btn-selector" id="btnUnidades">🔍 Seleccionar unidades</button>
         </div>
 
         <div class="popover-unidades" id="popoverUnidades">
             <label class="filter-label">Buscar unidad</label>
             <input type="text" id="buscarUnidad" class="input-text" placeholder="Escribe para filtrar...">
-
             <div class="popover-list">
                 {% for u in unidades_disponibles %}
                 <label class="popover-item">
-                    <input type="checkbox" name="unidades" value="{{ u }}">
-                    {{ u }}
+                    <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
                 </label>
                 {% endfor %}
             </div>
-
             <div class="popover-actions">
                 <button type="button" id="limpiarUnidades">Limpiar</button>
                 <button type="button" id="aplicarUnidades">Aplicar</button>
             </div>
         </div>
 
-        <!-- MESES -->
         <div class="filter-block">
             <label class="filter-label">Meses</label>
             <div class="checklist grid-3">
                 {% for id, nombre in meses.items() %}
                 <label class="check-item">
-                    <input type="checkbox" class="urg-filtro-mes" value="{{ id }}">
-                    {{ nombre[:3] }}
+                    <input type="checkbox" class="urg-filtro-mes" value="{{ id }}"> {{ nombre[:3] }}
                 </label>
                 {% endfor %}
             </div>
         </div>
 
-
-
-        <button class="btn-apply" id="btnFiltrarUrgencias">
-            Aplicar filtros
-        </button>
-
+        <button class="btn-apply" id="btnFiltrarUrgencias">Aplicar filtros</button>
     </div>
     {% endif %}
 
-
-    <!-- FILTRO PARA SIS-->
-    {% if request.path.startswith('/sis') %}
+    {# FILTROS: SIS #}
+    {% if ruta.startswith('/sis') %}
     <div class="menu-filtros">
-
         <div class="header-filtros">
             <p class="menu-section">🔍 FILTROS</p>
-            <button type="button" id="btnResetAll" class="btn-reset-link">
-                Limpiar
-            </button>
+            <button type="button" id="btnResetAll" class="btn-reset-link">Limpiar</button>
         </div>
 
-        <!-- AÑOS -->
         <div class="filter-block">
             <label class="filter-label">Años</label>
             <div class="checklist checklist-years">
                 {% for a in anios_disponibles %}
                 <label class="check-item">
-                    <input type="checkbox" class="sis-filtro-anio" value="{{ a }}">
-                    {{ a }}
+                    <input type="checkbox" class="sis-filtro-anio" value="{{ a }}"> {{ a }}
                 </label>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- UNIDAD (Egresos, Urgencias y Sis) -->
         <div class="filter-block">
             <label class="filter-label">Unidad</label>
-            <button type="button" class="btn-selector" id="btnUnidades">
-                🔍 Seleccionar unidades
-            </button>
+            <button type="button" class="btn-selector" id="btnUnidades">🔍 Seleccionar unidades</button>
         </div>
 
         <div class="popover-unidades" id="popoverUnidades">
             <label class="filter-label">Buscar unidad</label>
             <input type="text" id="buscarUnidad" class="input-text" placeholder="Escribe para filtrar...">
-
             <div class="popover-list">
                 {% for u in unidades_disponibles %}
                 <label class="popover-item">
-                    <input type="checkbox" name="unidades" value="{{ u }}">
-                    {{ u }}
+                    <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
                 </label>
                 {% endfor %}
             </div>
-
             <div class="popover-actions">
                 <button type="button" id="limpiarUnidades">Limpiar</button>
                 <button type="button" id="aplicarUnidades">Aplicar</button>
             </div>
         </div>
 
-        <!-- MESES -->
         <div class="filter-block">
             <label class="filter-label">Meses</label>
             <div class="checklist grid-3">
                 {% for id, nombre in meses.items() %}
                 <label class="check-item">
-                    <input type="checkbox" class="sis-filtro-mes" value="{{ id }}">
-                    {{ nombre[:3] }}
+                    <input type="checkbox" class="sis-filtro-mes" value="{{ id }}"> {{ nombre[:3] }}
                 </label>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- INDICADOR -->
         <div class="filter-block">
             <label class="filter-label">Indicador</label>
             <select id="filtroIndicador" class="input-text">
                 <option value="sis">Consultas</option>
                 <option value="estudios">Estudios</option>
                 <option value="diaspaciente">Días paciente</option>
-
             </select>
         </div>
 
-        <button class="btn-apply" id="btnFiltrarSis">
-            Aplicar filtros
-        </button>
-
+        <button class="btn-apply" id="btnFiltrarSis">Aplicar filtros</button>
     </div>
     {% endif %}
 
 
-    <!-- FILTRO PARA INDICADORES-->
-
-    {% if request.path.startswith('/indicadores') %}
+    {# FILTROS: INDICADORES #}
+    {% if ruta.startswith('/indicadores') %}
     <div class="menu-filtros">
-
         <div class="header-filtros">
             <p class="menu-section">🔍 FILTROS</p>
-            <button type="button" id="btnResetAll" class="btn-reset-link">
-                Limpiar
-            </button>
+            <button type="button" id="btnResetAll" class="btn-reset-link">Limpiar</button>
         </div>
 
-        <!-- AÑOS -->
         <div class="filter-block">
             <label class="filter-label">Años</label>
             <div class="checklist checklist-years">
                 {% for a in anios_disponibles %}
                 <label class="check-item">
-                    <input type="checkbox" class="ind-filtro-anio" value="{{ a }}">
-                    {{ a }}
+                    <input type="checkbox" class="ind-filtro-anio" value="{{ a }}"> {{ a }}
                 </label>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- UNIDAD -->
         <div class="filter-block">
             <label class="filter-label">Unidad</label>
-            <button type="button" class="btn-selector" id="btnUnidades">
-                🔍 Seleccionar unidades
-            </button>
+            <button type="button" class="btn-selector" id="btnUnidades">🔍 Seleccionar unidades</button>
         </div>
 
         <div class="popover-unidades" id="popoverUnidades">
             <label class="filter-label">Buscar unidad</label>
             <input type="text" id="buscarUnidad" class="input-text" placeholder="Escribe para filtrar...">
-
             <div class="popover-list">
                 {% for u in unidades_disponibles %}
                 <label class="popover-item">
-                    <input type="checkbox" name="unidades" value="{{ u }}">
-                    {{ u }}
+                    <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
                 </label>
                 {% endfor %}
             </div>
-
             <div class="popover-actions">
                 <button type="button" id="limpiarUnidades">Limpiar</button>
                 <button type="button" id="aplicarUnidades">Aplicar</button>
             </div>
         </div>
 
-
-        <!-- MESES -->
         <div class="filter-block">
             <label class="filter-label">Meses</label>
             <div class="checklist grid-3">
                 {% for id, nombre in meses.items() %}
                 <label class="check-item">
-                    <input type="checkbox" class="ind-filtro-mes" value="{{ id }}">
-                    {{ nombre[:3] }}
+                    <input type="checkbox" class="ind-filtro-mes" value="{{ id }}"> {{ nombre[:3] }}
                 </label>
                 {% endfor %}
             </div>
         </div>
 
-
-        <button class="btn-apply" id="btnFiltrarIndicadores">
-            Aplicar filtros
-        </button>
-
+        <button class="btn-apply" id="btnFiltrarIndicadores">Aplicar filtros</button>
     </div>
     {% endif %}
 
 
-
-    {% if request.path.startswith('/grafica') %}
+    {# FILTROS: ANÁLISIS DINÁMICO (GRÁFICA) #}
+    {% if ruta.startswith('/grafica') %}
     <div class="menu-filtros">
         <p class="menu-section">📈 Configurar Gráfica</p>
-        <div class="quick-settings mt-3">
+
+        <!-- 🔍 BUSCADOR GLOBAL DE FILTROS -->
+        <div class="search-container my-3">
+            <input type="text" id="searchGlobalSidebar" class="input-text"
+                placeholder="🔍 Buscar unidad, indicador, equipo...">
+        </div>
+
+        <div class="quick-settings mb-3">
             <div class="setting-row">
                 <span class="setting-label">Años:</span>
                 <div class="setting-controls d-flex gap-2 flex-wrap w-100">
@@ -621,383 +488,234 @@
             </div>
         </div>
 
+        <!-- ACORDEÓN: UNIDAD MÉDICA -->
         <details class="acordeon-indicadores">
             <summary class="text-white" style="font-size:11px;font-weight:bold;letter-spacing:.5px;">
-                <i class="bi bi-chevron-right"></i>
-                🏥 UNIDAD MÉDICA
+                <i class="bi bi-chevron-right"></i> 🏥 UNIDAD MÉDICA
             </summary>
-
             <div class="filter-block-acordeon">
-
-                <!-- BUSCADOR -->
-                <div class="search-container mb-2">
-                    <input type="text" id="searchUnidad" class="input-text"
-                        placeholder="🔍 Buscar por nombre o CLUES...">
-                </div>
-
-
-                <!-- GENERALES -->
                 <details class="sub-acordeon">
-
-                    <summary>
-                        <i class="bi bi-hospital"></i>
-                        Hospitales Generales
-                    </summary>
-
-                    <div id="listaGenerales" class="popover-list-inline custom-scroll">
+                    <summary><i class="bi bi-hospital"></i> Hospitales Generales (HG)</summary>
+                    <div id="listaGenerales" class="popover-list-inline custom-scroll unidad-container" data-tipo="HG">
+                        {% for u in unidades_generales %}
+                        <label class="check-item check-unidad searchable-item">
+                            <input type="checkbox" class="filtro-unidad" data-tipo="HG"
+                                value="{{ u.id if u.id else u }}">
+                            <span>{{ u.nombre if u.nombre else u }}</span>
+                        </label>
+                        {% endfor %}
                     </div>
-
                 </details>
 
-
-                <!-- COMUNITARIOS -->
                 <details class="sub-acordeon">
-
-                    <summary>
-                        <i class="bi bi-building"></i>
-                        Hospitales Comunitarios
-                    </summary>
-
-                    <div id="listaComunitarios" class="popover-list-inline custom-scroll">
+                    <summary><i class="bi bi-building"></i> Hospitales Comunitarios (HC)</summary>
+                    <div id="listaComunitarios" class="popover-list-inline custom-scroll unidad-container"
+                        data-tipo="HC">
+                        {% for u in unidades_comunitarios %}
+                        <label class="check-item check-unidad searchable-item">
+                            <input type="checkbox" class="filtro-unidad" data-tipo="HC"
+                                value="{{ u.id if u.id else u }}">
+                            <span>{{ u.nombre if u.nombre else u }}</span>
+                        </label>
+                        {% endfor %}
                     </div>
-
                 </details>
 
-
-                <!-- ESPECIALIDAD -->
                 <details class="sub-acordeon">
-
-                    <summary>
-                        <i class="bi bi-heart-pulse"></i>
-                        Hospitales de Especialidad
-                    </summary>
-
-                    <div id="listaEspecialidad" class="popover-list-inline custom-scroll">
+                    <summary><i class="bi bi-heart-pulse"></i> Hospitales de Especialidad (HE)</summary>
+                    <div id="listaEspecialidad" class="popover-list-inline custom-scroll unidad-container"
+                        data-tipo="HE">
+                        {% for u in unidades_especialidad %}
+                        <label class="check-item check-unidad searchable-item">
+                            <input type="checkbox" class="filtro-unidad" data-tipo="HE"
+                                value="{{ u.id if u.id else u }}">
+                            <span>{{ u.nombre if u.nombre else u }}</span>
+                        </label>
+                        {% endfor %}
                     </div>
-
                 </details>
-
             </div>
         </details>
-
 
         <details class="acordeon-indicadores">
             <summary class="text-white" style="color:#b39dc5 !important;">
-                <i class="bi bi-chevron-right"></i>
-                📈 Desempeño
+                <i class="bi bi-chevron-right"></i> 📈 Desempeño
             </summary>
-
             <div class="checklist p-2">
-
-                <!-- ========================= -->
                 <!-- % OCUPACION -->
-                <!-- ========================= -->
                 <details class="sub-acordeon">
-                    <summary>
-                        <i class="bi bi-pie-chart-fill"></i>
-                        📊 % Ocupación
-                    </summary>
-
-                    <div class="indicador-item" draggable="true" data-ind="porcentaje_ocupacion" data-sub="kpis">
-                        General
+                    <summary><i class="bi bi-pie-chart-fill"></i> 📊 % Ocupación</summary>
+                    <div class="indicador-item" draggable="true" data-ind="porcentaje_ocupacion" data-sub="kpis">General
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="porcentaje_ocupacion_med_interna"
-                        data-sub="kpis">
-                        Medicina Interna
-                    </div>
-
+                        data-sub="kpis">Medicina Interna</div>
                     <div class="indicador-item" draggable="true" data-ind="porcentaje_ocupacion_cirugia"
-                        data-sub="kpis">
-                        Cirugía
-                    </div>
-
+                        data-sub="kpis">Cirugía</div>
                     <div class="indicador-item" draggable="true" data-ind="porcentaje_ocupacion_pediatria"
-                        data-sub="kpis">
-                        Pediatría
-                    </div>
-
+                        data-sub="kpis">Pediatría</div>
                     <div class="indicador-item" draggable="true" data-ind="porcentaje_ocupacion_gineco" data-sub="kpis">
-                        Ginecobstetricia
-                    </div>
-
+                        Ginecobstetricia</div>
                     <div class="indicador-item" draggable="true" data-ind="porcentaje_ocupacion_otros" data-sub="kpis">
-                        Otros
-                    </div>
-
+                        Otros</div>
                 </details>
 
-
-                <!-- ========================= -->
                 <!-- PROMEDIO ESTANCIA -->
-                <!-- ========================= -->
                 <details class="sub-acordeon">
-                    <summary>
-                        <i class="bi bi-moon-stars-fill"></i>
-                        🛏️ Promedio de Estancia
-                    </summary>
-
-                    <div class="indicador-item" draggable="true" data-ind="prom_dias_estancia" data-sub="kpis">
-                        General
+                    <summary><i class="bi bi-moon-stars-fill"></i> 🛏️ Promedio de Estancia</summary>
+                    <div class="indicador-item" draggable="true" data-ind="prom_dias_estancia" data-sub="kpis">General
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="prom_estancia_med_int" data-sub="kpis">
-                        Medicina Interna
-                    </div>
-
+                        Medicina Interna</div>
                     <div class="indicador-item" draggable="true" data-ind="prom_estancia_cirugia" data-sub="kpis">
-                        Cirugía
-                    </div>
-
+                        Cirugía</div>
                     <div class="indicador-item" draggable="true" data-ind="prom_estancia_pediatria" data-sub="kpis">
-                        Pediatría
-                    </div>
-
+                        Pediatría</div>
                     <div class="indicador-item" draggable="true" data-ind="prom_estancia_gineco" data-sub="kpis">
-                        Ginecobstetricia
+                        Ginecobstetricia</div>
+                    <div class="indicador-item" draggable="true" data-ind="prom_estancia_otros" data-sub="kpis">Otros
                     </div>
-
-                    <div class="indicador-item" draggable="true" data-ind="prom_estancia_otros" data-sub="kpis">
-                        Otros
-                    </div>
-
                 </details>
 
-
-                <!-- ========================= -->
                 <!-- PRODUCTIVIDAD DIARIA -->
-                <!-- ========================= -->
                 <details class="sub-acordeon">
-                    <summary>
-                        <i class="bi bi-calendar-week"></i>
-                        📅 Productividad diaria
-                    </summary>
-
-                    <div class="indicador-item" draggable="true" data-ind="consultas_por_dia" data-sub="kpis">
-                        Consultas por día
-                    </div>
-
+                    <summary><i class="bi bi-calendar-week"></i> 📅 Productividad diaria</summary>
+                    <div class="indicador-item" draggable="true" data-ind="consultas_por_dia" data-sub="kpis">Consultas
+                        por día</div>
                     <div class="indicador-item" draggable="true" data-ind="especialidad_por_dia" data-sub="kpis">
-                        Especialidades por día
-                    </div>
-
-                    <div class="indicador-item" draggable="true" data-ind="urgencias_por_dia" data-sub="kpis">
-                        Urgencias por día
-                    </div>
-
+                        Especialidades por día</div>
+                    <div class="indicador-item" draggable="true" data-ind="urgencias_por_dia" data-sub="kpis">Urgencias
+                        por día</div>
                     <div class="indicador-item" draggable="true" data-ind="nacimientos_por_dia" data-sub="kpis">
-                        Nacimientos por día
-                    </div>
-
-                    <div class="indicador-item" draggable="true" data-ind="prom_inter_diarias_qx" data-sub="kpis">
-                        Prom. Intervenciones diarias Qx
-                    </div>
-
+                        Nacimientos por día</div>
+                    <div class="indicador-item" draggable="true" data-ind="prom_inter_diarias_qx" data-sub="kpis">Prom.
+                        Intervenciones diarias Qx</div>
                 </details>
 
-
-                <!-- ========================= -->
                 <!-- INDICADORES HOSPITALARIOS -->
-                <!-- ========================= -->
                 <details class="sub-acordeon">
-                    <summary>
-                        <i class="bi bi-bar-chart-line-fill"></i>
-                        📈 Indicadores Hospitalarios
-                    </summary>
-
-                    <div class="indicador-item" draggable="true" data-ind="porcentaje_calificada" data-sub="kpis">
-                        % Urgencia Calificada
-                    </div>
-
-                    <div class="indicador-item" draggable="true" data-ind="porcentaje_cesareas" data-sub="kpis">
-                        % Cesáreas
-                    </div>
-
-                    <div class="indicador-item" draggable="true" data-ind="porcentaje_apeo" data-sub="kpis">
-                        % Apeo
-                    </div>
-
-                    <div class="indicador-item" draggable="true" data-ind="indice_rotacion" data-sub="kpis">
-                        Índice de Rotación
-                    </div>
-
-                    <div class="indicador-item" draggable="true" data-ind="interv_sustitucion" data-sub="kpis">
-                        Intervalo de Sustitución
-                    </div>
-
-                    <div class="indicador-item" draggable="true" data-ind="mortalidad_cruda" data-sub="kpis">
-                        Mortalidad Cruda
-                    </div>
-
+                    <summary><i class="bi bi-bar-chart-line-fill"></i> 📈 Indicadores Hospitalarios</summary>
+                    <div class="indicador-item" draggable="true" data-ind="porcentaje_calificada" data-sub="kpis">%
+                        Urgencia Calificada</div>
+                    <div class="indicador-item" draggable="true" data-ind="porcentaje_cesareas" data-sub="kpis">%
+                        Cesáreas</div>
+                    <div class="indicador-item" draggable="true" data-ind="porcentaje_apeo" data-sub="kpis">% Apeo</div>
+                    <div class="indicador-item" draggable="true" data-ind="indice_rotacion" data-sub="kpis">Índice de
+                        Rotación</div>
+                    <div class="indicador-item" draggable="true" data-ind="interv_sustitucion" data-sub="kpis">Intervalo
+                        de Sustitución</div>
+                    <div class="indicador-item" draggable="true" data-ind="mortalidad_cruda" data-sub="kpis">Mortalidad
+                        Cruda</div>
                     <div class="indicador-item" draggable="true" data-ind="mortalidad_ajustada" data-sub="kpis">
-                        Mortalidad Ajustada
-                    </div>
-
+                        Mortalidad Ajustada</div>
                 </details>
-
             </div>
-
         </details>
 
         <details class="acordeon-indicadores">
-            <summary class="text-primary">
-                <i class="bi bi-chevron-right"></i>
-                📤 Egresos
-            </summary>
-
+            <summary class="text-primary"><i class="bi bi-chevron-right"></i> 📤 Egresos</summary>
             <div class="checklist p-2">
-
-                <!-- EGRESOS -->
                 <details class="sub-acordeon">
                     <summary>🏥 Egresos Hospitalarios</summary>
-
-                    <div class="indicador-item" draggable="true" data-ind="total_egresos" data-sub="egresos">
-                        Total de Egresos
+                    <div class="indicador-item" draggable="true" data-ind="total_egresos" data-sub="egresos">Total de
+                        Egresos</div>
+                    <div class="indicador-item" draggable="true" data-ind="egre_med_interna" data-sub="egresos">Medicina
+                        Interna</div>
+                    <div class="indicador-item" draggable="true" data-ind="egre_cirugia" data-sub="egresos">Cirugía
+                        General</div>
+                    <div class="indicador-item" draggable="true" data-ind="egre_pediatria" data-sub="egresos">Pediatría
                     </div>
-
-                    <div class="indicador-item" draggable="true" data-ind="egre_med_interna" data-sub="egresos">
-                        Medicina Interna
-                    </div>
-
-                    <div class="indicador-item" draggable="true" data-ind="egre_cirugia" data-sub="egresos">
-                        Cirugía General
-                    </div>
-
-                    <div class="indicador-item" draggable="true" data-ind="egre_pediatria" data-sub="egresos">
-                        Pediatría
-                    </div>
-
                     <div class="indicador-item" draggable="true" data-ind="egre_gineco" data-sub="egresos">
-                        Ginecobstetricia
-                    </div>
-
-                    <div class="indicador-item" draggable="true" data-ind="egre_otros" data-sub="egresos">
-                        Otros
-                    </div>
-
+                        Ginecobstetricia</div>
+                    <div class="indicador-item" draggable="true" data-ind="egre_otros" data-sub="egresos">Otros</div>
                 </details>
-
 
                 <!-- DEFUNCIONES -->
                 <details class="sub-acordeon">
-
                     <summary>⚰️ Defunciones</summary>
-
                     <div class="indicador-item" draggable="true" data-ind="egre_defunciones" data-sub="egresos">
                         Defunciones
                     </div>
-
                 </details>
-
 
                 <!-- NACIMIENTOS -->
                 <details class="sub-acordeon">
-
                     <summary>👶 Nacimientos</summary>
-
                     <div class="indicador-item" draggable="true" data-ind="total_nacimientos" data-sub="egresos">
                         Total de Nacimientos
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="nac_eutocico" data-sub="egresos">
                         Partos Eutócicos
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="nac_distocico" data-sub="egresos">
                         Partos Distócicos
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="nac_cesarea" data-sub="egresos">
                         Cesáreas
                     </div>
-
                 </details>
-
             </div>
         </details>
 
         <details class="acordeon-indicadores">
             <summary class="text-info">
-                <i class="bi bi-chevron-right"></i>
-                ⚙️ Procedimientos
+                <i class="bi bi-chevron-right"></i> ⚙️ Procedimientos
             </summary>
-
             <div class="checklist p-2">
-
                 <!-- TOTALES -->
                 <details class="sub-acordeon">
                     <summary>📊 Procedimientos Totales</summary>
-
                     <div class="indicador-item" draggable="true" data-ind="total_proced" data-sub="procedimientos">
                         Total de Procedimientos
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="total_proced_dentro"
                         data-sub="procedimientos">
                         Total Dentro de Quirófano
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="total_proced_fuera"
                         data-sub="procedimientos">
                         Total Fuera de Quirófano
                     </div>
-
                 </details>
-
 
                 <!-- DENTRO -->
                 <details class="sub-acordeon">
                     <summary>🟢 Dentro de Quirófano</summary>
-
                     <div class="indicador-item" draggable="true" data-ind="med_int_dentro" data-sub="procedimientos">
                         Medicina Interna
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="cirugia_dentro" data-sub="procedimientos">
                         Cirugía
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="gineco_dentro" data-sub="procedimientos">
                         Ginecobstetricia
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="pediatria_dentro" data-sub="procedimientos">
                         Pediatría
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="otros_dentro" data-sub="procedimientos">
                         Otros
                     </div>
-
                 </details>
-
 
                 <!-- FUERA -->
                 <details class="sub-acordeon">
                     <summary>🔵 Fuera de Quirófano</summary>
-
                     <div class="indicador-item" draggable="true" data-ind="med_int_fuera" data-sub="procedimientos">
                         Medicina Interna
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="cirugia_fuera" data-sub="procedimientos">
                         Cirugía
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="gineco_fuera" data-sub="procedimientos">
                         Ginecobstetricia
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="pediatria_fuera" data-sub="procedimientos">
                         Pediatría
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="otros_fuera" data-sub="procedimientos">
                         Otros
                     </div>
-
                 </details>
-
             </div>
         </details>
 
@@ -1005,21 +723,16 @@
             <summary class="text-danger">
                 <i class="bi bi-chevron-right"></i> 🚑 Urgencias
             </summary>
-
             <div class="checklist p-2">
-
                 <!-- SUBGRUPO ATENCIONES -->
                 <details class="sub-acordeon">
                     <summary>📋 Atenciones</summary>
-
                     <div class="indicador-item" draggable="true" data-ind="urgencias" data-sub="urgencias">
                         <i class="bi bi-hospital"></i> Total Urgencias
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="calificada" data-sub="urgencias">
                         <i class="bi bi-check-circle"></i> Calificadas
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="no_calificada" data-sub="urgencias">
                         <i class="bi bi-x-circle"></i> No Calificadas
                     </div>
@@ -1028,25 +741,19 @@
                 <!-- SUBGRUPO CLASIFICACIÓN -->
                 <details class="sub-acordeon">
                     <summary>🩺 Clasificación</summary>
-
                     <div class="indicador-item" draggable="true" data-ind="medica" data-sub="urgencias">
                         <i class="bi bi-person-heart"></i> Médicas
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="accidentes" data-sub="urgencias">
                         <i class="bi bi-cone-striped"></i> Accidentes / Violencia
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="pediatrica" data-sub="urgencias">
                         <i class="bi bi-balloon-heart"></i> Pediátricas
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="ginecobstetricia" data-sub="urgencias">
                         <i class="bi bi-gender-female"></i> Ginecobstetricia
                     </div>
-
                 </details>
-
             </div>
         </details>
 
@@ -1054,235 +761,165 @@
             <summary class="text-success">
                 <i class="bi bi-chevron-right"></i> 📊 SIS
             </summary>
-
             <div class="checklist p-2">
-
                 <!-- CONSULTAS -->
                 <details class="sub-acordeon">
                     <summary>🏥 Consultas y Atención</summary>
-
                     <div class="indicador-item" draggable="true" data-ind="consultas" data-sub="sis">
                         Consultas
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="especialidad" data-sub="sis">
                         Especialidades
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="mental" data-sub="sis">
                         Salud Mental
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="bucal" data-sub="sis">
                         Salud Bucal
                     </div>
                 </details>
 
-
                 <!-- APOYO DIAGNÓSTICO -->
                 <details class="sub-acordeon">
                     <summary>🧪 Servicios Diagnósticos</summary>
-
                     <div class="indicador-item" draggable="true" data-ind="laboratorio" data-sub="sis">
                         Laboratorio
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="rayosx" data-sub="sis">
                         Rayos X
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="ultrasonido" data-sub="sis">
                         Ultrasonido
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="electro" data-sub="sis">
                         Electrocardiograma
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="encefa" data-sub="sis">
                         Encefalograma
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="tac" data-sub="sis">
                         Tomografía (TAC)
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="rnm" data-sub="sis">
                         Resonancia Magnética
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="anatomia" data-sub="sis">
                         Anatomía Patológica
                     </div>
-
                 </details>
-
 
                 <!-- DÍAS PACIENTE -->
                 <details class="sub-acordeon">
                     <summary>🛏️ Días Paciente</summary>
-
                     <div class="indicador-item" draggable="true" data-ind="dias_p_med_int" data-sub="sis">
                         Medicina Interna
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="dias_p_cirugia" data-sub="sis">
                         Cirugía
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="dias_p_pediatria" data-sub="sis">
                         Pediatría
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="dias_p_gineco" data-sub="sis">
                         Ginecobstetricia
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="dias_p_otros" data-sub="sis">
                         Otros
                     </div>
-
                 </details>
-
             </div>
         </details>
-
 
         <details class="acordeon-indicadores">
             <summary class="text-warning">
                 <i class="bi bi-chevron-right"></i> 🔄 SINERHIAS
             </summary>
 
-            <!-- BUSCADOR -->
-            <div class="search-container mb-2">
-                <input type="text" id="searchSinerhias" class="input-text"
-                    placeholder="🔍 Buscar indicador SINERHIAS...">
-            </div>
 
             <div class="checklist p-2">
-
-                <!-- ===================================================== -->
                 <!-- QUIRÓFANOS -->
-                <!-- ===================================================== -->
-
                 <details class="sub-acordeon">
                     <summary>🏥 Quirófanos</summary>
-
                     <div class="indicador-item" draggable="true" data-ind="quirofanos" data-sub="sinerhias">
                         Quirófanos Habilitados
                     </div>
-
                 </details>
 
-                <!-- ===================================================== -->
                 <!-- CAMAS CENSABLES -->
-                <!-- ===================================================== -->
                 <details class="sub-acordeon">
                     <summary>🛏️ Camas Censables</summary>
-
                     <div class="indicador-item" draggable="true" data-ind="camas_total" data-sub="sinerhias">
                         Total Camas Censables
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="camas_med_int" data-sub="sinerhias">
                         Medicina Interna
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="camas_cirugia" data-sub="sinerhias">
                         Cirugía
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="camas_pediatria" data-sub="sinerhias">
                         Pediatría
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="camas_gineco" data-sub="sinerhias">
                         Ginecobstetricia
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="camas_otros" data-sub="sinerhias">
                         Otros
                     </div>
-
                 </details>
 
-
-
-
-
-                <!-- ===================================================== -->
                 <!-- CAMAS NO CENSABLES -->
-                <!-- ===================================================== -->
-
                 <details class="sub-acordeon">
                     <summary>🛌 Camas No Censables</summary>
-
                     <div class="indicador-item" draggable="true" data-ind="hab_urgencias" data-sub="camas_no_censables">
                         Urgencias
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="hab_observacion"
                         data-sub="camas_no_censables">
                         Observación
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="hab_cuid_int" data-sub="camas_no_censables">
                         Cuidados Intermedios
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="hab_cirug_amb" data-sub="camas_no_censables">
                         Cirugía Ambulatoria
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="hab_quemados" data-sub="camas_no_censables">
                         Quemados
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="hab_lab_parto" data-sub="camas_no_censables">
                         Labor de Parto
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="hab_recup_pp" data-sub="camas_no_censables">
                         Recuperación Post-Parto
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="hab_recup_pq" data-sub="camas_no_censables">
                         Recuperación Post-Quirúrgica
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="hab_uci_adulto"
                         data-sub="camas_no_censables">
                         UCI Adultos
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="hab_uci_ped" data-sub="camas_no_censables">
                         UCI Pediatría
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="hab_otras_areas"
                         data-sub="camas_no_censables">
                         Otras Áreas
                     </div>
-
                     <div class="indicador-item" draggable="true" data-ind="tot_otras_areas"
                         data-sub="camas_no_censables">
                         Total No Censables
                     </div>
-
                 </details>
 
-
-                <!-- ===================================================== -->
                 <!-- EQUIPO MÉDICO -->
-                <!-- ===================================================== -->
-
                 <details class="sub-acordeon">
                     <summary>⚙️ Equipo Médico</summary>
 
                     <!-- Imagenología -->
                     <details class="sub-acordeon">
                         <summary>🩻 Imagenología</summary>
-
                         {% set imagen = [
                         ('arco_c_analogo','Arco en C Analógico'),
                         ('arco_c_digital','Arco en C Digital'),
@@ -1304,21 +941,16 @@
                         ('tomografo_64','Tomógrafo 64'),
                         ('tomografo_128','Tomógrafo 128')
                         ] %}
-
                         {% for id_sql, etiqueta in imagen %}
                         <div class="indicador-item" draggable="true" data-ind="{{ id_sql }}" data-sub="equipo_medico">
                             {{ etiqueta }}
                         </div>
                         {% endfor %}
-
                     </details>
 
-
                     <!-- Monitoreo -->
-
                     <details class="sub-acordeon">
                         <summary>❤️ Monitoreo</summary>
-
                         {% set monitoreo = [
                         ('cardiotocografo','Cardiotocógrafo'),
                         ('ecocardiografo','Ecocardiógrafo'),
@@ -1332,21 +964,16 @@
                         ('monitor_signos_vit_neona','Monitor Neonatal Intensivo'),
                         ('monitor_anestesia','Monitor Anestesia')
                         ] %}
-
                         {% for id_sql, etiqueta in monitoreo %}
                         <div class="indicador-item" draggable="true" data-ind="{{ id_sql }}" data-sub="equipo_medico">
                             {{ etiqueta }}
                         </div>
                         {% endfor %}
-
                     </details>
 
-
                     <!-- Quirófano -->
-
                     <details class="sub-acordeon">
                         <summary>🏥 Quirófano y Soporte</summary>
-
                         {% set soporte = [
                         ('camilla_radiotransp','Camilla Radiotransparente'),
                         ('carro_rojo_reanim','Carro Rojo'),
@@ -1361,21 +988,16 @@
                         ('unidad_anestesia_bas','Unidad Anestesia'),
                         ('sierra_yesos','Sierra para Yesos')
                         ] %}
-
                         {% for id_sql, etiqueta in soporte %}
                         <div class="indicador-item" draggable="true" data-ind="{{ id_sql }}" data-sub="equipo_medico">
                             {{ etiqueta }}
                         </div>
                         {% endfor %}
-
                     </details>
 
-
                     <!-- Neonatal -->
-
                     <details class="sub-acordeon">
                         <summary>👶 Mobiliario y Neonatal</summary>
-
                         {% set mobiliario = [
                         ('bascula_estadimetro','Báscula Estadímetro'),
                         ('bascula_bebe','Báscula Bebé'),
@@ -1390,886 +1012,523 @@
                         ('unidad_dental','Unidad Dental'),
                         ('estuche_diag','Estuche Diagnóstico')
                         ] %}
-
                         {% for id_sql, etiqueta in mobiliario %}
                         <div class="indicador-item" draggable="true" data-ind="{{ id_sql }}" data-sub="equipo_medico">
                             {{ etiqueta }}
                         </div>
                         {% endfor %}
-
                     </details>
-
                 </details>
-
             </div>
         </details>
-    </div>
 
-
-
-    <div class="quick-settings mt-3">
-        <div class="setting-row">
-            <span class="setting-label">Detalle:</span>
-            <div class="setting-controls">
-                <select class="input-text-inline" id="modoVista">
-                    <option value="mensual">📅 Desglose Mensual</option>
-                    <option value="anual">📊 Total Anual</option>
-                </select>
+        <div class="quick-settings mt-3">
+            <div class="setting-row">
+                <span class="setting-label">Detalle:</span>
+                <div class="setting-controls">
+                    <select class="input-text-inline" id="modoVista">
+                        <option value="mensual">📅 Desglose Mensual</option>
+                        <option value="anual">📊 Total Anual</option>
+                    </select>
+                </div>
             </div>
-        </div>
 
-        <div class="setting-row">
-            <span class="setting-label">Gráfica:</span>
-            <div class="setting-controls">
-                <select class="input-text-inline" id="tipoGrafica">
-                    <optgroup label="Tendencias">
-                        <option value="line">📈 Líneas</option>
-                        <option value="bar">📊 Barras</option>
-                        <option value="area">🎨 Área Sombreada</option>
-                        <option value="scatter">📍 Puntos (Dispersión)</option>
-                    </optgroup>
-                    <optgroup label="Comparativos">
-                        <option value="radar">🕸️ Radar</option>
-                        <option value="polarArea">🔘 Área Polar</option>
-                        <option value="doughnut">🍩 Anillo</option>
-                        <option value="pie">🍕 Pastel</option>
-                    </optgroup>
-                </select>
+            <div class="setting-row">
+                <span class="setting-label">Gráfica:</span>
+                <div class="setting-controls">
+                    <select class="input-text-inline" id="tipoGrafica">
+                        <optgroup label="Tendencias">
+                            <option value="line">📈 Líneas</option>
+                            <option value="bar">📊 Barras</option>
+                            <option value="area">🎨 Área Sombreada</option>
+                            <option value="scatter">📍 Puntos (Dispersión)</option>
+                        </optgroup>
+                        <optgroup label="Comparativos">
+                            <option value="radar">🕸️ Radar</option>
+                            <option value="polarArea">🔘 Área Polar</option>
+                            <option value="doughnut">🍩 Anillo</option>
+                            <option value="pie">🍕 Pastel</option>
+                        </optgroup>
+                    </select>
+                </div>
             </div>
         </div>
     </div>
+    {% endif %}
 
 </div>
-{% endif %}
 
-</div>
 
 
 <script>
-    const tipo = "{{ tipo }}";          // morbi | morta
-    const sufijo = tipo.charAt(0).toUpperCase() + tipo.slice(1);
+    const tipo = "{{ tipo }}"; // morbi | morta | urg | urgencias | sis | egresos | ind | indicadores
+    const sufijo = tipo ? (tipo.charAt(0).toUpperCase() + tipo.slice(1)) : "";
+
     document.addEventListener("DOMContentLoaded", function () {
 
-        // ======================================================
-        // VARIABLES GLOBALES (OTROS MENÚS)
-        // ======================================================
+        const searchInput = document.getElementById("searchGlobalSidebar");
 
-        const btnUnidades =
-            document.getElementById("btnUnidades");
+        if (searchInput) {
+            searchInput.addEventListener("input", function (e) {
+                const query = e.target.value;
 
-        const popoverUnidades =
-            document.querySelector(".popover-unidades");
+                // 1. Emitimos evento global para la gráfica si está escuchando externamente
+                document.dispatchEvent(new CustomEvent("busquedaGlobalUnidades", {
+                    detail: { query: query }
+                }));
 
+                // 2. Ejecutamos el filtro local evitando el bloque de AÑOS
+                const contenedorGrafica =
+                    document.getElementById("sidebar") || document;
 
-
-        if (btnUnidades && popoverUnidades) {
-
-            btnUnidades.addEventListener("click", (e) => {
-
-                e.stopPropagation();
-
-                popoverUnidades.classList.toggle("open");
-
-            });
-
-        }
-        const buscar = document.getElementById("buscarUnidad");
-        const searchUnidadGrafica = document.getElementById("searchUnidad");
-        const containerGrafica = document.getElementById("listaUnidades");
-
-        let unidadesSeleccionadas = [];
-
-
-        // ======================================================
-        // REPORTE MORBI / MORTA
-        // ======================================================
-
-        const btnUnidadesRep =
-            document.getElementById(`btnUnidades${sufijo}`);
-
-        const popoverUnidadesRep =
-            document.getElementById(`popoverUnidades${sufijo}`);
-
-        const buscarUnidadRep =
-            document.getElementById(`buscarUnidad${sufijo}`);
-
-        const btnAfeccionesRep =
-            document.getElementById(`btnAfecciones${sufijo}`);
-
-        const popoverAfeccionesRep =
-            document.getElementById(`popoverAfecciones${sufijo}`);
-
-        const buscarAfeccionRep =
-            document.getElementById(`buscarAfeccion${sufijo}`);
-
-        const btnServicioRep =
-            document.getElementById(`btnServicio${sufijo}`);
-
-        const popoverServicioRep =
-            document.getElementById(`popoverServicio${sufijo}`);
-
-        const buscarServicioRep =
-            document.getElementById(`buscarServicio${sufijo}`);
-
-        let unidadesRepSeleccionadas = [];
-        let afeccionesSeleccionadas = [];
-        let serviciosSeleccionados = [];
-
-
-        // ======================================================
-        // BUSCADOR DE UNIDADES
-        // ======================================================
-
-        if (buscarUnidadRep) {
-
-            buscarUnidadRep.addEventListener("input", function () {
-
-                const texto = this.value.toLowerCase();
-
-                document.querySelectorAll(
-                    `#popoverUnidades${sufijo} .popover-item`
-                ).forEach(item => {
-
-                    item.style.display =
-                        item.textContent.toLowerCase().includes(texto)
-                            ? "flex"
-                            : "none";
-
-                });
-
-            });
-
-        }
-
-
-        // ======================================================
-        // BUSCADOR DE AFECCIONES
-        // ======================================================
-
-        if (buscarAfeccionRep) {
-
-            buscarAfeccionRep.addEventListener("input", function () {
-
-                const texto = this.value.toLowerCase();
-
-                document.querySelectorAll(
-                    `#popoverAfecciones${sufijo} .popover-item`
-                ).forEach(item => {
-
-                    item.style.display =
-                        item.textContent.toLowerCase().includes(texto)
-                            ? "flex"
-                            : "none";
-
-                });
-
-            });
-
-        }
-
-
-        // ======================================================
-        // BUSCADOR DE SERVICIOS
-        // ======================================================
-
-        if (buscarServicioRep) {
-
-            buscarServicioRep.addEventListener("input", function () {
-
-                const texto = this.value.toLowerCase();
-
-                document.querySelectorAll(
-                    `#popoverServicio${sufijo} .popover-item`
-                ).forEach(item => {
-
-                    item.style.display =
-                        item.textContent.toLowerCase().includes(texto)
-                            ? "flex"
-                            : "none";
-
-                });
-
-            });
-
-        }
-
-
-        // ======================================================
-        // REPORTE - ABRIR/CERRAR UNIDADES
-        // ======================================================
-
-        if (
-            btnUnidadesRep &&
-            popoverUnidadesRep
-        ) {
-
-            btnUnidadesRep.addEventListener(
-                "click",
-                (e) => {
-
-                    e.stopPropagation();
-
-                    popoverUnidadesRep
-                        .classList.toggle("open");
-
-                }
-            );
-
-        }
-
-
-        // ======================================================
-        // REPORTE - ABRIR/CERRAR AFECCIONES
-        // ======================================================
-
-        if (
-            btnAfeccionesRep &&
-            popoverAfeccionesRep
-        ) {
-
-            btnAfeccionesRep.addEventListener(
-                "click",
-                (e) => {
-
-                    e.stopPropagation();
-
-                    popoverAfeccionesRep
-                        .classList.toggle("open");
-
-                }
-            );
-
-        }
-
-
-        // ======================================================
-        // REPORTE - ABRIR/CERRAR SERVICIOS
-        // ======================================================
-
-        if (
-            btnServicioRep &&
-            popoverServicioRep
-        ) {
-
-            btnServicioRep.addEventListener(
-                "click",
-                (e) => {
-
-                    e.stopPropagation();
-
-                    popoverServicioRep
-                        .classList.toggle("open");
-
-                }
-            );
-
-        }
-
-
-        // ======================================================
-        // REPORTE - APLICAR UNIDADES
-        // ======================================================
-
-        document
-            .getElementById(`aplicarUnidades${sufijo}`)
-            ?.addEventListener("click", () => {
-
-                unidadesRepSeleccionadas = Array.from(
-
-                    document.querySelectorAll(
-                        `#popoverUnidades${sufijo} input[name='unidades']:checked`
-                    )
-
-                ).map(cb => cb.value);
-
-                if (btnUnidadesRep) {
-
-                    btnUnidadesRep.textContent =
-                        unidadesRepSeleccionadas.length
-                            ? `🔍 Unidades (${unidadesRepSeleccionadas.length})`
-                            : "🔍 Seleccionar unidades";
-
-                }
-
-                popoverUnidadesRep?.classList.remove("open");
-
-            });
-
-
-        // ======================================================
-        // REPORTE - LIMPIAR UNIDADES
-        // ======================================================
-
-        document
-            .getElementById(`limpiarUnidades${sufijo}`)
-            ?.addEventListener("click", () => {
-
-                document
-                    .querySelectorAll(
-                        `#popoverUnidades${sufijo} input[name='unidades']`
-                    )
-                    .forEach(cb => cb.checked = false);
-
-                unidadesRepSeleccionadas = [];
-
-                if (btnUnidadesRep) {
-
-                    btnUnidadesRep.textContent =
-                        "🔍 Seleccionar unidades";
-
-                }
-
-            });
-
-
-        // ======================================================
-        // REPORTE - APLICAR AFECCIONES
-        // ======================================================
-
-        document
-            .getElementById(`aplicarAfecciones${sufijo}`)
-            ?.addEventListener("click", () => {
-
-                afeccionesSeleccionadas = Array.from(
-
-                    document.querySelectorAll(
-                        `#popoverAfecciones${sufijo} input[name='afecciones']:checked`
-                    )
-
-                ).map(cb => cb.value);
-
-                if (btnAfeccionesRep) {
-
-                    btnAfeccionesRep.textContent =
-                        afeccionesSeleccionadas.length
-                            ? `🔍 Afecciones (${afeccionesSeleccionadas.length})`
-                            : "🔍 Seleccionar afecciones";
-
-                }
-
-                popoverAfeccionesRep?.classList.remove("open");
-
-            });
-
-        // ======================================================
-        // REPORTE - APLICAR SERVICIOS
-        // ======================================================
-
-        document
-            .getElementById(`aplicarServicios${sufijo}`)
-            ?.addEventListener("click", () => {
-
-                serviciosSeleccionados = Array.from(
-
-                    document.querySelectorAll(
-                        `#popoverServicio${sufijo} input[name='servicios']:checked`
-                    )
-
-                ).map(cb => cb.value);
-
-                if (btnServicioRep) {
-
-                    btnServicioRep.textContent =
-                        serviciosSeleccionados.length
-                            ? `🔍 Egreso (${serviciosSeleccionados.length})`
-                            : "🔍 Seleccionar Egreso";
-
-                }
-
-                popoverServicioRep?.classList.remove("open");
-
-            });
-
-
-        // ======================================================
-        // REPORTE - LIMPIAR AFECCIONES
-        // ======================================================
-
-        document
-            .getElementById(`limpiarAfecciones${sufijo}`)
-            ?.addEventListener("click", () => {
-
-                document
-                    .querySelectorAll(
-                        `#popoverAfecciones${sufijo} input[name='afecciones']`
-                    )
-                    .forEach(cb => cb.checked = false);
-
-                afeccionesSeleccionadas = [];
-
-                if (btnAfeccionesRep) {
-
-                    btnAfeccionesRep.textContent =
-                        "🔍 Seleccionar afecciones";
-
-                }
-
-            });
-
-
-        // ======================================================
-        // REPORTE - LIMPIAR SERVICIOS
-        // ======================================================
-
-        document
-            .getElementById(`limpiarServicios${sufijo}`)
-            ?.addEventListener("click", () => {
-
-                document
-                    .querySelectorAll(
-                        `#popoverServicio${sufijo} input[name='servicios']`
-                    )
-                    .forEach(cb => cb.checked = false);
-
-                serviciosSeleccionados = [];
-
-                if (btnServicioRep) {
-
-                    btnServicioRep.textContent =
-                        "🔍 Seleccionar Egreso";
-
-                }
-
-            });
-
-
-        // ======================================================
-        // REPORTE - RESET
-        // ======================================================
-
-        document
-            .getElementById(`btnReset${sufijo}`)
-            ?.addEventListener("click", () => {
-
-                document
-                    .querySelectorAll(`.filtro-anio-${tipo}`)
-                    .forEach(cb => cb.checked = false);
-
-                document
-                    .querySelectorAll(`.filtro-mes-${tipo}`)
-                    .forEach(cb => cb.checked = false);
-
-                document
-                    .querySelectorAll(
-                        `#popoverUnidades${sufijo} input[name='unidades']`
-                    )
-                    .forEach(cb => cb.checked = false);
-
-                document
-                    .querySelectorAll(
-                        `#popoverAfecciones${sufijo} input[name='afecciones']`
-                    )
-                    .forEach(cb => cb.checked = false);
-
-                document
-                    .querySelectorAll(
-                        `#popoverServicio${sufijo} input[name='servicios']`
-                    )
-                    .forEach(cb => cb.checked = false);
-
-                const top = document.getElementById(`filtroTop${sufijo}`);
-
-                if (top) {
-                    top.value = "";
-                }
-
-                unidadesRepSeleccionadas = [];
-                afeccionesSeleccionadas = [];
-                serviciosSeleccionados = [];
-
-                if (btnUnidadesRep) {
-                    btnUnidadesRep.textContent =
-                        "🔍 Seleccionar unidades";
-                }
-
-                if (btnAfeccionesRep) {
-                    btnAfeccionesRep.textContent =
-                        "🔍 Seleccionar afecciones";
-                }
-
-                if (btnServicioRep) {
-                    btnServicioRep.textContent =
-                        "🔍 Seleccionar Egreso";
-                }
-
-                if (typeof cargarDatos === "function") {
-                    cargarDatos();
-                }
-
-            });
-
-
-        // ======================================================
-        // REPORTE - CERRAR POPUPS
-        // ======================================================
-
-        document.addEventListener(
-            "click",
-            (e) => {
-
-                if (
-                    popoverUnidadesRep &&
-                    !popoverUnidadesRep.contains(e.target) &&
-                    btnUnidadesRep &&
-                    !btnUnidadesRep.contains(e.target)
-                ) {
-
-                    popoverUnidadesRep.classList.remove("open");
-
-                }
-
-                if (
-                    popoverAfeccionesRep &&
-                    !popoverAfeccionesRep.contains(e.target) &&
-                    btnAfeccionesRep &&
-                    !btnAfeccionesRep.contains(e.target)
-                ) {
-
-                    popoverAfeccionesRep.classList.remove("open");
-
-                }
-
-                if (
-                    popoverServicioRep &&
-                    !popoverServicioRep.contains(e.target) &&
-                    btnServicioRep &&
-                    !btnServicioRep.contains(e.target)
-                ) {
-
-                    popoverServicioRep.classList.remove("open");
-
-                }
-
-            }
-        );
-
-
-        // ======================================================
-        // EXPONER FILTROS A reporte_morbi.html
-        // ======================================================
-
-        window.getUnidadesRepSeleccionadas =
-            () => unidadesRepSeleccionadas;
-
-        window.getAfeccionesSeleccionadas =
-            () => afeccionesSeleccionadas;
-
-        window.getServiciosSeleccionados =
-            () => serviciosSeleccionados;
-
-
-        // ======================================================
-        // BOTON FILTRAR REPORTE
-        // ======================================================
-
-        document
-            .getElementById(`btnFiltrar${sufijo}`)
-            ?.addEventListener("click", () => {
-
-                if (typeof cargarDatos === "function") {
-                    cargarDatos();
-                } else {
-                    console.warn("cargarDatos no está disponible");
-                }
-
-            });
-
-        // 2. PREPARAR ITEMS DE UNIDAD
-        function prepararItemsUnidad() {
-            document.querySelectorAll(".popover-item").forEach(item => {
-                const originalText = item.textContent.trim();
-                const partes = originalText.split(/\s+/);
-                const clues = partes[0];
-                const nombreLimpio = partes.length > 1 ? partes.slice(1).join(" ") : originalText;
-
-                item.dataset.nombre = nombreLimpio;
-                item.dataset.clues = clues;
-
-                const checkbox = item.querySelector("input[name='unidades']");
-                if (checkbox) {
-                    item.innerHTML = '';
-                    item.appendChild(checkbox);
-                    const spanNombre = document.createElement("span");
-                    spanNombre.textContent = ` ${nombreLimpio}`;
-                    spanNombre.style.fontSize = "11px";
-                    item.appendChild(spanNombre);
-                }
-                item.setAttribute("draggable", "true");
-                item.addEventListener("dragstart", (e) => {
-                    const data = { type: 'unidad', value: clues, nombre: nombreLimpio };
-                    e.dataTransfer.setData("text", JSON.stringify(data));
-                });
+                filtrarContenedorGeneral(contenedorGrafica, query.toLowerCase().trim());
             });
         }
-        prepararItemsUnidad();
-        inicializarUnidadesAcordeon();
 
+        // ======================================================
+        // FUNCIÓN DE FILTRADO (EXCLUYE AÑOS Y ABRE TODOS LOS ACORDEONES)
+        // ======================================================
+        function filtrarContenedorGeneral(contenedor, query) {
+            if (!contenedor) return;
 
-        // 3. BUSCADORES
-        const manejarBusqueda = (input) => {
-            if (!input) return;
+            // EXCLUSIÓN EXPLÍCITA: Omitimos cualquier elemento dentro del bloque de años
+            const selectorElementos = ".unidad-item-grafica, .unidad-item, .searchable-item, .indicador-item, div[data-clues]";
 
-            input.addEventListener("input", function () {
-                const txt = this.value.toLowerCase().trim();
-                // Buscamos items tanto en el popover como en el nuevo acordeón
-                const items = document.querySelectorAll(".popover-item, .unidad-item-grafica");
+            const labels = contenedor.querySelectorAll(selectorElementos);
+            const subAcordeones = contenedor.querySelectorAll("details.sub-acordeon, details");
 
-                items.forEach(item => {
-                    const contenido = item.textContent.toLowerCase();
-                    const coincide = contenido.includes(txt);
-
-                    if (input === searchUnidadGrafica) {
-                        // IMPORTANTE: Si está vacío mostramos todo (flex), si no, filtramos
-                        item.style.display = (txt === "" || coincide) ? "flex" : "none";
-                        if (coincide && txt !== "") {
-                            item.style.backgroundColor = "#1E293B";
-                        } else {
-                            item.style.backgroundColor = "transparent";
-                        }
-                    } else if (input === buscar) {
-                        item.style.display = coincide ? "flex" : "none";
+            // Restauración al borrar la búsqueda
+            if (query === "") {
+                labels.forEach(el => {
+                    // Prevenir tocar los botones de años
+                    if (!el.closest('#bloqueAnios, .bloque-anios, .anios-container')) {
+                        el.style.display = "";
                     }
                 });
+                subAcordeones.forEach(acc => {
+                    if (!acc.closest('#bloqueAnios, .bloque-anios')) {
+                        acc.style.display = "";
+                        acc.open = false; // Cierra los acordeones al limpiar
+                    }
+                });
+                return;
+            }
+
+            // Ocultar todos los acordeones temporalmente antes de la búsqueda
+            subAcordeones.forEach(acc => {
+                if (!acc.closest('#bloqueAnios, .bloque-anios')) {
+                    acc.style.display = "none";
+                    acc.open = false;
+                }
             });
+
+            // Filtrado de elementos e investigación de coincidencias
+            labels.forEach(item => {
+                // Si el elemento está dentro del contenedor de Años, ignorarlo por completo
+                if (item.closest('#bloqueAnios, .bloque-anios, .anios-container')) return;
+
+                const text = item.textContent.toLowerCase().trim();
+                const coincide = text.includes(query);
+
+                item.style.display = coincide ? "" : "none";
+
+                if (coincide) {
+
+                    let padre = item.closest("details");
+
+                    while (padre) {
+                        padre.style.display = "";
+                        padre.open = true;
+                        padre = padre.parentElement.closest("details");
+                    }
+
+                }
+            });
+        }
+
+
+        // ======================================================
+        // 1. OBTENCIÓN ROBUSTA DE POPOVERS Y BOTONES
+        // ======================================================
+        const obtenerBotonUnidades = () => {
+            return document.getElementById(`btnUnidades${sufijo}`) ||
+                document.getElementById("btnUnidadesSis") ||
+                document.getElementById("btnUnidadesUrgencias") ||
+                document.getElementById("btnUnidadesUrg") ||
+                document.getElementById("btnUnidadesIndicadores") ||
+                document.getElementById("btnUnidadesEgresos") ||
+                document.getElementById("btnUnidades");
         };
 
+        const obtenerPopoverUnidades = () => {
+            return document.getElementById(`popoverUnidades${sufijo}`) ||
+                document.getElementById("popoverUnidadesSis") ||
+                document.getElementById("popoverUnidadesUrgencias") ||
+                document.getElementById("popoverUnidadesUrg") ||
+                document.getElementById("popoverUnidadesIndicadores") ||
+                document.getElementById("popoverUnidadesEgresos") ||
+                document.querySelector(".popover-unidades");
+        };
 
+        const buscarUnidad = document.getElementById(`buscarUnidad${sufijo}`) ||
+            document.getElementById("buscarUnidadSis") ||
+            document.getElementById("buscarUnidadUrgencias") ||
+            document.getElementById("buscarUnidadIndicadores") ||
+            document.getElementById("buscarUnidadEgresos") ||
+            document.getElementById("buscarUnidad");
 
-        // --- FUNCIÓN CLAVE CORREGIDA: Mover unidades al acordeón ---
-        function inicializarUnidadesAcordeon() {
-            const contenedorAcordeon = document.getElementById("listaUnidades");
-            // Buscamos los items originales (que vienen del backend en el popover oculto)
-            const unidadesOriginales = document.querySelectorAll(".popover-item");
+        const btnAfecciones = document.getElementById(`btnAfecciones${sufijo}`) || document.getElementById("btnAfecciones");
+        const popoverAfecciones = document.getElementById(`popoverAfecciones${sufijo}`) || document.querySelector(".popover-afecciones");
+        const buscarAfeccion = document.getElementById(`buscarAfeccion${sufijo}`) || document.getElementById("buscarAfeccion");
 
-            if (contenedorAcordeon && unidadesOriginales.length > 0) {
-                contenedorAcordeon.innerHTML = ''; // Limpiar contenedor de la gráfica
+        const btnServicio = document.getElementById(`btnServicio${sufijo}`) ||
+            document.getElementById("btnServicioSis") ||
+            document.getElementById("btnServicioUrgencias") ||
+            document.getElementById("btnServicioIndicadores") ||
+            document.getElementById("btnServicioEgresos") ||
+            document.getElementById("btnServicio");
 
+        const popoverServicio = document.getElementById(`popoverServicio${sufijo}`) ||
+            document.getElementById("popoverServicioSis") ||
+            document.getElementById("popoverServicioUrgencias") ||
+            document.getElementById("popoverServicioIndicadores") ||
+            document.getElementById("popoverServicioEgresos") ||
+            document.querySelector(".popover-servicios");
 
+        const buscarServicio = document.getElementById(`buscarServicio${sufijo}`) || document.getElementById("buscarServicio");
 
-                unidadesOriginales.forEach(unidad => {
-                    // Extraer datos con seguridad
-                    // Priorizamos dataset, si no, intentamos limpiar el texto
-                    let nombre = unidad.dataset.nombre;
-                    let clues = unidad.dataset.clues;
+        // ======================================================
+        // 1.1 COMPORTAMIENTO EXCLUSIVO DE SUB-ACORDEONES
+        // ======================================================
+        document.addEventListener("toggle", function (e) {
+            const targetDetail = e.target;
 
-                    // Si por alguna razón no tienen dataset, lo extraemos del texto (formato: "CLUES NOMBRE")
-                    if (!nombre || !clues) {
-                        const texto = unidad.textContent.trim();
-                        const partes = texto.split(/\s+/);
-                        clues = partes[0];
-                        nombre = partes.slice(1).join(" ");
-                    }
+            // Verificar que el elemento sea un acordeón <details> y se esté abriendo
+            if (targetDetail && targetDetail.tagName === "DETAILS" && targetDetail.open) {
 
-                    // Creamos el nuevo elemento para el menú lateral de la gráfica
-                    const div = document.createElement("div");
-                    div.className = "unidad-item-grafica"; // Clase específica para evitar conflictos
-                    div.style.display = "flex";
-                    div.style.alignItems = "center";
-                    div.style.padding = "8px";
-                    div.style.margin = "2px 0";
-                    div.style.cursor = "grab";
-                    div.style.color = "white";
-                    div.style.fontSize = "11px";
-                    div.style.borderRadius = "4px";
-                    div.style.transition = "background 0.2s";
+                // Ignorar si es el contenedor de Años o Meses para no cerrarlos por accidente
+                if (targetDetail.closest('#bloqueAnios, .bloque-anios, #bloqueMeses')) return;
 
-                    // Guardamos los datos críticos en el nuevo elemento
-                    div.dataset.clues = clues;
-                    div.dataset.nombre = nombre;
-
-                    div.innerHTML = `<i class="bi bi-hospital me-2" style="color: #3b82f6; opacity:0.9"></i> <span>${nombre}</span>`;
-
-                    // Configuración de Drag & Drop para la UNIDAD
-                    div.setAttribute("draggable", "true");
-                    div.addEventListener("dragstart", (e) => {
-                        // ESTA ES LA DATA QUE RECIBE LA GRÁFICA
-                        const data = {
-                            type: 'unidad',
-                            value: clues,
-                            nombre: nombre
-                        };
-                        e.dataTransfer.setData("text", JSON.stringify(data));
-                        div.style.background = "#1e293b";
-                        div.style.opacity = "0.5";
+                // Buscar el contenedor padre inmediato para cerrar solo los hermanos directos
+                const padre = targetDetail.parentElement;
+                if (padre) {
+                    const hermanos = padre.querySelectorAll(":scope > details");
+                    hermanos.forEach((hermano) => {
+                        if (hermano !== targetDetail && hermano.open) {
+                            hermano.open = false; // Cierra el otro acordeón abierto
+                        }
                     });
-
-                    div.addEventListener("dragend", () => {
-                        div.style.background = "transparent";
-                        div.style.opacity = "1";
-                    });
-
-                    // Hover visual
-                    div.addEventListener("mouseenter", () => div.style.background = "#1f2937");
-                    div.addEventListener("mouseleave", () => div.style.background = "transparent");
-
-                    contenedorAcordeon.appendChild(div);
-                });
+                }
             }
-        }
+        }, true);
 
-        manejarBusqueda(buscar);
-        manejarBusqueda(searchUnidadGrafica);
-
-        // 4. LÓGICA DE UNIDADES (APLICAR)
-        const btnAplicarUnidades = document.getElementById("aplicarUnidades");
-        if (btnAplicarUnidades) {
-            btnAplicarUnidades.addEventListener("click", () => {
-                unidadesSeleccionadas = Array.from(
-                    document.querySelectorAll("input[name='unidades']:checked")
-                ).map(cb => cb.value);
-
-                if (btnUnidades) {
-                    btnUnidades.textContent = unidadesSeleccionadas.length
-                        ? `🔍 Unidades (${unidadesSeleccionadas.length})`
-                        : "🔍 Seleccionar unidades";
-                }
-                if (popoverUnidades) {
-                    popoverUnidades.classList.remove("open");
-                }
-            });
-        }
-
-        // 5. RESET TOTAL (CORREGIDO)
-        document.getElementById("btnResetAll")?.addEventListener("click", function () {
-           
-
-            // A. Limpiar Checkboxes de Años
-            const clasesAnio = [".filtro-anio", ".urg-filtro-anio", ".sis-filtro-anio", ".ind-filtro-anio", ".anio-check"];
-            document.querySelectorAll(clasesAnio.join(",")).forEach(cb => cb.checked = false);
-
-            // B. Limpiar Checkboxes de Meses
-            const clasesMes = [".filtro-mes", ".urg-filtro-mes", ".sis-filtro-mes", ".ind-filtro-mes"];
-            document.querySelectorAll(clasesMes.join(",")).forEach(cb => cb.checked = false);
-
-            // C. Limpiar Unidades
-            document.querySelectorAll('input[name="unidades"]').forEach(cb => cb.checked = false);
-            unidadesSeleccionadas = [];
-            if (btnUnidades) btnUnidades.textContent = "🔍 Seleccionar unidades";
-
-            // D. Limpiar Buscadores e Indicadores
-            if (buscar) buscar.value = "";
-            if (searchUnidadGrafica) searchUnidadGrafica.value = "";
-
-            // Refrescar listas visuales
-            buscar?.dispatchEvent(new Event('input'));
-            searchUnidadGrafica?.dispatchEvent(new Event('input'));
-
-            const filtroIndicador = document.getElementById("filtroIndicador");
-            if (filtroIndicador) filtroIndicador.selectedIndex = 0;
-
-            // E. Configuración de Gráfica
-            const tipoGrafica = document.getElementById("tipoGrafica");
-            if (tipoGrafica) tipoGrafica.value = "line";
-            const modoVista = document.getElementById("modoVista");
-            if (modoVista) modoVista.value = "mensual";
-
-            // F. DISPARAR FILTRADO AUTOMÁTICO
-            const btnFiltrarCualquiera = document.getElementById("btnFiltrar") ||
-                document.getElementById("btnFiltrarUrgencias") ||
-                document.getElementById("btnFiltrarSis") ||
-                document.getElementById("btnFiltrarIndicadores");
-
-            btnFiltrarCualquiera?.click();
-
-            if (typeof actualizarGraficaDrag === 'function') {
-                actualizarGraficaDrag();
+        // Toggle de apertura para desplegables
+        document.addEventListener("click", function (e) {
+            const targetBtnUnidades = e.target.closest("#btnUnidades, #btnUnidadesSis, #btnUnidadesUrg, #btnUnidadesUrgencias, [id^='btnUnidades']");
+            if (targetBtnUnidades) {
+                e.preventDefault();
+                e.stopPropagation();
+                const pop = obtenerPopoverUnidades();
+                if (pop) pop.classList.toggle("open");
             }
         });
 
-
-
-        // 4.5 LÓGICA DEL BOTÓN LIMPIAR (DENTRO DEL POPOVER)
-        const btnLimpiarUnidades = document.getElementById("limpiarUnidades");
-        if (btnLimpiarUnidades) {
-            btnLimpiarUnidades.addEventListener("click", () => {
-                // Desmarcar todos los checkboxes de unidades
-                document.querySelectorAll("input[name='unidades']").forEach(cb => {
-                    cb.checked = false;
+        const bindToggle = (btn, pop) => {
+            if (btn && pop) {
+                btn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    pop.classList.toggle("open");
                 });
+            }
+        };
 
-                // Resetear la variable global
-                unidadesSeleccionadas = [];
+        bindToggle(btnAfecciones, popoverAfecciones);
+        bindToggle(btnServicio, popoverServicio);
 
-                // Actualizar el texto del botón principal
-                if (btnUnidades) {
-                    btnUnidades.textContent = "🔍 Seleccionar unidades";
-                }
+        // Cerrar popovers al hacer clic fuera
+        document.addEventListener("click", (e) => {
+            const popUnidadesActual = obtenerPopoverUnidades();
+            const btnUnidadesActual = obtenerBotonUnidades();
 
-                // Opcional: Limpiar el buscador interno si tuviera texto
-                if (buscar) {
-                    buscar.value = "";
-                    buscar.dispatchEvent(new Event('input'));
-                }
+            const esBoton = (btn, target) => btn && btn.contains(target);
 
-               
+            if (popUnidadesActual && popUnidadesActual.classList.contains("open") && !popUnidadesActual.contains(e.target) && !esBoton(btnUnidadesActual, e.target) && !e.target.closest("[id^='btnUnidades']")) {
+                popUnidadesActual.classList.remove("open");
+            }
+            if (popoverAfecciones && popoverAfecciones.classList.contains("open") && !popoverAfecciones.contains(e.target) && !esBoton(btnAfecciones, e.target)) {
+                popoverAfecciones.classList.remove("open");
+            }
+            if (popoverServicio && popoverServicio.classList.contains("open") && !popoverServicio.contains(e.target) && !esBoton(btnServicio, e.target)) {
+                popoverServicio.classList.remove("open");
+            }
+        });
+
+        // ======================================================
+        // 2. BUSCADORES INTERNOS LOCALES DE CADA POPOVER
+        // ======================================================
+        function asociarBuscadorInterno(inputEl, obtenerPopFn) {
+            if (!inputEl) return;
+
+            inputEl.addEventListener("input", function () {
+                const query = this.value.toLowerCase().trim();
+                const contenedorPop = typeof obtenerPopFn === "function" ? obtenerPopFn() : obtenerPopFn;
+                filtrarContenedorGeneral(contenedorPop, query);
             });
         }
 
+        asociarBuscadorInterno(buscarUnidad, obtenerPopoverUnidades);
+        asociarBuscadorInterno(buscarServicio, popoverServicio);
+        asociarBuscadorInterno(buscarAfeccion, popoverAfecciones);
 
+        // ======================================================
+        // 3. RECUPERACIÓN AISLADA DE UNIDADES Y LIMPIEZA DE NOMBRES
+        // ======================================================
+        function obtenerCheckboxesUnidades() {
+            const pop = obtenerPopoverUnidades();
+            if (!pop) return [];
+            return Array.from(pop.querySelectorAll('input[type="checkbox"]'));
+        }
+
+        function extraerTextoLimpio(cb) {
+            const parent = cb.closest('.popover-item') || cb.closest('label') || cb.closest('.check-unidad') || cb.closest('.form-check') || cb.parentElement;
+            let nombreText = parent ? parent.innerText.trim() : cb.value;
+            const partes = nombreText.split(/\s+/);
+            if (partes.length > 1 && partes[0] === cb.value) {
+                nombreText = partes.slice(1).join(" ");
+            }
+            return nombreText;
+        }
+
+        function cargarUnidadesEnGrafica() {
+            const containerGrafica = document.getElementById("listaUnidades");
+            if (!containerGrafica) return;
+
+            const checkboxes = obtenerCheckboxesUnidades();
+            if (checkboxes.length === 0) return;
+
+            containerGrafica.innerHTML = '';
+            const agregados = new Set();
+
+            checkboxes.forEach(cb => {
+                const clues = cb.value;
+                if (!clues || agregados.has(clues)) return;
+                agregados.add(clues);
+
+                const nombreText = extraerTextoLimpio(cb);
+
+                const div = document.createElement("div");
+                div.className = "unidad-item-grafica";
+                div.style.cssText = "display: flex; align-items: center; padding: 6px 8px; margin: 2px 0; cursor: grab; color: #f8fafc; font-size: 11px; border-radius: 4px; transition: background 0.2s;";
+                div.dataset.clues = clues;
+                div.dataset.nombre = nombreText;
+
+                div.innerHTML = `<i class="bi bi-hospital me-2" style="color: #3b82f6;"></i><span>${nombreText}</span>`;
+
+                div.setAttribute("draggable", "true");
+                div.addEventListener("dragstart", (e) => {
+                    const data = { type: 'unidad', value: clues, nombre: nombreText };
+                    e.dataTransfer.setData("text", JSON.stringify(data));
+                    div.style.opacity = "0.5";
+                });
+
+                div.addEventListener("dragend", () => div.style.opacity = "1");
+                div.addEventListener("mouseenter", () => div.style.background = "#1f2937");
+                div.addEventListener("mouseleave", () => div.style.background = "transparent");
+
+                containerGrafica.appendChild(div);
+            });
+        }
+
+        cargarUnidadesEnGrafica();
+        setTimeout(cargarUnidadesEnGrafica, 300);
+        setTimeout(cargarUnidadesEnGrafica, 1000);
+
+        let lockObserver = false;
+        const popoverTarget = obtenerPopoverUnidades();
+        if (popoverTarget) {
+            const observer = new MutationObserver(() => {
+                if (lockObserver) return;
+                lockObserver = true;
+                cargarUnidadesEnGrafica();
+                setTimeout(() => { lockObserver = false; }, 100);
+            });
+            observer.observe(popoverTarget, { childList: true, subtree: true });
+        }
+
+        // ======================================================
+        // 4. GETTERS GLOBALES (CON PROTECCIÓN DE CONTEXTO)
+        // ======================================================
+        function obtenerCheckboxesUnidadesGlobal() {
+            const checkboxes = obtenerCheckboxesUnidades();
+            return checkboxes.filter(cb => cb.checked).map(cb => extraerTextoLimpio(cb));
+        }
+
+        function obtenerServiciosSeleccionadosGlobal() {
+            if (!popoverServicio) return [];
+            const checkboxes = popoverServicio.querySelectorAll('input[type="checkbox"]:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        function obtenerAfeccionesSeleccionadasGlobal() {
+            if (!popoverAfecciones) return [];
+            const checkboxes = popoverAfecciones.querySelectorAll('input[type="checkbox"]:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        window.getUnidadesSeleccionadas = obtenerCheckboxesUnidadesGlobal;
+        window.getUnidadesRepSeleccionadas = obtenerCheckboxesUnidadesGlobal;
+        window.getUnidadesSisSeleccionadas = obtenerCheckboxesUnidadesGlobal;
+        window.getUnidadesSISSeleccionadas = obtenerCheckboxesUnidadesGlobal;
+        window.getUnidadesSis = obtenerCheckboxesUnidadesGlobal;
+        window.getUnidadesUrgSeleccionadas = obtenerCheckboxesUnidadesGlobal;
+        window.getUnidadesUrgenciasSeleccionadas = obtenerCheckboxesUnidadesGlobal;
+        window.getUnidadesEgresosSeleccionadas = obtenerCheckboxesUnidadesGlobal;
+        window.getUnidadesIndicadoresSeleccionadas = obtenerCheckboxesUnidadesGlobal;
+
+        window.getServiciosSeleccionados = obtenerServiciosSeleccionadosGlobal;
+        window.getAfeccionesSeleccionadas = obtenerAfeccionesSeleccionadasGlobal;
+
+        // ======================================================
+        // 5. REFRESCAR TABLAS Y GRÁFICAS
+        // ======================================================
+        function ejecutarGraficasSis() {
+            if (typeof renderGraficaPorUnidad === "function") renderGraficaPorUnidad();
+            if (typeof renderGraficaPorAnio === "function") renderGraficaPorAnio();
+            if (typeof renderGraficaMensual === "function") renderGraficaMensual();
+
+            if (typeof renderGraficaSis === "function") renderGraficaSis();
+            if (typeof actualizarGraficaSis === "function") actualizarGraficaSis();
+            if (typeof cargarGraficaSis === "function") cargarGraficaSis();
+            if (typeof dibujarGraficaSis === "function") dibujarGraficaSis();
+            if (typeof renderGraficaSecundariaSis === "function") renderGraficaSecundariaSis();
+            if (typeof actualizarGraficaTabla === "function") actualizarGraficaTabla();
+            if (typeof renderChartSis === "function") renderChartSis();
+        }
+
+        function ejecutarCargaGraficaYDatos() {
+            const btnActual = obtenerBotonUnidades();
+            const totalSelUnidades = obtenerCheckboxesUnidadesGlobal().length;
+            if (btnActual) {
+                btnActual.textContent = totalSelUnidades > 0 ? `🔍 Unidades (${totalSelUnidades})` : "🔍 Seleccionar unidades";
+            }
+
+            const totalSelServicios = obtenerServiciosSeleccionadosGlobal().length;
+            if (btnServicio) {
+                btnServicio.textContent = totalSelServicios > 0 ? `🔍 Egresos (${totalSelServicios})` : "🔍 Seleccionar Egreso";
+            }
+
+            const totalSelAfecciones = obtenerAfeccionesSeleccionadasGlobal().length;
+            if (btnAfecciones) {
+                btnAfecciones.textContent = totalSelAfecciones > 0 ? `🔍 Afecciones (${totalSelAfecciones})` : "🔍 Seleccionar afecciones";
+            }
+
+            if (window.filtrosSis && typeof window.filtrosSis === "object") {
+                window.filtrosSis.unidades = obtenerCheckboxesUnidadesGlobal();
+                window.filtrosSis.servicios = obtenerServiciosSeleccionadosGlobal();
+                window.filtrosSis.afecciones = obtenerAfeccionesSeleccionadasGlobal();
+            }
+            if (window.filtros && typeof window.filtros === "object") {
+                window.filtros.unidades = obtenerCheckboxesUnidadesGlobal();
+                window.filtros.servicios = obtenerServiciosSeleccionadosGlobal();
+                window.filtros.afecciones = obtenerAfeccionesSeleccionadasGlobal();
+            }
+
+            if (typeof cargarDatosSis === "function") cargarDatosSis();
+            if (typeof cargarTablaSis === "function") cargarTablaSis();
+            if (typeof cargarDatos === "function") cargarDatos();
+            if (typeof cargarDatosUrgencias === "function") cargarDatosUrgencias();
+            if (typeof cargarDatosIndicadores === "function") cargarDatosIndicadores();
+            if (typeof cargarDatosEgresos === "function") cargarDatosEgresos();
+
+            ejecutarGraficasSis();
+            if (typeof actualizarGraficaDrag === "function") actualizarGraficaDrag();
+            if (typeof renderGraficaUrg === "function") renderGraficaUrg();
+            if (typeof renderGraficaIndicadores === "function") renderGraficaIndicadores();
+            if (typeof renderGraficaEgresos === "function") renderGraficaEgresos();
+
+            document.dispatchEvent(new CustomEvent("aplicarFiltroUnidades"));
+
+            setTimeout(ejecutarGraficasSis, 300);
+            setTimeout(ejecutarGraficasSis, 800);
+        }
+
+        const selectoresBotonesAccion = [
+            `#aplicarUnidades${sufijo}`, "#aplicarUnidades", "#aplicarUnidadesSis", "#btnAplicarSis",
+            "#aplicarUnidadesUrgencias", "#aplicarUnidadesIndicadores", "#aplicarUnidadesEgresos",
+            `#aplicarServicios${sufijo}`, "#aplicarServicios",
+            `#aplicarAfecciones${sufijo}`, "#aplicarAfecciones",
+            `#btnFiltrar${sufijo}`, "#btnFiltrar", "#btnFiltrarSis", "#btnFiltrarUrgencias", "#btnFiltrarIndicadores", "#btnFiltrarEgresos"
+        ];
 
         document.addEventListener("click", (e) => {
+            if (e.target.closest(selectoresBotonesAccion.join(", "))) {
+                obtenerPopoverUnidades()?.classList.remove("open");
+                popoverServicio?.classList.remove("open");
+                popoverAfecciones?.classList.remove("open");
 
-            if (
-                popoverUnidades &&
-                !popoverUnidades.contains(e.target) &&
-                btnUnidades &&
-                !btnUnidades.contains(e.target)
-            ) {
-                popoverUnidades.classList.remove("open");
+                ejecutarCargaGraficaYDatos();
             }
-
         });
 
-        const btnUnidadesFinal = document.getElementById("btnUnidades");
-        const popoverUnidadesFinal = document.querySelector(".popover-unidades");
+        // Eventos de botones "Limpiar"
+        document.getElementById(`limpiarServicios${sufijo}`)?.addEventListener("click", () => {
+            if (popoverServicio) {
+                popoverServicio.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+            }
+        });
 
-        if (btnUnidadesFinal && popoverUnidadesFinal) {
+        document.getElementById(`limpiarAfecciones${sufijo}`)?.addEventListener("click", () => {
+            if (popoverAfecciones) {
+                popoverAfecciones.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+            }
+        });
 
-            btnUnidadesFinal.addEventListener("click", function () {
+        document.getElementById(`limpiarUnidades${sufijo}`)?.addEventListener("click", () => {
+            const popUnidades = obtenerPopoverUnidades();
+            if (popUnidades) {
+                popUnidades.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+            }
+        });
 
-                popoverUnidadesFinal.classList.toggle("open");
-
-            });
-
-        }
-
-        document.querySelectorAll('.acordeon-indicadores').forEach((el) => {
-            el.addEventListener('toggle', (e) => {
-                if (el.open) {
-                    document.querySelectorAll('.acordeon-indicadores').forEach((otro) => {
-                        if (otro !== el) otro.open = false;
-                    });
+        // ======================================================
+        // 6. EVENTO DEL SELECTOR DE INDICADOR
+        // ======================================================
+        const selectorIndicador = document.getElementById("filtroIndicador");
+        if (selectorIndicador) {
+            selectorIndicador.addEventListener("change", function () {
+                if (typeof window.actualizarIndicadorSis === "function") {
+                    window.actualizarIndicadorSis(this.value);
                 }
             });
+        }
+
+        // ======================================================
+        // 7. BOTÓN RESET / LIMPIAR GLOBAL
+        // ======================================================
+        document.addEventListener("click", function (e) {
+            if (e.target.closest('#btnResetAll, #btnResetSis, #btnReset' + sufijo + ', .btn-reset, .btn-limpiar')) {
+                e.preventDefault();
+
+                const popUnidades = obtenerPopoverUnidades();
+                if (popUnidades) popUnidades.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+                if (popoverServicio) popoverServicio.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+                if (popoverAfecciones) popoverAfecciones.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+
+                // Resetear buscadores
+                document.querySelectorAll('input[type="text"], input[type="search"]').forEach(inp => {
+                    inp.value = "";
+                    inp.dispatchEvent(new Event("input")); // Fuerza la restauración visual del buscador
+                });
+
+                const btnUnidades = obtenerBotonUnidades();
+                if (btnUnidades) btnUnidades.textContent = "🔍 Seleccionar unidades";
+                if (btnServicio) btnServicio.textContent = "🔍 Seleccionar Egreso";
+                if (btnAfecciones) btnAfecciones.textContent = "🔍 Seleccionar afecciones";
+
+                document.dispatchEvent(new CustomEvent("solicitarResetFiltros"));
+            }
         });
-
-
-        // NUEVO
-        document.querySelectorAll('.sub-acordeon').forEach((el) => {
-
-            el.addEventListener('toggle', function () {
-
-                if (!this.open) return;
-
-                const padre = this.parentElement;
-
-                padre.querySelectorAll(':scope > .sub-acordeon')
-                    .forEach((otro) => {
-
-                        if (otro !== this) {
-                            otro.open = false;
-                        }
-
-                    });
-
-            });
-
-        });
-
-
-        window.getUnidadesSeleccionadas = () => unidadesSeleccionadas;
-
-
 
     });
 </script>

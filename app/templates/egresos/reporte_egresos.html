@@ -96,22 +96,25 @@
         <hr>
         <div class="card mb-4">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                     <h5 class="mb-0">📈Total Egresos por mes</h5>
-                    <select id="filtroServicio" class="form-select form-select-sm w-auto mb-2"></select>
 
+                    <div class="d-flex gap-2 align-items-center">
+                        <select id="filtroServicio" class="form-select form-select-sm w-auto"></select>
+
+                        <!-- BOTÓN AGREGADO -->
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="btnToggleTablaLineaEgresos">
+                            Mostrar valores
+                        </button>
+                    </div>
                 </div>
                 <div style="height:350px">
                     <canvas id="graficaMensualTotal"></canvas>
                 </div>
-
             </div>
-
         </div>
 
     </div>
-
-
 
 </div>
 
@@ -121,19 +124,74 @@
 ======================== -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-
 <script>
+    // ==========================================
+    // 0. PLUGIN DE CHART.JS PARA DIBUJAR VALORES
+    // ==========================================
+    const pluginValoresLinea = {
+        id: 'pluginValoresLinea',
+        afterDatasetsDraw(chart, args, options) {
+            if (!options || !options.activo) return;
+            const { ctx } = chart;
+            ctx.save();
+            ctx.font = 'bold 10px sans-serif';
+            ctx.fillStyle = '#333333';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
 
-    const controlAnual = JSON.parse(
-        document.getElementById("seul-meta").dataset.control || "[]"
-    );
+            chart.data.datasets.forEach((dataset, datasetIndex) => {
+                const meta = chart.getDatasetMeta(datasetIndex);
+                if (meta.hidden) return;
+
+                meta.data.forEach((element, index) => {
+                    const valor = dataset.data[index];
+                    if (valor !== null && valor !== undefined && valor !== 0) {
+                        ctx.fillText(Number(valor).toLocaleString('en-US'), element.x, element.y - 5);
+                    }
+                });
+            });
+            ctx.restore();
+        }
+    };
+
+    // Registrar el plugin globalmente en Chart.js
+    if (typeof Chart !== 'undefined') {
+        Chart.register(pluginValoresLinea);
+    }
+
+    // ==========================================
+    // 1. ESTADO GLOBAL Y CONFIGURACIÓN INICIAL
+    // ==========================================
+    let controlAnual = [];
+    const metaElement = document.getElementById("seul-meta");
+    if (metaElement && metaElement.dataset.control) {
+        try {
+            controlAnual = JSON.parse(metaElement.dataset.control);
+        } catch (e) {
+            console.error("Error al parsear seul-meta data-control:", e);
+        }
+    }
+
+    let datosGlobales = [];
+    let datosMensualesGlobales = [];
+    let datosEgresosPermanentes = [];
+    let anioActual = null;
+    let paginaActual = 1;
+    const filasPorPagina = 10;
+    let mostrarValoresLineaEgresos = false;
+
+    // Instancias de Gráficas (Chart.js)
+    let chartEgresos = null;
+    let chartServicios = null;
+    let chartMensualTotal = null;
 
 
+    // ==========================================
+    // 2. FUNCIONES AUXILIARES Y FORMATO
+    // ==========================================
     function formatearFechaES(fechaStr) {
         if (!fechaStr) return "";
-
-        const fecha = new Date(fechaStr); // acepta GMT, ISO, etc.
-
+        const fecha = new Date(fechaStr);
         if (isNaN(fecha)) return "";
 
         const meses = [
@@ -144,17 +202,16 @@
         return `${fecha.getUTCDate()} de ${meses[fecha.getUTCMonth()]} de ${fecha.getUTCFullYear()}`;
     }
 
-
-
     function actualizarEncabezadoSEUL(anio) {
         const meta = document.getElementById("seul-meta");
+        if (!meta) return;
+
         if (!anio) {
             meta.textContent = "";
             return;
         }
 
         const anioNum = Number(anio);
-
         const registro = controlAnual.find(r => Number(r.anio) === anioNum);
 
         if (!registro) {
@@ -162,39 +219,30 @@
             return;
         }
 
-        meta.textContent =
-            ` | ${registro.estatus_inicio} al ${formatearFechaES(registro.fecha_actualizacion)} · ${registro.estatus}`;
+        meta.textContent = ` | ${registro.estatus_inicio} al ${formatearFechaES(registro.fecha_actualizacion)} · ${registro.estatus}`;
     }
 
-
-</script>
-
-
-<script>
-
-    let datosGlobales = [];
-    let anioActual = null;
-    let paginaActual = 1;
-    const filasPorPagina = 10;
-    let datosMensualesGlobales = [];
-    let datosEgresosPermanentes = [];
+    function obtenerCheckbox(clase) {
+        return Array.from(document.querySelectorAll(`.${clase}:checked`))
+            .map(x => x.value)
+            .join(",");
+    }
 
     function calcularTotalesDinamicos() {
-        // Si la variable está vacía, intentamos usar datosGlobales como respaldo
         const fuenteDatos = (datosEgresosPermanentes && datosEgresosPermanentes.length > 0)
             ? datosEgresosPermanentes
             : datosGlobales;
 
         if (!fuenteDatos || fuenteDatos.length === 0) return;
 
-       
-
         let sumaEgresosTotal = 0;
         let sumaDefuncionesTotal = 0;
         let sumaEgresos48h = 0;
         let sumaDefunciones48h = 0;
 
-        const unidadesSeleccionadas = window.getUnidadesSeleccionadas ? window.getUnidadesSeleccionadas() : [];
+        const unidadesSeleccionadas = (typeof window.getUnidadesSeleccionadas === "function")
+            ? window.getUnidadesSeleccionadas()
+            : [];
 
         const filtrados = fuenteDatos.filter(d => {
             const coincideAnio = Number(d.anio) === Number(anioActual);
@@ -204,7 +252,6 @@
         });
 
         filtrados.forEach(row => {
-            // Probamos todas las combinaciones posibles de nombres que tu SQL podría estar enviando
             sumaEgresosTotal += parseFloat(row.KPI_Egresos_Totales || row.total_egresos || row.Total || 0);
             sumaDefuncionesTotal += parseFloat(row.KPI_Defunciones_Totales || row.defunciones || row.Defunciones || 0);
             sumaEgresos48h += parseFloat(row.KPI_Egresos_48h || row.egresos_48h || 0);
@@ -214,7 +261,6 @@
         const tasaCruda = sumaEgresosTotal > 0 ? (sumaDefuncionesTotal / sumaEgresosTotal) * 1000 : 0;
         const tasaAjustada = sumaEgresos48h > 0 ? (sumaDefunciones48h / sumaEgresos48h) * 1000 : 0;
 
-        // Forzamos la actualización de los elementos
         const elCruda = document.getElementById("mortalidadCruda");
         const elAjustada = document.getElementById("MortalidadAjustada");
 
@@ -223,102 +269,9 @@
     }
 
 
-
-    // =========================
-    //  Obtener valores checkbox
-    // =========================
-    function obtenerCheckbox(clase) {
-        return Array.from(document.querySelectorAll(`.${clase}:checked`))
-            .map(x => x.value)
-            .join(",");
-    }
-
-    document.getElementById("filtroServicio")
-        ?.addEventListener("change", function () {
-            if (datosMensualesGlobales.length > 0) {
-                graficaTotalPorMes(datosMensualesGlobales);
-            }
-        });
-
-
-    // =========================
-    //  Botón Aplicar filtros
-    // =========================
-    document.getElementById("btnFiltrar").addEventListener("click", function () {
-
-
-        const anios = obtenerCheckbox("filtro-anio");
-        const meses = obtenerCheckbox("filtro-mes");
-        const indicador = document.getElementById("filtroIndicadorEgresos").value;
-        const unidades = window.getUnidadesSeleccionadas();
-
-        cargarServicios(indicador);
-
-        // ==========================
-        // 1️⃣ FETCH PRINCIPAL (tabla + gráficas actuales)
-        // ==========================
-        let params = new URLSearchParams();
-
-        if (anios) params.append("anios", anios);
-        if (meses) params.append("meses", meses);
-        if (unidades.length) params.append("unidades", unidades.join(","));
-
-        params.append("indicador", indicador);
-        params.append("modo", "tabla");  // modo tabla
-
-        fetch(`/egresos/api/indicadores?${params.toString()}&modo=grafica`)
-            .then(res => res.json())
-            .then(data => {
-                // --- AQUÍ VA EL CAMBIO ---
-                datosGlobales = data;
-
-                // Guardamos la copia solo si el usuario seleccionó "egresos"
-                if (indicador === "egresos") {
-                    datosEgresosPermanentes = [...data];
-                }
-
-                crearTabsAnios(data);
-
-                // Validación de seguridad por si data viene vacío
-                if (data.length > 0) {
-                    anioActual = data[3].anio;
-                }
-
-                actualizarTabla(data);
-                actualizarGraficas(data);
-                renderTabla();
-
-                // Llamamos a la función de las tarjetas
-                calcularTotalesDinamicos();
-                // -------------------------
-            })
-            .catch(err => console.error(err));
-
-        // ==========================
-        // 2️⃣ FETCH SOLO GRÁFICA MENSUAL
-        // ==========================
-        let paramsMensual = new URLSearchParams();
-
-        if (anios) paramsMensual.append("anios", anios);
-        if (meses) paramsMensual.append("meses", meses);
-        if (unidades.length) paramsMensual.append("unidades", unidades.join(","));
-
-        paramsMensual.append("indicador", indicador); // mismo indicador
-        paramsMensual.append("modo", "grafica");      // modo gráfico mensual
-
-        fetch(`/egresos/api/indicadores?${paramsMensual.toString()}`)
-            .then(res => res.json())
-            .then(dataMensual => {
-                datosMensualesGlobales = dataMensual;
-                graficaTotalPorMes(dataMensual);
-            })
-            .catch(err => console.error(err));
-    });
-
-
-    // ============================
-    //   TABLA (ADAPTADA)
-    // ============================
+    // ==========================================
+    // 3. CONTROLADORES DE TABLA Y PAGINACIÓN
+    // ==========================================
     function actualizarTabla(data) {
         const anioSeleccionado = obtenerCheckbox("filtro-anio");
         if (anioSeleccionado) {
@@ -328,9 +281,11 @@
 
         const tbody = document.querySelector("#tablaEgresos tbody");
         const thead = document.querySelector("#tablaEgresos thead tr");
+        if (!tbody || !thead) return;
+
         tbody.innerHTML = "";
 
-        const indicador = document.getElementById("filtroIndicadorEgresos").value;
+        const indicador = document.getElementById("filtroIndicadorEgresos")?.value;
         let columnas = ["Año", "CLUES", "Unidad"];
 
         if (indicador === "egresos") {
@@ -353,35 +308,28 @@
         let htmlFinal = "";
 
         data.forEach(row => {
-
-
             let tds = `
-            <td>${row.anio || ''}</td>
-            <td>${row.CLUES || ''}</td>
-            <td>${row.Hospital || ''}</td>
-        `;
+                <td>${row.anio || ''}</td>
+                <td>${row.CLUES || ''}</td>
+                <td>${row.Hospital || ''}</td>
+            `;
 
             columnas.slice(3).forEach(col => {
                 let valorFinal = 0;
 
-                // --- LÓGICA DE CÁLCULO MANUAL BASADA EN TUS COLUMNAS DE BACKEND ---
                 if (col === "Tasa Mortalidad Bruta") {
                     const egresos = parseFloat(row.KPI_Egresos_Totales || 0);
                     const defunciones = parseFloat(row.KPI_Defunciones_Totales || 0);
                     valorFinal = egresos > 0 ? ((defunciones / egresos) * 1000).toFixed(1) : "0.0";
-                }
-                else if (col === "Tasa Mortalidad Ajustada") {
+                } else if (col === "Tasa Mortalidad Ajustada") {
                     const egresos48 = parseFloat(row.KPI_Egresos_48h || 0);
                     const defunciones48 = parseFloat(row.KPI_Defunciones_48h || 0);
                     valorFinal = egresos48 > 0 ? ((defunciones48 / egresos48) * 1000).toFixed(1) : "0.0";
-                }
-                else if (col === "Porcentaje Cesárea") {
+                } else if (col === "Porcentaje Cesárea") {
                     const totalNac = parseFloat(row.Total || 0);
                     const cesareas = parseFloat(row.Cesárea || 0);
                     valorFinal = totalNac > 0 ? ((cesareas / totalNac) * 100).toFixed(1) + "%" : "0.0%";
-                }
-                else {
-                    // Para las columnas normales (Med Interna, Cirugía, etc.)
+                } else {
                     const key = col.replace(/ /g, "_");
                     const valorNum = parseFloat(row[key] || 0);
                     valorFinal = Math.floor(valorNum).toLocaleString('en-US');
@@ -396,80 +344,62 @@
         tbody.innerHTML = htmlFinal;
     }
 
+    function renderTabla() {
+        if (!datosGlobales || datosGlobales.length === 0) return;
 
-function renderTabla() {
-    // 1. Asegurarnos de tener datos
-    if (!datosGlobales || datosGlobales.length === 0) return;
+        if (!anioActual) {
+            const todosLosAnios = datosGlobales.map(d => Number(d.anio));
+            anioActual = Math.max(...todosLosAnios);
+        }
 
-    // 2. Si anioActual no tiene valor, buscamos el MÁXIMO estrictamente
-    if (!anioActual) {
-        const todosLosAnios = datosGlobales.map(d => Number(d.anio));
-        anioActual = Math.max(...todosLosAnios);
-    }
+        const filtrados = datosGlobales.filter(
+            d => Number(d.anio) === Number(anioActual)
+        );
 
-    // 3. Filtramos los datos globales por el año actual (ya sea el máximo o el clickeado)
-    let filtrados = datosGlobales.filter(
-        d => Number(d.anio) === Number(anioActual)
-    );
+        const inicio = (paginaActual - 1) * filasPorPagina;
+        const fin = inicio + filasPorPagina;
+        const paginaDatos = filtrados.slice(inicio, fin);
 
-    // 4. Paginación
-    const inicio = (paginaActual - 1) * filasPorPagina;
-    const fin = inicio + filasPorPagina;
-    const paginaDatos = filtrados.slice(inicio, fin);
+        actualizarTabla(paginaDatos);
+        crearPaginacion(filtrados.length);
 
-    // 5. Renderizar
-    actualizarTabla(paginaDatos);
-    crearPaginacion(filtrados.length);
-    
-    // Si tienes esta función para el título, asegúrate de pasarle el anioActual
-    if (typeof actualizarEncabezadoSEUL === "function") {
         actualizarEncabezadoSEUL(anioActual);
     }
-}
-
-
-
-    // ============================
-    //   TABLA PARA LOS AÑOS
-    // ============================
 
     function crearTabsAnios(data) {
         const tabs = document.getElementById("tabsAniosEgre");
+        if (!tabs) return;
+
         tabs.innerHTML = "";
 
-        // 1. Ordenamos de mayor a menor
-        const anios = [...new Set(data.map(d => d.anio))].sort((a, b) => b - a);
+        const anios = [...new Set(data.map(d => Number(d.anio)))].sort((a, b) => b - a);
 
         anios.forEach((anio, index) => {
-            // 2. Si es el primer elemento (el más alto), actualizamos la variable global
             if (index === 0) {
                 anioActual = anio;
                 paginaActual = 1;
             }
 
             tabs.innerHTML += `
-            <li class="nav-item">
-                <button class="nav-link ${index === 0 ? "active" : ""}" 
-                    data-anio="${anio}">
-                    ${anio}
-                </button>
-            </li>
-        `;
+                <li class="nav-item">
+                    <button class="nav-link ${index === 0 ? "active" : ""}" 
+                        data-anio="${anio}">
+                        ${anio}
+                    </button>
+                </li>
+            `;
         });
 
-        // 3. Importante: Llamar a renderizar después de crear las tabs 
-        // para que la tabla use el anioActual que acabamos de setear
         renderTabla();
         actualizarGraficas(data);
         calcularTotalesDinamicos();
 
-        // Eventos click (se mantienen igual)
         tabs.querySelectorAll(".nav-link").forEach(btn => {
             btn.addEventListener("click", () => {
                 tabs.querySelectorAll(".nav-link").forEach(b => b.classList.remove("active"));
                 btn.classList.add("active");
 
-                anioActual = btn.dataset.anio;
+                anioActual = Number(btn.dataset.anio);
                 paginaActual = 1;
 
                 renderTabla();
@@ -479,18 +409,19 @@ function renderTabla() {
         });
     }
 
-
     function crearPaginacion(totalFilas) {
         const totalPaginas = Math.ceil(totalFilas / filasPorPagina);
         const pag = document.getElementById("TablaPagination");
+        if (!pag) return;
+
         pag.innerHTML = "";
 
         for (let i = 1; i <= totalPaginas; i++) {
             pag.innerHTML += `
-            <li class="page-item ${i === paginaActual ? "active" : ""}">
-                <button class="page-link">${i}</button>
-            </li>
-        `;
+                <li class="page-item ${i === paginaActual ? "active" : ""}">
+                    <button class="page-link">${i}</button>
+                </li>
+            `;
         }
 
         pag.querySelectorAll(".page-link").forEach((btn, index) => {
@@ -502,168 +433,17 @@ function renderTabla() {
     }
 
 
-
-
-
-    // ============================
-    //   GRAFICAS (igual que antes)
-    // ============================
-    let chartEgresos = null;
-    let chartServicios = null;
-
-
-
-    function actualizarGraficas(data) {
-
-        if (!data || data.length === 0) return;
-
-        const indicador = document.getElementById("filtroIndicadorEgresos").value;
-
-        const coloresBase1 = [
-            "#4E2F82", "#822F45", "#2c2c2c"
-
-        ];
-
-        const coloresBase = [
-            "#3B82F6", "#10B981", "#F59E0B",
-            "#EF4444", "#8B5CF6", "#EC4899"
-        ];
-
-        // ============================
-        // 🔹 GRAFICA 1: TOTAL POR AÑO
-        // ============================
-        const resumenPorAnio = {};
-
-        data.forEach(r => {
-            if (!resumenPorAnio[r.anio]) resumenPorAnio[r.anio] = 0;
-
-            if (indicador === "egresos") {
-                resumenPorAnio[r.anio] += Number(r.Total || r.Total_Egresos || 0);
-            }
-            else if (indicador === "defunciones") {
-                resumenPorAnio[r.anio] += Number(r.Total || 0);
-            }
-            else {
-                resumenPorAnio[r.anio] += Number(r.Total || 0);
-            }
-        });
-
-        const labelsAnios = Object.keys(resumenPorAnio);
-        const dataTotales = labelsAnios.map(a => resumenPorAnio[a]);
-
-        if (chartEgresos) chartEgresos.destroy();
-
-        chartEgresos = new Chart(
-            document.getElementById("graficaEgresosPorAnio"),
-            {
-                type: "bar",
-                data: {
-                    labels: labelsAnios,
-                    datasets: [{
-                        label: "Total",
-                        data: dataTotales,
-                        backgroundColor: labelsAnios.map(
-                            (_, i) => coloresBase1[i % coloresBase1.length]
-                        ),
-                        borderRadius: 6
-                    }]
-
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } }
-                }
-            }
-        );
-
-        // ===================================
-        // 🔹 GRAFICA 2: POR SERVICIO (ACTUALIZADA)
-        // ===================================
-
-        // 1. FILTRAR los datos por el año seleccionado en los tabs antes de calcular nada
-        const datosFiltrados = data.filter(r => r.anio == anioActual);
-
-        let categorias = [];
-        let etiquetas = [];
-
-        if (indicador === "nacimientos") {
-            categorias = ["Eutócico", "Distócico", "Cesárea"];
-            etiquetas = ["Eutócico", "Distócico", "Cesárea"];
-        } else {
-            categorias = ["Med_Interna", "Cirugía", "Pediatría", "Ginecobstetricia", "Otros"];
-            etiquetas = ["Med Interna", "Cirugía", "Pediatría", "Ginecobstetricia", "Otros"];
-        }
-
-        const resumenServicios = {};
-        categorias.forEach(c => resumenServicios[c] = 0);
-
-        // 2. USAR 'datosFiltrados' para que la suma solo corresponda al año activo
-        datosFiltrados.forEach(r => {
-            categorias.forEach(c => {
-                resumenServicios[c] += Number(r[c] || 0);
-            });
-        });
-
-        if (chartServicios) chartServicios.destroy();
-
-        const txtServicio = document.getElementById("tituloServicio");
-        if (txtServicio) {
-            txtServicio.innerHTML = `Total por Servicio <strong>${anioActual}</strong>`;
-        }
-
-        chartServicios = new Chart(
-            document.getElementById("graficaEgresosPorServicio"),
-            {
-                type: "bar",
-                data: {
-                    labels: etiquetas,
-                    datasets: [{
-                        // Agregamos el año al label para confirmar visualmente el cambio
-                        label: `Total por servicio (${anioActual})`,
-                        data: categorias.map(c => resumenServicios[c]),
-                        backgroundColor: categorias.map(
-                            (_, i) => coloresBase[i % coloresBase.length]
-                        ),
-                        borderRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        // Añadimos un título dinámico para mayor claridad profesional
-                        title: {
-                            display: true,
-                            font: { size: 14 }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: { precision: 0 } // Evita decimales si son conteos enteros
-                        }
-                    }
-                }
-            }
-        );
-
-    }
-
-    // ===================================
-    // 🔹 GRAFICA 3:  DED LÑINEAS POR MES Y TIPO DE SERVICIO
-    // ===================================
-
+    // ==========================================
+    // 4. GENERACIÓN DE GRÁFICAS Y FILTROS
+    // ==========================================
     function cargarServicios(indicador) {
-
         const select = document.getElementById("filtroServicio");
-        select.innerHTML = "";
+        if (!select) return;
 
+        select.innerHTML = "";
         let opciones = [];
 
-        if (indicador === "egresos" || indicador === "defunciones" || indicador === "defunciones48" || indicador === "proc_dentro" || indicador === "proc_fuera") {
+        if (["egresos", "defunciones", "defunciones48", "proc_dentro", "proc_fuera"].includes(indicador)) {
             opciones = [
                 { value: "Total", label: "Total" },
                 { value: "Med_Interna", label: "Med Interna" },
@@ -672,9 +452,7 @@ function renderTabla() {
                 { value: "Ginecobstetricia", label: "Ginecobstetricia" },
                 { value: "Otros", label: "Otros" }
             ];
-        }
-
-        if (indicador === "nacimientos") {
+        } else if (indicador === "nacimientos") {
             opciones = [
                 { value: "Total", label: "Total" },
                 { value: "Eutócico", label: "Eutócico" },
@@ -691,17 +469,111 @@ function renderTabla() {
         });
     }
 
+    function actualizarGraficas(data) {
+        if (!data || data.length === 0) return;
 
+        const indicador = document.getElementById("filtroIndicadorEgresos")?.value;
+        const coloresBase1 = ["#4E2F82", "#822F45", "#2c2c2c"];
+        const coloresBase = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
 
+        // Gráfica 1: Total por año
+        const resumenPorAnio = {};
+        data.forEach(r => {
+            if (!resumenPorAnio[r.anio]) resumenPorAnio[r.anio] = 0;
+            resumenPorAnio[r.anio] += Number(r.Total || r.Total_Egresos || 0);
+        });
 
+        const labelsAnios = Object.keys(resumenPorAnio);
+        const dataTotales = labelsAnios.map(a => resumenPorAnio[a]);
 
-    let chartMensualTotal = null;
+        if (chartEgresos) chartEgresos.destroy();
+
+        const canvasEgresos = document.getElementById("graficaEgresosPorAnio");
+        if (canvasEgresos) {
+            chartEgresos = new Chart(canvasEgresos, {
+                type: "bar",
+                data: {
+                    labels: labelsAnios,
+                    datasets: [{
+                        label: "Total",
+                        data: dataTotales,
+                        backgroundColor: labelsAnios.map((_, i) => coloresBase1[i % coloresBase1.length]),
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        // Gráfica 2: Total por servicio (Año activo)
+        const datosFiltrados = data.filter(r => Number(r.anio) === Number(anioActual));
+        let categorias = [];
+        let etiquetas = [];
+
+        if (indicador === "nacimientos") {
+            categorias = ["Eutócico", "Distócico", "Cesárea"];
+            etiquetas = ["Eutócico", "Distócico", "Cesárea"];
+        } else {
+            categorias = ["Med_Interna", "Cirugía", "Pediatría", "Ginecobstetricia", "Otros"];
+            etiquetas = ["Med Interna", "Cirugía", "Pediatría", "Ginecobstetricia", "Otros"];
+        }
+
+        const resumenServicios = {};
+        categorias.forEach(c => resumenServicios[c] = 0);
+
+        datosFiltrados.forEach(r => {
+            categorias.forEach(c => {
+                resumenServicios[c] += Number(r[c] || 0);
+            });
+        });
+
+        if (chartServicios) chartServicios.destroy();
+
+        const txtServicio = document.getElementById("tituloServicio");
+        if (txtServicio) {
+            txtServicio.innerHTML = `Total por Servicio <strong>${anioActual}</strong>`;
+        }
+
+        const canvasServicios = document.getElementById("graficaEgresosPorServicio");
+        if (canvasServicios) {
+            chartServicios = new Chart(canvasServicios, {
+                type: "bar",
+                data: {
+                    labels: etiquetas,
+                    datasets: [{
+                        label: `Total por servicio (${anioActual})`,
+                        data: categorias.map(c => resumenServicios[c]),
+                        backgroundColor: categorias.map((_, i) => coloresBase[i % coloresBase.length]),
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: true, font: { size: 14 } }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { precision: 0 } }
+                    }
+                }
+            });
+        }
+    }
 
     function graficaTotalPorMes(data) {
-        const unidadesSeleccionadas = window.getUnidadesSeleccionadas?.() || [];
+        const unidadesSeleccionadas = (typeof window.getUnidadesSeleccionadas === "function")
+            ? window.getUnidadesSeleccionadas()
+            : [];
 
         if (!data || data.length === 0) {
-            if (window.chartMensualTotal) window.chartMensualTotal.destroy();
+            if (chartMensualTotal) chartMensualTotal.destroy();
             return;
         }
 
@@ -713,7 +585,6 @@ function renderTabla() {
 
         const meses = Array.from({ length: 12 }, (_, i) => i + 1);
         const labels = meses.map(m => mesesNombres[m]);
-
         const servicioSeleccionado = document.getElementById("filtroServicio")?.value;
         const resumenGrafica = {};
 
@@ -754,30 +625,24 @@ function renderTabla() {
         const ctx = document.getElementById("graficaMensualTotal");
         if (!ctx) return;
 
-        if (window.chartMensualTotal) window.chartMensualTotal.destroy();
+        if (chartMensualTotal) chartMensualTotal.destroy();
 
-        window.chartMensualTotal = new Chart(ctx, {
+        chartMensualTotal = new Chart(ctx, {
             type: "line",
             data: { labels, datasets },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                // Quitamos cualquier padding extra
-                layout: { padding: { top: 10, bottom: 20 } },
+                layout: { padding: { top: 20, bottom: 20 } },
                 plugins: {
+                    // Activa/desactiva la renderización de números con el estado actual
+                    pluginValoresLinea: { activo: mostrarValoresLineaEgresos },
                     legend: {
                         display: true,
-                        position: "bottom", // Leyenda abajo: solo nombres de unidad y año
-                        labels: {
-                            padding: 20,
-                            usePointStyle: true,
-                            font: { size: 12 }
-                        }
+                        position: "bottom",
+                        labels: { padding: 20, usePointStyle: true, font: { size: 12 } }
                     },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false
-                    }
+                    tooltip: { mode: 'index', intersect: false }
                 },
                 scales: {
                     y: {
@@ -790,25 +655,182 @@ function renderTabla() {
     }
 
 
-    document.addEventListener("DOMContentLoaded", function () {
+    // ==========================================
+    // 5. EVENTOS Y DISPARADOR PRINCIPAL
+    // ==========================================
+    function ejecutarFiltro() {
+        const anios = obtenerCheckbox("filtro-anio");
+        const meses = obtenerCheckbox("filtro-mes");
+        const indicador = document.getElementById("filtroIndicadorEgresos")?.value || "egresos";
+        const unidades = (typeof window.getUnidadesSeleccionadas === "function")
+            ? window.getUnidadesSeleccionadas()
+            : [];
 
-        // 🔥 Asegurar indicador por default
-        const indicadorSelect = document.getElementById("filtroIndicadorEgresos");
+        cargarServicios(indicador);
 
-        indicadorSelect.value = "egresos";
+        // Fetch Principal
+        let params = new URLSearchParams();
+        if (anios) params.append("anios", anios);
+        if (meses) params.append("meses", meses);
+        if (unidades.length) params.append("unidades", unidades.join(","));
+        params.append("indicador", indicador);
+        params.append("modo", "tabla");
 
-        // 🔥 Ejecutar consulta inicial
+        fetch(`/egresos/api/indicadores?${params.toString()}&modo=grafica`)
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                return res.json();
+            })
+            .then(data => {
+                datosGlobales = data;
 
-        document.getElementById("btnFiltrar").click();
+                if (indicador === "egresos") {
+                    datosEgresosPermanentes = [...data];
+                }
 
-    });
+                if (data.length > 0) {
+                    const todosLosAnios = data.map(d => Number(d.anio));
+                    anioActual = Math.max(...todosLosAnios);
+                }
 
-    document.getElementById("filtroIndicadorEgresos")
-        ?.addEventListener("change", function () {
-            cargarServicios(this.value);
+                crearTabsAnios(data);
+                actualizarTabla(data);
+                actualizarGraficas(data);
+                renderTabla();
+                calcularTotalesDinamicos();
+            })
+            .catch(err => console.error("Error al obtener indicadores principal:", err));
+
+        // Fetch Gráfica Mensual
+        let paramsMensual = new URLSearchParams();
+        if (anios) paramsMensual.append("anios", anios);
+        if (meses) paramsMensual.append("meses", meses);
+        if (unidades.length) paramsMensual.append("unidades", unidades.join(","));
+        paramsMensual.append("indicador", indicador);
+        paramsMensual.append("modo", "grafica");
+
+        fetch(`/egresos/api/indicadores?${paramsMensual.toString()}`)
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                return res.json();
+            })
+            .then(dataMensual => {
+                datosMensualesGlobales = dataMensual;
+                graficaTotalPorMes(dataMensual);
+            })
+            .catch(err => console.error("Error al obtener indicadores mensuales:", err));
+    }
+
+    // ==========================================
+    // LÓGICA DE LIMPIEZA / RESET
+    // ==========================================
+    function resetearVistaEgresos() {
+        // 1. Desmarcar checkboxes de Filtros locales
+        document.querySelectorAll(".filtro-anio, .filtro-mes").forEach(chk => {
+            chk.checked = false;
         });
 
+        // 2. Resetear el Selector de Indicadores a su opción inicial
+        const selectorIndicador = document.getElementById("filtroIndicadorEgresos");
+        if (selectorIndicador) {
+            selectorIndicador.value = "egresos";
+            cargarServicios("egresos");
+        }
 
+        // 3. Resetear el botón de Mostrar/Ocultar Valores de la línea
+        mostrarValoresLineaEgresos = false;
+        const btnMostrar = document.getElementById("btnToggleTablaLineaEgresos");
+        if (btnMostrar) {
+            btnMostrar.innerHTML = "Mostrar valores";
+            btnMostrar.classList.remove("btn-primary");
+            btnMostrar.classList.add("btn-outline-primary");
+        }
+
+        // 4. Recargar la información con todos los filtros limpios
+        ejecutarFiltro();
+    }
+
+    /* =====================================================
+        LISTENERS DE EVENTOS GLOBALES (MENÚ LATERAL / UNIDADES)
+    ===================================================== */
+    // 1. Al presionar "Aplicar" en el cuadro de unidades
+    document.addEventListener("aplicarFiltroUnidades", function () {
+        ejecutarFiltro();
+    });
+
+    // 2. Al cambiar la selección en los checkboxes de unidades
+    document.addEventListener("unidadesSeleccionadasCambiadas", function () {
+        ejecutarFiltro();
+    });
+
+    // 3. Al hacer clic en "Limpiar" desde la barra lateral / global
+    document.addEventListener("limpiarFiltrosGlobales", function () {
+        resetearVistaEgresos();
+    });
+
+    // 4. Reset local legacy / navbar externo
+    document.addEventListener("solicitarResetFiltros", resetearVistaEgresos);
+
+    // Delegación global de clics
+    document.addEventListener("click", function (e) {
+        // Clic en Filtrar
+        if (e.target && e.target.id === "btnFiltrar") {
+            e.preventDefault();
+            ejecutarFiltro();
+        }
+
+        // Clic en Limpiar / Reset
+        const btnLimpiar = e.target.closest("#btnLimpiar");
+        if (btnLimpiar) {
+            e.preventDefault();
+            resetearVistaEgresos();
+        }
+
+        // Clic en Mostrar/Ocultar datos de la gráfica de líneas
+        const btnMostrar = e.target.closest("#btnToggleTablaLineaEgresos");
+        if (btnMostrar) {
+            e.preventDefault();
+            mostrarValoresLineaEgresos = !mostrarValoresLineaEgresos;
+
+            // Cambiar vista del botón
+            btnMostrar.innerHTML = mostrarValoresLineaEgresos ? "Ocultar valores" : "Mostrar valores";
+            btnMostrar.classList.toggle("btn-primary", mostrarValoresLineaEgresos);
+            btnMostrar.classList.toggle("btn-outline-primary", !mostrarValoresLineaEgresos);
+
+            // Re-renderizar los números en la gráfica
+            if (chartMensualTotal) {
+                chartMensualTotal.options.plugins.pluginValoresLinea = { activo: mostrarValoresLineaEgresos };
+                chartMensualTotal.update();
+            }
+        }
+    });
+
+    // Delegación global de cambios en selects
+    document.addEventListener("change", function (e) {
+        if (e.target && e.target.id === "filtroServicio") {
+            if (datosMensualesGlobales.length > 0) {
+                graficaTotalPorMes(datosMensualesGlobales);
+            }
+        }
+        if (e.target && e.target.id === "filtroIndicadorEgresos") {
+            cargarServicios(e.target.value);
+        }
+    });
+
+    // Inicialización al cargar la página
+    function inicializarVista() {
+        const indicadorSelect = document.getElementById("filtroIndicadorEgresos");
+        if (indicadorSelect) {
+            indicadorSelect.value = "egresos";
+        }
+        ejecutarFiltro();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", inicializarVista);
+    } else {
+        inicializarVista();
+    }
 </script>
 
 {% endblock %}

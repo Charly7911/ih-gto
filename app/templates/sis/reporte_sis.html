@@ -69,12 +69,19 @@
                 <hr>
                 <div class="card mb-4">
                     <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                             <h5 class="mb-0">📈 Total SIS mensual</h5>
 
-                            <!-- SOLO PARA CONSULTAS -->
-                            <select id="filtroSisDetalle" class="form-select form-select-sm w-auto mb-2">
-                            </select>
+                            <div class="d-flex gap-2 align-items-center">
+                                <select id="filtroSisDetalle" class="form-select form-select-sm w-auto">
+                                </select>
+
+                                <!-- BOTÓN DE MOSTRAR / OCULTAR VALORES -->
+                                <button type="button" class="btn btn-outline-primary btn-sm"
+                                    id="btnToggleValoresMensual">
+                                    Mostrar valores
+                                </button>
+                            </div>
                         </div>
 
                         <div style="height:350px">
@@ -89,27 +96,53 @@
     </div>
 </div>
 
+<!-- Registrar plugin de DataLabels antes de inicializar scripts -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
 
 <script>
+    // Registrar el plugin DataLabels de Chart.js
+    if (typeof ChartDataLabels !== 'undefined') {
+        Chart.register(ChartDataLabels);
+    }
 
+    /* ==========================================================================
+       1. ESTADO GLOBAL Y CONFIGURACIÓN
+       ========================================================================== */
     const controlAnual = JSON.parse(
-        document.getElementById("sis-meta").dataset.control || "[]"
+        document.getElementById("sis-meta")?.dataset.control || "[]"
     );
+    const sisResultados = JSON.parse('{{ resultados | tojson | safe }}');
+    const FILAS_POR_PAGINA = 10;
 
+    let datosActuales = [];
+    let datosFiltradosSis = [...sisResultados];
+    let paginaActual = 1;
+    let anioActivo = null;
+
+    // Estado para conmutar etiquetas de datos
+    let mostrarValoresMensual = false;
+
+    // Instancias de Chart.js
+    let graficaAnio = null;
+    let graficaUnidad = null;
+    let graficaSisMensual = null;
+
+    /* ==========================================================================
+       2. FUNCIONES DE UTILIDAD Y FORMATO
+       ========================================================================== */
+    function fmt(n) {
+        return Number(n || 0).toLocaleString("es-MX");
+    }
 
     function formatearFechaES(fechaStr) {
         if (!fechaStr) return "";
-
         let fecha;
-
-
         if (fechaStr.includes("-")) {
             const [y, m, d] = fechaStr.split("-");
             fecha = new Date(Date.UTC(y, m - 1, d));
-        }
-
-        else {
+        } else {
             fecha = new Date(fechaStr);
         }
 
@@ -121,48 +154,37 @@
         return `${fecha.getUTCDate()} de ${meses[fecha.getUTCMonth()]} de ${fecha.getUTCFullYear()}`;
     }
 
-
     function actualizarEncabezadoSIS(anio) {
         const meta = document.getElementById("sis-meta");
+        if (!meta) return;
 
         const registro = controlAnual.find(r => r.anio === anio);
-
         if (!registro) {
             meta.textContent = "";
             return;
         }
 
-        meta.textContent =
-            ` | ${registro.estatus_inicio} al ${formatearFechaES(registro.fecha_actualizacion)} · ${registro.estatus}`;
+        meta.textContent = ` | ${registro.estatus_inicio} al ${formatearFechaES(registro.fecha_actualizacion)} · ${registro.estatus}`;
     }
 
-</script>
+    /* Función para recalcular el Total General visible en el encabezado de Gabinete */
+    function actualizarTituloGabineteTotal(chart) {
+        const elTitulo = document.getElementById("tituloGraficaSis");
+        if (!elTitulo) return;
 
+        let totalGabinete = 0;
+        chart.data.datasets.forEach((dataset, index) => {
+            if (chart.isDatasetVisible(index)) {
+                totalGabinete += dataset.data.reduce((acc, curr) => acc + (Number(curr) || 0), 0);
+            }
+        });
 
-
-<script>
-    /* ===============================
-       DATA INICIAL
-    ================================*/
-    const sisResultados = JSON.parse('{{ resultados | tojson | safe }}');
-    const FILAS_POR_PAGINA = 10;
-
-    let datosActuales = [];
-    let paginaActual = 1;
-    let anioActivo = null;
-
-    let graficaAnio = null;
-    let graficaUnidad = null;
-    let graficaSisMensual = null;
-    let datosFiltradosSis = [...sisResultados];
-
-    function fmt(n) {
-        return Number(n || 0).toLocaleString("es-MX");
+        elTitulo.innerHTML = `Estudios de Gabinete <strong>${anioActivo || ''}</strong> — Total: <strong>${fmt(totalGabinete)}</strong>`;
     }
 
-    /* ===============================
-        AGRUPAR POR AÑO + UNIDAD
-     ================================*/
+    /* ==========================================================================
+       3. PROCESAMIENTO Y FILTRADO DE DATOS
+       ========================================================================== */
     function agruparPorAnioUnidad(data) {
         const mapa = {};
 
@@ -174,37 +196,12 @@
                     anio: r.anio,
                     clues: r.clues,
                     nombre_unidad: r.nombre_unidad,
-
-                    // CONSULTAS
-                    consultas: 0,
-                    especialidad: 0,
-                    mental: 0,
-                    bucal: 0,
-                    medicas: 0,
-                    no_medicas: 0,
-
-                    // ESTUDIOS
-                    laboratorio: 0,
-                    rayosx: 0,
-                    anatomia: 0,
-                    electro: 0,
-                    encefa: 0,
-                    ultrasonido: 0,
-                    tac: 0,
-                    rnm: 0,
-
-                    // DÍAS PACIENTE
-                    diasPaciente: 0,
-                    med_interna: 0,
-                    cirugia: 0,
-                    gineco: 0,
-                    pediatria: 0,
-                    otros: 0,
-                    psiquiatria: 0
+                    consultas: 0, especialidad: 0, mental: 0, bucal: 0, medicas: 0, no_medicas: 0,
+                    laboratorio: 0, rayosx: 0, anatomia: 0, electro: 0, encefa: 0, ultrasonido: 0, tac: 0, rnm: 0,
+                    diasPaciente: 0, med_interna: 0, cirugia: 0, gineco: 0, pediatria: 0, otros: 0, psiquiatria: 0
                 };
             }
 
-            // CONSULTAS
             mapa[key].consultas += Number(r.consultas) || 0;
             mapa[key].especialidad += Number(r.especialidad) || 0;
             mapa[key].mental += Number(r.mental) || 0;
@@ -212,7 +209,6 @@
             mapa[key].medicas += Number(r.medicas) || 0;
             mapa[key].no_medicas += Number(r.no_medicas) || 0;
 
-            // ESTUDIOS
             mapa[key].laboratorio += Number(r.laboratorio) || 0;
             mapa[key].rayosx += Number(r.rayosx) || 0;
             mapa[key].anatomia += Number(r.anatomia) || 0;
@@ -222,7 +218,6 @@
             mapa[key].tac += Number(r.tac) || 0;
             mapa[key].rnm += Number(r.rnm) || 0;
 
-            // DÍAS PACIENTE
             mapa[key].diasPaciente += Number(r.diasPaciente) || 0;
             mapa[key].med_interna += Number(r.med_interna) || 0;
             mapa[key].cirugia += Number(r.cirugia) || 0;
@@ -235,58 +230,75 @@
         return Object.values(mapa);
     }
 
+    /**
+     * Función centralizada para ejecutar el filtro general en este subsistema
+     */
+    function ejecutarFiltradoSis() {
+        const anios = [...document.querySelectorAll(".sis-filtro-anio:checked")].map(cb => Number(cb.value));
+        const meses = [...document.querySelectorAll(".sis-filtro-mes:checked")].map(cb => Number(cb.value));
+        const unidades = window.getUnidadesSeleccionadas?.() || [];
 
-    /* ===============================
-       TABS POR AÑO
-    ================================*/
+        const filtrados = sisResultados.filter(r =>
+            (anios.length === 0 || anios.includes(r.anio)) &&
+            (meses.length === 0 || meses.includes(r.mes)) &&
+            (unidades.length === 0 || unidades.includes(r.nombre_unidad))
+        );
+
+        datosActuales = agruparPorAnioUnidad(filtrados);
+        paginaActual = 1;
+
+        renderTabsAnios(datosActuales);
+        renderTablaSis();
+        renderGraficaPorAnio(datosActuales);
+        renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
+
+        if (anios.length === 0 && meses.length === 0 && unidades.length === 0) {
+            datosFiltradosSis = [...sisResultados];
+            const aniosDisponibles = [...new Set(datosFiltradosSis.map(r => r.anio))].sort();
+            anioActivo = aniosDisponibles[0];
+            const selectDetalle = document.getElementById("filtroSisDetalle");
+            if (selectDetalle) selectDetalle.selectedIndex = 0;
+        } else {
+            datosFiltradosSis = filtrados;
+        }
+
+        graficaSisPorMes(datosFiltradosSis);
+    }
+
+    /* ==========================================================================
+       4. COMPONENTES DE INTERFAZ Y TABLAS
+       ========================================================================== */
     function renderTabsAnios(data) {
         const tabs = document.getElementById("tabsAnios");
+        if (!tabs) return;
         tabs.innerHTML = "";
 
-        // 1. Ordenamos de mayor a menor (b - a)
         const anios = [...new Set(data.map(r => r.anio))].sort((a, b) => b - a);
 
         anios.forEach((anio, i) => {
             const li = document.createElement("li");
             li.className = "nav-item";
+            li.innerHTML = `<button class="nav-link ${i === 0 ? 'active' : ''}">${anio}</button>`;
 
-            // El index 0 ahora siempre será el año más alto
-            li.innerHTML = `
-            <button class="nav-link ${i === 0 ? 'active' : ''}">
-                ${anio}
-            </button>
-        `;
+            li.querySelector("button").addEventListener("click", (e) => {
+                document.querySelectorAll("#tabsAnios .nav-link").forEach(b => b.classList.remove("active"));
+                e.target.classList.add("active");
 
-            li.querySelector("button").addEventListener("click", () => {
-                document.querySelectorAll("#tabsAnios .nav-link")
-                    .forEach(b => b.classList.remove("active"));
-
-                li.querySelector("button").classList.add("active");
-
-                // Actualizamos el año activo al hacer click
                 anioActivo = anio;
                 paginaActual = 1;
 
-                // Renderizamos con el nuevo año seleccionado
-                renderTablaSis(datosActuales);
-                renderGraficaPorUnidad(
-                    datosActuales.filter(r => r.anio === anioActivo)
-                );
+                renderTablaSis();
+                renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
             });
 
             tabs.appendChild(li);
         });
 
-        // 2. IMPORTANTE: Inicializamos anioActivo con el año más alto (posición 0)
-        // para que la primera carga coincida con la pestaña "active"
         if (anios.length > 0) {
             anioActivo = anios[0];
         }
     }
 
-    /* ===============================
-       TABLA + PAGINACIÓN
-    ================================*/
     function renderTablaSis() {
         actualizarEncabezadoSIS(anioActivo);
 
@@ -294,18 +306,17 @@
         const thead = document.querySelector("#tablaResultados thead tr");
         const paginacion = document.getElementById("paginacionTabla");
 
+        if (!tbody || !thead || !paginacion) return;
+
         tbody.innerHTML = "";
         paginacion.innerHTML = "";
 
         const indicador = document.getElementById("filtroIndicador")?.value || "sis";
-
         const datosFiltrados = datosActuales.filter(r => r.anio === anioActivo);
-
         const inicio = (paginaActual - 1) * FILAS_POR_PAGINA;
         const paginaDatos = datosFiltrados.slice(inicio, inicio + FILAS_POR_PAGINA);
 
         let columnas = ["Año", "CLUES", "Unidad"];
-
         if (indicador === "sis") {
             columnas.push("Consultas", "Especialidad", "Mental", "Bucal", "Médicas", "Días paciente", "No médicas");
         } else if (indicador === "estudios") {
@@ -314,64 +325,46 @@
             columnas.push("Med. Interna", "Cirugía", "Gineco", "Pediatría", "Otros", "Psiquiatría");
         }
 
-        // ============================
-        // 🔹 ENCABEZADOS CENTRADOS (excepto CLUES y Unidad para mejor lectura)
-        // ============================
         thead.innerHTML = columnas.map((c, index) => {
-            // Centramos Año (index 0) y todas las métricas (index >= 3)
             const clase = (index === 0 || index >= 3) ? 'class="text-center"' : '';
             return `<th ${clase}>${c}</th>`;
         }).join("");
 
-        // ============================
-        // 🔹 FILAS CON VALORES CENTRADOS
-        // ============================
+        let filasHTML = "";
         paginaDatos.forEach(r => {
-            // Año centrado, CLUES y Unidad a la izquierda
-            let fila = `
-            <td class="text-center">${r.anio}</td>
-            <td>${r.clues}</td>
-            <td>${r.nombre_unidad}</td>
-        `;
+            let fila = `<td class="text-center">${r.anio}</td><td>${r.clues}</td><td>${r.nombre_unidad}</td>`;
 
             if (indicador === "sis") {
                 fila += `
-                <td class="text-center">${fmt(r.consultas)}</td>
-                <td class="text-center">${fmt(r.especialidad)}</td>
-                <td class="text-center">${fmt(r.mental)}</td>
-                <td class="text-center">${fmt(r.bucal)}</td>
-                <td class="text-center">${fmt(r.medicas)}</td>
-                <td class="text-center">${fmt(r.diasPaciente)}</td>
-                <td class="text-center">${fmt(r.no_medicas)}</td>
-            `;
-            }
-            else if (indicador === "estudios") {
+                    <td class="text-center">${fmt(r.consultas)}</td>
+                    <td class="text-center">${fmt(r.especialidad)}</td>
+                    <td class="text-center">${fmt(r.mental)}</td>
+                    <td class="text-center">${fmt(r.bucal)}</td>
+                    <td class="text-center">${fmt(r.medicas)}</td>
+                    <td class="text-center">${fmt(r.diasPaciente)}</td>
+                    <td class="text-center">${fmt(r.no_medicas)}</td>`;
+            } else if (indicador === "estudios") {
                 fila += `
-                <td class="text-center">${fmt(r.laboratorio)}</td>
-                <td class="text-center">${fmt(r.rayosx)}</td>
-                <td class="text-center">${fmt(r.anatomia)}</td>
-                <td class="text-center">${fmt(r.electro)}</td>
-                <td class="text-center">${fmt(r.encefa)}</td>
-                <td class="text-center">${fmt(r.ultrasonido)}</td>
-                <td class="text-center">${fmt(r.tac)}</td>
-                <td class="text-center">${fmt(r.rnm)}</td>
-            `;
-            }
-            else if (indicador === "diaspaciente") {
+                    <td class="text-center">${fmt(r.laboratorio)}</td>
+                    <td class="text-center">${fmt(r.rayosx)}</td>
+                    <td class="text-center">${fmt(r.anatomia)}</td>
+                    <td class="text-center">${fmt(r.electro)}</td>
+                    <td class="text-center">${fmt(r.encefa)}</td>
+                    <td class="text-center">${fmt(r.ultrasonido)}</td>
+                    <td class="text-center">${fmt(r.tac)}</td>
+                    <td class="text-center">${fmt(r.rnm)}</td>`;
+            } else if (indicador === "diaspaciente") {
                 fila += `
-                <td class="text-center">${fmt(r.med_interna)}</td>
-                <td class="text-center">${fmt(r.cirugia)}</td>
-                <td class="text-center">${fmt(r.gineco)}</td>
-                <td class="text-center">${fmt(r.pediatria)}</td>
-                <td class="text-center">${fmt(r.otros)}</td>
-                <td class="text-center">${fmt(r.psiquiatria)}</td>
-            `;
+                    <td class="text-center">${fmt(r.med_interna)}</td>
+                    <td class="text-center">${fmt(r.cirugia)}</td>
+                    <td class="text-center">${fmt(r.gineco)}</td>
+                    <td class="text-center">${fmt(r.pediatria)}</td>
+                    <td class="text-center">${fmt(r.otros)}</td>
+                    <td class="text-center">${fmt(r.psiquiatria)}</td>`;
             }
-
-            tbody.innerHTML += `<tr>${fila}</tr>`;
+            filasHTML += `<tr>${fila}</tr>`;
         });
-
-        // ... (El resto del código de paginación se mantiene igual)
+        tbody.innerHTML = filasHTML;
 
         const totalPaginas = Math.ceil(datosFiltrados.length / FILAS_POR_PAGINA);
         for (let i = 1; i <= totalPaginas; i++) {
@@ -383,30 +376,21 @@
                 renderTablaSis();
             };
             paginacion.appendChild(li);
-
         }
     }
 
-    /* ===============================
-       GRÁFICA POR AÑO (CONSULTAS)
-    ================================*/
+    /* ==========================================================================
+       5. RENDERICIÓN DE GRÁFICAS (CHART.JS)
+       ========================================================================== */
     function renderGraficaPorAnio(data) {
-
         const porAnio = {};
-
         data.forEach(r => {
             porAnio[r.anio] = (porAnio[r.anio] || 0) + (Number(r.consultas) || 0);
         });
 
         const anios = Object.keys(porAnio).sort();
+        const colores = ['#4E79A7', '#59A14F', '#F28E2B', '#E15759', '#76B7B2', '#EDC948', '#B07AA1', '#FF9DA7'];
 
-        const colores = [
-            '#4E79A7', '#59A14F', '#F28E2B',
-            '#E15759', '#76B7B2', '#EDC948',
-            '#B07AA1', '#FF9DA7'
-        ];
-
-        //UN DATASET POR AÑO
         const datasets = anios.map((anio, i) => ({
             label: `Año ${anio}`,
             data: anios.map(a => a === anio ? porAnio[anio] : 0),
@@ -415,120 +399,57 @@
 
         if (graficaAnio) graficaAnio.destroy();
 
-        graficaAnio = new Chart(
-            document.getElementById('graficaSisPorAnio'),
-            {
-                type: 'bar',
-                data: {
-                    labels: anios,
-                    datasets
+        const ctx = document.getElementById('graficaSisPorAnio');
+        if (!ctx) return;
+
+        graficaAnio = new Chart(ctx, {
+            type: 'bar',
+            data: { labels: anios, datasets },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { stacked: true },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: v => Number(v).toLocaleString("es-MX") }
+                    }
                 },
-                options: {
-                    responsive: true,
-                    scales: {
-                        x: { stacked: true },
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: v => Number(v).toLocaleString("es-MX")
-                            }
-                        }
+                plugins: {
+                    legend: { position: 'top' },
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        formatter: (val) => val > 0 ? fmt(val) : '',
+                        font: { weight: 'bold', size: 10 }
                     },
-                    plugins: {
-                        legend: {
-                            position: 'top'
-                        },
-                        tooltip: {
-                            displayColors: false,
-                            callbacks: {
-
-                                //TÍTULO
-                                title: function (items) {
-                                    return items[0].dataset.label;
-                                },
-
-                                //CONTENIDO
-                                label: function (context) {
-                                    const valor = Number(context.raw).toLocaleString("es-MX");
-                                    return `Total: ${valor}`;
-                                }
-                            }
+                    tooltip: {
+                        displayColors: false,
+                        callbacks: {
+                            title: items => items[0].dataset.label,
+                            label: context => `Total: ${Number(context.raw).toLocaleString("es-MX")}`
                         }
                     }
                 }
             }
-        );
+        });
     }
-
-
-
-    /* ===============================
-       GRÁFICA POR UNIDAD
-    ================================*/
-
-    function totalEstudiosUnidad(r) {
-        return (
-            (r.rayosx || 0) +
-            (r.anatomia || 0) +
-            (r.electro || 0) +
-            (r.ultrasonido || 0) +
-            (r.tac || 0) +
-            (r.rnm || 0)
-        );
-    }
-
 
     function renderGraficaPorUnidad(data) {
-
         const unidadesSeleccionadas = window.getUnidadesSeleccionadas?.() || [];
-
         let labels = [];
-        let datasetsData = {
-            laboratorio: [],
-            rayosx: [],
-            anatomia: [],
-            electro: [],
-            ultrasonido: [],
-            tac: [],
-            rnm: []
-        };
+        let datasetsData = { rayosx: [], anatomia: [], electro: [], ultrasonido: [], tac: [], rnm: [] };
 
-        // 🔹 CASO 1: TOTAL GENERAL (inicio)
         if (unidadesSeleccionadas.length === 0) {
-
             labels = ['Total General'];
-
-
-            datasetsData.rayosx = [
-                data.reduce((s, r) => s + (r.rayosx || 0), 0)
-            ];
-            datasetsData.anatomia = [
-                data.reduce((s, r) => s + (r.anatomia || 0), 0)
-            ];
-            datasetsData.electro = [
-                data.reduce((s, r) => s + (r.electro || 0), 0)
-            ];
-            datasetsData.ultrasonido = [
-                data.reduce((s, r) => s + (r.ultrasonido || 0), 0)
-            ];
-            datasetsData.tac = [
-                data.reduce((s, r) => s + (r.tac || 0), 0)
-            ];
-            datasetsData.rnm = [
-                data.reduce((s, r) => s + (r.rnm || 0), 0)
-            ];
-
-        }
-        // 🔹 CASO 2: UNIDADES SELECCIONADAS
-        else {
-
-            const datosFiltrados = data.filter(r =>
-                unidadesSeleccionadas.includes(r.nombre_unidad)
-            );
-
+            datasetsData.rayosx = [data.reduce((s, r) => s + (r.rayosx || 0), 0)];
+            datasetsData.anatomia = [data.reduce((s, r) => s + (r.anatomia || 0), 0)];
+            datasetsData.electro = [data.reduce((s, r) => s + (r.electro || 0), 0)];
+            datasetsData.ultrasonido = [data.reduce((s, r) => s + (r.ultrasonido || 0), 0)];
+            datasetsData.tac = [data.reduce((s, r) => s + (r.tac || 0), 0)];
+            datasetsData.rnm = [data.reduce((s, r) => s + (r.rnm || 0), 0)];
+        } else {
+            const datosFiltrados = data.filter(r => unidadesSeleccionadas.includes(r.nombre_unidad));
             labels = datosFiltrados.map(r => r.nombre_unidad);
-
-
             datasetsData.rayosx = datosFiltrados.map(r => r.rayosx || 0);
             datasetsData.anatomia = datosFiltrados.map(r => r.anatomia || 0);
             datasetsData.electro = datosFiltrados.map(r => r.electro || 0);
@@ -539,95 +460,76 @@
 
         if (graficaUnidad) graficaUnidad.destroy();
 
-        const elTitulo = document.getElementById("tituloGraficaSis");
-        if (elTitulo) {
-            elTitulo.innerHTML = `Estudios de Gabinete <strong>${anioActivo}</strong>`;
-        }
+        const ctx = document.getElementById('graficaSis');
+        if (!ctx) return;
 
-
-        graficaUnidad = new Chart(
-            document.getElementById('graficaSis'),
-            {
-                type: 'bar',
-                data: {
-                    labels,
-                    datasets: [
-
-                        { label: 'Rayos X', data: datasetsData.rayosx },
-                        { label: 'Anatomía', data: datasetsData.anatomia },
-                        { label: 'Electrocardiograma', data: datasetsData.electro },
-                        { label: 'Ultrasonido', data: datasetsData.ultrasonido },
-                        { label: 'TAC', data: datasetsData.tac },
-                        { label: 'RNM', data: datasetsData.rnm }
-                    ]
+        graficaUnidad = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    { label: 'Rayos X', data: datasetsData.rayosx, backgroundColor: '#4E79A7' },
+                    { label: 'Anatomía', data: datasetsData.anatomia, backgroundColor: '#F28E2B' },
+                    { label: 'Electrocardiograma', data: datasetsData.electro, backgroundColor: '#E15759' },
+                    { label: 'Ultrasonido', data: datasetsData.ultrasonido, backgroundColor: '#76B7B2' },
+                    { label: 'TAC', data: datasetsData.tac, backgroundColor: '#59A14F' },
+                    { label: 'RNM', data: datasetsData.rnm, backgroundColor: '#EDC948' }
+                ]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                scales: {
+                    x: { stacked: true, ticks: { callback: v => Number(v).toLocaleString("es-MX") } },
+                    y: { stacked: true }
                 },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    scales: {
-                        x: {
-                            stacked: true,
-                            ticks: {
-                                callback: value => Number(value).toLocaleString("es-MX")
-                            }
-                        },
-                        y: {
-                            stacked: true
+                plugins: {
+                    datalabels: {
+                        color: '#fff',
+                        font: { weight: 'bold', size: 10 },
+                        formatter: (val) => val > 0 ? fmt(val) : ''
+                    },
+                    legend: {
+                        onClick: function (e, legendItem, legend) {
+                            Chart.defaults.plugins.legend.onClick.call(this, e, legendItem, legend);
+                            actualizarTituloGabineteTotal(legend.chart);
                         }
                     },
-
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: function (context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) {
-                                        label += ': ';
-                                    }
-                                    if (context.parsed.x !== null) {
-                                        // Formateamos el valor individual con es-MX
-                                        label += Number(context.parsed.x).toLocaleString("es-MX");
-                                    }
-                                    return label;
-                                },
-
-                                footer: function (items) {
-
-                                    let sumaGabinete = 0;
-                                    const chart = items[0].chart;
-                                    const dataIndex = items[0].dataIndex;
-                                    chart.data.datasets.forEach((dataset) => {
-                                        const valor = dataset.data[dataIndex] || 0;
-                                        sumaGabinete += valor;
-                                    });
-
-                                    // Retornamos el texto con el nombre "Estudios de Gabinete"
-                                    return `Estudios de Gabinete: ${sumaGabinete.toLocaleString("es-MX")}`;
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                if (context.parsed.x !== null) {
+                                    label += Number(context.parsed.x).toLocaleString("es-MX");
                                 }
+                                return label;
+                            },
+                            footer: function (items) {
+                                let sumaGabinete = 0;
+                                const chart = items[0].chart;
+                                const dataIndex = items[0].dataIndex;
+                                chart.data.datasets.forEach((dataset, index) => {
+                                    if (chart.isDatasetVisible(index)) {
+                                        sumaGabinete += (dataset.data[dataIndex] || 0);
+                                    }
+                                });
+                                return `Subtotal Visible: ${sumaGabinete.toLocaleString("es-MX")}`;
                             }
                         }
                     }
-
                 }
-
             }
-        );
+        });
+
+        actualizarTituloGabineteTotal(graficaUnidad);
     }
 
-
-
-    /* ===============================
-    GRÁFICA DE LINEAS DEBAJO TABLA
- ================================*/
-
-
     function cargarDetalleSis(indicador) {
-
         const select = document.getElementById("filtroSisDetalle");
         if (!select) return;
 
         select.innerHTML = "";
-
         let opciones = [];
 
         if (indicador === "sis") {
@@ -639,8 +541,7 @@
                 { value: "medicas", text: "Consultas médicas" },
                 { value: "no_medicas", text: "Consultas no médicas" }
             ];
-        }
-        else if (indicador === "estudios") {
+        } else if (indicador === "estudios") {
             opciones = [
                 { value: "laboratorio", text: "Laboratorio" },
                 { value: "rayosx", text: "Rayos X" },
@@ -651,8 +552,7 @@
                 { value: "tac", text: "TAC" },
                 { value: "rnm", text: "RNM" }
             ];
-        }
-        else if (indicador === "diaspaciente") {
+        } else if (indicador === "diaspaciente") {
             opciones = [
                 { value: "diasPaciente", text: "Días paciente" },
                 { value: "med_interna", text: "Medicina interna" },
@@ -672,11 +572,11 @@
         });
     }
 
-
     function graficaSisPorMes(data) {
         const detalle = document.getElementById("filtroSisDetalle")?.value;
+        const ctx = document.getElementById("graficaSisMensual");
 
-        if (!data || data.length === 0) {
+        if (!data || data.length === 0 || !ctx) {
             if (graficaSisMensual) graficaSisMensual.destroy();
             return;
         }
@@ -689,26 +589,16 @@
 
         const meses = Array.from({ length: 12 }, (_, i) => i + 1);
         const labels = meses.map(m => mesesNombres[m]);
-
-        // 🔹 Capturar todos los años seleccionados
-        const aniosSeleccionados = [...document.querySelectorAll(".sis-filtro-anio:checked")]
-            .map(cb => Number(cb.value));
-
+        const aniosSeleccionados = [...document.querySelectorAll(".sis-filtro-anio:checked")].map(cb => Number(cb.value));
         const resumen = {};
 
         data
             .filter(r => aniosSeleccionados.length === 0 || aniosSeleccionados.includes(r.anio))
             .forEach(r => {
                 if (!r.mes) return;
-
                 const mes = Number(r.mes);
                 const anio = r.anio;
-
-                let valor = 0;
-                if (detalle && r[detalle] !== undefined) {
-                    valor = Number(r[detalle]) || 0;
-                }
-
+                let valor = (detalle && r[detalle] !== undefined) ? (Number(r[detalle]) || 0) : 0;
                 const key = `Total ${anio}`;
 
                 if (!resumen[key]) resumen[key] = {};
@@ -725,151 +615,150 @@
 
         if (graficaSisMensual) graficaSisMensual.destroy();
 
-        graficaSisMensual = new Chart(
-            document.getElementById("graficaSisMensual"),
-            {
-                type: "line",
-                data: { labels, datasets },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function (value) {
-                                    return Number(value).toLocaleString("es-MX");
-                                }
-                            }
-                        }
+        graficaSisMensual = new Chart(ctx, {
+            type: "line",
+            data: { labels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: v => Number(v).toLocaleString("es-MX") }
+                    }
+                },
+                plugins: {
+                    datalabels: {
+                        display: () => mostrarValoresMensual,
+                        align: 'top',
+                        formatter: (val) => val > 0 ? fmt(val) : '',
+                        font: { size: 9, weight: 'bold' }
                     },
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-
-                                // 🟦 TÍTULO: Mes + Año
-                                title: function (items) {
-                                    const mes = items[0].label;                // Enero
-                                    const anio = items[0].dataset.label.replace("Total ", "");
-                                    return `${mes} ${anio}`;
-                                },
-
-                                // 🟩 CONTENIDO
-                                label: function (context) {
-                                    const valor = Number(context.raw).toLocaleString("es-MX");
-                                    return `Total: ${valor}`;
-                                }
-                            }
+                    tooltip: {
+                        callbacks: {
+                            title: items => {
+                                const mes = items[0].label;
+                                const anio = items[0].dataset.label.replace("Total ", "");
+                                return `${mes} ${anio}`;
+                            },
+                            label: context => `Total: ${Number(context.raw).toLocaleString("es-MX")}`
                         }
                     }
                 }
             }
-        );
-
+        });
     }
 
+    /* ==========================================================================
+           6. LISTENERS E INICIALIZACIÓN Y EXPOSICIÓN GLOBAL
+           ========================================================================== */
 
-    /* ===============================
-       FILTROS
-    ================================*/
-    document.getElementById("btnFiltrarSis")?.addEventListener("click", () => {
+    // A) EXPOSICIÓN GLOBAL PARA MENÚ LATERAL (Permite la invocación directa desde menu.html)
+    window.cargarDatosSis = ejecutarFiltradoSis;
+    window.cargarTablaSis = ejecutarFiltradoSis;
+    window.ejecutarGraficasSis = ejecutarFiltradoSis;
 
-        const anios = [...document.querySelectorAll(".sis-filtro-anio:checked")]
-            .map(cb => Number(cb.value));
+    // B) FUNCIÓN PARA REINICIAR Y LIMPIAR EL SUBSISTEMA DE SIS
+    function resetearFiltrosSis() {
+        // 1. Desmarcar checkboxes locales de SIS
+        document.querySelectorAll(".sis-filtro-anio, .sis-filtro-mes").forEach(cb => cb.checked = false);
 
-        const meses = [...document.querySelectorAll(".sis-filtro-mes:checked")]
-            .map(cb => Number(cb.value));
-
-        const unidades = window.getUnidadesSeleccionadas?.() || [];
-
-        const filtrados = sisResultados.filter(r =>
-            (anios.length === 0 || anios.includes(r.anio)) &&
-            (meses.length === 0 || meses.includes(r.mes)) &&
-            (unidades.length === 0 || unidades.includes(r.nombre_unidad))
-        );
-
-        // 🔹 TABLA + GRAFICAS SUPERIORES (agrupadas)
-        datosActuales = agruparPorAnioUnidad(filtrados);
+        // 2. Restaurar variables de estado al origen de datos original
+        datosActuales = agruparPorAnioUnidad(sisResultados);
+        datosFiltradosSis = [...sisResultados];
         paginaActual = 1;
+
+        // 3. Resetear selectores desplegables
+        const selectDetalle = document.getElementById("filtroSisDetalle");
+        if (selectDetalle) selectDetalle.selectedIndex = 0;
+
+        // 4. Volver a renderizar componentes visuales limpia la vista
+        renderTabsAnios(datosActuales);
+        renderTablaSis();
+        renderGraficaPorAnio(datosActuales);
+        renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
+        graficaSisPorMes(datosFiltradosSis);
+    }
+
+    // Exponer la función de reset a window por si menu.html la invoca directamente
+    window.limpiarFiltrosSis = resetearFiltrosSis;
+
+    document.addEventListener("DOMContentLoaded", () => {
+        // Carga Inicial
+        datosActuales = agruparPorAnioUnidad(sisResultados);
 
         renderTabsAnios(datosActuales);
         renderTablaSis();
         renderGraficaPorAnio(datosActuales);
-        renderGraficaPorUnidad(
-            datosActuales.filter(r => r.anio === anioActivo)
-        );
+        renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
 
+        const filtroIndicador = document.getElementById("filtroIndicador");
+        if (filtroIndicador) {
+            cargarDetalleSis(filtroIndicador.value);
 
-        if (
-            anios.length === 0 &&
-            meses.length === 0 &&
-            unidades.length === 0
-        ) {
-
-            datosFiltradosSis = [...sisResultados];
-
-
-            const aniosDisponibles = [
-                ...new Set(datosFiltradosSis.map(r => r.anio))
-            ].sort();
-
-            anioActivo = aniosDisponibles[0];
-
-            const selectDetalle = document.getElementById("filtroSisDetalle");
-            if (selectDetalle) selectDetalle.selectedIndex = 0;
-
-        } else {
-            datosFiltradosSis = filtrados;
+            filtroIndicador.addEventListener("change", function () {
+                cargarDetalleSis(this.value);
+                const aniosDisponibles = [...new Set(datosFiltradosSis.map(r => r.anio))].sort();
+                anioActivo = aniosDisponibles[0];
+                graficaSisPorMes(datosFiltradosSis);
+            });
         }
 
+        // Listener filtro detalle interno
+        document.getElementById("filtroSisDetalle")?.addEventListener("change", () => {
+            graficaSisPorMes(datosFiltradosSis);
+        });
+
+        // Listener Botón Mostrar / Ocultar Valores
+        const btnToggle = document.getElementById("btnToggleValoresMensual");
+        if (btnToggle) {
+            btnToggle.addEventListener("click", function () {
+                mostrarValoresMensual = !mostrarValoresMensual;
+
+                if (mostrarValoresMensual) {
+                    this.textContent = "Ocultar valores";
+                    this.classList.replace("btn-outline-primary", "btn-primary");
+                } else {
+                    this.textContent = "Mostrar valores";
+                    this.classList.replace("btn-primary", "btn-outline-primary");
+                }
+
+                if (graficaSisMensual) {
+                    graficaSisMensual.update();
+                }
+            });
+        }
+
+        // Listener Botón Filtrar local
+        document.getElementById("btnFiltrarSis")?.addEventListener("click", () => {
+            ejecutarFiltradoSis();
+        });
+
+        // ==========================================================================
+        // C) ESCUCHADORES DE EVENTOS GLOBALES (MENÚ LATERAL)
+        // ==========================================================================
+
+        // Escuchar cuando se hace clic en "Aplicar" en Unidades
+        document.addEventListener("aplicarFiltroUnidades", () => {
+            ejecutarFiltradoSis();
+        });
+
+        document.addEventListener("unidadesSeleccionadasCambiadas", () => {
+            ejecutarFiltradoSis();
+        });
+
+        // Escuchar cuando se hace clic en "Limpiar" en el menú lateral
+        document.addEventListener("solicitarResetFiltros", () => {
+            resetearFiltrosSis();
+        });
+
+        document.addEventListener("limpiarFiltrosGlobales", () => {
+            resetearFiltrosSis();
+        });
+
+        // Carga inicial gráfica mensual
+        datosFiltradosSis = [...sisResultados];
         graficaSisPorMes(datosFiltradosSis);
-
     });
-
-    /* ===============================
-     CARGA INICIAL
-  ===============================*/
-    datosActuales = agruparPorAnioUnidad(sisResultados);
-
-    renderTabsAnios(datosActuales);
-    renderTablaSis();
-    renderGraficaPorAnio(datosActuales);
-    renderGraficaPorUnidad(
-        datosActuales.filter(r => r.anio === anioActivo)
-    );
-
-    // 🔹 cargar select secundario
-    cargarDetalleSis(
-        document.getElementById("filtroIndicador").value
-    );
-
-    // 🔹 gráfica mensual
-    datosFiltradosSis = [...sisResultados];
-    graficaSisPorMes(datosFiltradosSis);
-
-
-    // 🔹 cuando cambia indicador principal
-    document.getElementById("filtroIndicador")
-        .addEventListener("change", function () {
-
-            cargarDetalleSis(this.value);
-
-            const aniosDisponibles = [
-                ...new Set(datosFiltradosSis.map(r => r.anio))
-            ].sort();
-
-            anioActivo = aniosDisponibles[0];
-
-            graficaSisPorMes(datosFiltradosSis);
-
-        });
-
-    // 🔹 cuando cambia el select interno de la gráfica
-    document.getElementById("filtroSisDetalle")
-        ?.addEventListener("change", () => {
-            graficaSisPorMes(datosFiltradosSis);
-
-        });
-
 </script>
 {% endblock %}

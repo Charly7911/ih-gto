@@ -1,127 +1,169 @@
 {% extends "layout/base.html" %} {% block content %}
 <div class="main-content bg-light-gray">
-  <div class="container-fluid py-4 px-4">
-    <div class="d-flex justify-content-between align-items-end mb-4">
+  <div class="container-fluid py-3 px-4">
+
+    <!-- 1. CABECERA PRINCIPAL (Título + Acciones globales) -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-3">
       <div>
-        <h2 class="dashboard-title">Comparativo Dinámico</h2>
-        <p class="dashboard-subtitle">
-          Análisis de indicadores hospitalarios por unidad
-        </p>
-        <div class="card shadow-sm border-0 mb-3 card-meses">
-          <div class="card-body py-3 px-3">
-            <div class="toolbar-meses">
-              <!-- Título -->
-              <div class="meses-title">
-                <i class="bi bi-calendar3"></i>
-                Meses
-              </div>
+        <h2 class="dashboard-title mb-1">Comparativo Dinámico</h2>
+        <p class="dashboard-subtitle text-muted mb-0">Análisis de indicadores hospitalarios por unidad</p>
+      </div>
 
-              <!-- CHECKS -->
-              <div id="checkMeses" class="meses-container">
-                <input type="checkbox" id="mes1" class="mes-check" value="1" checked />
-                <label for="mes1" class="mes-pill">Ene</label>
+      <!-- BOTONES PRINCIPALES -->
+      <div class="d-flex align-items-center gap-2">
+        <button id="btnExcel" onclick="descargarExcel()"
+          class="btn btn-sm btn-success d-flex align-items-center gap-2 shadow-sm">
+          <i class="bi bi-file-earmark-excel"></i>
+          <span id="textoBtn">Descargar Excel</span>
+        </button>
 
-                <input type="checkbox" id="mes2" class="mes-check" value="2" checked />
-                <label for="mes2" class="mes-pill">Feb</label>
+        <button onclick="limpiarTodo()"
+          class="btn btn-sm btn-outline-danger d-flex align-items-center gap-2 shadow-sm bg-white">
+          <i class="bi bi-arrow-repeat"></i>
+          Nuevo Comparativo
+        </button>
+      </div>
+    </div>
 
-                <input type="checkbox" id="mes3" class="mes-check" value="3" checked />
-                <label for="mes3" class="mes-pill">Mar</label>
+    <!-- 2. BARRA DE SELECCIÓN DE MESES -->
+    <div class="card shadow-sm border-0 mb-3 card-meses">
+      <div class="card-body py-2 px-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
 
-                <input type="checkbox" id="mes4" class="mes-check" value="4" checked />
-                <label for="mes4" class="mes-pill">Abr</label>
+        <div class="d-flex align-items-center gap-3 flex-grow-1 flex-wrap">
+          <div class="toolbar-meses fw-bold text-secondary d-flex align-items-center gap-2 text-uppercase small">
+            <i class="bi bi-calendar3"></i> Meses
+          </div>
 
-                <input type="checkbox" id="mes5" class="mes-check" value="5" checked />
-                <label for="mes5" class="mes-pill">May</label>
-
-                <input type="checkbox" id="mes6" class="mes-check" value="6" checked />
-                <label for="mes6" class="mes-pill">Jun</label>
-
-                <input type="checkbox" id="mes7" class="mes-check" value="7" checked />
-                <label for="mes7" class="mes-pill">Jul</label>
-
-                <input type="checkbox" id="mes8" class="mes-check" value="8" checked />
-                <label for="mes8" class="mes-pill">Ago</label>
-
-                <input type="checkbox" id="mes9" class="mes-check" value="9" checked />
-                <label for="mes9" class="mes-pill">Sep</label>
-
-                <input type="checkbox" id="mes10" class="mes-check" value="10" checked />
-                <label for="mes10" class="mes-pill">Oct</label>
-
-                <input type="checkbox" id="mes11" class="mes-check" value="11" checked />
-                <label for="mes11" class="mes-pill">Nov</label>
-
-                <input type="checkbox" id="mes12" class="mes-check" value="12" checked />
-                <label for="mes12" class="mes-pill">Dic</label>
-              </div>
-
-              <!-- BOTONES -->
-              <div class="d-flex gap-2 ms-auto">
-                <button class="btn btn-sm btn-todos btn-pill" onclick="seleccionarTodosMeses()">
-                  <i class="bi bi-check2-square"></i>
-                  Todos
-                </button>
-
-                <button class="btn btn-sm btn-outline-secondary btn-pill" onclick="limpiarMeses()">
-                  <i class="bi bi-x-square"></i>
-                  Ninguno
-                </button>
-              </div>
-
-              <!-- BOTONES PRINCIPALES -->
-              <div class="d-flex align-items-center gap-2 ms-2">
-                <button id="btnExcel" onclick="descargarExcel()" class="btn-dash btn-excel">
-                  <i class="bi bi-file-earmark-excel"></i>
-                  <span id="textoBtn">Descargar Excel</span>
-                </button>
-
-                <button onclick="limpiarTodo()" class="btn-dash btn-limpiar">
-                  <i class="bi bi-arrow-repeat"></i>
-                  Nuevo Comparativo
-                </button>
-              </div>
-            </div>
+          <!-- CHECKS / MESES -->
+          <div id="checkMeses" class="meses-container d-flex flex-wrap gap-1 align-items-center">
+            <!-- Renderizado dinámico de meses -->
           </div>
         </div>
+
+        <!-- BOTONES RÁPIDOS DE MESES -->
+        <div class="d-flex gap-2">
+          <button class="btn btn-xs btn-outline-primary rounded-pill px-2" onclick="seleccionarTodosMeses()">
+            <i class="bi bi-check2-square"></i> Todos
+          </button>
+          <button class="btn btn-xs btn-outline-secondary rounded-pill px-2" onclick="limpiarMeses()">
+            <i class="bi bi-x-square"></i> Ninguno
+          </button>
+        </div>
+
       </div>
-      <div id="selection-summary" class="text-end"></div>
     </div>
 
-    <div id="dropZone" class="drop-area-modern shadow-sm mb-4">
-      <div class="drop-content">
-        <i class="bi bi-plus-circle"></i>
-        <span class="placeholder-text">Arrastre indicadores y unidades aquí para comparar</span>
+    <div id="selection-summary" class="text-end small text-muted"></div>
+
+    <!-- 3. DROP ZONE (Compacta para no robar espacio vertical) -->
+    <div id="dropZone"
+      class="drop-area-modern shadow-sm mb-3 py-3 border border-2 border-dashed rounded text-center bg-white">
+      <div class="drop-content d-flex align-items-center justify-content-center gap-2 text-muted">
+        <i class="bi bi-plus-circle fs-5 text-primary"></i>
+        <span class="placeholder-text fw-medium">Arrastre indicadores y unidades aquí para comparar</span>
       </div>
     </div>
 
+    <!-- 4. TARJETA PRINCIPAL DE LA GRÁFICA -->
     <div class="card graph-card border-0 shadow-sm">
-      <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center pt-3 ps-4 pe-4">
-        <h5 id="tituloGrafica" class="card-title-sm mb-0">Tendencia Mensual</h5>
 
-        <div class="card-header bg-white border-0 d-flex align-items-center pt-3 ps-4 pe-4">
-          <div class="d-flex align-items-center gap-3 ms-auto">
-            <div class="form-check form-switch custom-switch m-0">
-              <input class="form-check-input" type="checkbox" id="switchEtiquetas" />
-              <label class="form-check-label" style="font-size: 11px; font-weight: 600; color: #6c757d">
-                MOSTRAR DATOS
-              </label>
-            </div>
+      <!-- CABECERA CON CONTROLES ORGANIZADOS -->
+      <div
+        class="card-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
 
-            <div class="form-check form-switch custom-switch m-0">
-              <input class="form-check-input" type="checkbox" id="switchTendencia" />
-              <label class="form-check-label" style="font-size: 11px; font-weight: 600; color: #6c757d">
-                MOSTRAR TENDENCIA
-              </label>
+        <!-- TÍTULO -->
+        <h5 id="tituloGrafica" class="card-title-sm mb-0 fw-bold text-dark me-2">
+          Tendencia Mensual
+        </h5>
+
+        <!-- CONTENEDOR DE CONTROLES (Agrupados limpia y modularmente) -->
+        <div class="d-flex align-items-center gap-3 flex-wrap ms-auto">
+
+          <!-- MODO DE VISTA -->
+          <div class="d-flex align-items-center gap-2">
+            <span class="text-uppercase text-muted fw-bold" style="font-size: 10px;">VISTA:</span>
+            <div class="btn-group btn-group-sm" role="group" id="selectorModoVista">
+              <input type="radio" class="btn-check" name="modoVista" id="vistaCombinada" value="combinada" checked>
+              <label class="btn btn-outline-secondary text-nowrap btn-xs" for="vistaCombinada">COMBINADA</label>
+
+              <input type="radio" class="btn-check" name="modoVista" id="vistaSeparada" value="separada">
+              <label class="btn btn-outline-secondary text-nowrap btn-xs" for="vistaSeparada">POR INDICADOR</label>
             </div>
           </div>
+
+          <!-- BARRA DE SWITCHES ENCAPSULADA EN UN PANEL LIGERO -->
+          <div class="d-flex align-items-center gap-3 bg-light px-3 py-1 rounded border">
+
+            <div class="form-check form-switch custom-switch m-0 d-inline-flex align-items-center gap-1">
+              <input class="form-check-input mt-0" type="checkbox" id="switchEtiquetas" />
+              <label class="form-check-label text-nowrap text-uppercase text-secondary fw-bold" style="font-size: 10px;"
+                for="switchEtiquetas">
+                Datos
+              </label>
+            </div>
+
+            <div class="form-check form-switch custom-switch m-0 d-inline-flex align-items-center gap-1">
+              <input class="form-check-input mt-0" type="checkbox" id="switchTendencia" />
+              <label class="form-check-label text-nowrap text-uppercase text-secondary fw-bold" style="font-size: 10px;"
+                for="switchTendencia">
+                Tendencia
+              </label>
+            </div>
+
+            <div class="form-check form-switch custom-switch m-0 d-inline-flex align-items-center gap-1">
+              <input class="form-check-input mt-0" type="checkbox" id="switchUnidades" />
+              <label class="form-check-label text-nowrap text-uppercase text-secondary fw-bold" style="font-size: 10px;"
+                for="switchUnidades">
+                Unidades
+              </label>
+            </div>
+
+            <div class="form-check form-switch custom-switch m-0 align-items-center gap-1"
+              id="contenedorAcumularTipologia" style="display: none !important;">
+              <input class="form-check-input mt-0" type="checkbox" id="switchAcumularTipologia" />
+              <label class="form-check-label text-nowrap text-uppercase text-secondary fw-bold" style="font-size: 10px;"
+                for="switchAcumularTipologia">
+                Acumulados
+              </label>
+            </div>
+
+          </div>
+
+          <!-- FILTRO DE TIPOLOGÍA DINÁMICO -->
+          <div id="contenedorTipologia" class="btn-group btn-group-sm" role="group" style="display: none !important;">
+            <input type="radio" class="btn-check" name="tipologia" id="tipTodas" value="TODAS" checked>
+            <label class="btn btn-outline-secondary" for="tipTodas">Todas</label>
+
+            <input type="radio" class="btn-check" name="tipologia" id="tipHG" value="HG">
+            <label class="btn btn-outline-secondary" for="tipHG">HG</label>
+
+            <input type="radio" class="btn-check" name="tipologia" id="tipHC" value="HC">
+            <label class="btn btn-outline-secondary" for="tipHC">HC</label>
+
+            <input type="radio" class="btn-check" name="tipologia" id="tipHE" value="HE">
+            <label class="btn btn-outline-secondary" for="tipHE">HE</label>
+          </div>
+
         </div>
+
       </div>
+
+      <!-- CUERPO DE LA GRÁFICA (Máximo aprovechamiento de espacio) -->
       <div class="card-body p-4">
-        <div class="chart-wrapper">
-          <canvas id="grafica"></canvas>
+        <div id="contenedorGraficas" class="chart-wrapper w-100">
+
+          <!-- Se incrementó la altura a 480px para destacar la gráfica -->
+          <div class="grafica-container w-100" style="position: relative; height: 480px;">
+            <canvas id="grafica"></canvas>
+          </div>
+
+          <div id="leyendaPersonalizada" class="mt-3 w-100"></div>
+
         </div>
       </div>
+
     </div>
+
   </div>
 </div>
 
@@ -136,12 +178,12 @@
   let unidadesSeleccionadas = new Set();
   let indicadoresSeleccionados = new Set();
   let aniosSeleccionados = new Set();
-
+  let mostrarTodasUnidades = false;
   let avisosMostrados = new Set();
   let alertasMostradas = new Set();
-
+  let instanciasCharts = []
   let todasUnidades = [];
-
+  let tipologiaSeleccionada = "TODAS";
   let timeoutRender = null;
   let indicadoresSinDatos = new Set();
 
@@ -166,6 +208,49 @@
     if (!nombre) return "";
     return nombre.replace(/^[A-Z0-9]{10,14}\s+/, "").trim();
   }
+
+  function nombreUnidad(unidad) {
+    if (!unidad) return "";
+
+    let texto = unidad;
+
+    // 1. Limpiar sufijos como " - medica (2026)" o similares
+    texto = texto.split("-")[0].trim();
+
+    // 2. Reemplazar los prefijos principales (acepta espacios o guiones bajos)
+    texto = texto
+      .replace(/^HOSPITAL[ _]GENERAL[ _]/i, "HG ")
+      .replace(/^HOSPITAL[ _]COMUNITARIO[ _]/i, "HC ")
+      .replace(/^HOSPITAL[ _](DE[ _])?ESPECIALIDAD(ES)?[ _]/i, "HE ")
+      .replace(/^CENTRO[ _]ESTATAL[ _]DE[ _]CUIDADOS[ _]CRITICOS[ _]/i, "CECC ")
+      .replace(/^CENTRO[ _]DE[ _]ATENCION[ _]INTEGRAL[ _]A[ _]LA[ _]SALUD[ _]MENTAL[ _]/i, "CAISAME ");
+
+    // 3. Cambiar todos los guiones bajos restantes por espacios
+    texto = texto.replace(/_/g, " ");
+
+    // 4. Limpiar espacios dobles
+    texto = texto.replace(/\s+/g, " ").trim();
+
+    // 5. Formatear cada palabra para que inicie con Mayúscula (ej: "abasolo" -> "Abasolo")
+    return texto
+      .toLowerCase()
+      .split(" ")
+      .map(p => {
+        // Mantener siglas en mayúsculas (HG, HC, HE, CECC, CAISAME)
+        if (["hg", "hc", "he", "cecc", "caisame"].includes(p)) return p.toUpperCase();
+        return p.charAt(0).toUpperCase() + p.slice(1);
+      })
+      .join(" ");
+  }
+
+
+  function obtenerNombreIndicador(indicador) {
+    if (!indicador) return "";
+    const clave = indicador.toString().trim().toLowerCase();
+    return nombresColumnas[clave] || indicador;
+  }
+
+
 
   // =========================
   // CARGA DE UNIDADES
@@ -245,28 +330,77 @@
     });
 
   }
-  // =========================
-  // MESES
-  // =========================
+
+
+  // ======================================================
+  // CONFIGURACIÓN Y FUNCIONES DE MESES PARA LA GRÁFICA
+  // ======================================================
+
+  const LISTA_MESES_GRAFICA = [
+    { id: 1, nombre: 'Ene' }, { id: 2, nombre: 'Feb' }, { id: 3, nombre: 'Mar' },
+    { id: 4, nombre: 'Abr' }, { id: 5, nombre: 'May' }, { id: 6, nombre: 'Jun' },
+    { id: 7, nombre: 'Jul' }, { id: 8, nombre: 'Ago' }, { id: 9, nombre: 'Sep' },
+    { id: 10, nombre: 'Oct' }, { id: 11, nombre: 'Nov' }, { id: 12, nombre: 'Dic' }
+  ];
+
+  // Función para renderizar dinámicamente las pills de meses según el límite
+  window.renderizarMesesGrafica = function (limiteMes = 12) {
+    const container = document.getElementById("checkMeses");
+    if (!container) return;
+
+    // 1. Guardar qué meses estaban marcados previamente
+    const chequesPrevios = Array.from(document.querySelectorAll(".mes-check:checked"))
+      .map(el => parseInt(el.value, 10));
+
+    // 2. Filtrar la lista de meses disponibles
+    const mesesVisibles = LISTA_MESES_GRAFICA.filter(m => m.id <= limiteMes);
+
+    // 3. Generar el nuevo HTML
+    container.innerHTML = mesesVisibles.map(mes => {
+      // Si no había nada seleccionado previamente (carga inicial), se marcan todos por defecto
+      const isChecked = chequesPrevios.length === 0 || chequesPrevios.includes(mes.id);
+
+      return `
+      <input 
+        type="checkbox" 
+        id="mes${mes.id}" 
+        class="mes-check" 
+        value="${mes.id}" 
+        ${isChecked ? 'checked' : ''} 
+        onchange="cargarGrafica()" 
+      />
+      <label for="mes${mes.id}" class="mes-pill">${mes.nombre}</label>
+    `;
+    }).join('');
+  };
+
+  // Obtener la lista de valores de los meses marcados actualmente
   function obtenerMesesSeleccionados() {
     const meses = Array.from(
       document.querySelectorAll(".mes-check:checked")
-    ).map(el => parseInt(el.value));
-
-
+    ).map(el => parseInt(el.value, 10));
 
     return meses;
   }
 
-  function seleccionarTodosMeses() {
-    document.querySelectorAll(".mes-check").forEach((el) => (el.checked = true));
+  // 1. Desmarcar todos los meses visibles
+  function limpiarMeses() {
+    document.querySelectorAll(".mes-check").forEach((el) => {
+      el.checked = false;
+    });
+
     cargarGrafica();
   }
 
-  function limpiarMeses() {
-    document.querySelectorAll(".mes-check").forEach((el) => (el.checked = false));
+  // 2. Seleccionar todos los meses visibles
+  function seleccionarTodosMeses() {
+    document.querySelectorAll(".mes-check").forEach((el) => {
+      el.checked = true;
+    });
+
     cargarGrafica();
   }
+
 
   // =========================
   // DRAG INDICADORES
@@ -287,6 +421,7 @@
       }
 
       el.addEventListener("dragstart", (e) => {
+        console.log("DRAG:", ind);
         const data = {
           type: "indicador",
           value: ind,
@@ -604,13 +739,45 @@
 
 
 
+  // Helper global para destruir cualquier tipo de gráfica
+  function destruirTodasLasGraficas() {
+    if (typeof chart !== "undefined" && chart) {
+      chart.destroy();
+      chart = null;
+    }
+    if (typeof instanciasCharts !== "undefined" && Array.isArray(instanciasCharts)) {
+      instanciasCharts.forEach((c) => c && c.destroy());
+      instanciasCharts = [];
+    }
+  }
+
   function cargarGrafica() {
 
-    if (
-      unidadesSeleccionadas.size === 0 ||
-      indicadoresSeleccionados.size === 0
-    ) {
-      if (chart) chart.destroy();
+    // 1. Si el usuario seleccionó unidades específicas, desactivamos "Mostrar Todas"
+    if (unidadesSeleccionadas.size > 0) {
+      mostrarTodasUnidades = false;
+
+      const swUnidades = document.getElementById("switchUnidades");
+      if (swUnidades) swUnidades.checked = false;
+
+      const contenedorTipologia = document.getElementById("contenedorTipologia");
+      if (contenedorTipologia) contenedorTipologia.style.display = "none";
+
+      const contenedorAcumular = document.getElementById("contenedorAcumularTipologia");
+      if (contenedorAcumular) contenedorAcumular.style.display = "none";
+    }
+
+    // 🔑 2. DECLARACIÓN PRIMERO: Definimos la variable antes de usarla
+    const puedeMostrarTodas = mostrarTodasUnidades && unidadesSeleccionadas.size === 0;
+
+    // 3. VALIDACIONES INICIALES
+    if (!puedeMostrarTodas && unidadesSeleccionadas.size === 0) {
+      destruirTodasLasGraficas();
+      return;
+    }
+
+    if (indicadoresSeleccionados.size === 0) {
+      destruirTodasLasGraficas();
       return;
     }
 
@@ -619,7 +786,7 @@
     ).map((el) => el.value);
 
     if (aniosChecked.length === 0) {
-      if (chart) chart.destroy();
+      destruirTodasLasGraficas();
       return;
     }
 
@@ -636,12 +803,20 @@
     });
 
     // =========================
+    // TIPOLOGIA
+    // =========================
+    if (mostrarTodasUnidades) {
+      const tipologia =
+        document.querySelector("input[name='tipologia']:checked")?.value || "TODAS";
+      params.append("tipologia", tipologia);
+    }
+
+    // =========================
     // INDICADORES
     // =========================
     indicadoresSeleccionados.forEach((i) => {
       params.append("indicadores[]", i);
     });
-
 
     // =========================
     // AÑOS
@@ -653,17 +828,21 @@
     // =========================
     // MESES
     // =========================
-
-
-    // si no hay meses, permitir continuar
     let mesesSeleccionados = obtenerMesesSeleccionados();
 
-    const esVistaAnual = document.getElementById("modoVista").value === "anual";
+    // Validar si no hay meses seleccionados en vista mensual
+    if (!esAnual && mesesSeleccionados.length === 0) {
+      destruirTodasLasGraficas();
 
-    if (!esVistaAnual && mesesSeleccionados.length === 0) {
-      if (chart) {
-        chart.destroy();
-        chart = null;
+      // Limpiamos el contenedor
+      const contenedor = document.getElementById("contenedorGraficas");
+      if (contenedor) {
+        contenedor.innerHTML = `
+        <div class="grafica-container w-100" style="height: 380px; position: relative; width: 100%;">
+          <canvas id="grafica" style="width: 100%; height: 100%;"></canvas>
+        </div>
+        <div id="leyendaPersonalizada" class="mt-3 w-100"></div>
+      `;
       }
       return;
     }
@@ -672,69 +851,46 @@
       params.append("meses[]", m);
     });
 
-
-    // 🔥 DETONADOR ANUAL
+    // DETONADOR ANUAL
     if (esAnual) {
       params.append("meses[]", "13");
     }
-
-
 
     // =========================
     // FETCH
     // =========================
     fetch("/grafica/api/indicadores?" + params.toString())
       .then((r) => {
-
-        // Si Flask redirige al login porque se perdió la sesión
         if (r.redirected) {
           window.location.href = r.url;
           return null;
         }
-
-        // Si la ruta responde sin autorización
         if (r.status === 401) {
           window.location.href = "/login";
           return null;
         }
-
         return r.json();
       })
-
       .then((data) => {
-
-        if (!data) return;
-
-
-
         if (!data || data.length === 0) {
-          if (chart) chart.destroy();
+          destruirTodasLasGraficas();
           return;
         }
 
-        const datosAnuales = data.filter(
-          (item) => Number(item.mes) === 13
-        );
-
-
-
-        //window.ultimoDataRecibido = data;
+        window.ultimoDataRecibido = data;
 
         renderGrafica(data);
 
         if (window.ultimoIndicadorArrastrado) {
-
           validarDatosIndicadorIndividual(
             data,
             window.ultimoIndicadorArrastrado
           );
           restaurarEstadosBadges();
-
         }
-
       })
       .catch((err) => {
-        console.error("Error:", err);
+        console.error("Error al cargar gráfica:", err);
       });
   }
 
@@ -818,6 +974,9 @@
 
   }
 
+
+  // PARTE 2
+
   function restaurarEstadosBadges() {
 
     document.querySelectorAll(".badge-item").forEach(badge => {
@@ -832,13 +991,153 @@
 
   }
 
+  function crearLeyendaPersonalizada(chart) {
+    const contenedor = document.getElementById("leyendaPersonalizada");
+
+
+    if (!contenedor) return;
+
+    contenedor.innerHTML = "";
+    const datasets = chart.data.datasets;
+
+    // 1. Agrupar los datasets por Indicador
+    const grupos = {};
+
+    datasets.forEach((dataset, index) => {
+      // Si es línea de tendencia, se omite
+      if (dataset.label?.includes("Tendencia")) return;
+
+      const nombreIndicador = obtenerNombreIndicador(dataset.indicador) || "General";
+
+      if (!grupos[nombreIndicador]) {
+        grupos[nombreIndicador] = [];
+      }
+
+      grupos[nombreIndicador].push({ dataset, index });
+    });
+
+    // 2. Renderizar cada bloque/grupo de indicador
+    Object.keys(grupos).forEach((nombreIndicador) => {
+      // Contenedor del grupo
+      const bloqueGrupo = document.createElement("div");
+      bloqueGrupo.classList.add("grupo-leyenda");
+
+      // Título de la sección (Nombre del Indicador)
+      const tituloGrupo = document.createElement("h6");
+      tituloGrupo.textContent = nombreIndicador;
+      tituloGrupo.style.width = "100%";
+      tituloGrupo.style.margin = "15px 0 10px 0";
+      tituloGrupo.style.paddingBottom = "4px";
+      tituloGrupo.style.borderBottom = "2px solid #e9ecef";
+      tituloGrupo.style.color = "#2c3e50";
+      tituloGrupo.style.fontSize = "13px";
+      tituloGrupo.style.fontWeight = "bold";
+
+      bloqueGrupo.appendChild(tituloGrupo);
+
+      // Grid para los elementos de este indicador
+      const gridItems = document.createElement("div");
+      gridItems.style.display = "grid";
+      gridItems.style.gridTemplateColumns = "repeat(auto-fit, minmax(240px, 1fr))";
+      gridItems.style.gap = "8px 15px";
+
+      // Ordenar los items del grupo por nombre de unidad
+      grupos[nombreIndicador].sort((a, b) =>
+        a.dataset.label.localeCompare(b.dataset.label)
+      );
+
+      grupos[nombreIndicador].forEach(({ dataset, index }) => {
+        const item = document.createElement("div");
+        item.style.display = "flex";
+        item.style.alignItems = "center";
+        item.style.cursor = "pointer";
+        item.style.fontSize = "11px";
+
+        // 🎨 Canvas mini para replicar exacto el trazado de la gráfica
+        const canvasIcon = document.createElement("canvas");
+        canvasIcon.width = 36;
+        canvasIcon.height = 14;
+        canvasIcon.style.marginRight = "8px";
+        canvasIcon.style.flexShrink = "0";
+
+        const ctxIcon = canvasIcon.getContext("2d");
+        const rawColor = dataset.borderColor || dataset.backgroundColor;
+        const colorFinal = Array.isArray(rawColor) ? rawColor[0] : rawColor;
+
+        ctxIcon.beginPath();
+        ctxIcon.strokeStyle = colorFinal;
+        ctxIcon.lineWidth = 3;
+
+        // Patrón de línea exacto
+        if (dataset.borderDash && dataset.borderDash.length > 0) {
+          ctxIcon.setLineDash(dataset.borderDash);
+        } else {
+          ctxIcon.setLineDash([]);
+        }
+
+        ctxIcon.moveTo(0, 7);
+        ctxIcon.lineTo(36, 7);
+        ctxIcon.stroke();
+
+        // Texto (Nombre de la Unidad)
+        const texto = document.createElement("span");
+        texto.textContent = nombreUnidad(dataset.unidad || dataset.label);
+        texto.style.color = "#495057";
+
+        // Estado inicial si está oculto
+        if (!chart.isDatasetVisible(index)) {
+          texto.style.textDecoration = "line-through";
+          texto.style.opacity = "0.4";
+          canvasIcon.style.opacity = "0.4";
+        }
+
+        // Evento Click para ocultar/mostrar
+        item.onclick = () => {
+          chart.setDatasetVisibility(index, !chart.isDatasetVisible(index));
+          chart.update();
+
+          const vis = chart.isDatasetVisible(index);
+          texto.style.textDecoration = vis ? "none" : "line-through";
+          texto.style.opacity = vis ? "1" : "0.4";
+          canvasIcon.style.opacity = vis ? "1" : "0.4";
+        };
+
+        item.appendChild(canvasIcon);
+        item.appendChild(texto);
+        gridItems.appendChild(item);
+      });
+
+      bloqueGrupo.appendChild(gridItems);
+      contenedor.appendChild(bloqueGrupo);
+    });
+  }
+
+
 
   function renderGrafica(data) {
+    // 🛡️ Guardacostas para data
+    if (!data && window.ultimoDataRecibido) {
+      data = window.ultimoDataRecibido;
+    }
+    if (!data) return;
+    window.ultimoDataRecibido = data;
+
+    // 1. Lectura de radios y controles
+    const radioSeleccionado = document.querySelector('input[name="modoVista"]:checked');
+    const modoVistaSeleccionado = radioSeleccionado ? radioSeleccionado.value : "combinada";
+
     const indicadoresSolicitados = Array.from(indicadoresSeleccionados);
     const unidadesSolicitadas = Array.from(unidadesSeleccionadas);
-    const modoVista = document.getElementById("modoVista").value;
-    const esVistaAnual = modoVista === "anual";
+
+    const modoVistaAnual = document.getElementById("modoVista")?.value;
+    const esVistaAnual = modoVistaAnual === "anual";
     const mesesSeleccionados = obtenerMesesSeleccionados();
+
+    const sw = document.getElementById("switchUnidades");
+    if (sw && unidadesSeleccionadas.size > 0) {
+      sw.checked = false;
+      mostrarTodasUnidades = false;
+    }
 
     const norm = (s) =>
       (s || "")
@@ -854,19 +1153,7 @@
       "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"
     ];
 
-
-
-    // =========================
-    // RESET CHART
-    // =========================
-    //window.ultimoDataRecibido = data;
-
-    if (chart) {
-      chart.destroy();
-      chart = null;
-    }
-
-    const tipoOriginal = document.getElementById("tipoGrafica").value;
+    const tipoOriginal = document.getElementById("tipoGrafica")?.value || "line";
 
     const tituloElt = document.getElementById("tituloGrafica");
     if (tituloElt) {
@@ -884,7 +1171,6 @@
     // ETIQUETAS X
     // =========================
     let etiquetasX;
-
     if (esVistaAnual) {
       etiquetasX = ["Total Anual"];
     } else {
@@ -893,56 +1179,87 @@
           ? mesesSeleccionados
           : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
-
       etiquetasX = mesesBase.map((m) => mesesLabels[m - 1]);
     }
 
     // =========================
-    // COMBOS (CLAVE DATASETS)
+    // COMBOS Y FILTRADO DE DATOS
     // =========================
-    const combos = [
-      ...new Set(
-        data.map((d) => {
-          const u = norm(limpiarNombreUnidad(d.nombre_unidad));
-          return `${norm(d.indicador)}|||${d.anio}|||${u}`;
-        })
-      ),
-    ];
+    let datosGrafica = data;
+    const acumularPorTipologia = document.getElementById("switchAcumularTipologia")?.checked || false;
 
-    const mostrarTendencia =
-      document.getElementById("switchTendencia")?.checked || false;
+    if (unidadesSeleccionadas.size === 0 && !mostrarTodasUnidades) {
+      datosGrafica = data.filter(d =>
+        d.nombre_unidad === "TOTAL GENERAL" || d.nombre_unidad === "TOTAL"
+      );
+    }
 
-    const mostrarEtiquetas =
-      document.getElementById("switchEtiquetas")?.checked || false;
+    if (unidadesSeleccionadas.size === 0 && mostrarTodasUnidades) {
+      datosGrafica = data;
+      if (tipologiaSeleccionada !== "TODAS") {
+        datosGrafica = datosGrafica.filter(d =>
+          (d.tipologia || "").trim().toUpperCase() === tipologiaSeleccionada.trim().toUpperCase()
+        );
+      }
+    }
+
+    // Generación correcta de combos
+    let combos = [];
+
+    if (mostrarTodasUnidades && acumularPorTipologia) {
+      // Modo Acumulado por Tipología
+      combos = [
+        ...new Set(
+          datosGrafica.map((d) => {
+            const tip = (d.tipologia || "OTRO").trim().toUpperCase();
+            return `${norm(d.indicador)}|||${d.anio}|||TIPOLOGIA_${tip}`;
+          })
+        ),
+      ];
+    } else {
+      // Modo Normal por Unidad
+      combos = [
+        ...new Set(
+          datosGrafica.map((d) => {
+            const u = norm(limpiarNombreUnidad(d.nombre_unidad));
+            return `${norm(d.indicador)}|||${d.anio}|||${u}`;
+          })
+        ),
+      ];
+    }
+
+    const mostrarTendencia = document.getElementById("switchTendencia")?.checked || false;
 
     // =========================
-    // DATASETS
+    // DATASETS (CONSTRUCCIÓN GLOBAL)
     // =========================
     const datasets = combos.flatMap((c) => {
       const [indicadorNom, anioNom, unidadLimpia] = c.split("|||");
-
       let valores = [];
+      const esModoTipologia = unidadLimpia.startsWith("TIPOLOGIA_");
+      const claveTipologia = esModoTipologia ? unidadLimpia.replace("TIPOLOGIA_", "") : null;
 
-      // =========================
-      // MENSUAL
-      // =========================
       if (!esVistaAnual) {
+        // Filtrar registros según sea por Tipología Acumulada o por Unidad individual
+        const registros = datosGrafica.filter((d) => {
+          const coincideInd = norm(d.indicador) === norm(indicadorNom);
+          const coincideAnio = String(d.anio) === String(anioNom);
+          const esMesValido = Number(d.mes) >= 1 && Number(d.mes) <= 12;
 
+          if (!coincideInd || !coincideAnio || !esMesValido) return false;
 
-        const registros = data.filter(
-          (d) =>
-            norm(d.indicador) === norm(indicadorNom) &&
-            String(d.anio) === String(anioNom) &&
-            norm(limpiarNombreUnidad(d.nombre_unidad)) === unidadLimpia &&
-            Number(d.mes) >= 1 &&
-            Number(d.mes) <= 12
-        );
+          if (esModoTipologia) {
+            return (d.tipologia || "OTRO").trim().toUpperCase() === claveTipologia;
+          } else {
+            return norm(limpiarNombreUnidad(d.nombre_unidad)) === unidadLimpia;
+          }
+        });
 
+        // Sumar los valores mes a mes (acumulación)
         const mapaMeses = {};
-
         registros.forEach((r) => {
           const m = Number(r.mes);
-          mapaMeses[m] = Number(r.valor || 0);
+          mapaMeses[m] = (mapaMeses[m] || 0) + Number(r.valor || 0);
         });
 
         const mesesBase =
@@ -951,68 +1268,47 @@
             : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
         valores = mesesBase.map((m) => mapaMeses[m] || 0);
+      } else {
+        // Vista Anual (mes 13)
+        const registros = datosGrafica.filter((d) => {
+          const coincideInd = norm(d.indicador) === norm(indicadorNom);
+          const coincideAnio = String(d.anio) === String(anioNom);
+          const esMes13 = Number(d.mes) === 13;
+
+          if (!coincideInd || !coincideAnio || !esMes13) return false;
+
+          if (esModoTipologia) {
+            return (d.tipologia || "OTRO").trim().toUpperCase() === claveTipologia;
+          } else {
+            return norm(limpiarNombreUnidad(d.nombre_unidad)) === unidadLimpia;
+          }
+        });
+
+        const totalAnual = registros.reduce((acc, r) => acc + Number(r.valor || 0), 0);
+        valores = [totalAnual];
       }
 
-      else {
-
-
-        const registros = data.filter(
-          (d) =>
-            norm(d.indicador) === norm(indicadorNom) &&
-            String(d.anio) === String(anioNom) &&
-            norm(limpiarNombreUnidad(d.nombre_unidad)) === unidadLimpia &&
-            Number(d.mes) === 13
-        );
-
-
-
-        valores = [
-          registros.length
-            ? Number(registros[0].valor || 0)
-            : 0
-        ];
-
-      }
-      // =========================
-      // COLOR
-      // =========================
       function generarColor({ unidad, indicador, anio }) {
-
-        // Caso 1: una sola unidad (o múltiples años de la misma unidad)
         const soloUnaUnidad = Array.from(unidadesSeleccionadas || []).length === 1;
 
         if (soloUnaUnidad) {
-
-          // 🎯 paleta fuerte de colores (bien separados visualmente)
           const paleta = [
-            "hsl(0, 70%, 55%)",     // rojo
-            "hsl(35, 80%, 55%)",    // naranja
-            "hsl(60, 70%, 45%)",    // amarillo
-            "hsl(120, 55%, 45%)",   // verde
-            "hsl(180, 60%, 45%)",   // cyan
-            "hsl(220, 65%, 55%)",   // azul
-            "hsl(270, 60%, 55%)",   // morado
-            "hsl(320, 60%, 55%)",   // rosa
-            "hsl(10, 70%, 60%)",    // rojo suave
-            "hsl(90, 55%, 50%)"     // verde lima
+            "hsl(0, 70%, 55%)", "hsl(35, 80%, 55%)", "hsl(60, 70%, 45%)",
+            "hsl(120, 55%, 45%)", "hsl(180, 60%, 45%)", "hsl(220, 65%, 55%)",
+            "hsl(270, 60%, 55%)", "hsl(320, 60%, 55%)", "hsl(10, 70%, 60%)",
+            "hsl(90, 55%, 50%)"
           ];
-
           const index = parseInt(anio) % paleta.length;
-
           return paleta[index];
         }
 
-        // Caso 2: múltiples unidades → color por unidad (tu lógica actual mejorada)
         const key = `${unidad}-${indicador}`;
         let hash = 0;
-
         for (let i = 0; i < key.length; i++) {
           hash = (hash << 5) - hash + key.charCodeAt(i);
           hash |= 0;
         }
-
         const hue = Math.abs(hash) % 360;
-
         return `hsl(${hue}, 45%, 55%)`;
       }
 
@@ -1022,22 +1318,35 @@
         anio: anioNom
       });
 
-      // Evitar líneas vacías
-      if (valores.every(v => Number(v) === 0)) {
-        return [];
-      }
+      if (valores.every(v => Number(v) === 0)) return [];
 
+      const estilosLinea = [
+        [], [6, 6], [2, 3], [12, 4, 2, 4], [8, 4], [12, 3, 3, 3, 3, 3], [2, 6], [15, 3, 2, 3, 2, 3]
+      ];
+
+      const listaIndicadores = Array.from(indicadoresSeleccionados);
+      const idxIndicador = listaIndicadores.indexOf(indicadorNom);
+      const estiloDash = estilosLinea[idxIndicador % estilosLinea.length];
+
+      // Formatear la etiqueta si es Tipología o Unidad
+      const nombreEtiqueta = esModoTipologia
+        ? `ACUMULADO ${claveTipologia}`
+        : nombreUnidad(unidadLimpia);
 
       const baseDataset = {
-        label: `${unidadLimpia} - ${indicadorNom} (${anioNom})`,
+        label: `${nombreEtiqueta} - ${obtenerNombreIndicador(indicadorNom)} (${anioNom})`,
+        unidad: unidadLimpia,
+        indicador: indicadorNom,
+        anio: anioNom,
         data: valores,
+        borderColor: colorBase,
+        borderDash: estiloDash,
+        borderWidth: 2,
+        tension: 0.4,
         backgroundColor:
           tipoOriginal === "area"
             ? colorBase.replace("hsl", "hsla").replace(")", ",0.4)")
             : colorBase,
-        borderColor: colorBase,
-        borderWidth: 2,
-        tension: 0.4,
         fill: tipoOriginal === "area",
         showLine: tipoOriginal !== "scatter",
         pointRadius: tipoOriginal === "scatter" ? 6 : 4,
@@ -1051,7 +1360,10 @@
       return [
         baseDataset,
         {
-          label: `Tendencia - ${unidadLimpia}`,
+          label: `Tendencia - ${nombreEtiqueta}`,
+          indicador: indicadorNom,
+          unidad: unidadLimpia,
+          anio: anioNom,
           data: tendencia,
           type: "line",
           borderColor: "#e74c3c",
@@ -1063,135 +1375,271 @@
       ];
     });
 
-
-
-    // =========================
-    // CHART
-    // =========================
-    const canvas = document.getElementById("grafica");
-    if (!canvas) return console.error("No canvas");
-
-    const ctx = canvas.getContext("2d");
-
-    chart = new Chart(ctx, {
-      type: tipoChartJS,
-      data: {
-        labels: etiquetasX,
-        datasets,
+    // Configuración de Opciones de Chart.js
+    const obtenerOpcionesGrafica = () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: {
+        padding: { top: 35, right: 20, bottom: 10, left: 10 },
       },
-
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        layout: {
-          padding: {
-            top: 35,
-            right: 20,
-            bottom: 10,
-            left: 10,
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          display: function (context) {
+            const sw = document.getElementById("switchEtiquetas");
+            if (!sw || !sw.checked) return false;
+            if (context.dataset.label?.includes("Tendencia")) return false;
+            return true;
           },
+          anchor: "end",
+          align: "top",
+          offset: 6,
+          backgroundColor: "rgba(255,255,255,0.95)",
+          borderColor: "#2c3e50",
+          borderWidth: 1,
+          borderRadius: 6,
+          color: "#2c3e50",
+          padding: 4,
+          font: { size: 11, weight: "bold" },
+          formatter: (v) => new Intl.NumberFormat("es-MX").format(v),
         },
-
-        plugins: {
-          // =========================
-          // LEYENDA
-          // =========================
-          legend: {
-            display: true,
-            position: "bottom",
-            labels: {
-              boxWidth: 12,
-              usePointStyle: true,
-              font: {
-                size: 11,
-                weight: "600",
-              },
-            },
-          },
-
-          // =========================
-          // ETIQUETAS (DATALABELS)
-          // =========================
-          datalabels: {
-            display: function (context) {
-              const sw = document.getElementById("switchEtiquetas");
-              if (!sw || !sw.checked) return false;
-
-              // ❌ NO mostrar en tendencia
-              if (context.dataset.label?.includes("Tendencia")) {
-                return false;
-              }
-
-              return true;
-            },
-
-            anchor: "end",
-            align: "top",
-
-            offset: 6,
-
-            clip: false,
-            clamp: false,
-
-            backgroundColor: "rgba(255,255,255,0.95)",
-            borderColor: "#2c3e50",
-            borderWidth: 1,
-            borderRadius: 6,
-
-            color: "#2c3e50",
-
-            padding: 4,
-
-            font: {
-              size: 11,
-              weight: "bold",
-            },
-
-            formatter: (v) => new Intl.NumberFormat("es-MX").format(v),
-          },
-        },
-
-        scales: esVistaAnual
-          ? {}
-          : {
-            x: {
-              ticks: {
-                font: { size: 10 },
-              },
-            },
-            y: {
-              beginAtZero: true,
-            },
-          },
       },
+      scales: esVistaAnual
+        ? {}
+        : {
+          x: { ticks: { font: { size: 10 } } },
+          y: { beginAtZero: true },
+        },
     });
+
+    // ===================================================
+    // 🚀 RENDERIZADO SEGÚN EL MODO DE VISTA
+    // ===================================================
+    const contenedor = document.getElementById("contenedorGraficas");
+
+    if (!contenedor) {
+      console.error("No se encontró el contenedor 'contenedorGraficas'");
+      return;
+    }
+
+    // Limpieza de instancias
+    if (typeof chart !== "undefined" && chart) {
+      chart.destroy();
+      chart = null;
+    }
+    if (Array.isArray(instanciasCharts)) {
+      instanciasCharts.forEach(c => c.destroy());
+      instanciasCharts = [];
+    }
+
+    if (modoVistaSeleccionado === "combinada") {
+      contenedor.innerHTML = `
+      <div class="grafica-container" style="height: 380px; position: relative;">
+        <canvas id="grafica"></canvas>
+      </div>
+      <div id="leyendaPersonalizada" class="mt-3"></div>
+    `;
+
+      const canvas = document.getElementById("grafica");
+      const ctx = canvas.getContext("2d");
+
+      chart = new Chart(ctx, {
+        type: tipoChartJS,
+        data: { labels: etiquetasX, datasets },
+        options: obtenerOpcionesGrafica()
+      });
+
+      if (typeof crearLeyendaPersonalizada === "function") {
+        crearLeyendaPersonalizada(chart);
+      }
+
+      // ----------------------------------------------------
+      // OPCIÓN 2: VISTA POR INDICADOR (SEPARADA)
+      // ----------------------------------------------------
+    } else {
+
+      // Agrupamos los datasets por su propiedad 'indicador'
+      const gruposDatasets = {};
+
+      datasets.forEach(ds => {
+        // Obtenemos la clave del indicador directamente del dataset
+        const indKey = ds.indicador || "general";
+
+        if (!gruposDatasets[indKey]) {
+          gruposDatasets[indKey] = [];
+        }
+        gruposDatasets[indKey].push(ds);
+      });
+
+      const listaClaves = Object.keys(gruposDatasets);
+      contenedor.innerHTML = ""; // Limpiamos el contenedor
+
+      listaClaves.forEach((indKey, index) => {
+        const subDatasets = gruposDatasets[indKey];
+
+        const nombreInd = typeof obtenerNombreIndicador === "function"
+          ? obtenerNombreIndicador(indKey)
+          : indKey;
+
+        const cardDiv = document.createElement("div");
+        cardDiv.className = "tarjeta-subgrafica mb-4 p-3 border rounded bg-white shadow-sm w-100";
+        cardDiv.innerHTML = `
+          <h6 class="fw-bold text-primary mb-3 border-bottom pb-2" style="font-size: 13px; text-transform: uppercase;">
+            📊 Indicador: ${nombreInd}
+          </h6>
+          <div style="height: 280px; position: relative;" class="w-100">
+            <canvas id="grafica_sub_${index}"></canvas>
+          </div>
+          <div id="leyenda_sub_${index}" class="mt-3"></div>
+        `;
+        contenedor.appendChild(cardDiv);
+
+        const canvasSub = document.getElementById(`grafica_sub_${index}`);
+        const ctxSub = canvasSub.getContext("2d");
+
+        const subChart = new Chart(ctxSub, {
+          type: tipoChartJS,
+          data: { labels: etiquetasX, datasets: subDatasets },
+          options: obtenerOpcionesGrafica()
+        });
+
+        if (Array.isArray(instanciasCharts)) {
+          instanciasCharts.push(subChart);
+        }
+
+        if (typeof renderizarLeyendaEnContenedor === "function") {
+          renderizarLeyendaEnContenedor(subChart, `leyenda_sub_${index}`);
+        }
+      });
+    }
+  }
+
+
+  // PARTE 3
+
+  // Función auxiliar para redireccionar la leyenda en vistas dinámicas
+  function renderizarLeyendaEnContenedor(chartInstance, targetId) {
+    const target = document.getElementById(targetId);
+    if (!target) return;
+
+    const tempDiv = document.createElement("div");
+    tempDiv.id = "leyendaPersonalizada";
+    target.appendChild(tempDiv);
+
+    crearLeyendaPersonalizada(chartInstance);
+    tempDiv.removeAttribute("id");
   }
 
 
   function bindUIEvents() {
 
-    document.getElementById("modoVista")?.addEventListener("change", cargarGrafica);
+    // 1. VISTA ANUAL / MENSUAL
+    document.getElementById("modoVista")
+      ?.addEventListener("change", cargarGrafica);
 
-    document.getElementById("switchTendencia")?.addEventListener("change", cargarGrafica);
 
-    document.getElementById("switchEtiquetas")?.addEventListener("change", cargarGrafica);
+    // 2. SWITCH TENDENCIA (Render inmediato en memoria)
+    document.getElementById("switchTendencia")
+      ?.addEventListener("change", () => {
+        if (window.ultimoDataRecibido) renderGrafica(window.ultimoDataRecibido);
+        else cargarGrafica();
+      });
 
-    document.getElementById("tipoGrafica")?.addEventListener("change", () => {
-      cargarGrafica();
+
+    // 3. SWITCH ETIQUETAS (Render inmediato en memoria)
+    document.getElementById("switchEtiquetas")
+      ?.addEventListener("change", () => {
+        if (window.ultimoDataRecibido) renderGrafica(window.ultimoDataRecibido);
+        else cargarGrafica();
+      });
+
+
+    // 4. SWITCH ACUMULAR POR TIPOLOGÍA (Render inmediato en memoria)
+    document.getElementById("switchAcumularTipologia")
+      ?.addEventListener("change", () => {
+        if (window.ultimoDataRecibido) renderGrafica(window.ultimoDataRecibido);
+        else cargarGrafica();
+      });
+
+
+    // 5. MOSTRAR UNIDADES (Ajustado con inline-flex para respetar la barra alineada)
+    document.getElementById("switchUnidades")
+      ?.addEventListener("change", function () {
+        mostrarTodasUnidades = this.checked;
+
+        // Contenedor de Tipologías (HG, HC, HE...)
+        const contenedorTipologia = document.getElementById("contenedorTipologia");
+        if (contenedorTipologia) {
+          // Usamos 'inline-flex' para convivir con los demás botones de la barra sin forzar saltos bruscos
+          contenedorTipologia.style.setProperty('display', this.checked ? "inline-flex" : "none", 'important');
+        }
+
+        // Contenedor del Switch Acumular por Tipología
+        const contenedorAcumular = document.getElementById("contenedorAcumularTipologia");
+        if (contenedorAcumular) {
+          contenedorAcumular.style.setProperty('display', this.checked ? "inline-flex" : "none", 'important');
+        }
+
+        // Si se apaga Mostrar Unidades, desmarcamos el de acumular
+        if (!this.checked) {
+          const swAcumular = document.getElementById("switchAcumularTipologia");
+          if (swAcumular) swAcumular.checked = false;
+        }
+
+        cargarGrafica();
+      });
+
+
+    // 6. CAMBIO DE TIPOLOGÍA (HG, HC, HE, TODAS)
+    document.querySelectorAll('input[name="tipologia"]').forEach((radio) => {
+      radio.addEventListener("change", function () {
+        tipologiaSeleccionada = this.value;
+
+        if (mostrarTodasUnidades) {
+          if (window.ultimoDataRecibido) {
+            renderGrafica(window.ultimoDataRecibido);
+          } else {
+            cargarGrafica();
+          }
+        }
+      });
     });
 
+
+    // 7. TIPO DE GRÁFICA (Línea, Barra, Área, etc.)
+    document.getElementById("tipoGrafica")
+      ?.addEventListener("change", () => {
+        if (window.ultimoDataRecibido) renderGrafica(window.ultimoDataRecibido);
+        else cargarGrafica();
+      });
+
+
+    // 8. FILTROS DE AÑOS
     document.addEventListener("change", (e) => {
       if (e.target.classList.contains("anio-check")) {
         cargarGrafica();
       }
     });
 
-    document.querySelectorAll(".mes-check").forEach(el => {
+
+    // 9. FILTROS DE MESES
+    document.querySelectorAll(".mes-check").forEach((el) => {
       el.addEventListener("change", cargarGrafica);
     });
+
+
+    // 10. MODO DE VISTA (Combinada vs Separada por Indicador)
+    document.querySelectorAll('input[name="modoVista"]').forEach((radio) => {
+      radio.addEventListener("change", () => {
+        if (window.ultimoDataRecibido) {
+          renderGrafica(window.ultimoDataRecibido);
+        } else {
+          cargarGrafica();
+        }
+      });
+    });
+
   }
-
-
 
   function calcularTendencia(data) {
     if (!data || data.length < 2) return [];
@@ -1265,7 +1713,41 @@
       "Dic",
     ];
 
+    // =========================
+    // MESES
+    // =========================
     let mesesSeleccionados = obtenerMesesSeleccionados();
+
+    const esVistaAnual = document.getElementById("modoVista").value === "anual";
+
+    // 🔑 Si no hay meses y no estamos en vista anual, destruimos TODAS las instancias de gráficas
+    if (!esVistaAnual && mesesSeleccionados.length === 0) {
+
+      // 1. Destruir gráfica principal (Combinada)
+      if (typeof chart !== "undefined" && chart) {
+        chart.destroy();
+        chart = null;
+      }
+
+      // 2. Destruir subgráficas (Vista por Indicador)
+      if (typeof instanciasCharts !== "undefined" && Array.isArray(instanciasCharts)) {
+        instanciasCharts.forEach((c) => c && c.destroy());
+        instanciasCharts = [];
+      }
+
+      // 3. Limpiar visualmente el contenedor
+      const contenedor = document.getElementById("contenedorGraficas");
+      if (contenedor) {
+        contenedor.innerHTML = `
+        <div class="grafica-container w-100" style="height: 380px; position: relative; width: 100%;">
+          <canvas id="grafica" style="width: 100%; height: 100%;"></canvas>
+        </div>
+        <div id="leyendaPersonalizada" class="mt-3 w-100"></div>
+      `;
+      }
+
+      return; // Interrumpimos la ejecución de la API
+    }
 
     const params = new URLSearchParams();
 
@@ -1284,78 +1766,6 @@
 
     aniosChecked.forEach((a) => params.append("anios[]", a));
 
-    // =========================
-    // UNIDADES
-    // =========================
-    const unidadesSeleccion =
-      typeof unidadesSeleccionadas !== "undefined" &&
-        unidadesSeleccionadas.size > 0
-        ? Array.from(unidadesSeleccionadas)
-        : typeof todasUnidades !== "undefined"
-          ? todasUnidades.map((u) => u.clues)
-          : [];
-
-    unidadesSeleccion.forEach((u) => params.append("clues[]", u));
-
-    // =========================
-    // INDICADORES 🔥 FIX
-    // =========================
-    const indicadoresSeleccion =
-      typeof indicadoresSeleccionados !== "undefined" &&
-        indicadoresSeleccionados.size > 0
-        ? Array.from(indicadoresSeleccionados)
-        : [];
-
-    indicadoresSeleccion.forEach((i) => params.append("indicadores[]", i));
-
-    // =========================
-    // MESES 🔥 FIX CRÍTICO
-    // =========================
-    if (mesesSeleccionados.length === 0) {
-      alert("Selecciona al menos un mes.");
-      resetBotonExcel();
-      return;
-    }
-
-    mesesSeleccionados.forEach((m) => {
-      params.append("meses[]", m);
-    });
-
-    if (esAnual) {
-      params.append("meses[]", "13");
-    }
-
-    // =========================
-    // FETCH
-    // =========================
-    let dataTotal = [];
-
-
-    try {
-      const res = await fetch("/grafica/api/indicadores?" + params.toString());
-      dataTotal = await res.json();
-
-
-      if (!dataTotal.length) {
-        alert("No hay datos.");
-        resetBotonExcel();
-        return;
-      }
-    } catch (e) {
-      console.error(e);
-      alert("Error al conectar con el servidor.");
-      resetBotonExcel();
-      return;
-    }
-
-
-    // =========================
-    // COLUMNAS
-    // =========================
-    const columnasSet = new Set();
-    dataTotal.forEach((d) => {
-      if (d.indicador) columnasSet.add(d.indicador.trim());
-    });
 
     const columnasDeseadas = [
       "especialidad",
@@ -1470,10 +1880,174 @@
       "hab_uci_adulto",
       "hab_uci_ped",
       "hab_otras_areas",
-     
+
     ];
 
-    const columnas = columnasDeseadas.filter((c) => columnasSet.has(c));
+    const columnasEquipo = [
+      "arco_c_analogo",
+      "arco_c_digital",
+      "bascula_estadimetro",
+      "bascula_bebe",
+      "camilla_radiotransp",
+      "cardiotocografo",
+      "carro_rojo_reanim",
+      "cuna_calor_rad",
+      "cuna_calor_rad_foto",
+      "defibrilador_monit",
+      "ecocardiografo",
+      "electrocardiografo",
+      "estuche_diag",
+      "incubadora_fototer",
+      "incubadora_trasl",
+      "incubadora_cuidados",
+      "lampara_quirurgica_doble",
+      "lampara_quir_port",
+      "lampara_quir_senc",
+      "mesa_quir_obs",
+      "mesa_exploracion",
+      "mesa_quir_gral",
+      "microscopio_rutina",
+      "monitor_radiacion",
+      "monitor_signos_vit_avanz",
+      "monitor_signos_neo",
+      "monitor_signos_bas",
+      "monitor_traslado",
+      "monitor_signos_int",
+      "monitor_signos_vit_neona",
+      "monitor_anestesia",
+      "negatoscopio",
+      "refrige_lab",
+      "sierra_yesos",
+      "ultrasonido_diag",
+      "unidad_anestesia_bas",
+      "ultrasonido_terap",
+      "unidad_dental",
+      "unidad_rx_analogo",
+      "unidad_rx_dental",
+      "unidad_rx_digital",
+      "unidad_rx_port_ana",
+      "unidad_rx_port_dig",
+      "fluoroscopio_dig",
+      "fluoroscopio_dig_analog",
+      "mastografo_digital",
+      "mastografo_estereo",
+      "mastografo_estereo_tomosin",
+      "microscopio_cirugia",
+      "resonancia_mag",
+      "tomografo_128",
+      "tomografo_16",
+      "tomografo_32",
+      "tomografo_64"
+    ];
+
+    // =========================
+    // UNIDADES
+    // =========================
+    const unidadesSeleccion =
+      typeof unidadesSeleccionadas !== "undefined" &&
+        unidadesSeleccionadas.size > 0
+        ? Array.from(unidadesSeleccionadas)
+        : typeof todasUnidades !== "undefined"
+          ? todasUnidades.map((u) => u.clues)
+          : [];
+
+    unidadesSeleccion.forEach((u) => params.append("clues[]", u));
+
+    // =========================
+    // INDICADORES SELECCIONADOS
+    // =========================
+    const indicadoresSeleccion =
+      typeof indicadoresSeleccionados !== "undefined" &&
+        indicadoresSeleccionados.size > 0
+        ? Array.from(indicadoresSeleccionados)
+        : [];
+
+
+    indicadoresSeleccion.forEach((i) => {
+      params.append("indicadores[]", i);
+    });
+
+    // =========================
+    // MESES 🔥 FIX CRÍTICO
+    // =========================
+    if (mesesSeleccionados.length === 0) {
+      alert("Selecciona al menos un mes.");
+      resetBotonExcel();
+      return;
+    }
+
+    mesesSeleccionados.forEach((m) => {
+      params.append("meses[]", m);
+    });
+
+    if (esAnual) {
+      params.append("meses[]", "13");
+    }
+
+    // =========================
+    // FETCH
+    // =========================
+    let dataTotal = [];
+
+
+    try {
+      const res = await fetch("/grafica/api/indicadores?" + params.toString());
+      dataTotal = await res.json();
+
+
+      if (!dataTotal.length) {
+        alert("No hay datos.");
+        resetBotonExcel();
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error al conectar con el servidor.");
+      resetBotonExcel();
+      return;
+    }
+
+    // =========================
+    // COLUMNAS DISPONIBLES EN DATOS
+    // =========================
+
+    const columnasSet = new Set();
+
+    dataTotal.forEach((d) => {
+      if (d.indicador) {
+        columnasSet.add(d.indicador.trim());
+      }
+    });
+
+
+    // =========================
+    // COLUMNAS PARA EXCEL
+    // =========================
+    const columnas = [];
+
+
+    // Indicadores hospitalarios normales
+    columnasDeseadas.forEach((c) => {
+      if (columnasSet.has(c)) {
+        columnas.push(c);
+      }
+    });
+
+
+    // Equipo médico solamente si fue seleccionado
+    columnasEquipo.forEach((c) => {
+
+      if (
+        columnasSet.has(c) &&
+        indicadoresSeleccion.includes(c)
+      ) {
+        columnas.push(c);
+      }
+
+    });
+
+
+    // const columnas = columnasDeseadas.filter((c) => columnasSet.has(c));
 
     // =========================
     // FILTRADO FINAL
@@ -1728,7 +2302,64 @@
       "hab_uci_adulto",
       "hab_uci_ped",
       "hab_otras_areas",
-      
+
+    ],
+
+    "EQUIPO MEDICO": [
+      "arco_c_analogo",
+      "arco_c_digital",
+      "bascula_estadimetro",
+      "bascula_bebe",
+      "camilla_radiotransp",
+      "cardiotocografo",
+      "carro_rojo_reanim",
+      "cuna_calor_rad",
+      "cuna_calor_rad_foto",
+      "defibrilador_monit",
+      "ecocardiografo",
+      "electrocardiografo",
+      "estuche_diag",
+      "incubadora_fototer",
+      "incubadora_trasl",
+      "incubadora_cuidados",
+      "lampara_quirurgica_doble",
+      "lampara_quir_port",
+      "lampara_quir_senc",
+      "mesa_quir_obs",
+      "mesa_exploracion",
+      "mesa_quir_gral",
+      "microscopio_rutina",
+      "monitor_radiacion",
+      "monitor_signos_vit_avanz",
+      "monitor_signos_neo",
+      "monitor_signos_bas",
+      "monitor_traslado",
+      "monitor_signos_int",
+      "monitor_signos_vit_neona",
+      "monitor_anestesia",
+      "negatoscopio",
+      "refrige_lab",
+      "sierra_yesos",
+      "ultrasonido_diag",
+      "unidad_anestesia_bas",
+      "ultrasonido_terap",
+      "unidad_dental",
+      "unidad_rx_analogo",
+      "unidad_rx_dental",
+      "unidad_rx_digital",
+      "unidad_rx_port_ana",
+      "unidad_rx_port_dig",
+      "fluoroscopio_dig",
+      "fluoroscopio_dig_analog",
+      "mastografo_digital",
+      "mastografo_estereo",
+      "mastografo_estereo_tomosin",
+      "microscopio_cirugia",
+      "resonancia_mag",
+      "tomografo_128",
+      "tomografo_16",
+      "tomografo_32",
+      "tomografo_64"
     ],
 
   };
@@ -1845,13 +2476,76 @@
     hab_cuid_int: "Hab Cuid Int",
     hab_uci_adulto: "Hab Uci Adulto",
     hab_uci_ped: "Hab Uci Ped",
-    hab_otras_areas: "Total No Censables"
-   
+    hab_otras_areas: "Total No Censables",
+
+    // EQUIPO MEDICO
+    arco_c_analogo: "Arco C Analogo",
+    arco_c_digital: "Arco C Digital",
+    bascula_estadimetro: "Bascula Estadimetro",
+    bascula_bebe: "Bascula Bebe",
+    camilla_radiotransp: "Camilla Radiotransp",
+    cardiotocografo: "Cardiotocografo",
+    carro_rojo_reanim: "Carro Rojo Reanim",
+    cuna_calor_rad: "Cuna Calor Rad",
+    cuna_calor_rad_foto: "Cuna Calor Rad Foto",
+    defibrilador_monit: "Defibrilador Monit",
+    ecocardiografo: "Ecocardiografo",
+    electrocardiografo: "Electrocardiografo",
+    estuche_diag: "Estuche Diag",
+    incubadora_fototer: "Incubadora Fototer",
+    incubadora_trasl: "Incubadora Trasl",
+    incubadora_cuidados: "Incubadora Cuidados",
+    lampara_quirurgica_doble: "Lampara Quirurgica Doble",
+    lampara_quir_port: "Lampara Quir Port",
+    lampara_quir_senc: "Lampara Quir Senc",
+    mesa_quir_obs: "Mesa Quir Obs",
+    mesa_exploracion: "Mesa Exploracion",
+    mesa_quir_gral: "Mesa Quir Gral",
+    microscopio_rutina: "Microscopio Rutina",
+    monitor_radiacion: "Monitor Radiacion",
+    monitor_signos_vit_avanz: "Monitor Signos Vit Avanz",
+    monitor_signos_neo: "Monitor Signos Neo",
+    monitor_signos_bas: "Monitor Signos Bas",
+    monitor_traslado: "Monitor Traslado",
+    monitor_signos_int: "Monitor Signos Int",
+    monitor_signos_vit_neona: "Monitor Signos Vit Neona",
+    monitor_anestesia: "Monitor Anestesia",
+    negatoscopio: "Negatoscopio",
+    refrige_lab: "Refrige Lab",
+    sierra_yesos: "Sierra Yesos",
+    ultrasonido_diag: "Ultrasonido Diag",
+    unidad_anestesia_bas: "Unidad Anestesia Bas",
+    ultrasonido_terap: "Ultrasonido Terap",
+    unidad_dental: "Unidad Dental",
+    unidad_rx_analogo: "Unidad Rx Analogo",
+    unidad_rx_dental: "Unidad Rx Dental",
+    unidad_rx_digital: "Unidad Rx Digital",
+    unidad_rx_port_ana: "Unidad Rx Port Ana",
+    unidad_rx_port_dig: "Unidad Rx Port Dig",
+    fluoroscopio_dig: "Fluoroscopio Dig",
+    fluoroscopio_dig_analog: "Fluoroscopio Dig Analog",
+    mastografo_digital: "Mastografo Digital",
+    mastografo_estereo: "Mastografo Estereo",
+    mastografo_estereo_tomosin: "Mastografo Estereo Tomosin",
+    microscopio_cirugia: "Microscopio Cirugia",
+    resonancia_mag: "Resonancia Mag",
+    tomografo_128: "Tomografo 128",
+    tomografo_16: "Tomografo 16",
+    tomografo_32: "Tomografo 32",
+    tomografo_64: "Tomografo 64"
+
   };
+
+
+
+  //ETAPA 4
+
 
   // =========================
   // EXPORTAR EXCEL PRO
   // =========================
+
+
 
   function exportarXLSX(matriz, columnas) {
     const data = [];
@@ -1956,7 +2650,8 @@
       "EGRESOS POR DEFUNCIONES": { oscuro: "7F6000", claro: "FFF2CC" },
       "PORCENTAJE DE OCUPACION": { oscuro: "00838F", claro: "D9F2F2" },
       "INDICADORES DE HOSPITALIZACION": { oscuro: "0B6E4F", claro: "DDEFE8" },
-      "INFRAESTRUCTURA (SINERHIAS)": { oscuro: "44546A", claro: "D9E2F3" }
+      "INFRAESTRUCTURA (SINERHIAS)": { oscuro: "44546A", claro: "D9E2F3" },
+      "EQUIPO MEDICO": { oscuro: "B45F06", claro: "FCE4D6" }
     };
 
     // -------------------------------------------------------------
@@ -2089,29 +2784,52 @@
 
 
   function limpiarTodo() {
-    // 1. Vaciar los Sets de selección
+    // 1. Vaciar los Sets de selección y reiniciar variables globales de estado
     unidadesSeleccionadas.clear();
     indicadoresSeleccionados.clear();
     avisosMostrados.clear();
     alertasMostradas.clear();
     indicadoresSinDatos.clear();
     window.ultimoIndicadorArrastrado = null;
+    window.ultimoDataRecibido = null;
+
+    // 🔑 REINICIO DE ESTADOS GLOBALES (Esto corrige el problema):
+    mostrarTodasUnidades = false;
+    tipologiaSeleccionada = "TODAS";
 
     // 2. Limpiar visualmente la Drop Zone
     const dropZone = document.getElementById("dropZone");
-    const placeholder = dropZone.querySelector(".placeholder-text");
+    const placeholder = dropZone ? dropZone.querySelector(".placeholder-text") : null;
 
-    const badges = dropZone.querySelectorAll(".badge-item");
+    const badges = document.querySelectorAll(".badge-item");
     badges.forEach((b) => b.remove());
 
     if (placeholder) {
       placeholder.style.display = "block";
     }
 
-    // 3. Destruir gráfica si existe
-    if (chart) {
+    // 3. Destruir TODAS las gráficas de Chart.js
+    if (typeof chart !== "undefined" && chart) {
       chart.destroy();
       chart = null;
+    }
+
+    if (Array.isArray(instanciasCharts)) {
+      instanciasCharts.forEach((c) => c && c.destroy());
+      instanciasCharts = [];
+    }
+
+    // 3.1 Restructurar el contenedor
+    const contenedor = document.getElementById("contenedorGraficas");
+    if (contenedor) {
+      contenedor.style.width = "100%";
+      contenedor.className = "w-100 col-12";
+      contenedor.innerHTML = `
+      <div class="grafica-container w-100" style="height: 380px; position: relative; width: 100%;">
+        <canvas id="grafica" style="width: 100%; height: 100%;"></canvas>
+      </div>
+      <div id="leyendaPersonalizada" class="mt-3 w-100"></div>
+    `;
     }
 
     // 4. Reset años (solo el primero)
@@ -2124,12 +2842,40 @@
       check.checked = true;
     });
 
-    // 5. Reset switches
+    // 5. Reset switches visuales
     const swEtiquetas = document.getElementById("switchEtiquetas");
     if (swEtiquetas) swEtiquetas.checked = false;
 
     const swTendencia = document.getElementById("switchTendencia");
     if (swTendencia) swTendencia.checked = false;
+
+    const swUnidades = document.getElementById("switchUnidades");
+    if (swUnidades) swUnidades.checked = false;
+
+    // 5.1 Reset del switch de Acumular por Tipología
+    const swAcumular = document.getElementById("switchAcumularTipologia");
+    if (swAcumular) swAcumular.checked = false;
+
+    const contenedorAcumular = document.getElementById("contenedorAcumularTipologia");
+    if (contenedorAcumular) {
+      contenedorAcumular.style.display = "none";
+    }
+
+    // 5.2 Reset del Radio Button de Vista (Regresar a Combinada)
+    const radioCombinada = document.querySelector('input[name="modoVista"][value="combinada"]');
+    if (radioCombinada) radioCombinada.checked = true;
+
+    // Ocultar las tipologías
+    const contenedorTipologia = document.getElementById("contenedorTipologia");
+    if (contenedorTipologia) {
+      contenedorTipologia.style.display = "none";
+    }
+
+    // Dejar seleccionada la opción "Todas"
+    const tipTodas = document.getElementById("tipTodas");
+    if (tipTodas) {
+      tipTodas.checked = true;
+    }
 
     // 6. Limpiar resumen si existe
     const summary = document.getElementById("selection-summary");
@@ -2139,19 +2885,33 @@
     if (typeof cargarGrafica === "function") {
       cargarGrafica();
     }
-
-    document.querySelectorAll(".badge-item").forEach(badge => {
-      badge.dataset.sinDatos = "false";
-      badge.classList.remove("indicador-sin-datos");
-    });
   }
 
 
-
+// ======================================================
+  // INICIALIZACIÓN EXCLUSIVA DE GRAFICA.HTML
+  // ======================================================
   document.addEventListener("DOMContentLoaded", () => {
-    bindUIEvents();
-    initDraggableIndicadores();
+
+    // 1. Renderizado de la estructura del área de trabajo (Meses)
+    if (typeof renderizarMesesGrafica === 'function') {
+      renderizarMesesGrafica(12);
+    }
+
+    // 2. Eventos de la interfaz y zona de soltado (Drag & Drop)
+    if (typeof bindUIEvents === 'function') {
+      bindUIEvents();
+    }
+    
+    if (typeof initDraggableIndicadores === 'function') {
+      initDraggableIndicadores();
+    }
+
   });
+  
+
 </script>
+
+
 
 {% endblock %}

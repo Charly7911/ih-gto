@@ -1,4 +1,20 @@
-/* SIDEBAR */
+/* ==========================================
+   1. VARIABLES & RESET BASE
+   ========================================== */
+:root {
+  --sidebar-width: 280px;
+  --bg-main: #f8fafc;
+  --bg-sidebar: #0a162b;
+  --bg-card-dark: rgba(15, 23, 42, 0.7);
+  --border-color: rgba(255, 255, 255, 0.1);
+  --primary-green: #10b981;
+  --primary-green-hover: #0ea172;
+  --text-dark: #1e293b;
+  --text-muted: #9ca3af;
+  --text-light: #f3f4f6;
+  --primary-salud: #0a162b;
+  --accent-salud: #10b981;
+}
 
 .container,
 .card,
@@ -8,44 +24,43 @@ canvas {
   z-index: 1;
 }
 
-#sidebar {
-  position: fixed;
-  z-index: 2000;
-  top: 0;
-  left: 0;
-
-  width: var(--sidebar-width);
-  height: 100vh;
-
-  background: #0a162b;
-  padding: 20px 15px;
-
-  color: white;
-
-  overflow-y: auto;
-
-  box-shadow: 4px 0 15px rgba(0, 0, 0, 0.6);
-
+#page-wrapper {
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
+/* ==========================================
+   2. ESTRUCTURA Y SIDEBAR PRINCIPAL
+   ========================================== */
+#sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2000;
+  width: var(--sidebar-width);
+  height: 100vh;
+  background-color: var(--bg-sidebar);
+  padding: 16px 12px;
+  color: var(--text-light);
+  box-shadow: 4px 0 15px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* Fondo decorativo sin generar scrollbars desbordadas */
 #sidebar::before {
   content: "";
   position: absolute;
-
-  top: -50%;
-  left: -100%;
-
-  width: 300%;
-  height: 200%;
-
-  background: url("../img/pie_1.png") center/contain no-repeat;
-
-  transform: rotate(90deg);
-
-  opacity: 0.3;
-
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: url("../img/pie_1.png") center/cover no-repeat;
+  opacity: 0.15;
   z-index: 0;
   pointer-events: none;
 }
@@ -53,46 +68,8 @@ canvas {
 #sidebar > * {
   position: relative;
   z-index: 1;
-}
-
-/* BLOQUES DE FILTRO: Más oscuros y semi-transparentes para que se vea el fondo */
-.filter-block {
-  background: rgba(15, 23, 42, 0.6); /* Azul pizarra profundo */
-  backdrop-filter: blur(4px); /* Efecto de cristal esmerilado */
-  padding: 12px;
-  border-radius: 8px;
-  margin-bottom: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* INPUTS Y SELECTS: Color que combine con el logo */
-.input-text,
-.btn-selector,
-.input-text-inline {
-  background: #1e293b !important;
-  color: white !important;
-  border: 1px solid #334155 !important;
-}
-
-/* LABELS: Blanco puro para lectura fácil */
-.filter-label {
-  color: #ffffff !important;
-  text-shadow: 0px 1px 2px rgba(0, 0, 0, 0.5);
-}
-
-#page-wrapper {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-#sidebar * {
   max-width: 100%;
   box-sizing: border-box;
-}
-
-#sidebar {
-  overflow-x: hidden;
 }
 
 #main-content {
@@ -101,196 +78,197 @@ canvas {
   width: auto;
   padding: 25px;
   flex: 1;
-  transition: 0.3s ease;
+  transition: margin-left 0.3s ease;
 }
 
-/* TITULO DE SECCIÓN */
+/* ==========================================
+   3. NAVEGACIÓN Y MENÚ
+   ========================================== */
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .menu-title {
   text-transform: uppercase;
-  color: #9ca3af;
-  font-size: 13px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
   padding-left: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
-/* CONTENEDOR DE BLOQUES DE FILTRO */
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: #e5e7eb;
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.menu-item.active {
+  background: rgba(16, 185, 129, 0.15);
+  border-left: 3px solid var(--primary-green);
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.menu-section {
+  margin: 14px 6px 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 12px 0;
+}
+
+.logout {
+  color: #fca5a5;
+  margin-top: auto;
+}
+
+.logout:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+/* ==========================================
+   4. BLOQUES DE FILTROS & INPUTS
+   ========================================== */
+.menu-filtros {
+  border-top: 1px solid var(--border-color);
+  padding-top: 12px;
+  margin-top: 8px;
+  animation: slideDown 0.25s ease-out;
+}
+
 .filter-block {
-  background: rgba(15, 23, 42, 0.6);
-  padding: 12px;
+  background: var(--bg-card-dark);
+  backdrop-filter: blur(4px);
+  padding: 10px 12px;
   border-radius: 8px;
-  margin-bottom: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 12px;
+  border: 1px solid var(--border-color);
 }
 
-/* LABELS */
 .filter-label {
   display: block;
-  font-weight: bold;
-  font-size: 14px;
+  font-weight: 600;
+  font-size: 12.5px;
   margin-bottom: 6px;
-  color: #e5e7eb;
+  color: #ffffff;
 }
 
-/* CHECKLIST */
-.checklist {
-  background: rgba(15, 23, 42, 0.6);
-  padding: 10px;
+/* Inputs, Selects y Botones Selectores */
+.input-text,
+.btn-selector,
+.input-text-inline {
+  width: 100%;
+  padding: 7px 10px;
   border-radius: 6px;
-  max-height: 150px;
+  background: #1e293b !important;
+  color: #ffffff !important;
+  border: 1px solid #334155 !important;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.btn-selector {
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.btn-selector:hover {
+  background: #334155 !important;
+}
+
+/* Checklists y Filtros de Años/Meses */
+.checklist {
+  background: rgba(15, 23, 42, 0.5);
+  padding: 8px;
+  border-radius: 6px;
+  max-height: 140px;
   overflow-y: auto;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-color);
 }
 
 .check-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 0;
+  padding: 3px 0;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 12.5px;
+  color: #e2e8f0;
 }
 
 .grid-3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
 }
 
-/* INPUTS */
-.input-text {
-  width: 100%;
-  padding: 8px;
-  border-radius: 6px;
-  background: rgba(15, 23, 42, 0.6);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  margin-bottom: 8px;
-}
-
-/* LISTA DE UNIDADES */
-.unidad-list {
-  max-height: 190px;
-  overflow-y: auto;
-  margin-top: 6px;
-  padding-right: 5px;
-}
-
-/* Cada unidad */
-.unidad-item {
-  font-size: 10px;
-  /* 👈 aquí se hace más chica */
-  padding: 4px 6px;
-  /* menos alto */
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-/* Hover */
-.unidad-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-/* BOTÓN */
-.btn-apply {
-  width: 100%;
-  background: #10b981;
-  border: none;
-  padding: 12px;
-  border-radius: 6px;
-  color: black;
-  font-weight: bold;
-  cursor: pointer;
-  transition: 0.2s;
-  margin-top: 10px;
-}
-
-.btn-apply:hover {
-  background: #0ea172;
-}
-
-.menu {
-  display: flex;
-  flex-direction: column;
-}
-
-.menu-item {
-  display: block;
-  padding: 10px 14px;
-  margin: 4px 0;
-  border-radius: 8px;
-  color: #e5e7eb;
-  text-decoration: none;
-  font-size: 14px;
-}
-
-.menu-item:hover {
-  background: rgba(29, 123, 151, 0.473);
-}
-
-.menu-section {
-  margin: 18px 10px 8px;
-  font-size: 11px;
-  color: #9ca3af;
-  font-weight: bold;
-  text-transform: uppercase;
-}
-
-.menu-divider {
-  height: 1px;
-  background: rgba(17, 58, 148, 0.493);
-  margin: 16px 0;
-}
-
-.logout {
-  color: #fca5a5;
-}
-
-/* AÑOS EN HORIZONTAL */
 .checklist-years {
   display: flex;
   flex-wrap: wrap;
-  /* Salta de línea si no caben */
   gap: 6px 10px;
-  /* Espacio entre items */
 }
 
-/* Cada año */
 .checklist-years .check-item {
-  display: flex;
-  align-items: center;
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
-/* BOTÓN SELECTOR UNIDADES */
-.btn-selector {
+/* Botones de Acción */
+.btn-apply {
   width: 100%;
-  padding: 8px;
+  background: var(--primary-green);
+  border: none;
+  padding: 10px;
   border-radius: 6px;
-  background: rgba(15, 23, 42, 0.6);
-  color: #e5e7eb;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  cursor: pointer;
+  color: #022c22;
+  font-weight: 700;
   font-size: 13px;
-  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 8px;
 }
 
-.btn-selector:hover {
-  background: #0d2a3f;
+.btn-apply:hover {
+  background: var(--primary-green-hover);
 }
 
-/* POPOVER UNIDADES */
+/* ==========================================
+   5. POPOVERS FLOANTES (Unidades/Servicios)
+   ========================================== */
 .popover-unidades {
   position: fixed;
-  left: 290px;
-  /* sidebar 270px + margen */
-  top: 180px;
-  width: 260px;
-
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  left: calc(var(--sidebar-width) + 10px);
+  top: 100px;
+  width: 280px;
+  background: #0f172a;
+  border: 1px solid var(--border-color);
   border-radius: 10px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
-
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
   padding: 12px;
   z-index: 9999;
   display: none;
@@ -300,10 +278,9 @@ canvas {
   display: block;
 }
 
-/* LISTA */
 .popover-list {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   margin-top: 8px;
   max-height: 180px;
@@ -311,56 +288,50 @@ canvas {
   padding: 6px;
 }
 
-/* ITEM */
 .popover-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px;
+  padding: 4px 6px;
   font-size: 12px;
   cursor: pointer;
+  border-radius: 4px;
+  color: #e2e8f0;
 }
 
 .popover-item:hover {
-  background: rgba(29, 123, 151, 0.473);
+  background: rgba(255, 255, 255, 0.1);
 }
 
-/* ACCIONES */
 .popover-actions {
   display: flex;
-  justify-content: space-between;
+  gap: 8px;
   margin-top: 10px;
 }
 
 .popover-actions button {
   flex: 1;
-  padding: 6px;
-  border-radius: 6px;
+  padding: 6px 10px;
+  border-radius: 5px;
   border: none;
   font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
 }
 
 [id^="aplicarUnidades"] {
-  background: #10b981;
-  color: black;
-  margin-left: 6px;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 5px;
-  cursor: pointer;
+  background: var(--primary-green);
+  color: #022c22;
 }
 
 [id^="limpiarUnidades"] {
-  background: #cf8920;
-  color: #e5e7eb;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 5px;
-  cursor: pointer;
+  background: #d97706;
+  color: #ffffff;
 }
 
-/* TABLAS GRANDES */
+/* ==========================================
+   6. TABLAS, GRÁFICAS Y CARDS Y RESUMEN
+   ========================================== */
 .table {
   font-size: 13px;
   white-space: nowrap;
@@ -384,16 +355,10 @@ canvas {
   padding: 8px 10px;
 }
 
-.chart-container {
-  position: relative;
-  height: 220px;
-  /* 👈 aquí controlas el tamaño real */
-}
-
+.chart-container,
 .chart-box {
   position: relative;
   height: 220px;
-  /* 👈 MISMO TAMAÑO QUE URGENCIAS */
 }
 
 .resumen-mensual-tabla {
@@ -404,13 +369,11 @@ canvas {
   font-size: 13px;
 }
 
-/* Las filas no rompen el grid */
 .resumen-fila,
 .encabezado-fila {
   display: contents;
 }
 
-/* Celdas alineadas al centro del tick */
 .resumen-cell,
 .encabezado-cell {
   text-align: center;
@@ -418,7 +381,6 @@ canvas {
   font-weight: 500;
 }
 
-/* Columna de unidad */
 .resumen-unidad {
   text-align: left;
   font-weight: 600;
@@ -426,52 +388,24 @@ canvas {
   white-space: nowrap;
 }
 
-/* Encabezados (meses) */
 .encabezado-cell {
   font-weight: 600;
   opacity: 0.85;
 }
 
-/* 1. Resaltar el item activo en el menú superior */
-.menu-item.active {
-  background: rgba(16, 185, 129, 0.2);
-  /* Verde como tus botones pero transparente */
-  border-left: 4px solid #1e2e5ce8;
-  font-weight: bold;
-  color: white;
-}
-
-/* 2. Ajustar el espacio de los filtros para que suban */
-.menu-filtros {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding-top: 15px;
-  animation: slideDown 0.3s ease-out;
-}
-
-/* 3. Animación suave cuando aparecen los filtros */
+/* ANIMACIONES */
 @keyframes slideDown {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(-8px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
-/* Paleta de colores profesional */
-:root {
-  --sidebar-width: 280px;
-  --bg-main: #f8fafc;
-  --primary-green: #12719c;
-  --text-dark: #1e293b;
-  --text-muted: #64748b;
-  --primary-salud: #0a162b;
-  --accent-salud: #10b981;
-}
-
+/* CARDS SUBSISTEMA & DASHBOARD UI */
 .card-subsistema {
   border: none;
   border-radius: 16px;
@@ -480,73 +414,47 @@ canvas {
   height: 100%;
   display: flex;
   flex-direction: column;
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.05),
-    0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
 }
 
-/* Efecto al pasar el mouse */
 .card-subsistema:hover {
-  transform: translateY(-8px);
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.1),
-    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  transform: translateY(-6px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
-/* Contenedores de iconos circulares */
 .icon-box {
-  width: 54px;
-  height: 54px;
+  width: 50px;
+  height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  margin-bottom: 1.5rem;
-  font-size: 1.5rem;
+  margin-bottom: 1.25rem;
+  font-size: 1.4rem;
 }
 
-/* Colores "Soft" Profesionales */
-.bg-info-soft {
-  background-color: #e0f2fe;
-  color: #0369a1;
-}
-.bg-primary-soft {
-  background-color: #e0e7ff;
-  color: #4338ca;
-}
-.bg-danger-soft {
-  background-color: #fee2e2;
-  color: #b91c1c;
-}
-.bg-success-soft {
-  background-color: #dcfce7;
-  color: #15803d;
-}
-.bg-warning-soft {
-  background-color: #fef9c3;
-  color: #a16207;
-}
-.bg-dark-soft {
-  background-color: #f1f5f9;
-  color: var(--primary-salud);
-}
+.bg-info-soft { background-color: #e0f2fe; color: #0369a1; }
+.bg-primary-soft { background-color: #e0e7ff; color: #4338ca; }
+.bg-danger-soft { background-color: #fee2e2; color: #b91c1c; }
+.bg-success-soft { background-color: #dcfce7; color: #15803d; }
+.bg-warning-soft { background-color: #fef9c3; color: #a16207; }
+.bg-dark-soft { background-color: #f1f5f9; color: var(--primary-salud); }
 
-/* Botones con estilo ejecutivo */
 .btn-modulo {
   border-radius: 8px;
-  padding: 10px 20px;
-  font-size: 0.85rem;
+  padding: 8px 16px;
+  font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   transition: all 0.2s;
 }
 
-/* El botón de Análisis Predictivo debe resaltar */
 .btn-dark {
   background-color: var(--primary-salud) !important;
   border: none;
 }
+
 .btn-dark:hover {
   background-color: var(--accent-salud) !important;
   color: white;
@@ -557,9 +465,8 @@ canvas {
   min-height: 100vh;
 }
 
-/* Títulos */
 .dashboard-title {
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   font-weight: 700;
   color: var(--text-dark);
   letter-spacing: -0.02em;
@@ -570,292 +477,274 @@ canvas {
   color: var(--text-muted);
 }
 
-/* Área de Drop modernizada */
-.drop-area-modern {
-  background: #ffffff;
-  border: 2px dashed #e2e8f0;
-  border-radius: 12px;
-  padding: 25px;
-  text-align: center;
-  transition: all 0.3s ease;
-  color: var(--text-muted);
-}
 
-.drop-area-modern:hover {
-  border-color: var(--primary-green);
-  background: rgba(16, 185, 129, 0.02);
-}
 
-/* Tarjeta de Gráfica */
 .graph-card {
   border-radius: 16px !important;
   overflow: hidden;
 }
 
+
+/* PARTE 2 */
+
+/* ==========================================
+   7. GRAFICAS, CONTENEDOR & LEYENDA
+   ========================================== */
 .card-title-sm {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 600;
   text-transform: uppercase;
   color: var(--text-muted);
   letter-spacing: 0.05em;
 }
 
-/* Ajuste de la Gráfica */
 .chart-wrapper {
-  position: relative;
-  height: 400px;
-  padding: 20px 15px 10px 15px;
-  /* Aumentamos un poco para mejor visibilidad */
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  overflow: visible;
+  padding: 10px 0;
 }
 
-/* --- OPTIMIZACIÓN DE NOMBRES DE UNIDADES --- */
-/* En el Popover o listas de selección */
-.popover-item {
-  padding: 6px 10px;
-  font-size: 0.75rem;
-  /* Letra pequeña pero legible */
-  color: #e2e8f0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+.grafica-container {
+  position: relative;
+  width: 100%;
+  height: 400px;
+  flex-shrink: 0;
 }
 
-.popover-item input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
+#leyendaPersonalizada {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  width: 100%;
 }
 
-/* Estilo del Acordeón */
+/* ==========================================
+   8. ACORDEONES E INDICADORES EN SIDEBAR
+   ========================================== */
+/* Acordeón Principal */
 .acordeon-indicadores {
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  margin-bottom: 4px;
+  overflow: hidden;
 }
 
 .acordeon-indicadores summary {
-  padding: 10px 15px;
-  font-size: 13px;
+  padding: 8px 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   list-style: none;
   display: flex;
   align-items: center;
-  background: #0e3450;
-  transition: background 0.3s;
+  background: rgba(15, 23, 42, 0.5);
+  color: #e2e8f0;
+  transition: background 0.2s ease;
+}
+
+.acordeon-indicadores summary::-webkit-details-marker {
+  display: none;
 }
 
 .acordeon-indicadores summary:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .acordeon-indicadores summary i {
   margin-right: 8px;
-  transition: transform 0.3s;
+  transition: transform 0.2s ease;
+  color: var(--primary-green);
 }
 
-/* Rotar flecha al abrir */
+/* Rotación suave de la flecha al abrir */
+.acordeon-indicadores[open] summary i {
+  transform: rotate(90deg);
+}
 
 .acordeon-indicadores[open] summary {
-  background: rgba(0, 0, 0, 0.2);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.25);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+/* Sub-acordeón Jerárquico */
 .sub-acordeon {
-  margin: 8px 0 10px 12px;
-
-  padding-left: 14px;
-
-  border-left: 2px solid rgba(255, 255, 255, 0.15);
+  margin: 6px 0 6px 10px;
+  padding-left: 10px;
+  border-left: 2px solid rgba(255, 255, 255, 0.1);
+  transition: border-color 0.2s;
 }
 
 .sub-acordeon summary {
-  font-size: 12px;
-
+  font-size: 11.5px;
   font-weight: 600;
-
-  color: #d7e3ee;
-
+  color: #cbd5e1;
   cursor: pointer;
-
-  padding: 6px 0;
-
-  transition: 0.2s;
+  padding: 4px 0;
+  transition: color 0.2s;
 }
 
 .sub-acordeon summary:hover {
-  color: #fff;
+  color: #ffffff;
 }
 
 .sub-acordeon[open] {
-  border-left: 3px solid #4ea3ff;
+  border-left-color: var(--primary-green);
 }
 
 .sub-acordeon[open] summary {
-  color: #7ec3ff;
+  color: var(--primary-green);
 }
 
+/* Items dentro del sub-acordeón */
 .sub-acordeon .indicador-item {
-  margin-left: 14px;
-
-  padding: 7px 10px;
-
-  border-radius: 6px;
-
-  transition: 0.2s;
-
+  margin-left: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
   position: relative;
 }
 
 .sub-acordeon .indicador-item::before {
   content: "";
-
   position: absolute;
-
-  left: -12px;
-
+  left: -10px;
   top: 50%;
-
-  width: 8px;
-
-  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  width: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .filter-block-acordeon {
-  padding: 10px;
-}
-
-.search-container {
-  margin-bottom: 10px;
-}
-
-#searchUnidad {
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid #394b63;
-  background: #172133;
-  color: white;
-}
-
-#searchUnidad:focus {
-  outline: none;
-  border-color: #5aa9ff;
-}
-
-#searchSinerhias {
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid #394b63;
-  background: #172133;
-  color: white;
-}
-
-#searchSinerhias:focus {
-  outline: none;
-  border-color: #5aa9ff;
+  padding: 8px;
 }
 
 .popover-list-inline {
   max-height: 220px;
-
   overflow-y: auto;
-
-  padding: 6px;
-
+  padding: 4px;
   margin-top: 6px;
-
   border-left: 2px solid rgba(255, 255, 255, 0.08);
 }
 
-/* Ajustes de los items arrastrables */
+/* Items Arrastrables (Drag & Drop) */
 .indicador-item {
-  padding: 6px 10px;
-  font-size: 12px;
+  padding: 6px 8px;
+  font-size: 11.5px;
   border-radius: 4px;
-  margin-bottom: 2px;
-  background: rgba(255, 255, 255, 0.02);
+  margin-bottom: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
   cursor: grab;
+  user-select: none;
+  transition: background 0.2s;
+}
+
+.indicador-item:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .indicador-item:active {
   cursor: grabbing;
+  background: rgba(16, 185, 129, 0.2);
 }
 
-/* Scrollbar personalizado más fino */
+/* Búsqueda dentro del Sidebar */
+.search-container {
+  margin-bottom: 8px;
+}
+
+#searchUnidad,
+#searchSinerhias,
+.search-input-sidebar {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #ffffff;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+#searchUnidad:focus,
+#searchSinerhias:focus,
+.search-input-sidebar:focus {
+  outline: none;
+  border-color: var(--primary-green);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+/* Custom Scrollbar Fino */
 .custom-scroll::-webkit-scrollbar {
   width: 4px;
 }
 
 .custom-scroll::-webkit-scrollbar-thumb {
-  background: #4b5563;
+  background: #475569;
   border-radius: 10px;
 }
 
-/* Contenedor de configuraciones rápidas */
+/* ==========================================
+   9. CONFIGURACIONES RÁPIDAS & CHIPS DE FILTRO
+   ========================================== */
 .quick-settings {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  /* Espacio entre filas */
+  gap: 10px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
 }
 
-/* Fila individual */
 .setting-row {
-  margin-bottom: 20px;
+  margin-bottom: 8px;
 }
 
-/* Etiqueta izquierda */
 .setting-label {
-  margin-bottom: 10px;
-  color: #9ca3af;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
   letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
-/* Controles derecha */
 .setting-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  /* Espacio entre chips */
-  justify-content: flex-start;
+  gap: 6px;
   width: 100%;
 }
 
-/* Estilo para los Selects In-line */
+/* Selects In-line */
 .input-text-inline {
   width: 100%;
-  max-width: none;
-  /* 👈 Quitamos el límite para que use el ancho del sidebar */
-  height: 38px;
-  /* Altura estándar cómoda */
-  background: #092d66;
-  color: white;
-  border: 1px solid #1b2a42;
+  height: 36px;
+  background-color: #1e293b;
+  color: #ffffff;
+  border: 1px solid #334155;
   border-radius: 6px;
-  padding: 0 12px;
-  font-size: 13px;
+  padding: 0 10px;
+  font-size: 12.5px;
   appearance: none;
-  /* Limpiamos estilos nativos */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='C19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
-  background-size: 16px;
+  background-size: 14px;
 }
 
 .input-text-inline:focus {
-  border-color: #12719c;
+  border-color: var(--primary-green);
   outline: none;
   box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
 }
 
-/* Chips para los años (Checkboxes estilo botón) - VERSION COMPACTA */
+/* Chips Filtro de Años (Compactos y Legibles) */
 .chip-check {
-  /* Quitamos el flex-basis del 33% para que el cuadro se ajuste al texto */
   flex: 0 0 auto;
-  min-width: 45px;
-  /* Ancho mínimo reducido para que quepa justo el año */
+  min-width: 42px;
   text-align: center;
 }
 
@@ -866,64 +755,59 @@ canvas {
 .chip-check span {
   display: block;
   width: 100%;
-  /* Reducimos el padding: 3px arriba/abajo y 8px a los lados */
-  padding: 3px 8px;
-  background: rgba(255, 255, 255, 0.08);
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  /* Un borde sutil ayuda a ver el límite */
   border-radius: 4px;
-  /* Bordes un poco más rectos para tamaños pequeños */
   font-size: 11px;
-  /* Fuente más pequeña y discreta */
   font-weight: 600;
   color: #cbd5e1;
-  transition: 0.2s;
+  transition: all 0.2s ease;
   cursor: pointer;
 }
 
+/* Corregido: contraste alto al seleccionar */
 .chip-check input:checked + span {
-  background: #12719c;
-  color: #000;
-  font-weight: bold;
-  border-color: #10b981;
+  background: var(--primary-green);
+  color: #022c22;
+  font-weight: 700;
+  border-color: var(--primary-green);
 }
 
 .chip-check:hover span {
-  background: #283342;
-  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
 }
 
-/* Tarjeta de unidad con doble fila */
+/* ==========================================
+   10. TARJETAS DE UNIDAD Y DROP AREA
+   ========================================== */
 .unidad-grafica-card {
   background: #1e293b !important;
-  border: 1px solid #173a6b;
-  border-radius: 8px;
-  padding: 10px;
-  margin-bottom: 8px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
   cursor: grab;
   display: flex;
   align-items: flex-start;
-  /* Alinea el icono arriba */
-  gap: 10px;
+  gap: 8px;
   transition: all 0.2s ease;
 }
 
 .unidad-grafica-card:hover {
-  background: #2d3748 !important;
-  border-color: #12719c;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  background: #334155 !important;
+  border-color: var(--primary-green);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Contenedor de los textos */
 .unidad-info {
   display: flex;
   flex-direction: column;
-  /* Apila nombre arriba y clues abajo */
   gap: 2px;
 }
 
-/* Estilo para el Nombre (Arriba) */
 .unidad-nombre {
   font-size: 11px;
   font-weight: 600;
@@ -931,72 +815,91 @@ canvas {
   line-height: 1.2;
 }
 
-/* Estilo para el CLUES (Abajo) */
 .unidad-clues {
-  font-size: 9px;
-  color: #9ca3af;
-  /* Color gris suave */
+  font-size: 9.5px;
+  color: var(--text-muted);
   font-family: monospace;
-  /* Estilo de código */
   letter-spacing: 0.5px;
 }
 
 .unidad-grafica-card i {
-  color: #12719c;
-  font-size: 14px;
+  color: var(--primary-green);
+  font-size: 13px;
   margin-top: 2px;
 }
 
-/* El contenedor principal de las etiquetas */
+/* --- ZONA DE SOLTADO (BASE) --- */
 .drop-area-modern {
   min-height: 80px;
-  padding: 15px;
+  padding: 12px;
   display: flex;
   flex-wrap: wrap;
-  /* Para que bajen al siguiente renglón si son muchos */
-  gap: 10px;
-  /* Espacio uniforme entre elementos */
+  gap: 8px;
   align-items: center;
-  background-color: #f8fafc;
+  justify-content: center; /* Mantiene el texto inicial centrado */
+  background-color: #ffffff;
   border: 2px dashed #cbd5e1;
-  border-radius: 12px;
-  transition: all 0.3s ease;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  color: var(--text-muted);
 }
 
+/* --- HOVER NORMAL (Solo pasar el cursor) --- */
+.drop-area-modern:hover {
+  border-color: var(--primary-green);
+  background-color: rgba(16, 185, 129, 0.02);
+}
+
+/* --- DRAG OVER (Cuando estás arrastrando algo encima) --- */
 .drop-area-modern.drag-over {
-  background-color: #f1f5f9;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  background-color: #f0fdf4 !important; /* Verde muy claro y limpio */
+  border-color: var(--primary-green) !important;
+  /* Anillo de enfoque verde + sombra suave */
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15), 0 4px 12px rgba(16, 185, 129, 0.1) !important;
+  transform: scale(1.005); /* Efecto micro-foco */
 }
 
-/* Estilo general para las etiquetas (Badges) */
 .badge-item {
   display: inline-flex;
   align-items: center;
-  padding: 6px 12px;
-  border-radius: 20px;
+  padding: 5px 10px;
+  border-radius: 16px;
   font-size: 11px;
   font-weight: 600;
-  color: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  animation: fadeIn 0.3s ease;
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  animation: fadeIn 0.2s ease;
 }
 
-/* Color para UNIDADES (Verde) */
+
+
+
+/* PARTE 3 */
+
+/* ==========================================
+   11. BADGES, BOTONES & DRAG ITEMS
+   ========================================== */
 .badge-item[data-tipo="unidad"] {
-  background-color: #12719c;
-  /* Esmeralda */
+  background-color: var(--primary-green);
   border: 1px solid #059669;
 }
 
-/* Color para INDICADORES (Azul) */
 .badge-item[data-tipo="indicador"] {
   background-color: #3b82f6;
-  /* Azul */
   border: 1px solid #2563eb;
 }
 
-/* El botón de cerrar (X) */
+.badge-item[data-tipo="estado"] {
+  background-color: #0f766e;
+  border: 1px solid #14b8a6;
+}
+
+.badge-item.indicador-sin-datos {
+  background-color: #f59e0b !important;
+  border: 1px solid #ef4444 !important;
+  color: #ffffff !important;
+}
+
 .close-btn {
   margin-left: 8px;
   cursor: pointer;
@@ -1007,208 +910,261 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s;
+  transition: background 0.2s ease;
 }
 
 .close-btn:hover {
   background: rgba(255, 255, 255, 0.4);
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(5px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Contenedor de la lista */
 #listaUnidades {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  /* Espacio entre cada unidad */
   padding: 8px !important;
 }
 
-/* Estilo de cada item de unidad (Más compacto) */
 .unidad-item-grafica {
-  background: #1f2937;
-  border: 1px solid #374151;
-  border-radius: 4px;
-  /* Bordes más finos */
-  padding: 4px 8px;
-  /* Reducimos el relleno */
-  color: #e5e7eb;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: #e2e8f0;
   cursor: grab;
   display: flex;
   align-items: center;
-  gap: 10px;
-  /* Menos espacio entre icono y texto */
+  gap: 8px;
   margin-bottom: 4px;
-  /* Margen mínimo */
-  transition: all 0.2s ease;
+  font-size: 11.5px;
   width: 100%;
+  transition: all 0.2s ease;
 }
 
 .unidad-item-grafica:hover {
-  background: #2d3748;
-  border-color: #10b981;
-  /* Resalte verde al pasar el mouse */
+  background: #334155;
+  border-color: var(--primary-green);
 }
 
-/* Texto del nombre limpio (Letra más chica) */
-.nombre-limpio {
-  font-size: 10.5px;
-  /* Tamaño reducido */
-  font-weight: 400;
-  /* Menos grosor para que no se empaste */
-  line-height: 1.2;
-  text-transform: none;
-  word-break: break-word;
-  /* Opcional: ayuda a leer mejor en pequeño */
+.unidad-item-grafica:active {
+  cursor: grabbing;
 }
 
-/* Icono más pequeño */
 .unidad-item-grafica i {
   color: #60a5fa;
-  font-size: 10px;
-  /* Icono miniatura */
+  font-size: 11px;
   flex-shrink: 0;
 }
 
-/* Buscador más discreto */
-#searchUnidad {
-  font-size: 10px !important;
-  height: 28px !important;
-  padding: 6px 10px !important;
-  margin-bottom: 12px;
+.nombre-limpio {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.2;
+  text-transform: none;
+  word-break: break-word;
 }
 
-#searchSinerhias {
-  font-size: 10px !important;
-  height: 28px !important;
-  padding: 6px 10px !important;
-  margin-bottom: 12px;
-}
-
-/* Contenedor del encabezado de filtros */
+/* Header de Filtros dentro del Sidebar */
 .header-filtros {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #334155;
-  /* Línea divisoria sutil */
-  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 14px;
 }
 
-/* Texto "FILTROS" */
-.menu-section {
-  color: #f8fafc;
-  /* Blanco azulado muy brillante */
-  font-size: 0.9rem;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  margin: 0;
-}
-
-/* Botón "Limpiar" alineado */
 .btn-reset-link {
-  background: #334155;
-  /* Fondo sutil para que parezca botón */
+  background: rgba(255, 255, 255, 0.08);
   border: none;
   color: #fbbf24;
-  /* Color ámbar/oro para que resalte del resto */
-  font-size: 0.75rem;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  padding: 4px 10px;
+  padding: 4px 8px;
   border-radius: 4px;
-  transition: all 0.2s;
+  transition: background 0.2s;
   text-transform: uppercase;
 }
 
 .btn-reset-link:hover {
-  background: #475569;
+  background: rgba(255, 255, 255, 0.15);
   color: #ffffff;
 }
 
-/* Resaltar etiquetas de los bloques (Años, Unidad, Meses) */
-.filter-label {
-  color: #ffffff !important;
-  /* Blanco puro */
-  font-weight: 600;
-  margin-bottom: 10px;
-  display: block;
-  font-size: 0.95rem;
+/* ==========================================
+   12. TOOLBAR DE MESES & BARRA DE CONTROLES
+   ========================================== */
+.card-meses {
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
 }
 
-/* Resaltar los nombres de los checkboxes (2025, Ene, etc.) */
-.check-item {
-  color: #cbd5e1;
-  /* Gris claro que resalta en el fondo oscuro */
-  font-weight: 500;
-}
-
-/* Clase base para ambos botones */
-.btn-dash {
+.meses-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
   display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-meses {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.meses-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  min-width: 260px;
+}
+
+.mes-check {
+  display: none;
+}
+
+.mes-pill {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #475569;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.mes-pill:hover {
+  background: #e2e8f0;
+}
+
+.mes-check:checked + .mes-pill {
+  background: var(--primary-salud);
+  color: #ffffff;
+  border-color: var(--primary-salud);
+  box-shadow: 0 2px 6px rgba(10, 22, 43, 0.25);
+}
+
+.btn-todos {
+  background-color: var(--primary-salud) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--primary-salud) !important;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-todos:hover {
+  background-color: var(--accent-salud) !important;
+  border-color: var(--accent-salud) !important;
+  color: #ffffff !important;
+}
+
+.btn-pill {
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-weight: 600;
+  font-size: 11.5px;
+}
+
+/* Botones Principales de Acción (Dashboard/Filtros) */
+.btn-dash {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-
-  height: 42px;
-  /* Altura fija para alineación perfecta */
-  min-width: 180px;
-  /* Ancho mínimo para que se vean parejos */
-  padding: 0 20px;
-
+  height: 38px;
+  min-width: 150px;
+  padding: 0 16px;
   border: none;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   transition: all 0.2s ease;
   cursor: pointer;
 }
 
-/* Color específico Excel (Verde) */
+.btn-dash:hover {
+  transform: translateY(-1px);
+}
+
 .btn-excel {
-  background-color: #10b981;
-  color: #000;
+  background: #10b981;
+  color: #022c22;
 }
 
 .btn-excel:hover {
-  background-color: #0ea172;
+  background: #0ea172;
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.2);
 }
 
-/* Color específico Limpiar (Rojo) */
 .btn-limpiar {
-  background-color: #ef4444;
-  color: #fff;
+  background: #ef4444;
+  color: #ffffff;
 }
 
 .btn-limpiar:hover {
-  background-color: #dc2626;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  background: #dc2626;
+  box-shadow: 0 4px 8px rgba(239, 68, 68, 0.2);
 }
 
+/* Controls Header de la Gráfica */
+.barra-controles-grafica {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  width: 100%;
+}
+
+.control-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-group-custom {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.btn-group-custom .btn {
+  font-size: 11.5px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+/* Leyenda estilo GRID Unificado */
+#leyendaPersonalizada {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+  width: 100%;
+}
+
+/* ==========================================
+   13. FOOTER GLOBAL Y ANIMACIÓN ECG
+   ========================================== */
 .footer-global {
   position: relative;
   width: 100%;
-  height: 50px;
-  /* un poco más alto si quieres */
+  height: 45px;
   display: flex;
   justify-content: center;
   align-items: center;
   overflow: hidden;
+  opacity: 1;
 }
 
 .footer-global img {
@@ -1216,10 +1172,8 @@ canvas {
   height: 100%;
   object-fit: cover;
   border-radius: 2px;
-  /* leve suavidad casi imperceptible */
 }
 
-/* SVG */
 .ecg-line {
   position: absolute;
   width: 100%;
@@ -1236,382 +1190,91 @@ canvas {
   stroke-width: 2.5;
   stroke-linejoin: miter;
   stroke-linecap: square;
-
   stroke-dasharray: 1250;
   stroke-dashoffset: 1250;
-
   filter: drop-shadow(0 0 6px #08a6c5);
+  will-change: stroke-dashoffset;
 }
 
-/* Animación tipo monitor */
 .footer-visible .ecg-line path {
   animation: ecgBeat 3.5s ease-in-out infinite;
 }
 
-/* Pausa + latido + pausa */
 @keyframes ecgBeat {
-  0% {
-    stroke-dashoffset: 1250;
-  }
-
-  40% {
-    stroke-dashoffset: 0;
-  }
-
-  60% {
-    stroke-dashoffset: 0;
-  }
-
-  100% {
-    stroke-dashoffset: -1250;
-  }
+  0% { stroke-dashoffset: 1250; }
+  40% { stroke-dashoffset: 0; }
+  60% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -1250; }
 }
 
-/* Aparece suave */
-.footer-visible {
-  opacity: 1;
-  transform: translateY(0);
+/* Highlight animación para resultados de búsqueda */
+.resultado-encontrado {
+  animation: destacarResultado 1.2s ease;
 }
 
-html,
-body {
-  height: 100%;
-  margin: 0;
-  overflow-x: hidden !important;
-  width: 100%;
+@keyframes destacarResultado {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.04); background: rgba(16, 185, 129, 0.2); }
+  100% { transform: scale(1); }
 }
 
-#page-wrapper {
-  min-height: 100vh;
-  display: flex;
-  overflow-x: hidden;
-  flex-direction: column;
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-#main-content {
-  overflow-x: auto;
-}
-
-body {
-  overflow-x: hidden;
-}
-
-/* 1. Vista dse los meses de la grafica junto con los botones */
-
-.card-meses {
-  border-radius: 18px;
-  background: #ffffff;
-}
-
-.meses-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #34495e;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.meses-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.mes-check {
-  display: none;
-}
-
-.mes-pill {
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: #f1f5f9;
-  border: 1px solid #dbe3ec;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  color: #34495e;
-  transition: all 0.2s ease;
-  user-select: none;
-}
-
-.mes-pill:hover {
-  background: #e2e8f0;
-  transform: translateY(-1px);
-}
-
-.mes-check:checked + .mes-pill {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  color: white;
-  border-color: #1d93d8;
-  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.25);
-}
-
-.btn-todos {
-  background-color: #0a6075 !important;
-  color: white !important;
-  border: 1px solid #10b981 !important;
-  font-weight: 600;
-  transition: all 0.2s ease;
-}
-
-.btn-todos:hover {
-  background-color: #059669 !important;
-  border-color: #059669 !important;
-  color: white !important;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.25);
-}
-
-.btn-pill {
-  border-radius: 999px;
-  padding: 6px 14px;
-  font-weight: 600;
-}
-
-.btn-dash {
-  border: none;
-  border-radius: 14px;
-  padding: 10px 18px;
-  font-weight: 700;
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: 0.2s ease;
-}
-
-.btn-dash:hover {
-  transform: translateY(-2px);
-}
-
-.btn-excel {
-  background: linear-gradient(135deg, #16a34a, #15803d);
-  color: white;
-  box-shadow: 0 4px 10px rgba(22, 163, 74, 0.25);
-}
-
-.btn-limpiar {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  color: white;
-  box-shadow: 0 4px 10px rgba(239, 68, 68, 0.25);
-}
-
-/* ==========================================================================
-   OPTIMIZACIÓN PARA LAPTOPS Y PANTALLAS MEDIANAS (1024px - 1440px)
-   ========================================================================== */
-
+/* ==========================================
+   14. RESPONSIVE & MEDIA QUERIES
+   ========================================== */
 @media (max-width: 1440px) {
-  /* 1. Ajuste de Contenedor Principal */
   .container-fluid {
     padding-left: 1rem !important;
     padding-right: 1rem !important;
   }
 
-  h2 {
-    font-size: 1.4rem !important;
-  }
-  h5 {
-    font-size: 1.1rem !important;
-  }
-
-  /* 2. Gráficas: Reducción de altura para visibilidad simultánea */
   .chart-box,
   .chart-container,
-  [style*="height:350px"],
-  [style*="height:360px"],
   .chart-wrapper {
-    height: 260px !important; /* Altura ideal en laptop */
+    height: 300px !important;
   }
 
-
-
-  /* Especial para la gráfica de Indicadores que es más densa */
-  [style*="height: 300px"] {
-    height: 240px !important;
-  }
-
-  /* 3. KPI Cards (Mortalidad, Ocupación, etc.) */
-  .card-body h3 {
-    font-size: 1.3rem !important; /* Números más pequeños */
-  }
-  .card-body h6 {
-    font-size: 0.7rem !important; /* Etiquetas pequeñas */
-  }
-
-  /* 4. Tablas: El corazón del ajuste */
-  .table-responsive {
-    border-radius: 8px;
-    overflow-x: auto !important;
-  }
-
-  .table {
-    font-size: 0.75rem !important; /* 12px aprox */
-  }
-
-  .table th,
-  .table td {
-    padding: 0.5rem 0.3rem !important;
-    vertical-align: middle;
-  }
-
-  /* Fix específico para la tabla de Indicadores (la más ancha) */
-  #tablaIndicadores {
-    min-width: 1200px !important; /* Permite scroll horizontal sin romper el layout */
-  }
-
-  /* 5. Selectores y Navegación */
-  .nav-tabs .nav-link {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.8rem;
-  }
-
-  .form-select-sm {
-    font-size: 0.75rem !important;
-    padding: 2px 20px 2px 8px !important;
-  }
-
-  /* 6. Dashboard Comparativo Dinámico */
-  .dashboard-title {
-    font-size: 1.3rem !important;
-  }
   .btn-dash {
-    padding: 0.4rem 1rem !important;
-    min-width: 140px !important;
-    font-size: 0.7rem !important;
-    height: 36px !important;
+    padding: 0 12px !important;
+    min-width: 130px !important;
+    font-size: 11px !important;
+    height: 34px !important;
   }
 
   .drop-area-modern {
     min-height: 60px !important;
-    padding: 10px !important;
+    padding: 8px !important;
   }
 
-  .placeholder-text {
-    font-size: 0.8rem;
-  }
-}
-
-/* ==========================================================================
-   AJUSTES PARA TABLETS O PANTALLAS MUY PEQUEÑAS (992px)
-   ========================================================================== */
-@media (max-width: 992px) {
-  .col-md-3 {
-    width: 50% !important; /* 2 KPIs por fila en lugar de 4 */
-    margin-bottom: 1rem;
-  }
-
-  .col-md-6 {
-    width: 100% !important; /* Gráficas una sobre otra */
-    margin-bottom: 1rem;
-  }
-}
-
-/* 8. Fix para el error de sintaxis que mencionaste antes */
-.chip-check {
-  flex: 0 0 auto;
-}
-
-.chip-check span {
-  min-width: 40px;
-  text-align: center;
-}
-
-.unidad-item-grafica {
-  background: #1f2937;
-  padding: 6px 8px;
-  border-radius: 6px;
-  margin-bottom: 4px;
-  cursor: grab;
-  font-size: 12px;
-}
-
-.unidad-item-grafica:hover {
-  background: #374151;
-}
-
-.unidad-item-grafica:active {
-  cursor: grabbing;
-}
-
-.badge-item[data-tipo="estado"] {
-  background: #0f766e;
-  border: 1px solid #14b8a6;
-}
-
-/* ==========================================================================
-   TOOLBAR MESES RESPONSIVE
-   ========================================================================== */
-
-.toolbar-meses {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-
-  /* 🔥 ESTO ES LA CLAVE */
-  flex-wrap: wrap;
-}
-
-/* ==========================================================================
-   CONTENEDOR DE MESES
-   ========================================================================== */
-
-.meses-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-
-  /* 🔥 permite crecer y acomodarse */
-  flex: 1;
-  min-width: 280px;
-}
-
-/* ==========================================================================
-   BOTONES SECUNDARIOS
-   ========================================================================== */
-
-.toolbar-meses .d-flex.gap-2.ms-auto {
-  flex-wrap: wrap;
-}
-
-/* ==========================================================================
-   BOTONES PRINCIPALES
-   ========================================================================== */
-
-.toolbar-meses .d-flex.align-items-center.gap-2.ms-2 {
-  flex-wrap: wrap;
-}
-
-/* ==========================================================================
-   LAPTOPS
-   ========================================================================== */
-
-@media (max-width: 1400px) {
   .toolbar-meses {
-    gap: 10px;
+    gap: 8px;
   }
 
-  .mes-pill {
-    padding: 5px 10px;
-    font-size: 11px;
-  }
-
-  .btn-pill {
-    padding: 5px 10px;
-    font-size: 11px;
-  }
-
-  .btn-dash {
-    padding: 8px 12px;
+  .mes-pill, .btn-pill {
+    padding: 4px 8px;
     font-size: 11px;
   }
 }
 
-/* ==========================================================================
-   TABLETS
-   ========================================================================== */
-
 @media (max-width: 992px) {
+  #main-content {
+    margin-left: 0 !important;
+    padding: 15px;
+  }
+
+  #sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  #sidebar.open {
+    transform: translateX(0);
+  }
+
   .toolbar-meses {
     flex-direction: column;
     align-items: flex-start;
@@ -1621,16 +1284,16 @@ body {
     width: 100%;
   }
 
-  .toolbar-meses .d-flex.gap-2.ms-auto,
-  .toolbar-meses .d-flex.align-items-center.gap-2.ms-2 {
-    width: 100%;
-    margin-left: 0 !important;
+  .col-md-3 {
+    width: 50% !important;
+    margin-bottom: 1rem;
+  }
+
+  .col-md-6 {
+    width: 100% !important;
+    margin-bottom: 1rem;
   }
 }
-
-/* ==========================================================================
-   MOBILE
-   ========================================================================== */
 
 @media (max-width: 576px) {
   .btn-dash {
@@ -1640,42 +1303,9 @@ body {
 
   .mes-pill {
     font-size: 10px;
-    padding: 4px 8px;
+    padding: 4px 6px;
   }
 }
 
-.resultado-encontrado {
-  animation: destacarResultado 1.5s ease;
-}
-
-@keyframes destacarResultado {
-  0% {
-    transform: scale(1);
-  }
-
-  50% {
-    transform: scale(1.08);
-  }
-
-  100% {
-    transform: scale(1);
-  }
-}
-
-/* Corrección scroll tabla indicadores en laptops */
-.table-responsive {
-  overflow-x: auto !important;
-  overflow-y: hidden;
-  width: 100%;
-}
-
-#tablaIndicadores {
-  min-width: 1200px;
-}
 
 
-.badge-item.indicador-sin-datos {
-    background-color: orange !important;
-    border: 2px solid red !important;
-    color: white !important;
-}
