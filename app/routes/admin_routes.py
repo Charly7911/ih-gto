@@ -1623,6 +1623,172 @@ def subir_csv_sis():
 
 
 #*****************************************************************
+#**********  CARGAR SIS PRIMER NIVEL *****************************
+#*****************************************************************
+
+@admin.route("/subir_csv_sis_primer_nivel", methods=["GET", "POST"])
+@login_required
+def subir_csv_sis_primer_nivel():
+    
+    if request.method == "POST":
+        # 📌 1. Obtención de datos
+        file = request.files.get("file")
+        anio = request.form.get("anio")
+        modo = request.form.get("modo_carga")
+        fecha_actualizacion = request.form.get("fecha_actualizacion")
+        estatus = request.form.get("estatus")
+        estatus_inicio = request.form.get("estatus_inicio")
+
+        if not file or not anio:
+            flash("Falta el archivo o el año", "danger")
+            return redirect(url_for('admin.subir_csv_sis_primer_nivel'))
+        
+        anio = int(anio)
+
+        try:
+            # 📖 2. Lectura y Normalización
+            df = pd.read_csv(file, dtype=str) 
+            df.columns = [col.strip().lower().replace(" ", "_").replace("ó","o") for col in df.columns]
+
+            conn = mysql.connection
+            cursor = conn.cursor()
+
+            # 🏥 3. Filtro de Catálogo (Solo unidades autorizadas)
+            cursor.execute("SELECT clues FROM catalogo_unidades")
+            clues_validas = set(row[0].upper().strip() for row in cursor.fetchall())
+
+            if 'clues' in df.columns:
+                df['clues'] = df['clues'].str.upper().str.strip()
+                df = df[df['clues'].isin(clues_validas)].copy()
+
+            # 🧹 4. Limpieza de Datos Críticos
+            if "total" in df.columns:
+                df["total"] = df["total"].str.replace(",", "").fillna("0")
+            
+            if "apartado" in df.columns:
+                df["apartado"] = df["apartado"].str[:3]
+            if "variable" in df.columns:
+                df["variable"] = df["variable"].str[:5]
+            
+            df["anio"] = anio
+            df = df.where(pd.notnull(df), None)
+
+            # 🔓 5. Operaciones de Base de Datos
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+
+            # 🔥 Borrado preventivo (CORREGIDO A LAS TABLAS DE PRIMER NIVEL)
+            if modo in ["actualizar", "reemplazar"]:
+                cursor.execute("DELETE FROM sis_registros_primer_nivel WHERE anio = %s", (anio,))
+                cursor.execute("DELETE FROM sis_registros_agregados_primer_nivel WHERE anio = %s", (anio,))
+                print(f"🧹 Limpieza SIS PRIMER NIVEL año {anio} completada.")
+
+            # 🚀 6. Inserción por Bloques
+            columnas_db = ['anio', 'jurisdiccion', 'municipio', 'clues', 'mes', 'apartado', 'variable', 'total']
+            for col in columnas_db:
+                if col not in df.columns: 
+                    df[col] = None
+
+            df_final = df[columnas_db]
+
+            df_final = df_final.replace({np.nan: None})
+            df_final = df_final.where(pd.notnull(df_final), None)
+
+            valores = [
+                tuple(None if pd.isna(x) else x for x in row)
+                for row in df_final.to_numpy()
+            ]
+            
+            sql_ins = f"INSERT INTO sis_registros_primer_nivel ({', '.join(columnas_db)}) VALUES ({', '.join(['%s']*len(columnas_db))})"
+            
+            bloque_size = 10000
+            for i in range(0, len(valores), bloque_size):
+                cursor.executemany(sql_ins, valores[i : i + bloque_size])
+
+            # ⚙️ 7. Recálculo de Agregados SIS (CORREGIDO APUNTANDO A LA NUEVA TABLA)
+            cursor.execute("""
+                INSERT INTO sis_registros_agregados_primer_nivel (
+                    anio, mes, clues, nombre_unidad,
+                    consultas, mental, bucal, embarazadas,
+                    planificacion_familiar, detecciones, tamiz
+                )
+                SELECT
+                    sr.anio, sr.mes, sr.clues, cu.nombre_unidad,
+                    SUM(CASE WHEN sr.variable IN ('CON01','CON02','CON03','CON04','CON05','CON06','CON07','CON08','CON09','CON10',
+                        'CON11','CON12','CON13','CON14','CON15','CON16','CON17','CON18','CON19','CON20',
+                        'CON21','CON22','CON23','CON24','CON25','CON26','CON27','CON28','CON29','CON30',
+                        'CON31','CON32','CON33','CON34','CON35','CON36','CON37','CON38','CON39','CON40',
+                        'CON41','CON42','CON43','CON44','CON45','CON46','CON47','COD01','COD02')
+                    THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+                    
+                    SUM(CASE WHEN sr.variable IN ('CPP07','CPP14') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+                    SUM(CASE WHEN sr.variable IN ('CPP06','CPP13','COD01','COD02') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+                    SUM(CASE WHEN sr.variable IN ('EMB01','EMB02','EMB03','EMB04','EMB05','EMB06') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+                    SUM(CASE WHEN sr.variable IN (
+                        'PFC01','PFC02','PFC03','PFC04','PFC05','PFC06','PFC07','PFC08','PFC10',
+                        'PFC11','PFC12','PFC13','PFC14','PFC15','PFC16','PFC17','PFC19','PFC20',
+                        'PFC21','PFC22','PFC23','PFC24','PFC25','PFC26','PFC27','PFC28','PFC29',
+                        'PFC30', 'PFC31','PFC32')
+                    THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+                    SUM(CASE WHEN sr.variable IN (
+                        'DET01','DET02','DET03','DET04','DET05','DET06','DET07','DET08','DET09','DET11', 'DET12', 'DET13', 'DET14', 'DET15', 'DET16', 'DET17', 'DET18', 'DET19',
+                        'DET21','DET22','DET23','DET24','DET25','DET26','DET27','DET28','DET29','DET31', 'DET32', 'DET33', 'DET34', 'DET35', 'DET36', 'DET37', 'DET38', 'DET39',
+                        'DET41','DET42','DET43','DET44','DET45','DET46','DET47','DET48','DET49','DET51', 'DET52', 'DET53', 'DET54', 'DET55', 'DET56', 'DET57', 'DET58', 'DET59',
+                        'DET61','DET62','DET63','DET64','DET65','DET66','DET67','DET68','DET69','DET71', 'DET72', 'DET73', 'DET74', 'DET75', 'DET76', 'DET77', 'DET78', 'DET79',
+                        'DET81','DET82','DET83','DET84','DET85','DET86','DET87','DET88','DET89','DET91', 'DET92', 'DET93', 'DET94', 'DET95', 'DET96', 'DET97', 'DET98', 'DET99',
+                        'DTO01','DTO02','DTO03','DTO04','DTO05','DTO06','DTO07','DTO08','DTO09','DTO11', 'DTO12', 'DTO13', 'DTO14', 'DTO15', 'DTO16', 'DTO17', 'DTO18', 'DTO19',
+                        'DTO21','DTO22','DTO23','DTO24','DTO25','DTO26','DTO27','DTO28','DTO29','DTO31', 'DTO32', 'DTO33', 'DTO34', 'DTO35', 'DTO36', 'DTO37', 'DTO38', 'DTO39',
+                        'DTO41','DTO42','DTO43','DTO44','DTO45','DTO46','DTO47','DTO48','DTO49','DTO51', 'DTO52', 'DTO53', 'DTO54', 'DTO55', 'DTO56', 'DTO57', 'DTO58', 'DTO59',
+                        'DTO61','DTO62','DTO63','DTO64','DTO65','DTO66','DTO67','DTO68','DTO69','DTO71', 'DTO72', 'DTO73', 'DTO74', 'DTO75', 'DTO76', 'DTO77', 'DTO78', 'DTO79',
+                        'DTO81','DTO82','DTO83','DTO84','DTO85','DTO86','DTO87','DTO88','DTO89','DTO91', 'DTO92', 'DTO93', 'DTO94', 'DTO95', 'DTO96', 'DTO97', 'DTO98', 'DTO99',
+                        'DTI01','DTI02','DTI03','DTI04','DTI05','DTI06','DTI07','DTI08','DTI09','DTI11', 'DTI12', 'DTI13', 'DTI14', 'DTI15', 'DTI16', 'DTI17', 'DTI18', 'DTI19',
+                        'DTI21','DTI22','DTI23','DTI24','DTI25','DTI26','DTI27','DTI28','DTI29','DTI31', 'DTI32', 'DTI33', 'DTI34', 'DTI35', 'DTI36', 'DTI37', 'DTI38', 'DTI39',
+                        'DTI41','DTI42','DTI43','DTI44','DTI45','DTI46','DTI47','DTI48','DTI49','DTI51', 'DTI52', 'DTI53', 'DTI54', 'DTI55', 'DTI56', 'DTI57', 'DTI58', 'DTI59',
+                        'DTI61','DTI62','DTI63','DTI64','DTI65','DTI66','DTI67','DTI68','DTI69','DTI71', 'DTI72', 'DTI73', 'DTI74', 'DTI75', 'DTI76', 'DTI77', 'DTI78', 'DTI79',
+                        'DTE01','DTE02','DTE03','DTE04','DTE05','DTE06','DTE07','DTE08','DTE09','DTE11', 'DTE12', 'DTE13', 'DTE14', 'DTE15', 'DTE16', 'DTE17', 'DTE18', 'DTE19',
+                        'DTE21','DTE22','DTE23','DTE24','DTE25','DTE26','DTE27','DTE28','DTE29','DTE31', 'DTE32', 'DTE33', 'DTE34', 'DTE35', 'DTE36', 'DTE37', 'DTE38', 'DTE39',
+                        'DTE41','DTE42','DTE43','DTE44','DTE45','DTE46','DTE47','DTE48','DTE49','DTE51', 'DTE52', 'DTE53', 'DTE54', 'DTE55', 'DTE56', 'DTE57', 'DTE58', 'DTE59',
+                        'DTE61','DTE62','DTE63','DTE64','DTE65','DTE66','DTE67','DTE68','DTE69','DTE71', 'DTE72', 'DTE73', 'DTE74', 'DTE75', 'DTE76', 'DTE77', 'DTE78', 'DTE79'
+                        )
+                    THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+                    SUM(CASE WHEN sr.variable IN ('RNL06') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END)
+                    
+                FROM sis_registros_primer_nivel sr
+                LEFT JOIN catalogo_unidades cu ON sr.clues = cu.clues
+                WHERE sr.anio = %s
+                GROUP BY sr.anio, sr.mes, sr.clues, cu.nombre_unidad
+            """, (anio,))
+
+            # 📊 8. Control Anual (Actualiza el encabezado)
+            cursor.execute("""
+                INSERT INTO sis_control_anual_primer_nivel (anio, estatus_inicio, fecha_actualizacion, estatus)
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    fecha_actualizacion = VALUES(fecha_actualizacion),
+                    estatus_inicio = VALUES(estatus_inicio),
+                    estatus = VALUES(estatus)
+            """, (anio, estatus_inicio, fecha_actualizacion, estatus))
+
+            # ✅ 9. COMMIT FINAL
+            conn.commit()
+            flash(f"Base SIS Primer Nivel {anio} procesada con éxito.", "success")
+
+        except Exception as e:
+            if 'conn' in locals(): 
+                conn.rollback()
+            flash(f"Error al procesar SIS PRIMER NIVEL: {str(e)}", "danger")
+            print(f"❌ Error SIS: {e}")
+        finally:
+            if 'cursor' in locals():
+                cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+                cursor.close()
+
+        return redirect(url_for('admin.subir_csv_sis_primer_nivel'))
+
+    return render_template("admin/subir_csv_sis_primer_nivel.html")
+
+
+
+#*****************************************************************
 #**********  CARGAR AGENDAS **************************************
 #*****************************************************************
 
