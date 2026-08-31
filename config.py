@@ -1,8 +1,7 @@
 class Config:
     SECRET_KEY = '*(Chichin)$'
     MYSQL_USER = 'oficios_dgp'
-    #MYSQL_PASSWORD = '$Estadistic4#'
-    MYSQL_PASSWORD = '$Indic4dores#'
+    MYSQL_PASSWORD = '$Estadistic4#'
     MYSQL_HOST = 'localhost'
     MYSQL_DB = 'indicador_hospitalario'
     
