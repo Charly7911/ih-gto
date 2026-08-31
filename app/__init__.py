@@ -46,6 +46,7 @@ def create_app():
     from app.routes.reportes import reportes as reportes_bp
     from app.routes.urgencias import urgencias as urgencias_bp
     from app.routes.sis import sis as sis_bp
+    from app.routes.sis_primer_nivel import sis_pn as sis_pn_bp
     from app.routes.indicador import indicador as indicador_bp
     from app.routes.grafica import grafica as grafica_bp
     from app.routes.main import main as main_bp
@@ -68,6 +69,7 @@ def create_app():
     app.register_blueprint(urgencias_bp)
     app.register_blueprint(main_bp)
     app.register_blueprint(sis_bp)
+    app.register_blueprint(sis_pn_bp)
     app.register_blueprint(indicador_bp)
     app.register_blueprint(grafica_bp)
     app.register_blueprint(agenda_bp)

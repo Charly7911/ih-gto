@@ -1,0 +1,668 @@
+{% extends "layout/base.html" %}
+{% block content %}
+<div class="main-content">
+    <div class="container-fluid mt-4 ps-4 pe-4">
+        <h2 class="mb-3" id="sis-title">
+            🏥 SIS - Primer Nivel
+            <span id="sis-meta" style="font-size: 18px;" data-control='{{ control_anual | tojson | safe }}'>
+            </span>
+        </h2>
+
+        <!-- GRÁFICAS -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted mb-2">Total Consultas</h6>
+                        <canvas id="graficaSisPorAnio"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted mb-2" id="tituloGraficaSis">Estudios de Gabinete</h6>
+                        <canvas id="graficaSis"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TABLA -->
+        <div class="card">
+            <div class="card-body">
+                <!-- 🔹 PESTAÑAS POR AÑO -->
+                <ul class="nav nav-tabs mb-3" id="tabsAnios"></ul>
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm" id="tablaResultados">
+                        <thead>
+                            <tr>
+                                <th>Año</th>
+                                <th>CLUES</th>
+                                <th>Unidad</th>
+                                <th>Consultas</th>
+                                <th>Mental</th>
+                                <th>Bucal</th>
+                                <th>Embarazadas</th>
+                                <th>Detecciones</th>
+                                <th>Planificacion Familiar</th>
+                                <th>Tamiz</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaSIS"></tbody>
+                    </table>
+                </div>
+                <!-- 🔹 PAGINACIÓN -->
+                <nav class="mt-2">
+                    <ul class="pagination pagination-sm" id="paginacionTabla"></ul>
+                </nav>
+
+                <!-- =======================
+                        GRAFICA MENSUAL SIS
+                    ======================== -->
+                <hr>
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                            <h5 class="mb-0">📈 Total SIS mensual</h5>
+
+                            <div class="d-flex gap-2 align-items-center">
+                                <select id="filtroSisDetalle" class="form-select form-select-sm w-auto">
+                                </select>
+
+                                <!-- BOTÓN DE MOSTRAR / OCULTAR VALORES -->
+                                <button type="button" class="btn btn-outline-primary btn-sm"
+                                    id="btnToggleValoresMensual">
+                                    Mostrar valores
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="height:350px">
+                            <canvas id="graficaSisMensual"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Registrar plugin de DataLabels antes de inicializar scripts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
+<script>
+    if (typeof ChartDataLabels !== 'undefined') {
+        Chart.register(ChartDataLabels);
+    }
+
+    /* ==========================================================================
+       1. ESTADO GLOBAL Y CONFIGURACIÓN
+       ========================================================================== */
+    const controlAnual = JSON.parse(
+        document.getElementById("sis-meta")?.dataset.control || "[]"
+    );
+    const sisResultados = JSON.parse('{{ resultados | tojson | safe }}');
+    const FILAS_POR_PAGINA = 10;
+
+    let datosActuales = [];
+    let datosFiltradosSis = [...sisResultados];
+    let paginaActual = 1;
+    let anioActivo = null;
+
+    let mostrarValoresMensual = false;
+
+    let graficaAnio = null;
+    let graficaUnidad = null;
+    let graficaSisMensual = null;
+
+    /* ==========================================================================
+       2. FUNCIONES DE UTILIDAD Y FORMATO
+       ========================================================================== */
+    function fmt(n) {
+        return Number(n || 0).toLocaleString("es-MX");
+    }
+
+    function formatearFechaES(fechaStr) {
+        if (!fechaStr) return "";
+        let fecha;
+        if (fechaStr.includes("-")) {
+            const [y, m, d] = fechaStr.split("-");
+            fecha = new Date(Date.UTC(y, m - 1, d));
+        } else {
+            fecha = new Date(fechaStr);
+        }
+
+        const meses = [
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+        ];
+
+        return `${fecha.getUTCDate()} de ${meses[fecha.getUTCMonth()]} de ${fecha.getUTCFullYear()}`;
+    }
+
+    function actualizarEncabezadoSIS(anio) {
+        const meta = document.getElementById("sis-meta");
+        if (!meta) return;
+
+        const registro = controlAnual.find(r => r.anio === anio);
+        if (!registro) {
+            meta.textContent = "";
+            return;
+        }
+
+        meta.textContent = ` | ${registro.estatus_inicio} al ${formatearFechaES(registro.fecha_actualizacion)} · ${registro.estatus}`;
+    }
+
+    function actualizarTituloGabineteTotal(chart) {
+        const elTitulo = document.getElementById("tituloGraficaSis");
+        if (!elTitulo) return;
+
+        let totalGabinete = 0;
+        chart.data.datasets.forEach((dataset, index) => {
+            if (chart.isDatasetVisible(index)) {
+                totalGabinete += dataset.data.reduce((acc, curr) => acc + (Number(curr) || 0), 0);
+            }
+        });
+
+        elTitulo.innerHTML = `Indicadores <strong>${anioActivo || ''}</strong> — Total: <strong>${fmt(totalGabinete)}</strong>`;
+    }
+
+    /* ==========================================================================
+       3. PROCESAMIENTO Y FILTRADO DE DATOS (7 Indicadores Primer Nivel)
+       ========================================================================== */
+    function agruparPorAnioUnidad(data) {
+        const mapa = {};
+
+        data.forEach(r => {
+            const key = `${r.anio}-${r.clues}`;
+
+            if (!mapa[key]) {
+                mapa[key] = {
+                    anio: r.anio,
+                    clues: r.clues,
+                    nombre_unidad: r.nombre_unidad,
+                    consultas: 0,
+                    embarazadas: 0,
+                    mental: 0,
+                    bucal: 0,
+                    tamiz: 0,
+                    planificacion_familiar: 0,
+                    detecciones: 0
+                };
+            }
+
+            mapa[key].consultas += Number(r.consultas) || 0;
+            mapa[key].embarazadas += Number(r.embarazadas) || 0;
+            mapa[key].mental += Number(r.mental) || 0;
+            mapa[key].bucal += Number(r.bucal) || 0;
+            mapa[key].tamiz += Number(r.tamiz) || 0;
+            mapa[key].planificacion_familiar += Number(r.planificacion_familiar) || 0;
+            mapa[key].detecciones += Number(r.detecciones) || 0;
+        });
+
+        return Object.values(mapa);
+    }
+
+    function ejecutarFiltradoSis() {
+        const anios = [...document.querySelectorAll(".sis-filtro-anio:checked")].map(cb => Number(cb.value));
+        const meses = [...document.querySelectorAll(".sis-filtro-mes:checked")].map(cb => Number(cb.value));
+        const unidades = window.getUnidadesSeleccionadas?.() || [];
+
+        const filtrados = sisResultados.filter(r =>
+            (anios.length === 0 || anios.includes(r.anio)) &&
+            (meses.length === 0 || meses.includes(r.mes)) &&
+            (unidades.length === 0 || unidades.includes(r.nombre_unidad))
+        );
+
+        datosActuales = agruparPorAnioUnidad(filtrados);
+        paginaActual = 1;
+
+        renderTabsAnios(datosActuales);
+        renderTablaSis();
+        renderGraficaPorAnio(datosActuales);
+        renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
+
+        if (anios.length === 0 && meses.length === 0 && unidades.length === 0) {
+            datosFiltradosSis = [...sisResultados];
+            const aniosDisponibles = [...new Set(datosFiltradosSis.map(r => r.anio))].sort();
+            anioActivo = aniosDisponibles[0];
+            const selectDetalle = document.getElementById("filtroSisDetalle");
+            if (selectDetalle) selectDetalle.selectedIndex = 0;
+        } else {
+            datosFiltradosSis = filtrados;
+        }
+
+        graficaSisPorMes(datosFiltradosSis);
+    }
+
+    /* ==========================================================================
+       4. COMPONENTES DE INTERFAZ Y TABLAS
+       ========================================================================== */
+    function renderTabsAnios(data) {
+        const tabs = document.getElementById("tabsAnios");
+        if (!tabs) return;
+        tabs.innerHTML = "";
+
+        const anios = [...new Set(data.map(r => r.anio))].sort((a, b) => b - a);
+
+        anios.forEach((anio, i) => {
+            const li = document.createElement("li");
+            li.className = "nav-item";
+            li.innerHTML = `<button class="nav-link ${i === 0 ? 'active' : ''}">${anio}</button>`;
+
+            li.querySelector("button").addEventListener("click", (e) => {
+                document.querySelectorAll("#tabsAnios .nav-link").forEach(b => b.classList.remove("active"));
+                e.target.classList.add("active");
+
+                anioActivo = anio;
+                paginaActual = 1;
+
+                renderTablaSis();
+                renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
+            });
+
+            tabs.appendChild(li);
+        });
+
+        if (anios.length > 0) {
+            anioActivo = anios[0];
+        }
+    }
+
+    function renderTablaSis() {
+        actualizarEncabezadoSIS(anioActivo);
+
+        const tbody = document.getElementById("tablaSIS");
+        const thead = document.querySelector("#tablaResultados thead tr");
+        const paginacion = document.getElementById("paginacionTabla");
+
+        if (!tbody || !thead || !paginacion) return;
+
+        tbody.innerHTML = "";
+        paginacion.innerHTML = "";
+
+        const datosFiltrados = datosActuales.filter(r => r.anio === anioActivo);
+        const inicio = (paginaActual - 1) * FILAS_POR_PAGINA;
+        const paginaDatos = datosFiltrados.slice(inicio, inicio + FILAS_POR_PAGINA);
+
+        const columnas = [
+            "Año", "CLUES", "Unidad", "Consultas", "Embarazadas", 
+            "Salud Mental", "Salud Bucal", "Tamiz", "Planificación Fam.", "Detecciones"
+        ];
+
+        thead.innerHTML = columnas.map((c, index) => {
+            const clase = (index === 0 || index >= 3) ? 'class="text-center"' : '';
+            return `<th ${clase}>${c}</th>`;
+        }).join("");
+
+        let filasHTML = "";
+        paginaDatos.forEach(r => {
+            filasHTML += `
+                <tr>
+                    <td class="text-center">${r.anio}</td>
+                    <td>${r.clues}</td>
+                    <td>${r.nombre_unidad}</td>
+                    <td class="text-center">${fmt(r.consultas)}</td>
+                    <td class="text-center">${fmt(r.embarazadas)}</td>
+                    <td class="text-center">${fmt(r.mental)}</td>
+                    <td class="text-center">${fmt(r.bucal)}</td>
+                    <td class="text-center">${fmt(r.tamiz)}</td>
+                    <td class="text-center">${fmt(r.planificacion_familiar)}</td>
+                    <td class="text-center">${fmt(r.detecciones)}</td>
+                </tr>`;
+        });
+        tbody.innerHTML = filasHTML;
+
+        const totalPaginas = Math.ceil(datosFiltrados.length / FILAS_POR_PAGINA);
+        for (let i = 1; i <= totalPaginas; i++) {
+            const li = document.createElement("li");
+            li.className = `page-item ${i === paginaActual ? "active" : ""}`;
+            li.innerHTML = `<button class="page-link">${i}</button>`;
+            li.onclick = () => {
+                paginaActual = i;
+                renderTablaSis();
+            };
+            paginacion.appendChild(li);
+        }
+    }
+
+    function cargarDetalleSis() {
+        const select = document.getElementById("filtroSisDetalle");
+        if (!select) return;
+
+        select.innerHTML = "";
+        const opciones = [
+            { value: "consultas", text: "Consultas Total" },
+            { value: "embarazadas", text: "Embarazadas" },
+            { value: "mental", text: "Salud Mental" },
+            { value: "bucal", text: "Salud Bucal" },
+            { value: "tamiz", text: "Tamiz" },
+            { value: "planificacion_familiar", text: "Planificación Familiar" },
+            { value: "detecciones", text: "Detecciones" }
+        ];
+
+        opciones.forEach(op => {
+            const option = document.createElement("option");
+            option.value = op.value;
+            option.textContent = op.text;
+            select.appendChild(option);
+        });
+    }
+
+    /* ==========================================================================
+       5. RENDERIZADO DE GRÁFICAS (CHART.JS)
+       ========================================================================== */
+    function renderGraficaPorAnio(data) {
+        const porAnio = {};
+        data.forEach(r => {
+            porAnio[r.anio] = (porAnio[r.anio] || 0) + (Number(r.consultas) || 0);
+        });
+
+        const anios = Object.keys(porAnio).sort();
+        const colores = ['#4E79A7', '#59A14F', '#F28E2B', '#E15759', '#76B7B2', '#EDC948', '#B07AA1', '#FF9DA7'];
+
+        const datasets = anios.map((anio, i) => ({
+            label: `Año ${anio}`,
+            data: anios.map(a => a === anio ? porAnio[anio] : 0),
+            backgroundColor: colores[i % colores.length]
+        }));
+
+        if (graficaAnio) graficaAnio.destroy();
+
+        const ctx = document.getElementById('graficaSisPorAnio');
+        if (!ctx) return;
+
+        graficaAnio = new Chart(ctx, {
+            type: 'bar',
+            data: { labels: anios, datasets },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { stacked: true },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: v => Number(v).toLocaleString("es-MX") }
+                    }
+                },
+                plugins: {
+                    legend: { position: 'top' },
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        formatter: (val) => val > 0 ? fmt(val) : '',
+                        font: { weight: 'bold', size: 10 }
+                    },
+                    tooltip: {
+                        displayColors: false,
+                        callbacks: {
+                            title: items => items[0].dataset.label,
+                            label: context => `Total: ${Number(context.raw).toLocaleString("es-MX")}`
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderGraficaPorUnidad(data) {
+        const unidadesSeleccionadas = window.getUnidadesSeleccionadas?.() || [];
+        let labels = [];
+        let datasetsData = {
+            consultas: [], embarazadas: [], mental: [], bucal: [],
+            tamiz: [], planificacion_familiar: [], detecciones: []
+        };
+
+        if (unidadesSeleccionadas.length === 0) {
+            labels = ['Total General'];
+            datasetsData.consultas = [data.reduce((s, r) => s + (r.consultas || 0), 0)];
+            datasetsData.embarazadas = [data.reduce((s, r) => s + (r.embarazadas || 0), 0)];
+            datasetsData.mental = [data.reduce((s, r) => s + (r.mental || 0), 0)];
+            datasetsData.bucal = [data.reduce((s, r) => s + (r.bucal || 0), 0)];
+            datasetsData.tamiz = [data.reduce((s, r) => s + (r.tamiz || 0), 0)];
+            datasetsData.planificacion_familiar = [data.reduce((s, r) => s + (r.planificacion_familiar || 0), 0)];
+            datasetsData.detecciones = [data.reduce((s, r) => s + (r.detecciones || 0), 0)];
+        } else {
+            const datosFiltrados = data.filter(r => unidadesSeleccionadas.includes(r.nombre_unidad));
+            labels = datosFiltrados.map(r => r.nombre_unidad);
+            datasetsData.consultas = datosFiltrados.map(r => r.consultas || 0);
+            datasetsData.embarazadas = datosFiltrados.map(r => r.embarazadas || 0);
+            datasetsData.mental = datosFiltrados.map(r => r.mental || 0);
+            datasetsData.bucal = datosFiltrados.map(r => r.bucal || 0);
+            datasetsData.tamiz = datosFiltrados.map(r => r.tamiz || 0);
+            datasetsData.planificacion_familiar = datosFiltrados.map(r => r.planificacion_familiar || 0);
+            datasetsData.detecciones = datosFiltrados.map(r => r.detecciones || 0);
+        }
+
+        if (graficaUnidad) graficaUnidad.destroy();
+
+        const ctx = document.getElementById('graficaSis');
+        if (!ctx) return;
+
+        graficaUnidad = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    { label: 'Consultas', data: datasetsData.consultas, backgroundColor: '#4E79A7' },
+                    { label: 'Embarazadas', data: datasetsData.embarazadas, backgroundColor: '#F28E2B' },
+                    { label: 'Salud Mental', data: datasetsData.mental, backgroundColor: '#E15759' },
+                    { label: 'Salud Bucal', data: datasetsData.bucal, backgroundColor: '#76B7B2' },
+                    { label: 'Tamiz', data: datasetsData.tamiz, backgroundColor: '#59A14F' },
+                    { label: 'Planificación Familiar', data: datasetsData.planificacion_familiar, backgroundColor: '#EDC948' },
+                    { label: 'Detecciones', data: datasetsData.detecciones, backgroundColor: '#B07AA1' }
+                ]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                scales: {
+                    x: { stacked: true, ticks: { callback: v => Number(v).toLocaleString("es-MX") } },
+                    y: { stacked: true }
+                },
+                plugins: {
+                    datalabels: {
+                        color: '#fff',
+                        font: { weight: 'bold', size: 10 },
+                        formatter: (val) => val > 0 ? fmt(val) : ''
+                    },
+                    legend: {
+                        onClick: function (e, legendItem, legend) {
+                            Chart.defaults.plugins.legend.onClick.call(this, e, legendItem, legend);
+                            actualizarTituloGabineteTotal(legend.chart);
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                if (context.parsed.x !== null) {
+                                    label += Number(context.parsed.x).toLocaleString("es-MX");
+                                }
+                                return label;
+                            },
+                            footer: function (items) {
+                                let sumaGabinete = 0;
+                                const chart = items[0].chart;
+                                const dataIndex = items[0].dataIndex;
+                                chart.data.datasets.forEach((dataset, index) => {
+                                    if (chart.isDatasetVisible(index)) {
+                                        sumaGabinete += (dataset.data[dataIndex] || 0);
+                                    }
+                                });
+                                return `Subtotal Visible: ${sumaGabinete.toLocaleString("es-MX")}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        actualizarTituloGabineteTotal(graficaUnidad);
+    }
+
+    function graficaSisPorMes(data) {
+        const detalle = document.getElementById("filtroSisDetalle")?.value;
+        const ctx = document.getElementById("graficaSisMensual");
+
+        if (!data || data.length === 0 || !ctx) {
+            if (graficaSisMensual) graficaSisMensual.destroy();
+            return;
+        }
+
+        const mesesNombres = {
+            1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+            5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+            9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+        };
+
+        const meses = Array.from({ length: 12 }, (_, i) => i + 1);
+        const labels = meses.map(m => mesesNombres[m]);
+        const aniosSeleccionados = [...document.querySelectorAll(".sis-filtro-anio:checked")].map(cb => Number(cb.value));
+        const resumen = {};
+
+        data
+            .filter(r => aniosSeleccionados.length === 0 || aniosSeleccionados.includes(r.anio))
+            .forEach(r => {
+                if (!r.mes) return;
+                const mes = Number(r.mes);
+                const anio = r.anio;
+                let valor = (detalle && r[detalle] !== undefined) ? (Number(r[detalle]) || 0) : 0;
+                const key = `Total ${anio}`;
+
+                if (!resumen[key]) resumen[key] = {};
+                resumen[key][mes] = (resumen[key][mes] || 0) + valor;
+            });
+
+        const datasets = Object.keys(resumen).map(key => ({
+            label: key,
+            data: meses.map(m => resumen[key][m] || 0),
+            tension: 0.35,
+            pointRadius: 4,
+            fill: false
+        }));
+
+        if (graficaSisMensual) graficaSisMensual.destroy();
+
+        graficaSisMensual = new Chart(ctx, {
+            type: "line",
+            data: { labels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: v => Number(v).toLocaleString("es-MX") }
+                    }
+                },
+                plugins: {
+                    datalabels: {
+                        display: () => mostrarValoresMensual,
+                        align: 'top',
+                        formatter: (val) => val > 0 ? fmt(val) : '',
+                        font: { size: 9, weight: 'bold' }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: items => {
+                                const mes = items[0].label;
+                                const anio = items[0].dataset.label.replace("Total ", "");
+                                return `${mes} ${anio}`;
+                            },
+                            label: context => `Total: ${Number(context.raw).toLocaleString("es-MX")}`
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    /* ==========================================================================
+       6. LISTENERS E INICIALIZACIÓN
+       ========================================================================== */
+    window.cargarDatosSis = ejecutarFiltradoSis;
+    window.cargarTablaSis = ejecutarFiltradoSis;
+    window.ejecutarGraficasSis = ejecutarFiltradoSis;
+
+    function resetearFiltrosSis() {
+        document.querySelectorAll(".sis-filtro-anio, .sis-filtro-mes").forEach(cb => cb.checked = false);
+
+        datosActuales = agruparPorAnioUnidad(sisResultados);
+        datosFiltradosSis = [...sisResultados];
+        paginaActual = 1;
+
+        const selectDetalle = document.getElementById("filtroSisDetalle");
+        if (selectDetalle) selectDetalle.selectedIndex = 0;
+
+        renderTabsAnios(datosActuales);
+        renderTablaSis();
+        renderGraficaPorAnio(datosActuales);
+        renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
+        graficaSisPorMes(datosFiltradosSis);
+    }
+
+    window.limpiarFiltrosSis = resetearFiltrosSis;
+
+    document.addEventListener("DOMContentLoaded", () => {
+        datosActuales = agruparPorAnioUnidad(sisResultados);
+
+        cargarDetalleSis();
+        renderTabsAnios(datosActuales);
+        renderTablaSis();
+        renderGraficaPorAnio(datosActuales);
+        renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
+
+        document.getElementById("filtroSisDetalle")?.addEventListener("change", () => {
+            graficaSisPorMes(datosFiltradosSis);
+        });
+
+        const btnToggle = document.getElementById("btnToggleValoresMensual");
+        if (btnToggle) {
+            btnToggle.addEventListener("click", function () {
+                mostrarValoresMensual = !mostrarValoresMensual;
+
+                if (mostrarValoresMensual) {
+                    this.textContent = "Ocultar valores";
+                    this.classList.replace("btn-outline-primary", "btn-primary");
+                } else {
+                    this.textContent = "Mostrar valores";
+                    this.classList.replace("btn-primary", "btn-outline-primary");
+                }
+
+                if (graficaSisMensual) {
+                    graficaSisMensual.update();
+                }
+            });
+        }
+
+        document.getElementById("btnFiltrarSis")?.addEventListener("click", () => {
+            ejecutarFiltradoSis();
+        });
+
+        document.addEventListener("aplicarFiltroUnidades", () => {
+            ejecutarFiltradoSis();
+        });
+
+        document.addEventListener("unidadesSeleccionadasCambiadas", () => {
+            ejecutarFiltradoSis();
+        });
+
+        document.addEventListener("solicitarResetFiltros", () => {
+            resetearFiltrosSis();
+        });
+
+        document.addEventListener("limpiarFiltrosGlobales", () => {
+            resetearFiltrosSis();
+        });
+
+        datosFiltradosSis = [...sisResultados];
+        graficaSisPorMes(datosFiltradosSis);
+    });
+</script>
+{% endblock %}
