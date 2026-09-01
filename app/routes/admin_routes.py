@@ -1654,7 +1654,7 @@ def subir_csv_sis_primer_nivel():
             cursor = conn.cursor()
 
             # 🏥 3. Filtro de Catálogo (Solo unidades autorizadas)
-            cursor.execute("SELECT clues FROM catalogo_unidades")
+            cursor.execute("SELECT clues FROM catalogo_unidades_primer_nivel")
             clues_validas = set(row[0].upper().strip() for row in cursor.fetchall())
 
             if 'clues' in df.columns:
