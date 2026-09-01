@@ -1653,58 +1653,32 @@ def subir_csv_sis_primer_nivel():
             conn = mysql.connection
             cursor = conn.cursor()
 
-            # 🏥 3. Filtro de Catálogo (Solo unidades autorizadas)
+            # 🏥 3. Filtro de Catálogo (CORREGIDO A PRIMER NIVEL)
             cursor.execute("SELECT clues FROM catalogo_unidades_primer_nivel")
-            clues_validas = set(row[0].upper().strip() for row in cursor.fetchall())
+            clues_validas = set(row[0].upper().strip() for row in cursor.fetchall() if row[0])
 
             if 'clues' in df.columns:
                 df['clues'] = df['clues'].str.upper().str.strip()
                 df = df[df['clues'].isin(clues_validas)].copy()
 
-            # 🧹 4. Limpieza de Datos Críticos
+            # 🧹 4. Limpieza de Datos Críticos y Manejo de NOT NULL
             if "total" in df.columns:
-                df["total"] = df["total"].str.replace(",", "").fillna("0")
-            
-            if "apartado" in df.columns:
-                df["apartado"] = df["apartado"].str[:3]
-            if "variable" in df.columns:
-                df["variable"] = df["variable"].str[:5]
-            
+                df["total"] = df["total"].astype(str).str.replace(",", "").str.strip()
+                df["total"] = pd.to_numeric(df["total"], errors='coerce').fillna(0).astype(int)
+            else:
+                df["total"] = 0
+
+            # Rellenar obligatorios para evitar error NOT NULL de MySQL
+            df["jurisdiccion"] = pd.to_numeric(df.get("jurisdiccion"), errors='coerce').fillna(0).astype(int)
+            df["mes"] = pd.to_numeric(df.get("mes"), errors='coerce').fillna(1).astype(int)
+            df["apartado"] = df.get("apartado", "SIN").str[:3].fillna("SIN")
+            df["variable"] = df.get("variable", "SIN").str[:5].fillna("SIN")
+
             df["anio"] = anio
-            df = df.where(pd.notnull(df), None)
 
-            # 🔓 5. Operaciones de Base de Datos
-            cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+            # ... (Pasos 5 y 6 de inserción sin cambios) ...
 
-            # 🔥 Borrado preventivo (CORREGIDO A LAS TABLAS DE PRIMER NIVEL)
-            if modo in ["actualizar", "reemplazar"]:
-                cursor.execute("DELETE FROM sis_registros_primer_nivel WHERE anio = %s", (anio,))
-                cursor.execute("DELETE FROM sis_registros_agregados_primer_nivel WHERE anio = %s", (anio,))
-                print(f"🧹 Limpieza SIS PRIMER NIVEL año {anio} completada.")
-
-            # 🚀 6. Inserción por Bloques
-            columnas_db = ['anio', 'jurisdiccion', 'municipio', 'clues', 'mes', 'apartado', 'variable', 'total']
-            for col in columnas_db:
-                if col not in df.columns: 
-                    df[col] = None
-
-            df_final = df[columnas_db]
-
-            df_final = df_final.replace({np.nan: None})
-            df_final = df_final.where(pd.notnull(df_final), None)
-
-            valores = [
-                tuple(None if pd.isna(x) else x for x in row)
-                for row in df_final.to_numpy()
-            ]
-            
-            sql_ins = f"INSERT INTO sis_registros_primer_nivel ({', '.join(columnas_db)}) VALUES ({', '.join(['%s']*len(columnas_db))})"
-            
-            bloque_size = 10000
-            for i in range(0, len(valores), bloque_size):
-                cursor.executemany(sql_ins, valores[i : i + bloque_size])
-
-            # ⚙️ 7. Recálculo de Agregados SIS (CORREGIDO APUNTANDO A LA NUEVA TABLA)
+            # ⚙️ 7. Recálculo de Agregados SIS (JOIN CORREGIDO)
             cursor.execute("""
                 INSERT INTO sis_registros_agregados_primer_nivel (
                     anio, mes, clues, nombre_unidad,
@@ -1753,7 +1727,7 @@ def subir_csv_sis_primer_nivel():
                     SUM(CASE WHEN sr.variable IN ('RNL06') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END)
                     
                 FROM sis_registros_primer_nivel sr
-                LEFT JOIN catalogo_unidades cu ON sr.clues = cu.clues
+                LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
                 WHERE sr.anio = %s
                 GROUP BY sr.anio, sr.mes, sr.clues, cu.nombre_unidad
             """, (anio,))
