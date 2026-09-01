@@ -4,7 +4,7 @@ from flask_mysqldb import MySQLdb
 from app import mysql
 
 # Blueprint para SIS Primer Nivel
-sis_pn = Blueprint('sis_pn', __name__, url_prefix='/sis-primer-nivel')
+sis_pn = Blueprint('sis_pn', __name__, url_prefix='/sis_primer_nivel')
 
 
 @sis_pn.route("/")
