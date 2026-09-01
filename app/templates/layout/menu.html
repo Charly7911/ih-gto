@@ -66,14 +66,12 @@
                 {% endif %}
 
                 {# 6. SIS #}
-                {% if es_home or ruta.startswith('/sis') %}
+                {% if es_home or (ruta.startswith('/sis') and not ruta.startswith('/sis_primer_nivel')) %}
                 <a href="{{ url_for('sis.inicio') if 'sis.inicio' in config else '/sis' }}"
-                    class="menu-item {% if ruta.startswith('/sis') %}active{% endif %}">
+                    class="menu-item {% if ruta.startswith('/sis') and not ruta.startswith('/sis_primer_nivel') %}active{% endif %}">
                     🏨 Sistema (SIS)
                 </a>
                 {% endif %}
-
-
 
                 {# 7. SIS PRIMER NIVEL #}
                 {% if es_home or ruta.startswith('/sis_primer_nivel') %}
