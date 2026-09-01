@@ -29,17 +29,21 @@
         display: block;
         font-size: 1rem;
         color: #333;
-        margin-bottom: 10px;
+        margin-top: 15px;
+        margin-bottom: 5px;
         font-weight: 500;
     }
 
-    .zona-formulario form input[type="file"] {
+    .zona-formulario form input[type="file"],
+    .zona-formulario form input[type="number"],
+    .zona-formulario form input[type="date"],
+    .zona-formulario form select {
         width: 100%;
         padding: 10px;
         border: 2px solid #ccc;
         border-radius: 8px;
         background-color: #fafafa;
-        margin-bottom: 20px;
+        box-sizing: border-box;
     }
 
     .zona-formulario form input[type="submit"] {
@@ -51,6 +55,7 @@
         border-radius: 8px;
         font-size: 1rem;
         cursor: pointer;
+        margin-top: 30px;
     }
 
     .zona-formulario form input[type="submit"]:hover {
@@ -68,60 +73,55 @@
         color: #2e7d32;
     }
 </style>
-</head>
 
-<body>
+<div class="zona-formulario">
+    <h1>Subir base CSV - Sistema SIS Primer Nivel</h1>
 
-    <div class="zona-formulario">
-        <h1>Subir base CSV - Sistema SIS primer nivel</h1>
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <ul>
+        {% for msg in messages %}
+        <li>{{ msg }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    {% endwith %}
 
-        {% with messages = get_flashed_messages() %}
-        {% if messages %}
-        <ul>
-            {% for msg in messages %}
-            <li>{{ msg }}</li>
-            {% endfor %}
-        </ul>
-        {% endif %}
-        {% endwith %}
+    <div class="form-container">
+        <form method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-        <div class="form-container">
-            <form method="POST" enctype="multipart/form-data">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="file">Selecciona archivo CSV:</label>
+            <input type="file" id="file" name="file" accept=".csv" required>
 
-                <label for="file">Selecciona archivo CSV:</label>
-                <input type="file" name="file" accept=".csv" required>
+            <label for="anio">Año de la información:</label>
+            <input type="number" id="anio" name="anio" min="2015" max="2100" required>
 
-                <label for="anio">Año de la información:</label>
-                <input type="number" name="anio" min="2015" max="2100" required>
+            <label for="modo_carga">Modo de carga:</label>
+            <select id="modo_carga" name="modo_carga" required>
+                <option value="" disabled selected>Selecciona modo de carga</option>
+                <option value="agregar">Agregar</option>
+                <option value="reemplazar">Reemplazar año</option>
+            </select>
 
-                <label>Modo de carga:</label>
-                <select name="modo_carga" required>
-                    <option value="" disabled selected>Selecciona modo de carga</option>
-                    <option value="agregar">Agregar</option>
-                    <option value="reemplazar">Reemplazar año</option>
-                </select>
+            <label for="estatus_inicio">Actualización ó Cierre:</label>
+            <select id="estatus_inicio" name="estatus_inicio" required>
+                <option value="Actualizado">Actualizado</option>
+                <option value="Cierre">Cierre</option>
+            </select>
 
-                <label for="estatus">Actualizacion ó Cierre:</label>
-                <select name="estatus_inicio" required>
-                    <option value="Actualizado">Actualizado</option>
-                    <option value="Cierre">Cierre</option>
-                </select>
+            <label for="fecha_actualizacion">Fecha de actualización:</label>
+            <input type="date" id="fecha_actualizacion" name="fecha_actualizacion" required>
 
-                <label for="fecha_actualizacion">Fecha de actualización:</label>
-                <input type="date" name="fecha_actualizacion" required>
+            <label for="estatus">Estatus del año:</label>
+            <select id="estatus" name="estatus" required>
+                <option value="PRELIMINAR">Preliminar</option>
+                <option value="CONSOLIDADO">Consolidado</option>
+            </select>
 
-
-                <label for="estatus">Estatus del año:</label>
-                <select name="estatus" required>
-                    <option value="PRELIMINAR">Preliminar</option>
-                    <option value="CONSOLIDADO">Consolidado</option>
-                </select>
-
-
-                <input type="submit" value="Subir y Procesar" style="margin-top: 60px;">
-            </form>
-        </div>
+            <input type="submit" value="Subir y Procesar">
+        </form>
     </div>
+</div>
 
-    {% endblock %}
+{% endblock %}

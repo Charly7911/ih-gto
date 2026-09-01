@@ -1629,7 +1629,7 @@ def subir_csv_sis():
 @admin.route("/subir_csv_sis_primer_nivel", methods=["GET", "POST"])
 @login_required
 def subir_csv_sis_primer_nivel():
-    
+
     if request.method == "POST":
         # 📌 1. Obtención de datos
         file = request.files.get("file")
@@ -1641,45 +1641,91 @@ def subir_csv_sis_primer_nivel():
 
         if not file or not anio:
             flash("Falta el archivo o el año", "danger")
-            return redirect(url_for('admin.subir_csv_sis_primer_nivel'))
-        
+            return redirect(url_for("admin.subir_csv_sis_primer_nivel"))
+
         anio = int(anio)
 
         try:
             # 📖 2. Lectura y Normalización
-            df = pd.read_csv(file, dtype=str) 
-            df.columns = [col.strip().lower().replace(" ", "_").replace("ó","o") for col in df.columns]
+            df = pd.read_csv(file, dtype=str)
+            df.columns = [
+                col.strip().lower().replace(" ", "_").replace("ó", "o")
+                for col in df.columns
+            ]
 
             conn = mysql.connection
             cursor = conn.cursor()
 
-            # 🏥 3. Filtro de Catálogo (CORREGIDO A PRIMER NIVEL)
+            # 🏥 3. Filtro de Catálogo (Usa catálogo de primer nivel)
             cursor.execute("SELECT clues FROM catalogo_unidades_primer_nivel")
-            clues_validas = set(row[0].upper().strip() for row in cursor.fetchall() if row[0])
+            clues_validas = set(
+                row[0].upper().strip() for row in cursor.fetchall() if row[0]
+            )
 
-            if 'clues' in df.columns:
-                df['clues'] = df['clues'].str.upper().str.strip()
-                df = df[df['clues'].isin(clues_validas)].copy()
+            if "clues" in df.columns:
+                df["clues"] = df["clues"].str.upper().str.strip()
+                df = df[df["clues"].isin(clues_validas)].copy()
 
-            # 🧹 4. Limpieza de Datos Críticos y Manejo de NOT NULL
+            # 🧹 4. Limpieza de Datos Críticos (Igual a subir_csv_sis)
             if "total" in df.columns:
-                df["total"] = df["total"].astype(str).str.replace(",", "").str.strip()
-                df["total"] = pd.to_numeric(df["total"], errors='coerce').fillna(0).astype(int)
-            else:
-                df["total"] = 0
+                df["total"] = df["total"].str.replace(",", "").fillna("0")
 
-            # Rellenar obligatorios para evitar error NOT NULL de MySQL
-            df["jurisdiccion"] = pd.to_numeric(df.get("jurisdiccion"), errors='coerce').fillna(0).astype(int)
-            df["mes"] = pd.to_numeric(df.get("mes"), errors='coerce').fillna(1).astype(int)
-            df["apartado"] = df.get("apartado", "SIN").str[:3].fillna("SIN")
-            df["variable"] = df.get("variable", "SIN").str[:5].fillna("SIN")
+            if "apartado" in df.columns:
+                df["apartado"] = df["apartado"].str[:3]
+            if "variable" in df.columns:
+                df["variable"] = df["variable"].str[:5]
 
             df["anio"] = anio
+            df = df.where(pd.notnull(df), None)
 
-            # ... (Pasos 5 y 6 de inserción sin cambios) ...
+            # 🔓 5. Operaciones de Base de Datos
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
 
-            # ⚙️ 7. Recálculo de Agregados SIS (JOIN CORREGIDO)
-            cursor.execute("""
+            # 🔥 Borrado preventivo
+            if modo in ["actualizar", "reemplazar"]:
+                cursor.execute(
+                    "DELETE FROM sis_registros_primer_nivel WHERE anio = %s",
+                    (anio,),
+                )
+                cursor.execute(
+                    "DELETE FROM sis_registros_agregados_primer_nivel WHERE anio = %s",
+                    (anio,),
+                )
+                print(f"🧹 Limpieza SIS Primer Nivel año {anio} completada.")
+
+            # 🚀 6. Inserción por Bloques
+            columnas_db = [
+                "anio",
+                "jurisdiccion",
+                "municipio",
+                "clues",
+                "mes",
+                "apartado",
+                "variable",
+                "total",
+            ]
+            for col in columnas_db:
+                if col not in df.columns:
+                    df[col] = None
+
+            df_final = df[columnas_db]
+            df_final = df_final.replace({np.nan: None})
+            df_final = df_final.where(pd.notnull(df_final), None)
+
+            valores = [
+                tuple(None if pd.isna(x) else x for x in row)
+                for row in df_final.to_numpy()
+            ]
+
+            sql_ins = f"INSERT INTO sis_registros_primer_nivel ({', '.join(columnas_db)}) VALUES ({', '.join(['%s']*len(columnas_db))})"
+
+            bloque_size = 10000
+            for i in range(0, len(valores), bloque_size):
+                cursor.executemany(sql_ins, valores[i : i + bloque_size])
+
+            # ⚙️ 7. Recálculo de Agregados SIS Primer Nivel
+            cursor.execute(
+                """
                 INSERT INTO sis_registros_agregados_primer_nivel (
                     anio, mes, clues, nombre_unidad,
                     consultas, mental, bucal, embarazadas,
@@ -1730,33 +1776,40 @@ def subir_csv_sis_primer_nivel():
                 LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
                 WHERE sr.anio = %s
                 GROUP BY sr.anio, sr.mes, sr.clues, cu.nombre_unidad
-            """, (anio,))
+            """,
+                (anio,),
+            )
 
-            # 📊 8. Control Anual (Actualiza el encabezado)
-            cursor.execute("""
+            # 📊 8. Control Anual
+            cursor.execute(
+                """
                 INSERT INTO sis_control_anual_primer_nivel (anio, estatus_inicio, fecha_actualizacion, estatus)
                 VALUES (%s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     fecha_actualizacion = VALUES(fecha_actualizacion),
                     estatus_inicio = VALUES(estatus_inicio),
                     estatus = VALUES(estatus)
-            """, (anio, estatus_inicio, fecha_actualizacion, estatus))
+            """,
+                (anio, estatus_inicio, fecha_actualizacion, estatus),
+            )
 
             # ✅ 9. COMMIT FINAL
             conn.commit()
-            flash(f"Base SIS Primer Nivel {anio} procesada con éxito.", "success")
+            flash(
+                f"Base SIS Primer Nivel {anio} procesada con éxito.", "success"
+            )
 
         except Exception as e:
-            if 'conn' in locals(): 
+            if "conn" in locals():
                 conn.rollback()
             flash(f"Error al procesar SIS PRIMER NIVEL: {str(e)}", "danger")
             print(f"❌ Error SIS: {e}")
         finally:
-            if 'cursor' in locals():
+            if "cursor" in locals():
                 cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
                 cursor.close()
 
-        return redirect(url_for('admin.subir_csv_sis_primer_nivel'))
+        return redirect(url_for("admin.subir_csv_sis_primer_nivel"))
 
     return render_template("admin/subir_csv_sis_primer_nivel.html")
 
