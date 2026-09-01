@@ -4,6 +4,7 @@ import pandas as pd
 import zipfile
 import os
 import shutil
+import threading
 import MySQLdb
 from flask import Blueprint, current_app, render_template, request, redirect, session, url_for, flash
 from flask_login import login_required, current_user
@@ -163,70 +164,27 @@ def archivo_permitido(filename):
 #************************* SUBIR CARPETA Y ARCHIVO DE URGENCIAS***************************
 #*****************************************************************************************
 
-@admin.route("/upload_zip_urgencias", methods=["GET", "POST"])
-@login_required
-def subir_zip_urgencias():
-    if request.method == "POST":
-        anio = int(request.form.get("anio"))
-        modo_carga = request.form.get("modo_carga")
-        fecha_actualizacion = request.form.get("fecha_actualizacion")
-        estatus = request.form.get("estatus")
-        estatus_inicio = request.form.get("estatus_inicio")
-
-        if "file" not in request.files:
-            flash("No hay archivo en la solicitud", "danger")
-            return redirect(url_for("admin.subir_zip_urgencias"))
-
-        file = request.files["file"]
-        if file.filename == "" or not (
-            file and archivo_permitido(file.filename)
-        ):
-            flash("Archivo no válido o no seleccionado", "danger")
-            return redirect(url_for("admin.subir_zip_urgencias"))
-
-        carpeta_nombre = f"urgencias_{anio}"
-        carpeta_destino = os.path.join(
-            current_app.root_path, "uploads", carpeta_nombre
-        )
-
-        if modo_carga == "actualizar" and os.path.exists(carpeta_destino):
-            shutil.rmtree(carpeta_destino)
-        os.makedirs(carpeta_destino, exist_ok=True)
-
-        filename = secure_filename(file.filename)
-        zip_path = os.path.join(carpeta_destino, filename)
-        file.save(zip_path)
-
-        with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            zip_ref.extractall(carpeta_destino)
-
-        # 🗃️ Manejo Unificado de Conexión y Cursor
+# 💡 Función auxiliar para ejecutar el proceso pesado fuera de la petición Web
+def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, estatus_inicio, carpeta_destino, filename, user_id):
+    # Flask requiere el contexto de la app para acceder a 'mysql' fuera de una petición web
+    with app.app_context():
         conn = mysql.connection
         cursor = conn.cursor()
-
         try:
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
             cursor.execute("SET innodb_lock_wait_timeout = 300")
 
             if modo_carga == "actualizar":
-                cursor.execute(
-                    "DELETE FROM urgencias_registros WHERE anio = %s", (anio,)
-                )
-                cursor.execute(
-                    "DELETE FROM urgencias_agregado WHERE anio = %s", (anio,)
-                )
+                cursor.execute("DELETE FROM urgencias_registros WHERE anio = %s", (anio,))
+                cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
 
             # Historial de carga
             sql_historial = "INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id) VALUES (%s, %s, %s)"
-            cursor.execute(
-                sql_historial, (filename, carpeta_nombre, session["user_id"])
-            )
+            cursor.execute(sql_historial, (filename, carpeta_destino, user_id))
             carga_id = cursor.lastrowid
 
-            # Pasar conn y cursor a las funciones internas
-            procesar_txt_detallado_urgencias(
-                cursor, carga_id, carpeta_destino, anio
-            )
+            # Ejecutamos TUS MISMAS FUNCIONES sin cambiarlas
+            procesar_txt_detallado_urgencias(cursor, carga_id, carpeta_destino, anio)
             actualizar_urgencias_agregado(cursor, anio)
 
             # Tabla de control anual
@@ -242,21 +200,76 @@ def subir_zip_urgencias():
                 (anio, estatus_inicio, fecha_actualizacion, estatus),
             )
 
-            # UN SOLO COMMIT AL FINAL
             conn.commit()
-            flash(
-                f"Datos de urgencias {anio} y control anual actualizados correctamente.",
-                "success",
-            )
+            print(f"✅ [ÉXITO BACKGROUND] Urgencias {anio} procesado correctamente.")
 
         except Exception as e:
             conn.rollback()
-            flash(f"Error procesando la base: {str(e)}", "danger")
-            print(f"❌ Error en upload_zip_urgencias: {e}")
+            print(f"❌ [ERROR BACKGROUND] Error procesando urgencias {anio}: {e}")
         finally:
             cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
             cursor.close()
 
+
+@admin.route("/upload_zip_urgencias", methods=["GET", "POST"])
+@login_required
+def subir_zip_urgencias():
+    if request.method == "POST":
+        anio = int(request.form.get("anio"))
+        modo_carga = request.form.get("modo_carga")
+        fecha_actualizacion = request.form.get("fecha_actualizacion")
+        estatus = request.form.get("estatus")
+        estatus_inicio = request.form.get("estatus_inicio")
+
+        if "file" not in request.files:
+            flash("No hay archivo en la solicitud", "danger")
+            return redirect(url_for("admin.subir_zip_urgencias"))
+
+        file = request.files["file"]
+        if file.filename == "" or not (file and archivo_permitido(file.filename)):
+            flash("Archivo no válido o no seleccionado", "danger")
+            return redirect(url_for("admin.subir_zip_urgencias"))
+
+        carpeta_nombre = f"urgencias_{anio}"
+        carpeta_destino = os.path.join(current_app.root_path, "uploads", carpeta_nombre)
+
+        if modo_carga == "actualizar" and os.path.exists(carpeta_destino):
+            shutil.rmtree(carpeta_destino)
+        os.makedirs(carpeta_destino, exist_ok=True)
+
+        filename = secure_filename(file.filename)
+        zip_path = os.path.join(carpeta_destino, filename)
+        file.save(zip_path)
+
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall(carpeta_destino)
+
+        # 🚀 INICIAR EL PROCESO EN SEGUNDO PLANO
+        # Capturamos la app real para pasarla al hilo
+        app = current_app._get_current_object()
+        user_id = session.get("user_id")
+
+        hilo = threading.Thread(
+            target=tarea_segundo_plano,
+            args=(
+                app,
+                anio,
+                modo_carga,
+                fecha_actualizacion,
+                estatus,
+                estatus_inicio,
+                carpeta_destino,
+                filename,
+                user_id,
+            ),
+        )
+        hilo.start()
+
+        # Respuesta INMEDIATA a la vista para evitar ERR_EMPTY_RESPONSE
+        flash(
+            f"El archivo para {anio} se ha subido e iniciado su procesamiento en segundo plano. Puedes continuar navegando.",
+            "info",
+        )
         return redirect(url_for("admin.subir_zip_urgencias"))
 
     return render_template("admin/subir_zip_urgencias.html")
