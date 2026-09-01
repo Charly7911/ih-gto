@@ -3,7 +3,6 @@ from flask_login import login_required
 from flask_mysqldb import MySQLdb
 from app import mysql
 
-# Blueprint para SIS Primer Nivel
 sis_pn = Blueprint('sis_pn', __name__, url_prefix='/sis_primer_nivel')
 
 
@@ -12,7 +11,6 @@ sis_pn = Blueprint('sis_pn', __name__, url_prefix='/sis_primer_nivel')
 def dashboard_sis_primer_nivel():
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
-    # 1. Consulta principal de registros SIS (Asegúrate que la tabla tenga las columnas jurisdiccion y municipio)
     query = """
         SELECT 
             anio,
@@ -32,29 +30,25 @@ def dashboard_sis_primer_nivel():
         ORDER BY anio, mes, clues
     """
     cursor.execute(query)
-    resultados = cursor.fetchall()
+    resultados = cursor.fetchall() or []
 
-    # 2. Extracción de Catálogos Únicos para poblar el Sidebar y los Popovers de Filtro
-    anios_disponibles = sorted({r["anio"] for r in resultados if r["anio"]}) if resultados else []
+    # 1. Catálogo de Años
+    anios_disponibles = sorted({r["anio"] for r in resultados if r.get("anio")}, reverse=True)
     
-    # Lista de dicts para Unidades (CLUES y Nombre)
-    unidades_unicas = {}
-    for r in resultados:
-        if r["clues"] and r["clues"] not in unidades_unicas:
-            unidades_unicas[r["clues"]] = r["nombre_unidad"]
-    unidades_disponibles = [{"clues": k, "nombre": v} for k, v in sorted(unidades_unicas.items(), key=lambda x: x[1])]
+    # 2. Catálogo de Unidades (Lista simple ordenada de nombres/CLUES)
+    unidades_disponibles = sorted({r["nombre_unidad"] for r in resultados if r.get("nombre_unidad")})
 
-    # Listas simples de Jurisdicciones y Municipios ordenadas
-    jurisdicciones_disponibles = sorted({r["jurisdiccion"] for r in resultados if r.get("jurisdiccion")}) if resultados else []
-    municipios_disponibles = sorted({r["municipio"] for r in resultados if r.get("municipio")}) if resultados else []
+    # 3. Catálogo de Jurisdicciones y Municipios
+    jurisdicciones_disponibles = sorted({str(r["jurisdiccion"]) for r in resultados if r.get("jurisdiccion") is not None})
+    municipios_disponibles = sorted({r["municipio"] for r in resultados if r.get("municipio")})
 
-    # 3. Consulta de control de estatus
+    # 4. Control Anual
     cursor.execute("""
         SELECT anio, estatus_inicio, fecha_actualizacion, estatus
         FROM sis_control_anual
         ORDER BY anio
     """)
-    control_anual = cursor.fetchall()
+    control_anual = cursor.fetchall() or []
 
     cursor.close()
 
@@ -71,18 +65,16 @@ def dashboard_sis_primer_nivel():
     )
 
 
-# ======================================================
-# API ENDPOINT (Para peticiones AJAX de filtros en vivo)
-# ======================================================
 @sis_pn.route("/api/filtrar", methods=["POST"])
 @login_required
 def filtrar_datos_sis():
     data = request.get_json() or {}
 
-    agrupar_por = data.get("agrupar_por", "clues") # clues | jurisdiccion | municipio
     unidades = data.get("unidades", [])
     jurisdicciones = data.get("jurisdicciones", [])
     municipios = data.get("municipios", [])
+    anios = data.get("anios", [])
+    meses = data.get("meses", [])
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
@@ -95,21 +87,31 @@ def filtrar_datos_sis():
     """
     params = []
 
-    # Aplicación de filtros según el nivel de agrupación activo
-    if agrupar_por == "clues" and unidades:
-        query_base += f" AND clues IN ({','.join(['%s'] * len(unidades))})"
-        params.extend(unidades)
-    elif agrupar_por == "jurisdiccion" and jurisdicciones:
+    # Evaluaciones independientes para permitir combinación cruzada de filtros
+    if unidades:
+        query_base += f" AND (clues IN ({','.join(['%s'] * len(unidades))}) OR nombre_unidad IN ({','.join(['%s'] * len(unidades))}))"
+        params.extend(unidades + unidades)
+        
+    if jurisdicciones:
         query_base += f" AND jurisdiccion IN ({','.join(['%s'] * len(jurisdicciones))})"
         params.extend(jurisdicciones)
-    elif agrupar_por == "municipio" and municipios:
+        
+    if municipios:
         query_base += f" AND municipio IN ({','.join(['%s'] * len(municipios))})"
         params.extend(municipios)
+
+    if anios:
+        query_base += f" AND anio IN ({','.join(['%s'] * len(anios))})"
+        params.extend(anios)
+
+    if meses:
+        query_base += f" AND mes IN ({','.join(['%s'] * len(meses))})"
+        params.extend(meses)
 
     query_base += " ORDER BY anio, mes"
 
     cursor.execute(query_base, params)
-    datos_filtrados = cursor.fetchall()
+    datos_filtrados = cursor.fetchall() or []
     cursor.close()
 
     return jsonify({"status": "success", "data": datos_filtrados})
