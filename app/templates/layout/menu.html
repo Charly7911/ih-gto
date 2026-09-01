@@ -366,7 +366,10 @@
 
 
             {# FILTROS: SIS PRIMER NIVEL #}
-            {% if request.path.startswith('/sis_primer_nivel') %}
+            {% set path_actual = request.path if request is defined and request.path is defined else (ruta if ruta is
+            defined else '') %}
+
+            {% if path_actual.startswith('/sis_primer_nivel') %}
             <div class="menu-filtros">
                 <div class="header-filtros">
                     <p class="menu-section">🔍 FILTROS PRIMER NIVEL</p>
@@ -483,9 +486,8 @@
                 <button class="btn-apply" id="btnFiltrarSis">Aplicar filtros</button>
             </div>
 
-
             {# FILTROS: SIS REGULAR / SEGUNDO NIVEL #}
-            {% elif ruta.startswith('/sis') %}
+            {% elif path_actual.startswith('/sis') %}
             <div class="menu-filtros">
                 <div class="header-filtros">
                     <p class="menu-section">🔍 FILTROS</p>
@@ -508,7 +510,7 @@
                     <button type="button" class="btn-selector" id="btnUnidades">🔍 Seleccionar unidades</button>
                 </div>
 
-                <div class="popover-unidades" id="popoverUnidades">
+                <div class="popover-unidades" id="popoverUnidades" style="display: none;">
                     <label class="filter-label">Buscar unidad</label>
                     <input type="text" id="buscarUnidad" class="input-text" placeholder="Escribe para filtrar...">
                     <div class="popover-list">
@@ -1443,12 +1445,28 @@
         const togglePopoverVisibilidad = (pop) => {
             if (!pop) return;
             const estaAbierto = pop.classList.contains("open") || pop.style.display === "block";
+
             if (estaAbierto) {
                 pop.classList.remove("open");
                 pop.style.display = "none";
             } else {
                 pop.classList.add("open");
                 pop.style.display = "block";
+
+                // FORZAR VISIBILIDAD DE ELEMENTOS AL ABRIR
+                // Evita que el contenedor se muestre vacío o en blanco
+                const items = pop.querySelectorAll(".popover-item, label, .form-check, .check-unidad, div");
+                items.forEach(item => {
+                    if (!item.classList.contains('popover-actions') && !item.classList.contains('filter-label')) {
+                        item.style.display = "";
+                    }
+                });
+
+                // Limpiar el input de búsqueda del popover al abrir
+                const inputBusqueda = pop.querySelector('input[type="text"], input[type="search"]');
+                if (inputBusqueda) {
+                    inputBusqueda.value = "";
+                }
             }
         };
 
@@ -1531,13 +1549,21 @@
 
                 if (!contenedorPop) return;
 
-                const items = contenedorPop.querySelectorAll(".popover-item, label, .form-check");
+                // Búsqueda en los contenedores directos de los checkboxes
+                const items = contenedorPop.querySelectorAll(".popover-item, label, .form-check, .check-unidad");
 
                 items.forEach(item => {
-                    if (item.closest('.popover-actions') || item.classList.contains('filter-label')) return;
+                    // Ignorar la barra de herramientas/acciones del popover
+                    if (item.closest('.popover-actions') || item.classList.contains('filter-label') || item.classList.contains('popover-header')) {
+                        return;
+                    }
 
                     const texto = item.textContent.toLowerCase();
-                    item.style.display = texto.includes(query) ? "" : "none";
+                    if (query === "") {
+                        item.style.display = "";
+                    } else {
+                        item.style.display = texto.includes(query) ? "" : "none";
+                    }
                 });
             });
         }
