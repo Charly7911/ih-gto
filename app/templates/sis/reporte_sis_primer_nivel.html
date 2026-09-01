@@ -173,17 +173,20 @@
     }
 
     /* ==========================================================================
-       3. PROCESAMIENTO Y FILTRADO DE DATOS (7 Indicadores Primer Nivel)
+       3. PROCESAMIENTO Y FILTRADO DE DATOS (Con Jurisdicción y Municipio)
        ========================================================================== */
-    function agruparPorAnioUnidad(data) {
+    function agruparDatos(data) {
         const mapa = {};
 
         data.forEach(r => {
-            const key = `${r.anio}-${r.clues}`;
+            // Mantiene la jerarquía completa: Año - Jurisdicción - Municipio - Unidad
+            const key = `${r.anio}-${r.jurisdiccion || 'N/A'}-${r.municipio || 'N/A'}-${r.clues}`;
 
             if (!mapa[key]) {
                 mapa[key] = {
                     anio: r.anio,
+                    jurisdiccion: r.jurisdiccion || 'Sin Especificar',
+                    municipio: r.municipio || 'Sin Especificar',
                     clues: r.clues,
                     nombre_unidad: r.nombre_unidad,
                     consultas: 0,
@@ -211,15 +214,21 @@
     function ejecutarFiltradoSis() {
         const anios = [...document.querySelectorAll(".sis-filtro-anio:checked")].map(cb => Number(cb.value));
         const meses = [...document.querySelectorAll(".sis-filtro-mes:checked")].map(cb => Number(cb.value));
+        
+        // Obtención de selecciones de los tres Popovers (Unidades, Jurisdicciones y Municipios)
         const unidades = window.getUnidadesSeleccionadas?.() || [];
+        const jurisdicciones = window.getJurisdiccionesSeleccionadas?.() || [];
+        const municipios = window.getMunicipiosSeleccionados?.() || [];
 
         const filtrados = sisResultados.filter(r =>
             (anios.length === 0 || anios.includes(r.anio)) &&
             (meses.length === 0 || meses.includes(r.mes)) &&
-            (unidades.length === 0 || unidades.includes(r.nombre_unidad))
+            (unidades.length === 0 || unidades.includes(r.clues) || unidades.includes(r.nombre_unidad)) &&
+            (jurisdicciones.length === 0 || jurisdicciones.includes(r.jurisdiccion)) &&
+            (municipios.length === 0 || municipios.includes(r.municipio))
         );
 
-        datosActuales = agruparPorAnioUnidad(filtrados);
+        datosActuales = agruparDatos(filtrados);
         paginaActual = 1;
 
         renderTabsAnios(datosActuales);
@@ -227,7 +236,7 @@
         renderGraficaPorAnio(datosActuales);
         renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
 
-        if (anios.length === 0 && meses.length === 0 && unidades.length === 0) {
+        if (anios.length === 0 && meses.length === 0 && unidades.length === 0 && jurisdicciones.length === 0 && municipios.length === 0) {
             datosFiltradosSis = [...sisResultados];
             const aniosDisponibles = [...new Set(datosFiltradosSis.map(r => r.anio))].sort();
             anioActivo = aniosDisponibles[0];
@@ -416,7 +425,7 @@
             datasetsData.planificacion_familiar = [data.reduce((s, r) => s + (r.planificacion_familiar || 0), 0)];
             datasetsData.detecciones = [data.reduce((s, r) => s + (r.detecciones || 0), 0)];
         } else {
-            const datosFiltrados = data.filter(r => unidadesSeleccionadas.includes(r.nombre_unidad));
+            const datosFiltrados = data.filter(r => unidadesSeleccionadas.includes(r.clues) || unidadesSeleccionadas.includes(r.nombre_unidad));
             labels = datosFiltrados.map(r => r.nombre_unidad);
             datasetsData.consultas = datosFiltrados.map(r => r.consultas || 0);
             datasetsData.embarazadas = datosFiltrados.map(r => r.embarazadas || 0);
@@ -582,7 +591,7 @@
     function resetearFiltrosSis() {
         document.querySelectorAll(".sis-filtro-anio, .sis-filtro-mes").forEach(cb => cb.checked = false);
 
-        datosActuales = agruparPorAnioUnidad(sisResultados);
+        datosActuales = agruparDatos(sisResultados);
         datosFiltradosSis = [...sisResultados];
         paginaActual = 1;
 
@@ -599,10 +608,10 @@
     window.limpiarFiltrosSis = resetearFiltrosSis;
 
     document.addEventListener("DOMContentLoaded", () => {
-        datosActuales = agruparPorAnioUnidad(sisResultados);
+        datosActuales = agruparDatos(sisResultados);
 
         cargarDetalleSis();
-        renderTabsAnios(datosActuales); // Asigna anioActivo internamente
+        renderTabsAnios(datosActuales);
         renderTablaSis();
         renderGraficaPorAnio(datosActuales);
         renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
@@ -634,21 +643,14 @@
             ejecutarFiltradoSis();
         });
 
-        document.addEventListener("aplicarFiltroUnidades", () => {
-            ejecutarFiltradoSis();
-        });
+        // Escuchadores de eventos emitidos desde el Menú de Filtros
+        document.addEventListener("aplicarFiltroUnidades", () => ejecutarFiltradoSis());
+        document.addEventListener("unidadesSeleccionadasCambiadas", () => ejecutarFiltradoSis());
+        document.addEventListener("aplicarFiltroJurisdicciones", () => ejecutarFiltradoSis());
+        document.addEventListener("aplicarFiltroMunicipios", () => ejecutarFiltradoSis());
 
-        document.addEventListener("unidadesSeleccionadasCambiadas", () => {
-            ejecutarFiltradoSis();
-        });
-
-        document.addEventListener("solicitarResetFiltros", () => {
-            resetearFiltrosSis();
-        });
-
-        document.addEventListener("limpiarFiltrosGlobales", () => {
-            resetearFiltrosSis();
-        });
+        document.addEventListener("solicitarResetFiltros", () => resetearFiltrosSis());
+        document.addEventListener("limpiarFiltrosGlobales", () => resetearFiltrosSis());
 
         datosFiltradosSis = [...sisResultados];
         graficaSisPorMes(datosFiltradosSis);
