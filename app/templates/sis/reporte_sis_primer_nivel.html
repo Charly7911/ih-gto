@@ -90,8 +90,6 @@
 
     </div>
 </div>
-
-<!-- Registrar plugin de DataLabels antes de inicializar scripts -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 
@@ -121,7 +119,7 @@
     let graficaSisMensual = null;
 
     /* ==========================================================================
-       2. FUNCIONES DE UTILIDAD Y FORMATO
+       2. FUNCIONES DE UTILIDAD
        ========================================================================== */
     function fmt(n) {
         return Number(n || 0).toLocaleString("es-MX");
@@ -173,22 +171,23 @@
     }
 
     /* ==========================================================================
-       3. PROCESAMIENTO Y FILTRADO DE DATOS (Con Jurisdicción y Municipio)
+       3. PROCESAMIENTO, FILTRADO Y POBLADO DE SELECTS
        ========================================================================== */
     function agruparDatos(data) {
         const mapa = {};
 
         data.forEach(r => {
-            // Mantiene la jerarquía completa: Año - Jurisdicción - Municipio - Unidad
-            const key = `${r.anio}-${r.jurisdiccion || 'N/A'}-${r.municipio || 'N/A'}-${r.clues}`;
+            const jur = r.jurisdiccion ? String(r.jurisdiccion) : 'Sin Especificar';
+            const mun = r.municipio ? String(r.municipio) : 'Sin Especificar';
+            const key = `${r.anio}-${jur}-${mun}-${r.clues}`;
 
             if (!mapa[key]) {
                 mapa[key] = {
                     anio: r.anio,
-                    jurisdiccion: r.jurisdiccion || 'Sin Especificar',
-                    municipio: r.municipio || 'Sin Especificar',
+                    jurisdiccion: jur,
+                    municipio: mun,
                     clues: r.clues,
-                    nombre_unidad: r.nombre_unidad,
+                    nombre_unidad: r.nombre_unidad || r.clues,
                     consultas: 0,
                     embarazadas: 0,
                     mental: 0,
@@ -211,22 +210,53 @@
         return Object.values(mapa);
     }
 
-    function ejecutarFiltradoSis() {
-        const anios = [...document.querySelectorAll(".sis-filtro-anio:checked")].map(cb => Number(cb.value));
-        const meses = [...document.querySelectorAll(".sis-filtro-mes:checked")].map(cb => Number(cb.value));
-        
-        // Obtención de selecciones de los tres Popovers (Unidades, Jurisdicciones y Municipios)
-        const unidades = window.getUnidadesSeleccionadas?.() || [];
-        const jurisdicciones = window.getJurisdiccionesSeleccionadas?.() || [];
-        const municipios = window.getMunicipiosSeleccionados?.() || [];
+    function popularFiltrosDinamicos() {
+        // Extraer valores únicos limpios
+        const jurisdicciones = [...new Set(sisResultados.map(r => r.jurisdiccion).filter(Boolean))].sort();
+        const municipios = [...new Set(sisResultados.map(r => r.municipio).filter(Boolean))].sort();
 
-        const filtrados = sisResultados.filter(r =>
-            (anios.length === 0 || anios.includes(r.anio)) &&
-            (meses.length === 0 || meses.includes(r.mes)) &&
-            (unidades.length === 0 || unidades.includes(r.clues) || unidades.includes(r.nombre_unidad)) &&
-            (jurisdicciones.length === 0 || jurisdicciones.includes(r.jurisdiccion)) &&
-            (municipios.length === 0 || municipios.includes(r.municipio))
-        );
+        // Si existen contenedores/popovers de Checkboxes en tu DOM:
+        const contJur = document.getElementById("contenedorFiltroJurisdiccion");
+        if (contJur) {
+            contJur.innerHTML = jurisdicciones.map(j => `
+                <div class="form-check">
+                    <input class="form-check-input filtro-jurisdiccion" type="checkbox" value="${j}" id="jur_${j}">
+                    <label class="form-check-label" for="jur_${j}">Jurisdicción ${j}</label>
+                </div>
+            `).join('');
+        }
+
+        const contMun = document.getElementById("contenedorFiltroMunicipio");
+        if (contMun) {
+            contMun.innerHTML = municipios.map(m => `
+                <div class="form-check">
+                    <input class="form-check-input filtro-municipio" type="checkbox" value="${m}" id="mun_${m}">
+                    <label class="form-check-label" for="mun_${m}">${m}</label>
+                </div>
+            `).join('');
+        }
+    }
+
+    function obtenerSeleccionados(selector) {
+        return [...document.querySelectorAll(selector + ":checked")].map(cb => cb.value);
+    }
+
+    function ejecutarFiltradoSis() {
+        const anios = obtenerSeleccionados(".sis-filtro-anio");
+        const meses = obtenerSeleccionados(".sis-filtro-mes").map(Number);
+        const jurisdicciones = obtenerSeleccionados(".filtro-jurisdiccion");
+        const municipios = obtenerSeleccionados(".filtro-municipio");
+        const unidades = window.getUnidadesSeleccionadas?.() || [];
+
+        const filtrados = sisResultados.filter(r => {
+            const matchAnio = anios.length === 0 || anios.includes(String(r.anio));
+            const matchMes = meses.length === 0 || meses.includes(Number(r.mes));
+            const matchJur = jurisdicciones.length === 0 || jurisdicciones.includes(String(r.jurisdiccion));
+            const matchMun = municipios.length === 0 || municipios.includes(String(r.municipio));
+            const matchUni = unidades.length === 0 || unidades.includes(r.clues) || unidades.includes(r.nombre_unidad);
+
+            return matchAnio && matchMes && matchJur && matchMun && matchUni;
+        });
 
         datosActuales = agruparDatos(filtrados);
         paginaActual = 1;
@@ -236,21 +266,12 @@
         renderGraficaPorAnio(datosActuales);
         renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
 
-        if (anios.length === 0 && meses.length === 0 && unidades.length === 0 && jurisdicciones.length === 0 && municipios.length === 0) {
-            datosFiltradosSis = [...sisResultados];
-            const aniosDisponibles = [...new Set(datosFiltradosSis.map(r => r.anio))].sort();
-            anioActivo = aniosDisponibles[0];
-            const selectDetalle = document.getElementById("filtroSisDetalle");
-            if (selectDetalle) selectDetalle.selectedIndex = 0;
-        } else {
-            datosFiltradosSis = filtrados;
-        }
-
+        datosFiltradosSis = filtrados;
         graficaSisPorMes(datosFiltradosSis);
     }
 
     /* ==========================================================================
-       4. COMPONENTES DE INTERFAZ Y TABLAS
+       4. TABLA Y TABS
        ========================================================================== */
     function renderTabsAnios(data) {
         const tabs = document.getElementById("tabsAnios");
@@ -329,31 +350,8 @@
         }
     }
 
-    function cargarDetalleSis() {
-        const select = document.getElementById("filtroSisDetalle");
-        if (!select) return;
-
-        select.innerHTML = "";
-        const opciones = [
-            { value: "consultas", text: "Consultas Total" },
-            { value: "embarazadas", text: "Embarazadas" },
-            { value: "mental", text: "Salud Mental" },
-            { value: "bucal", text: "Salud Bucal" },
-            { value: "tamiz", text: "Tamiz" },
-            { value: "planificacion_familiar", text: "Planificación Familiar" },
-            { value: "detecciones", text: "Detecciones" }
-        ];
-
-        opciones.forEach(op => {
-            const option = document.createElement("option");
-            option.value = op.value;
-            option.textContent = op.text;
-            select.appendChild(option);
-        });
-    }
-
     /* ==========================================================================
-       5. RENDERIZADO DE GRÁFICAS (CHART.JS)
+       5. RENDERIZADO DE GRÁFICAS (CON ACCESO SEGURO A PROPIEDADES)
        ========================================================================== */
     function renderGraficaPorAnio(data) {
         const porAnio = {};
@@ -382,10 +380,7 @@
                 responsive: true,
                 scales: {
                     x: { stacked: true },
-                    y: {
-                        beginAtZero: true,
-                        ticks: { callback: v => Number(v).toLocaleString("es-MX") }
-                    }
+                    y: { beginAtZero: true, ticks: { callback: v => Number(v).toLocaleString("es-MX") } }
                 },
                 plugins: {
                     legend: { position: 'top' },
@@ -394,13 +389,6 @@
                         align: 'top',
                         formatter: (val) => val > 0 ? fmt(val) : '',
                         font: { weight: 'bold', size: 10 }
-                    },
-                    tooltip: {
-                        displayColors: false,
-                        callbacks: {
-                            title: items => items[0].dataset.label,
-                            label: context => `Total: ${Number(context.raw).toLocaleString("es-MX")}`
-                        }
                     }
                 }
             }
@@ -408,32 +396,35 @@
     }
 
     function renderGraficaPorUnidad(data) {
-        const unidadesSeleccionadas = window.getUnidadesSeleccionadas?.() || [];
+        const arrSafe = data || [];
         let labels = [];
         let datasetsData = {
             consultas: [], embarazadas: [], mental: [], bucal: [],
             tamiz: [], planificacion_familiar: [], detecciones: []
         };
 
+        const unidadesSeleccionadas = window.getUnidadesSeleccionadas?.() || [];
+
         if (unidadesSeleccionadas.length === 0) {
             labels = ['Total General'];
-            datasetsData.consultas = [data.reduce((s, r) => s + (r.consultas || 0), 0)];
-            datasetsData.embarazadas = [data.reduce((s, r) => s + (r.embarazadas || 0), 0)];
-            datasetsData.mental = [data.reduce((s, r) => s + (r.mental || 0), 0)];
-            datasetsData.bucal = [data.reduce((s, r) => s + (r.bucal || 0), 0)];
-            datasetsData.tamiz = [data.reduce((s, r) => s + (r.tamiz || 0), 0)];
-            datasetsData.planificacion_familiar = [data.reduce((s, r) => s + (r.planificacion_familiar || 0), 0)];
-            datasetsData.detecciones = [data.reduce((s, r) => s + (r.detecciones || 0), 0)];
+            // Acceso seguro evitando undefined en reduce
+            datasetsData.consultas = [arrSafe.reduce((s, r) => s + (Number(r?.consultas) || 0), 0)];
+            datasetsData.embarazadas = [arrSafe.reduce((s, r) => s + (Number(r?.embarazadas) || 0), 0)];
+            datasetsData.mental = [arrSafe.reduce((s, r) => s + (Number(r?.mental) || 0), 0)];
+            datasetsData.bucal = [arrSafe.reduce((s, r) => s + (Number(r?.bucal) || 0), 0)];
+            datasetsData.tamiz = [arrSafe.reduce((s, r) => s + (Number(r?.tamiz) || 0), 0)];
+            datasetsData.planificacion_familiar = [arrSafe.reduce((s, r) => s + (Number(r?.planificacion_familiar) || 0), 0)];
+            datasetsData.detecciones = [arrSafe.reduce((s, r) => s + (Number(r?.detecciones) || 0), 0)];
         } else {
-            const datosFiltrados = data.filter(r => unidadesSeleccionadas.includes(r.clues) || unidadesSeleccionadas.includes(r.nombre_unidad));
-            labels = datosFiltrados.map(r => r.nombre_unidad);
-            datasetsData.consultas = datosFiltrados.map(r => r.consultas || 0);
-            datasetsData.embarazadas = datosFiltrados.map(r => r.embarazadas || 0);
-            datasetsData.mental = datosFiltrados.map(r => r.mental || 0);
-            datasetsData.bucal = datosFiltrados.map(r => r.bucal || 0);
-            datasetsData.tamiz = datosFiltrados.map(r => r.tamiz || 0);
-            datasetsData.planificacion_familiar = datosFiltrados.map(r => r.planificacion_familiar || 0);
-            datasetsData.detecciones = datosFiltrados.map(r => r.detecciones || 0);
+            const datosFiltrados = arrSafe.filter(r => unidadesSeleccionadas.includes(r.clues) || unidadesSeleccionadas.includes(r.nombre_unidad));
+            labels = datosFiltrados.map(r => r.nombre_unidad || r.clues);
+            datasetsData.consultas = datosFiltrados.map(r => Number(r?.consultas) || 0);
+            datasetsData.embarazadas = datosFiltrados.map(r => Number(r?.embarazadas) || 0);
+            datasetsData.mental = datosFiltrados.map(r => Number(r?.mental) || 0);
+            datasetsData.bucal = datosFiltrados.map(r => Number(r?.bucal) || 0);
+            datasetsData.tamiz = datosFiltrados.map(r => Number(r?.tamiz) || 0);
+            datasetsData.planificacion_familiar = datosFiltrados.map(r => Number(r?.planificacion_familiar) || 0);
+            datasetsData.detecciones = datosFiltrados.map(r => Number(r?.detecciones) || 0);
         }
 
         if (graficaUnidad) graficaUnidad.destroy();
@@ -467,35 +458,6 @@
                         color: '#fff',
                         font: { weight: 'bold', size: 10 },
                         formatter: (val) => val > 0 ? fmt(val) : ''
-                    },
-                    legend: {
-                        onClick: function (e, legendItem, legend) {
-                            Chart.defaults.plugins.legend.onClick.call(this, e, legendItem, legend);
-                            actualizarTituloGabineteTotal(legend.chart);
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function (context) {
-                                let label = context.dataset.label || '';
-                                if (label) label += ': ';
-                                if (context.parsed.x !== null) {
-                                    label += Number(context.parsed.x).toLocaleString("es-MX");
-                                }
-                                return label;
-                            },
-                            footer: function (items) {
-                                let sumaGabinete = 0;
-                                const chart = items[0].chart;
-                                const dataIndex = items[0].dataIndex;
-                                chart.data.datasets.forEach((dataset, index) => {
-                                    if (chart.isDatasetVisible(index)) {
-                                        sumaGabinete += (dataset.data[dataIndex] || 0);
-                                    }
-                                });
-                                return `Subtotal Visible: ${sumaGabinete.toLocaleString("es-MX")}`;
-                            }
-                        }
                     }
                 }
             }
@@ -521,21 +483,18 @@
 
         const meses = Array.from({ length: 12 }, (_, i) => i + 1);
         const labels = meses.map(m => mesesNombres[m]);
-        const aniosSeleccionados = [...document.querySelectorAll(".sis-filtro-anio:checked")].map(cb => Number(cb.value));
         const resumen = {};
 
-        data
-            .filter(r => aniosSeleccionados.length === 0 || aniosSeleccionados.includes(r.anio))
-            .forEach(r => {
-                if (!r.mes) return;
-                const mes = Number(r.mes);
-                const anio = r.anio;
-                let valor = (detalle && r[detalle] !== undefined) ? (Number(r[detalle]) || 0) : 0;
-                const key = `Total ${anio}`;
+        data.forEach(r => {
+            if (!r.mes) return;
+            const mes = Number(r.mes);
+            const anio = r.anio;
+            let valor = (detalle && r[detalle] !== undefined) ? (Number(r[detalle]) || 0) : 0;
+            const key = `Total ${anio}`;
 
-                if (!resumen[key]) resumen[key] = {};
-                resumen[key][mes] = (resumen[key][mes] || 0) + valor;
-            });
+            if (!resumen[key]) resumen[key] = {};
+            resumen[key][mes] = (resumen[key][mes] || 0) + valor;
+        });
 
         const datasets = Object.keys(resumen).map(key => ({
             label: key,
@@ -554,10 +513,7 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { callback: v => Number(v).toLocaleString("es-MX") }
-                    }
+                    y: { beginAtZero: true, ticks: { callback: v => Number(v).toLocaleString("es-MX") } }
                 },
                 plugins: {
                     datalabels: {
@@ -565,16 +521,6 @@
                         align: 'top',
                         formatter: (val) => val > 0 ? fmt(val) : '',
                         font: { size: 9, weight: 'bold' }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            title: items => {
-                                const mes = items[0].label;
-                                const anio = items[0].dataset.label.replace("Total ", "");
-                                return `${mes} ${anio}`;
-                            },
-                            label: context => `Total: ${Number(context.raw).toLocaleString("es-MX")}`
-                        }
                     }
                 }
             }
@@ -582,78 +528,25 @@
     }
 
     /* ==========================================================================
-       6. LISTENERS E INICIALIZACIÓN
+       6. INICIALIZACIÓN
        ========================================================================== */
-    window.cargarDatosSis = ejecutarFiltradoSis;
-    window.cargarTablaSis = ejecutarFiltradoSis;
-    window.ejecutarGraficasSis = ejecutarFiltradoSis;
-
-    function resetearFiltrosSis() {
-        document.querySelectorAll(".sis-filtro-anio, .sis-filtro-mes").forEach(cb => cb.checked = false);
-
-        datosActuales = agruparDatos(sisResultados);
-        datosFiltradosSis = [...sisResultados];
-        paginaActual = 1;
-
-        const selectDetalle = document.getElementById("filtroSisDetalle");
-        if (selectDetalle) selectDetalle.selectedIndex = 0;
-
-        renderTabsAnios(datosActuales);
-        renderTablaSis();
-        renderGraficaPorAnio(datosActuales);
-        renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
-        graficaSisPorMes(datosFiltradosSis);
-    }
-
-    window.limpiarFiltrosSis = resetearFiltrosSis;
-
     document.addEventListener("DOMContentLoaded", () => {
         datosActuales = agruparDatos(sisResultados);
 
-        cargarDetalleSis();
+        popularFiltrosDinamicos();
         renderTabsAnios(datosActuales);
         renderTablaSis();
         renderGraficaPorAnio(datosActuales);
         renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
 
-        document.getElementById("filtroSisDetalle")?.addEventListener("change", () => {
-            graficaSisPorMes(datosFiltradosSis);
+        document.getElementById("btnFiltrarSis")?.addEventListener("click", ejecutarFiltradoSis);
+        document.addEventListener("change", (e) => {
+            if (e.target.classList.contains("filtro-jurisdiccion") || e.target.classList.contains("filtro-municipio")) {
+                ejecutarFiltradoSis();
+            }
         });
 
-        const btnToggle = document.getElementById("btnToggleValoresMensual");
-        if (btnToggle) {
-            btnToggle.addEventListener("click", function () {
-                mostrarValoresMensual = !mostrarValoresMensual;
-
-                if (mostrarValoresMensual) {
-                    this.textContent = "Ocultar valores";
-                    this.classList.replace("btn-outline-primary", "btn-primary");
-                } else {
-                    this.textContent = "Mostrar valores";
-                    this.classList.replace("btn-primary", "btn-outline-primary");
-                }
-
-                if (graficaSisMensual) {
-                    graficaSisMensual.update();
-                }
-            });
-        }
-
-        document.getElementById("btnFiltrarSis")?.addEventListener("click", () => {
-            ejecutarFiltradoSis();
-        });
-
-        // Escuchadores de eventos emitidos desde el Menú de Filtros
-        document.addEventListener("aplicarFiltroUnidades", () => ejecutarFiltradoSis());
-        document.addEventListener("unidadesSeleccionadasCambiadas", () => ejecutarFiltradoSis());
-        document.addEventListener("aplicarFiltroJurisdicciones", () => ejecutarFiltradoSis());
-        document.addEventListener("aplicarFiltroMunicipios", () => ejecutarFiltradoSis());
-
-        document.addEventListener("solicitarResetFiltros", () => resetearFiltrosSis());
-        document.addEventListener("limpiarFiltrosGlobales", () => resetearFiltrosSis());
-
-        datosFiltradosSis = [...sisResultados];
-        graficaSisPorMes(datosFiltradosSis);
+        graficaSisPorMes(sisResultados);
     });
 </script>
 {% endblock %}
