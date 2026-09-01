@@ -27,7 +27,7 @@ def dashboard_sis_primer_nivel():
             detecciones,
             tamiz
             
-        FROM sis_primer_nivel_registros
+        FROM sis_registros_agregados_primer_nivel
         ORDER BY anio, mes, clues
     """
 
