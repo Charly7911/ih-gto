@@ -1268,6 +1268,8 @@
 
 </div>
 
+
+
 <script>
     const tipo = "{{ tipo }}"; // morbi | morta | urg | urgencias | sis | egresos | ind | indicadores
     const sufijo = tipo ? (tipo.charAt(0).toUpperCase() + tipo.slice(1)) : "";
@@ -1454,7 +1456,6 @@
                 pop.style.display = "block";
 
                 // FORZAR VISIBILIDAD DE ELEMENTOS AL ABRIR
-                // Evita que el contenedor se muestre vacío o en blanco
                 const items = pop.querySelectorAll(".popover-item, label, .form-check, .check-unidad, div");
                 items.forEach(item => {
                     if (!item.classList.contains('popover-actions') && !item.classList.contains('filter-label')) {
@@ -1549,11 +1550,9 @@
 
                 if (!contenedorPop) return;
 
-                // Búsqueda en los contenedores directos de los checkboxes
                 const items = contenedorPop.querySelectorAll(".popover-item, label, .form-check, .check-unidad");
 
                 items.forEach(item => {
-                    // Ignorar la barra de herramientas/acciones del popover
                     if (item.closest('.popover-actions') || item.classList.contains('filter-label') || item.classList.contains('popover-header')) {
                         return;
                     }
@@ -1669,6 +1668,17 @@
             return Array.from(checkboxes).map(cb => cb.value);
         }
 
+        // --- NUEVAS FUNCIONES PARA AÑOS Y MESES ---
+        function obtenerAniosSeleccionadosGlobal() {
+            const checkboxes = document.querySelectorAll('.sis-filtro-anio:checked, input[name="anio"]:checked, input[name="anios"]:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        function obtenerMesesSeleccionadosGlobal() {
+            const checkboxes = document.querySelectorAll('.sis-filtro-mes:checked, input[name="mes"]:checked, input[name="meses"]:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
         function obtenerServiciosSeleccionadosGlobal() {
             if (!popoverServicio) return [];
             const checkboxes = popoverServicio.querySelectorAll('input[type="checkbox"]:checked');
@@ -1693,6 +1703,8 @@
 
         window.getJurisdiccionesSeleccionadas = obtenerJurisdiccionesSeleccionadasGlobal;
         window.getMunicipiosSeleccionados = obtenerMunicipiosSeleccionadosGlobal;
+        window.getAniosSeleccionados = obtenerAniosSeleccionadosGlobal;
+        window.getMesesSeleccionados = obtenerMesesSeleccionadosGlobal;
         window.getServiciosSeleccionados = obtenerServiciosSeleccionadosGlobal;
         window.getAfeccionesSeleccionadas = obtenerAfeccionesSeleccionadasGlobal;
 
@@ -1742,23 +1754,22 @@
 
             const agruparPorVal = selectNivel ? selectNivel.value : 'clues';
 
-            if (window.filtrosSis && typeof window.filtrosSis === "object") {
-                window.filtrosSis.agrupar_por = agruparPorVal;
-                window.filtrosSis.unidades = obtenerCheckboxesUnidadesGlobal();
-                window.filtrosSis.jurisdicciones = obtenerJurisdiccionesSeleccionadasGlobal();
-                window.filtrosSis.municipios = obtenerMunicipiosSeleccionadosGlobal();
-                window.filtrosSis.servicios = obtenerServiciosSeleccionadosGlobal();
-                window.filtrosSis.afecciones = obtenerAfeccionesSeleccionadasGlobal();
-            }
-            if (window.filtros && typeof window.filtros === "object") {
-                window.filtros.agrupar_por = agruparPorVal;
-                window.filtros.unidades = obtenerCheckboxesUnidadesGlobal();
-                window.filtros.jurisdicciones = obtenerJurisdiccionesSeleccionadasGlobal();
-                window.filtros.municipios = obtenerMunicipiosSeleccionadosGlobal();
-                window.filtros.servicios = obtenerServiciosSeleccionadosGlobal();
-                window.filtros.afecciones = obtenerAfeccionesSeleccionadasGlobal();
-            }
+            // ASIGNAR VALORES AL OBJETO GLOBAL DE FILTROS
+            const payloadFiltros = {
+                agrupar_por: agruparPorVal,
+                anios: obtenerAniosSeleccionadosGlobal(),
+                meses: obtenerMesesSeleccionadosGlobal(),
+                unidades: obtenerCheckboxesUnidadesGlobal(),
+                jurisdicciones: obtenerJurisdiccionesSeleccionadasGlobal(),
+                municipios: obtenerMunicipiosSeleccionadosGlobal(),
+                servicios: obtenerServiciosSeleccionadosGlobal(),
+                afecciones: obtenerAfeccionesSeleccionadasGlobal()
+            };
 
+            window.filtrosSis = Object.assign(window.filtrosSis || {}, payloadFiltros);
+            window.filtros = Object.assign(window.filtros || {}, payloadFiltros);
+
+            // EJECUTAR FUNCIONES DE RECARGA DE VISTA
             if (typeof cargarDatosSis === "function") cargarDatosSis();
             if (typeof cargarTablaSis === "function") cargarTablaSis();
             if (typeof cargarDatos === "function") cargarDatos();
@@ -1772,12 +1783,13 @@
             if (typeof renderGraficaIndicadores === "function") renderGraficaIndicadores();
             if (typeof renderGraficaEgresos === "function") renderGraficaEgresos();
 
-            document.dispatchEvent(new CustomEvent("aplicarFiltroUnidades"));
+            document.dispatchEvent(new CustomEvent("aplicarFiltroUnidades", { detail: payloadFiltros }));
 
             setTimeout(ejecutarGraficasSis, 300);
             setTimeout(ejecutarGraficasSis, 800);
         }
 
+        // LISTA EXTENDIDA DE SELECTORES
         const selectoresBotonesAccion = [
             `#aplicarUnidades${sufijo}`, "#aplicarUnidades", "#aplicarUnidadesSis", "#btnAplicarSis",
             "#aplicarUnidadesUrgencias", "#aplicarUnidadesIndicadores", "#aplicarUnidadesEgresos",
@@ -1788,7 +1800,10 @@
         ];
 
         document.addEventListener("click", (e) => {
-            if (e.target.closest(selectoresBotonesAccion.join(", "))) {
+            const btnEncontrado = e.target.closest(selectoresBotonesAccion.join(", "));
+            if (btnEncontrado) {
+                e.preventDefault();
+
                 const cerrar = (pop) => {
                     if (pop) {
                         pop.classList.remove("open");
@@ -1806,7 +1821,7 @@
             }
         });
 
-        // Eventos de botones "Limpiar"
+        // Eventos de botones "Limpiar" por popover
         document.getElementById("limpiarJurisdicciones")?.addEventListener("click", () => {
             if (popoverJurisdicciones) {
                 popoverJurisdicciones.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
@@ -1831,7 +1846,6 @@
             }
         });
 
-        // Unificado el evento de Limpiar Unidades
         document.addEventListener("click", (e) => {
             if (e.target.closest("#limpiarUnidades, #limpiarUnidades" + sufijo)) {
                 const popUnidades = obtenerPopoverUnidades();
@@ -1860,12 +1874,8 @@
             if (e.target.closest('#btnResetAll, #btnResetSis, #btnReset' + sufijo + ', .btn-reset, .btn-limpiar')) {
                 e.preventDefault();
 
-                const popUnidades = obtenerPopoverUnidades();
-                if (popUnidades) popUnidades.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-                if (popoverJurisdicciones) popoverJurisdicciones.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-                if (popoverMunicipios) popoverMunicipios.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-                if (popoverServicio) popoverServicio.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-                if (popoverAfecciones) popoverAfecciones.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+                // Limpiar todos los checkboxes del sidebar
+                document.querySelectorAll('.menu-filtros input[type="checkbox"]').forEach(cb => cb.checked = false);
 
                 if (selectNivel) selectNivel.value = 'clues';
                 if (blockUnidades) blockUnidades.style.display = 'block';
@@ -1884,6 +1894,7 @@
                 if (btnServicio) btnServicio.textContent = "🔍 Seleccionar Egreso";
                 if (btnAfecciones) btnAfecciones.textContent = "🔍 Seleccionar afecciones";
 
+                ejecutarCargaGraficaYDatos();
                 document.dispatchEvent(new CustomEvent("solicitarResetFiltros"));
             }
         });
