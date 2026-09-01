@@ -1681,7 +1681,6 @@ def subir_csv_sis():
 #*****************************************************************
 #**********  CARGAR SIS PRIMER NIVEL *****************************
 #*****************************************************************
-
 @admin.route("/subir_csv_sis_primer_nivel", methods=["GET", "POST"])
 @login_required
 def subir_csv_sis_primer_nivel():
@@ -1722,7 +1721,7 @@ def subir_csv_sis_primer_nivel():
                 df["clues"] = df["clues"].str.upper().str.strip()
                 df = df[df["clues"].isin(clues_validas)].copy()
 
-            # 🧹 4. Limpieza de Datos Críticos (Igual a subir_csv_sis)
+            # 🧹 4. Limpieza de Datos Críticos
             if "total" in df.columns:
                 df["total"] = df["total"].str.replace(",", "").fillna("0")
 
@@ -1779,8 +1778,7 @@ def subir_csv_sis_primer_nivel():
             for i in range(0, len(valores), bloque_size):
                 cursor.executemany(sql_ins, valores[i : i + bloque_size])
 
-           
-            # ⚙️ 7. Recálculo de Agregados SIS Primer Nivel
+            # ⚙️ 7. Recálculo de Agregados SIS Primer Nivel (CORREGIDO)
             cursor.execute(
                 """
                 INSERT INTO sis_registros_agregados_primer_nivel (
@@ -1793,8 +1791,8 @@ def subir_csv_sis_primer_nivel():
                     sr.mes, 
                     sr.clues, 
                     cu.nombre_unidad,
-                    cu.jurisdiccion,
-                    cu.municipio,
+                    sr.jurisdiccion, -- Tomado del CSV en sr
+                    sr.municipio,    -- Tomado del CSV en sr
                     SUM(CASE WHEN sr.variable IN ('CON01','CON02','CON03','CON04','CON05','CON06','CON07','CON08','CON09','CON10',
                         'CON11','CON12','CON13','CON14','CON15','CON16','CON17','CON18','CON19','CON20',
                         'CON21','CON22','CON23','CON24','CON25','CON26','CON27','CON28','CON29','CON30',
@@ -1837,7 +1835,7 @@ def subir_csv_sis_primer_nivel():
                 FROM sis_registros_primer_nivel sr
                 LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
                 WHERE sr.anio = %s
-                GROUP BY sr.anio, sr.mes, sr.clues, cu.nombre_unidad, cu.jurisdiccion, cu.municipio
+                GROUP BY sr.anio, sr.mes, sr.clues, cu.nombre_unidad, sr.jurisdiccion, sr.municipio
             """,
                 (anio,),
             )
