@@ -2,13 +2,40 @@
 {% block content %}
 <div class="main-content">
     <div class="container-fluid mt-4 ps-4 pe-4">
+        
         <h2 class="mb-3" id="sis-title">
             🏥 SIS - Primer Nivel
             <span id="sis-meta" style="font-size: 18px;" data-control='{{ control_anual | tojson | safe }}'>
             </span>
         </h2>
 
-        <!-- GRÁFICAS -->
+        <!-- =================================================================== -->
+        <!-- 🔹 NUEVO: CONTENEDORES DE FILTROS DINÁMICOS                         -->
+        <!-- =================================================================== -->
+        <div class="card mb-4">
+            <div class="card-header font-weight-bold bg-light">Filtros</div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- Contenedor donde JS inyectará los Checkboxes de Jurisdicción -->
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label font-weight-bold">Jurisdicción:</label>
+                        <div id="contenedorFiltroJurisdiccion" class="border p-2 rounded" style="max-height: 120px; overflow-y: auto;">
+                        </div>
+                    </div>
+
+                    <!-- Contenedor donde JS inyectará los Checkboxes de Municipio -->
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label font-weight-bold">Municipio:</label>
+                        <div id="contenedorFiltroMunicipio" class="border p-2 rounded" style="max-height: 120px; overflow-y: auto;">
+                        </div>
+                    </div>
+                </div>
+                <!-- Botón opcional de filtrado explícito (tu JS ya lo busca con "btnFiltrarSis") -->
+                <button type="button" id="btnFiltrarSis" class="btn btn-primary btn-sm mt-2">Aplicar Filtros</button>
+            </div>
+        </div>
+
+        <!-- GRÁFICAS SUPERIORES -->
         <div class="row mb-4">
             <div class="col-md-6">
                 <div class="card">
@@ -58,9 +85,9 @@
                     <ul class="pagination pagination-sm" id="paginacionTabla"></ul>
                 </nav>
 
-                <!-- =======================
-                        GRAFICA MENSUAL SIS
-                    ======================== -->
+                <!-- ===================================================
+                     GRAFICA MENSUAL SIS
+                ==================================================== -->
                 <hr>
                 <div class="card mb-4">
                     <div class="card-body">
@@ -68,12 +95,19 @@
                             <h5 class="mb-0">📈 Total SIS mensual</h5>
 
                             <div class="d-flex gap-2 align-items-center">
+                                <!-- 🔹 OPCIONES AGREGADAS AL SELECT -->
                                 <select id="filtroSisDetalle" class="form-select form-select-sm w-auto">
+                                    <option value="consultas">Consultas</option>
+                                    <option value="embarazadas">Embarazadas</option>
+                                    <option value="mental">Salud Mental</option>
+                                    <option value="bucal">Salud Bucal</option>
+                                    <option value="tamiz">Tamiz</option>
+                                    <option value="planificacion_familiar">Planificación Familiar</option>
+                                    <option value="detecciones">Detecciones</option>
                                 </select>
 
                                 <!-- BOTÓN DE MOSTRAR / OCULTAR VALORES -->
-                                <button type="button" class="btn btn-outline-primary btn-sm"
-                                    id="btnToggleValoresMensual">
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="btnToggleValoresMensual">
                                     Mostrar valores
                                 </button>
                             </div>
@@ -90,7 +124,6 @@
 
     </div>
 </div>
-
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
@@ -213,11 +246,9 @@
     }
 
     function popularFiltrosDinamicos() {
-        // Extraer valores únicos limpios
         const jurisdicciones = [...new Set(sisResultados.map(r => r.jurisdiccion).filter(Boolean))].sort();
         const municipios = [...new Set(sisResultados.map(r => r.municipio).filter(Boolean))].sort();
 
-        // Si existen contenedores/popovers de Checkboxes en tu DOM:
         const contJur = document.getElementById("contenedorFiltroJurisdiccion");
         if (contJur) {
             contJur.innerHTML = jurisdicciones.map(j => `
@@ -261,6 +292,7 @@
         });
 
         datosActuales = agruparDatos(filtrados);
+        datosFiltradosSis = filtrados;
         paginaActual = 1;
 
         renderTabsAnios(datosActuales);
@@ -268,7 +300,6 @@
         renderGraficaPorAnio(datosActuales);
         renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
 
-        datosFiltradosSis = filtrados;
         graficaSisPorMes(datosFiltradosSis);
     }
 
@@ -281,6 +312,11 @@
         tabs.innerHTML = "";
 
         const anios = [...new Set(data.map(r => r.anio))].sort((a, b) => b - a);
+
+        if (anios.length === 0) {
+            anioActivo = null;
+            return;
+        }
 
         anios.forEach((anio, i) => {
             const li = document.createElement("li");
@@ -301,7 +337,8 @@
             tabs.appendChild(li);
         });
 
-        if (anios.length > 0) {
+        // Asegurar que exista un año activo seleccionado por defecto
+        if (!anioActivo || !anios.includes(anioActivo)) {
             anioActivo = anios[0];
         }
     }
@@ -353,7 +390,7 @@
     }
 
     /* ==========================================================================
-       5. RENDERIZADO DE GRÁFICAS (CON ACCESO SEGURO A PROPIEDADES)
+       5. RENDERIZADO DE GRÁFICAS
        ========================================================================== */
     function renderGraficaPorAnio(data) {
         const porAnio = {};
@@ -409,7 +446,6 @@
 
         if (unidadesSeleccionadas.length === 0) {
             labels = ['Total General'];
-            // Acceso seguro evitando undefined en reduce
             datasetsData.consultas = [arrSafe.reduce((s, r) => s + (Number(r?.consultas) || 0), 0)];
             datasetsData.embarazadas = [arrSafe.reduce((s, r) => s + (Number(r?.embarazadas) || 0), 0)];
             datasetsData.mental = [arrSafe.reduce((s, r) => s + (Number(r?.mental) || 0), 0)];
@@ -469,7 +505,7 @@
     }
 
     function graficaSisPorMes(data) {
-        const detalle = document.getElementById("filtroSisDetalle")?.value;
+        const detalle = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const ctx = document.getElementById("graficaSisMensual");
 
         if (!data || data.length === 0 || !ctx) {
@@ -530,9 +566,10 @@
     }
 
     /* ==========================================================================
-       6. INICIALIZACIÓN
+       6. INICIALIZACIÓN Y EVENT LISTENERS
        ========================================================================== */
     document.addEventListener("DOMContentLoaded", () => {
+        // Inicialización de estructura y datos
         datosActuales = agruparDatos(sisResultados);
 
         popularFiltrosDinamicos();
@@ -540,15 +577,29 @@
         renderTablaSis();
         renderGraficaPorAnio(datosActuales);
         renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
+        graficaSisPorMes(datosFiltradosSis);
 
+        // 🔹 Evento para el botón principal de Filtrado
         document.getElementById("btnFiltrarSis")?.addEventListener("click", ejecutarFiltradoSis);
+
+        // 🔹 Delegación de eventos para checkboxes de Jurisdicción y Municipio
         document.addEventListener("change", (e) => {
             if (e.target.classList.contains("filtro-jurisdiccion") || e.target.classList.contains("filtro-municipio")) {
                 ejecutarFiltradoSis();
             }
         });
 
-        graficaSisPorMes(sisResultados);
+        // 🔹 Evento al cambiar la métrica de la gráfica mensual
+        document.getElementById("filtroSisDetalle")?.addEventListener("change", () => {
+            graficaSisPorMes(datosFiltradosSis);
+        });
+
+        // 🔹 Evento al conmutar 'Mostrar/Ocultar Valores'
+        document.getElementById("btnToggleValoresMensual")?.addEventListener("click", (e) => {
+            mostrarValoresMensual = !mostrarValoresMensual;
+            e.target.textContent = mostrarValoresMensual ? "Ocultar valores" : "Mostrar valores";
+            graficaSisPorMes(datosFiltradosSis);
+        });
     });
 </script>
 {% endblock %}
