@@ -38,16 +38,16 @@
                     <table class="table table-striped table-sm" id="tablaResultados">
                         <thead>
                             <tr>
-                                <th>Año</th>
+                                <th class="text-center">Año</th>
                                 <th>CLUES</th>
                                 <th>Unidad</th>
-                                <th>Consultas</th>
-                                <th>Mental</th>
-                                <th>Bucal</th>
-                                <th>Embarazadas</th>
-                                <th>Detecciones</th>
-                                <th>Planificacion Familiar</th>
-                                <th>Tamiz</th>
+                                <th class="text-center">Consultas</th>
+                                <th class="text-center">Embarazadas</th>
+                                <th class="text-center">Salud Mental</th>
+                                <th class="text-center">Salud Bucal</th>
+                                <th class="text-center">Tamiz</th>
+                                <th class="text-center">Planificación Fam.</th>
+                                <th class="text-center">Detecciones</th>
                             </tr>
                         </thead>
                         <tbody id="tablaSIS"></tbody>
@@ -278,10 +278,9 @@
         actualizarEncabezadoSIS(anioActivo);
 
         const tbody = document.getElementById("tablaSIS");
-        const thead = document.querySelector("#tablaResultados thead tr");
         const paginacion = document.getElementById("paginacionTabla");
 
-        if (!tbody || !thead || !paginacion) return;
+        if (!tbody || !paginacion) return;
 
         tbody.innerHTML = "";
         paginacion.innerHTML = "";
@@ -289,16 +288,6 @@
         const datosFiltrados = datosActuales.filter(r => r.anio === anioActivo);
         const inicio = (paginaActual - 1) * FILAS_POR_PAGINA;
         const paginaDatos = datosFiltrados.slice(inicio, inicio + FILAS_POR_PAGINA);
-
-        const columnas = [
-            "Año", "CLUES", "Unidad", "Consultas", "Embarazadas", 
-            "Salud Mental", "Salud Bucal", "Tamiz", "Planificación Fam.", "Detecciones"
-        ];
-
-        thead.innerHTML = columnas.map((c, index) => {
-            const clase = (index === 0 || index >= 3) ? 'class="text-center"' : '';
-            return `<th ${clase}>${c}</th>`;
-        }).join("");
 
         let filasHTML = "";
         paginaDatos.forEach(r => {
@@ -613,7 +602,7 @@
         datosActuales = agruparPorAnioUnidad(sisResultados);
 
         cargarDetalleSis();
-        renderTabsAnios(datosActuales);
+        renderTabsAnios(datosActuales); // Asigna anioActivo internamente
         renderTablaSis();
         renderGraficaPorAnio(datosActuales);
         renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));

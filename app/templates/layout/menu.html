@@ -73,7 +73,7 @@
                 </a>
                 {% endif %}
 
-                
+
 
                 {# 7. SIS PRIMER NIVEL #}
                 {% if es_home or ruta.startswith('/sis_primer_nivel') %}
@@ -366,8 +366,66 @@
             </div>
             {% endif %}
 
-            {# FILTROS: SIS #}
-            {% if ruta.startswith('/sis') %}
+
+            {# FILTROS: SIS PRIMER NIVEL #}
+            {% if ruta.startswith('/sis_primer_nivel') %}
+            <div class="menu-filtros">
+                <div class="header-filtros">
+                    <p class="menu-section">🔍 FILTROS PRIMER NIVEL</p>
+                    <button type="button" id="btnResetAll" class="btn-reset-link">Limpiar</button>
+                </div>
+
+                <!-- Filtro Años -->
+                <div class="filter-block">
+                    <label class="filter-label">Años</label>
+                    <div class="checklist checklist-years">
+                        {% for a in anios_disponibles %}
+                        <label class="check-item">
+                            <input type="checkbox" class="sis-filtro-anio" value="{{ a }}"> {{ a }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Filtro Unidades -->
+                <div class="filter-block">
+                    <label class="filter-label">Unidad</label>
+                    <button type="button" class="btn-selector" id="btnUnidades">🔍 Seleccionar unidades</button>
+                </div>
+
+                <div class="popover-unidades" id="popoverUnidades">
+                    <label class="filter-label">Buscar unidad</label>
+                    <input type="text" id="buscarUnidad" class="input-text" placeholder="Escribe para filtrar...">
+                    <div class="popover-list">
+                        {% for u in unidades_disponibles %}
+                        <label class="popover-item">
+                            <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <div class="popover-actions">
+                        <button type="button" id="limpiarUnidades">Limpiar</button>
+                        <button type="button" id="aplicarUnidades">Aplicar</button>
+                    </div>
+                </div>
+
+                <!-- Filtro Meses -->
+                <div class="filter-block">
+                    <label class="filter-label">Meses</label>
+                    <div class="checklist grid-3">
+                        {% for id, nombre in meses.items() %}
+                        <label class="check-item">
+                            <input type="checkbox" class="sis-filtro-mes" value="{{ id }}"> {{ nombre[:3] }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <button class="btn-apply" id="btnFiltrarSis">Aplicar filtros</button>
+            </div>
+
+            {# FILTROS: SIS REGULAR / SEGUNDO NIVEL #}
+            {% elif ruta.startswith('/sis') %}
             <div class="menu-filtros">
                 <div class="header-filtros">
                     <p class="menu-section">🔍 FILTROS</p>
@@ -424,65 +482,6 @@
                         <option value="estudios">Estudios</option>
                         <option value="diaspaciente">Días paciente</option>
                     </select>
-                </div>
-
-                <button class="btn-apply" id="btnFiltrarSis">Aplicar filtros</button>
-            </div>
-            {% endif %}
-
-
-            {# FILTROS: SIS PRIMER NIVEL #}
-            {% if ruta.startswith('/sis_primer_nivel') %}
-            <div class="menu-filtros">
-                <div class="header-filtros">
-                    <p class="menu-section">🔍 FILTROS PRIMER NIVEL</p>
-                    <button type="button" id="btnResetAll" class="btn-reset-link">Limpiar</button>
-                </div>
-
-                <!-- Filtro Años -->
-                <div class="filter-block">
-                    <label class="filter-label">Años</label>
-                    <div class="checklist checklist-years">
-                        {% for a in anios_disponibles %}
-                        <label class="check-item">
-                            <input type="checkbox" class="sis-filtro-anio" value="{{ a }}"> {{ a }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <!-- Filtro Unidades -->
-                <div class="filter-block">
-                    <label class="filter-label">Unidad</label>
-                    <button type="button" class="btn-selector" id="btnUnidades">🔍 Seleccionar unidades</button>
-                </div>
-
-                <div class="popover-unidades" id="popoverUnidades">
-                    <label class="filter-label">Buscar unidad</label>
-                    <input type="text" id="buscarUnidad" class="input-text" placeholder="Escribe para filtrar...">
-                    <div class="popover-list">
-                        {% for u in unidades_disponibles %}
-                        <label class="popover-item">
-                            <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                    <div class="popover-actions">
-                        <button type="button" id="limpiarUnidades">Limpiar</button>
-                        <button type="button" id="aplicarUnidades">Aplicar</button>
-                    </div>
-                </div>
-
-                <!-- Filtro Meses -->
-                <div class="filter-block">
-                    <label class="filter-label">Meses</label>
-                    <div class="checklist grid-3">
-                        {% for id, nombre in meses.items() %}
-                        <label class="check-item">
-                            <input type="checkbox" class="sis-filtro-mes" value="{{ id }}"> {{ nombre[:3] }}
-                        </label>
-                        {% endfor %}
-                    </div>
                 </div>
 
                 <button class="btn-apply" id="btnFiltrarSis">Aplicar filtros</button>
