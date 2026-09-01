@@ -158,233 +158,207 @@ ALLOWED_EXTENSIONS = {'zip'}
 def archivo_permitido(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
 #*****************************************************************************************
 #************************* SUBIR CARPETA Y ARCHIVO DE URGENCIAS***************************
 #*****************************************************************************************
 
-@admin.route('/upload_zip_urgencias', methods=['GET', 'POST'])
+@admin.route("/upload_zip_urgencias", methods=["GET", "POST"])
 @login_required
 def subir_zip_urgencias():
-    if request.method == 'POST':
-        # 📌 1. Obtención de datos del formulario (Asegúrate de capturar todos los campos)
+    if request.method == "POST":
         anio = int(request.form.get("anio"))
         modo_carga = request.form.get("modo_carga")
         fecha_actualizacion = request.form.get("fecha_actualizacion")
         estatus = request.form.get("estatus")
         estatus_inicio = request.form.get("estatus_inicio")
 
-        # 📁 2. Validar archivo
-        if 'file' not in request.files:
-            flash('No hay archivo en la solicitud', 'danger')
-            return redirect(url_for('admin.subir_zip_urgencias'))
+        if "file" not in request.files:
+            flash("No hay archivo en la solicitud", "danger")
+            return redirect(url_for("admin.subir_zip_urgencias"))
 
-        file = request.files['file']
-        if file.filename == '' or not (file and archivo_permitido(file.filename)):
-            flash('Archivo no válido o no seleccionado', 'danger')
-            return redirect(url_for('admin.subir_zip_urgencias'))
+        file = request.files["file"]
+        if file.filename == "" or not (
+            file and archivo_permitido(file.filename)
+        ):
+            flash("Archivo no válido o no seleccionado", "danger")
+            return redirect(url_for("admin.subir_zip_urgencias"))
 
-        # 📂 3. Preparar carpeta destino
         carpeta_nombre = f"urgencias_{anio}"
-        carpeta_destino = os.path.join(current_app.root_path, 'uploads', carpeta_nombre)
+        carpeta_destino = os.path.join(
+            current_app.root_path, "uploads", carpeta_nombre
+        )
 
-        if modo_carga == 'actualizar' and os.path.exists(carpeta_destino):
+        if modo_carga == "actualizar" and os.path.exists(carpeta_destino):
             shutil.rmtree(carpeta_destino)
         os.makedirs(carpeta_destino, exist_ok=True)
 
-        # 💾 4. Guardar y descomprimir
         filename = secure_filename(file.filename)
         zip_path = os.path.join(carpeta_destino, filename)
         file.save(zip_path)
 
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
             zip_ref.extractall(carpeta_destino)
 
-        # 🗃️ 5. Conexión a Base de Datos
+        # 🗃️ Manejo Unificado de Conexión y Cursor
         conn = mysql.connection
         cursor = conn.cursor()
 
         try:
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+            cursor.execute("SET innodb_lock_wait_timeout = 300")
 
-            # 🧹 Limpieza preventiva (Si es actualizar)
-            if modo_carga == 'actualizar':
-                cursor.execute("DELETE FROM urgencias_registros WHERE anio = %s", (anio,))
-                cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
-                conn.commit()
+            if modo_carga == "actualizar":
+                cursor.execute(
+                    "DELETE FROM urgencias_registros WHERE anio = %s", (anio,)
+                )
+                cursor.execute(
+                    "DELETE FROM urgencias_agregado WHERE anio = %s", (anio,)
+                )
 
-            # 6. Historial de carga
-            cursor = conn.cursor()
+            # Historial de carga
             sql_historial = "INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id) VALUES (%s, %s, %s)"
-            valores_historial = (filename, carpeta_nombre, session['user_id'])
-            cursor.execute(sql_historial, valores_historial)
+            cursor.execute(
+                sql_historial, (filename, carpeta_nombre, session["user_id"])
+            )
             carga_id = cursor.lastrowid
 
-            # 7. Procesar TXT y Recálculo
-            procesar_txt_detallado_urgencias(carga_id, carpeta_destino, anio)
-            conn.commit()
+            # Pasar conn y cursor a las funciones internas
+            procesar_txt_detallado_urgencias(
+                cursor, carga_id, carpeta_destino, anio
+            )
+            actualizar_urgencias_agregado(cursor, anio)
 
-            actualizar_urgencias_agregado(anio)
-            conn.commit()
-
-            # 8. AQUÍ ESTÁ LO QUE FALTABA: Tabla de control anual
-            # Esto inserta los datos que ves en el encabezado (span id="urgencias-meta")
-            cursor = conn.cursor()
-            cursor.execute("""
+            # Tabla de control anual
+            cursor.execute(
+                """
                 INSERT INTO urgencias_control_anual (anio, estatus_inicio, fecha_actualizacion, estatus)
                 VALUES (%s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     fecha_actualizacion = VALUES(fecha_actualizacion),
                     estatus_inicio = VALUES(estatus_inicio),
                     estatus = VALUES(estatus)
-            """, (anio, estatus_inicio, fecha_actualizacion, estatus))
+            """,
+                (anio, estatus_inicio, fecha_actualizacion, estatus),
+            )
 
-            # ✅ COMMIT FINAL
+            # UN SOLO COMMIT AL FINAL
             conn.commit()
-            flash(f'Datos de urgencias {anio} y control anual actualizados.', 'success')
+            flash(
+                f"Datos de urgencias {anio} y control anual actualizados correctamente.",
+                "success",
+            )
 
         except Exception as e:
             conn.rollback()
-            flash(f'Error: {str(e)}', 'danger')
-            print(f"❌ Error: {e}")
+            flash(f"Error procesando la base: {str(e)}", "danger")
+            print(f"❌ Error en upload_zip_urgencias: {e}")
         finally:
             cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
             cursor.close()
 
-        return redirect(url_for('admin.subir_zip_urgencias'))
+        return redirect(url_for("admin.subir_zip_urgencias"))
 
-    return render_template('admin/subir_zip_urgencias.html')
+    return render_template("admin/subir_zip_urgencias.html")
 
 
-def procesar_txt_detallado_urgencias(carga_id, carpeta_destino, anio_seleccionado):
-    import pandas as pd
-    import os
-    
-    conn = mysql.connection
-    cursor = conn.cursor()
-
-    # 🏥 1. Obtener el "Libro Blanco" de CLUES (Solo las que están en el catálogo)
-    # Usamos un Set para que la validación sea instantánea
+def procesar_txt_detallado_urgencias(
+    cursor, carga_id, carpeta_destino, anio_seleccionado
+):
     cursor.execute("SELECT clues FROM catalogo_unidades")
     clues_validas = set(row[0].upper().strip() for row in cursor.fetchall())
 
-    # 2. Obtener columnas de la DB para mapeo (excluyendo autoincrementales)
     cursor.execute("DESCRIBE urgencias_registros")
-    columnas_db = [col[0] for col in cursor.fetchall() if 'auto_increment' not in col[5].lower() and col[0] != 'id']
+    columnas_db = [
+        col[0]
+        for col in cursor.fetchall()
+        if "auto_increment" not in col[5].lower() and col[0] != "id"
+    ]
 
-    # 🔍 3. Localizar el archivo urgencias.txt
     path_urg = None
     for root, _, files in os.walk(carpeta_destino):
         for f in files:
-            if f.lower().strip() == 'urgencias.txt':
+            if f.lower().strip() == "urgencias.txt":
                 path_urg = os.path.join(root, f)
                 break
 
     if not path_urg:
-        print("❌ No se encontró el archivo urgencias.txt")
-        return
+        raise Exception("No se encontró el archivo urgencias.txt en el ZIP")
 
-    try:
-        # 📖 4. Leer el archivo con Pandas
-        df = pd.read_csv(path_urg, sep='|', encoding='utf-8-sig', dtype=str)
-        
-        # 🛡️ 5. APLICAR FILTRO ESTRICTO
-        # Convertimos a mayúsculas y quitamos espacios para evitar errores de dedo
-        if 'CLUES' in df.columns:
-            df['CLUES'] = df['CLUES'].str.upper().str.strip()
-            # Solo conservamos las filas cuya CLUE está en nuestro Set de permitidas
-            df = df[df['CLUES'].isin(clues_validas)].copy()
-            print(f"✅ Filtro aplicado: Se procesarán {len(df)} registros que coinciden con el catálogo.")
-        else:
-            print("⚠️ El archivo no contiene la columna 'CLUES'. Se aborta el filtrado.")
-            return
+    df = pd.read_csv(path_urg, sep="|", encoding="utf-8-sig", dtype=str)
 
-        # 📅 6. Preparar columnas obligatorias
-        df['anio'] = anio_seleccionado
-        df['carga_id'] = carga_id
+    if "CLUES" in df.columns:
+        df["CLUES"] = df["CLUES"].str.upper().str.strip()
+        df = df[df["CLUES"].isin(clues_validas)].copy()
+    else:
+        raise Exception("El archivo no contiene la columna 'CLUES'")
 
-        # Asegurar que el DataFrame tenga todas las columnas que la DB pide
-        for col in columnas_db:
-            if col not in df.columns:
-                df[col] = None
-        
-        # Reordenar columnas para que coincidan con la DB y limpiar NaNs
-        df_final = df[columnas_db].copy()
+    df["anio"] = anio_seleccionado
+    df["carga_id"] = carga_id
 
-        columnas_hora = ['HORASESTANCIA', 'hora_ingreso', 'hora_alta'] # Añade aquí otras si existen
-        for col_h in columnas_hora:
-            if col_h in df_final.columns:
-                # Reemplaza 99:99, 9999 o cualquier cosa que no parezca hora por None
-                df_final[col_h] = df_final[col_h].replace(['99:99', '9999', '99:9', ' : '], None)
+    for col in columnas_db:
+        if col not in df.columns:
+            df[col] = None
 
-        df_final = df_final.astype(object).replace({pd.NA: None, float('nan'): None, 'nan': None})
-        df_final = df_final.where(pd.notnull(df_final), None)
+    df_final = df[columnas_db].copy()
 
-        # 🚀 7. Inserción masiva por bloques (570k registros)
-        bloque_size = 15000 # Aumentamos un poco el bloque para mayor velocidad
-        valores = [tuple(x) for x in df_final.to_numpy()]
-        total = len(valores)
-        
-        placeholders = ', '.join(['%s'] * len(columnas_db))
-        columnas_sql = ', '.join(columnas_db)
-        sql = f"INSERT INTO urgencias_registros ({columnas_sql}) VALUES ({placeholders})"
-
-        for i in range(0, total, bloque_size):
-            bloque = valores[i : i + bloque_size]
-            cursor.executemany(sql, bloque)
-
-            if i % 45000 == 0:
-                conn.commit()
-            print(f"⏳ Progreso: {i + len(bloque)} de {total} (Solo unidades autorizadas)")
-
-        conn.commit()
-
-    except Exception as e:
-        print(f"❌ Error en el procesamiento: {e}")
-        raise e
-    finally:
-        cursor.close()
-
-
-
-def actualizar_urgencias_agregado(anio):
-    cursor = mysql.connection.cursor()
-    try:
-        # Borrar solo el año a recalcular (evita duplicados)
-        cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
-
-        sql = """
-            INSERT INTO urgencias_agregado (
-                clues, nombre_unidad, tipologia, mes_estadistico, anio,
-                calificada, no_calificada, accidentes, medica, 
-                ginecobstetricia, pediatrica, no_especificado, total
+    columnas_hora = ["HORASESTANCIA", "hora_ingreso", "hora_alta"]
+    for col_h in columnas_hora:
+        if col_h in df_final.columns:
+            df_final[col_h] = df_final[col_h].replace(
+                ["99:99", "9999", "99:9", " : "], None
             )
-            SELECT
-                r.CLUES,
-                MAX(cu.nombre_unidad),
-                MAX(cu.tipologia),
-                r.MES_ESTADISTICO,
-                r.anio,
-                SUM(CASE WHEN tu.Descrip LIKE '%%CALIFICADA%%' AND tu.Descrip NOT LIKE '%%NO%%' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN tu.Descrip LIKE '%%NO CALIFICADA%%' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN ma.Descrip LIKE '%%ACCIDENTES%%' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN ma.Descrip = 'MÉDICA' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN ma.Descrip LIKE '%%GINECO%%' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN ma.Descrip = 'PEDIÁTRICA' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN ma.Descrip = 'NO ESPECIFICADO' THEN 1 ELSE 0 END),
-                COUNT(*)
-            FROM urgencias_registros r
-            LEFT JOIN catalogo_unidades cu ON cu.clues = r.CLUES
-            LEFT JOIN catalogo_motivo_atencion ma ON r.MOTATE = ma.IDMotAte
-            LEFT JOIN catalogo_tipourgencia tu ON r.TIPOURGENCIA = tu.IdTipoUrgencia
-            WHERE r.anio = %s
-            GROUP BY r.CLUES, r.MES_ESTADISTICO, r.anio
-        """
-        cursor.execute(sql, (anio,))
-        print(f"📊 Indicadores de Urgencias {anio} actualizados.")
-    finally:
-        cursor.close()
+
+    df_final = df_final.where(pd.notnull(df_final), None)
+
+    # Lotes reducidos a 3000 para optimizar memoria RAM y tiempo de ejecución
+    bloque_size = 3000
+    valores = [
+        tuple(None if pd.isna(x) else x for x in row)
+        for row in df_final.to_numpy()
+    ]
+    total = len(valores)
+
+    placeholders = ", ".join(["%s"] * len(columnas_db))
+    columnas_sql = ", ".join(columnas_db)
+    sql = f"INSERT INTO urgencias_registros ({columnas_sql}) VALUES ({placeholders})"
+
+    for i in range(0, total, bloque_size):
+        bloque = valores[i : i + bloque_size]
+        cursor.executemany(sql, bloque)
 
 
+def actualizar_urgencias_agregado(cursor, anio):
+    cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
+
+    sql = """
+        INSERT INTO urgencias_agregado (
+            clues, nombre_unidad, tipologia, mes_estadistico, anio,
+            calificada, no_calificada, accidentes, medica, 
+            ginecobstetricia, pediatrica, no_especificado, total
+        )
+        SELECT 
+            r.CLUES,
+            MAX(cu.nombre_unidad),
+            MAX(cu.tipologia),
+            r.MES_ESTADISTICO,
+            r.anio,
+            SUM(CASE WHEN tu.Descrip LIKE '%%CALIFICADA%%' AND tu.Descrip NOT LIKE '%%NO%%' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN tu.Descrip LIKE '%%NO CALIFICADA%%' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN ma.Descrip LIKE '%%ACCIDENTES%%' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN ma.Descrip = 'MÉDICA' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN ma.Descrip LIKE '%%GINECO%%' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN ma.Descrip = 'PEDIÁTRICA' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN ma.Descrip = 'NO ESPECIFICADO' THEN 1 ELSE 0 END),
+            COUNT(*)
+        FROM urgencias_registros r
+        LEFT JOIN catalogo_unidades cu ON cu.clues = r.CLUES
+        LEFT JOIN catalogo_motivo_atencion ma ON r.MOTATE = ma.IDMotAte
+        LEFT JOIN catalogo_tipourgencia tu ON r.TIPOURGENCIA = tu.IdTipoUrgencia
+        WHERE r.anio = %s
+        GROUP BY r.CLUES, r.MES_ESTADISTICO, r.anio
+    """
+    cursor.execute(sql, (anio,))
 
 #***************************************************************************************
 #************************* SUBIR CARPETA Y ARCHIVO DE EGRESOS****************************
