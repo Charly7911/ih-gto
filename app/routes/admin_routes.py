@@ -166,7 +166,6 @@ def archivo_permitido(filename):
 
 # 💡 Función auxiliar para ejecutar el proceso pesado fuera de la petición Web
 def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, estatus_inicio, carpeta_destino, filename, user_id):
-    # Flask requiere el contexto de la app para acceder a 'mysql' fuera de una petición web
     with app.app_context():
         conn = mysql.connection
         cursor = conn.cursor()
@@ -178,16 +177,19 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
                 cursor.execute("DELETE FROM urgencias_registros WHERE anio = %s", (anio,))
                 cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
 
-            # Historial de carga
-            sql_historial = "INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id) VALUES (%s, %s, %s)"
+            # 📌 1. Registramos con estatus 'EN PROCESO'
+            sql_historial = """
+                INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso) 
+                VALUES (%s, %s, %s, 'EN PROCESO')
+            """
             cursor.execute(sql_historial, (filename, carpeta_destino, user_id))
             carga_id = cursor.lastrowid
+            conn.commit() # Commit para que se guarde el estado inicial
 
-            # Ejecutamos TUS MISMAS FUNCIONES sin cambiarlas
+            # ⚙️ TUS MISMAS FUNCIONES SIN CAMBIOS
             procesar_txt_detallado_urgencias(cursor, carga_id, carpeta_destino, anio)
             actualizar_urgencias_agregado(cursor, anio)
 
-            # Tabla de control anual
             cursor.execute(
                 """
                 INSERT INTO urgencias_control_anual (anio, estatus_inicio, fecha_actualizacion, estatus)
@@ -200,12 +202,23 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
                 (anio, estatus_inicio, fecha_actualizacion, estatus),
             )
 
+            # 📌 2. Marcar como COMPLETADO cuando termine
+            cursor.execute(
+                "UPDATE cargas_zip SET estatus_proceso = 'COMPLETADO' WHERE id = %s", 
+                (carga_id,)
+            )
             conn.commit()
-            print(f"✅ [ÉXITO BACKGROUND] Urgencias {anio} procesado correctamente.")
+            print(f"✅ Urgencias {anio} completado con éxito.")
 
         except Exception as e:
             conn.rollback()
-            print(f"❌ [ERROR BACKGROUND] Error procesando urgencias {anio}: {e}")
+            # 📌 3. Marcar como ERROR si falla
+            cursor.execute(
+                "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s", 
+                (f"ERROR: {str(e)[:100]}", carga_id)
+            )
+            conn.commit()
+            print(f"❌ Error en segundo plano: {e}")
         finally:
             cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
             cursor.close()
@@ -377,99 +390,155 @@ def actualizar_urgencias_agregado(cursor, anio):
 #************************* SUBIR CARPETA Y ARCHIVO DE EGRESOS****************************
 #****************************************************************************************
 
-@admin.route('/upload_zip_egresos', methods=['GET', 'POST'])
-@login_required
-def subir_zip_egresos():
-    if request.method == 'POST':
-        
-
-        anio = int(request.form.get("anio"))
-        fecha_actualizacion = request.form.get("fecha_actualizacion")
-        estatus = request.form.get("estatus")
-        estatus_inicio = request.form.get("estatus_inicio")
-        modo_carga = request.form.get("modo_carga")
-
-        # 📁 2. Validar archivo
-        if 'file' not in request.files:
-            flash('No hay archivo en la solicitud', 'danger')
-            return redirect(url_for('admin.subir_zip_egresos'))
-
-        file = request.files['file']
-        if file.filename == '' or not (file and archivo_permitido(file.filename)):
-            flash('Archivo no válido o no seleccionado', 'danger')
-            return redirect(url_for('admin.subir_zip_egresos'))
-
-        # 📂 3. Preparar carpeta destino
-        carpeta_nombre = f"egresos_{anio}"
-        carpeta_destino = os.path.join(current_app.root_path, 'uploads', carpeta_nombre)
-
-        if modo_carga == 'actualizar' and os.path.exists(carpeta_destino):
-            shutil.rmtree(carpeta_destino)
-        os.makedirs(carpeta_destino, exist_ok=True)
-
-        # 💾 4. Guardar y descomprimir
-        filename = secure_filename(file.filename)
-        zip_path = os.path.join(carpeta_destino, filename)
-        file.save(zip_path)
-
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(carpeta_destino)
-
-        # 🗃️ 5. Conexión a Base de Datos
+def tarea_segundo_plano_egresos(
+    app,
+    anio,
+    modo_carga,
+    fecha_actualizacion,
+    estatus,
+    estatus_inicio,
+    carpeta_destino,
+    carpeta_nombre,
+    filename,
+    user_id,
+):
+    with app.app_context():
         conn = mysql.connection
         cursor = conn.cursor()
-
         try:
-            # 🔓 Desactivar checks para todo el proceso
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
 
-            # 🧹 SI ES REEMPLAZAR → Limpiar (SIN COMMIT AQUÍ)
             if modo_carga == "actualizar":
-                cursor.execute("DELETE FROM egresos_registros WHERE anio = %s", (anio,))
-                cursor.execute("DELETE FROM procedimientos_registros WHERE anio = %s", (anio,))
-                cursor.execute("DELETE FROM egresos_agregado WHERE anio = %s", (anio,))
-                cursor.execute("DELETE FROM procedimiento_agregado WHERE anio = %s", (anio,))
-                print(f"🧹 Limpieza del año {anio} preparada.")
+                cursor.execute(
+                    "DELETE FROM egresos_registros WHERE anio = %s", (anio,)
+                )
+                cursor.execute(
+                    "DELETE FROM procedimientos_registros WHERE anio = %s",
+                    (anio,),
+                )
+                cursor.execute(
+                    "DELETE FROM egresos_agregado WHERE anio = %s", (anio,)
+                )
+                cursor.execute(
+                    "DELETE FROM procedimiento_agregado WHERE anio = %s",
+                    (anio,),
+                )
 
-            # 🧾 6. Registrar historial
-            cursor.execute("""
-                INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id)
-                VALUES (%s, %s, %s)
-            """, (filename, carpeta_nombre, session['user_id']))
+            # Insertar registro con estatus 'EN_PROCESO'
+            cursor.execute(
+                """
+                INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_carga)
+                VALUES (%s, %s, %s, %s)
+            """,
+                (filename, carpeta_nombre, user_id, "EN_PROCESO"),
+            )
             carga_id = cursor.lastrowid
+            conn.commit()
 
-            # ⚙️ 7. Procesar TXT (Quitamos el commit que tenías aquí)
-            procesar_txt_detallado_egresos(carga_id, carpeta_destino, anio, modo_carga)
-
-            # ⚙️ 8. Realizar cálculos (Quitamos los commits de estas funciones también)
+            # Tus funciones tal como las tienes
+            procesar_txt_detallado_egresos(
+                carga_id, carpeta_destino, anio, modo_carga
+            )
             recalcular_procedimiento_agregado(anio)
             recalcular_egresos_agregado(anio)
 
-            # 📊 9. Tabla de control anual
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO seul_control_anual (anio, estatus_inicio, fecha_actualizacion, estatus)
                 VALUES (%s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     fecha_actualizacion = VALUES(fecha_actualizacion),
                     estatus_inicio = VALUES(estatus_inicio),
                     estatus = VALUES(estatus)
-            """, (anio, estatus_inicio, fecha_actualizacion, estatus))
+            """,
+                (anio, estatus_inicio, fecha_actualizacion, estatus),
+            )
 
-            # ✅ EL ÚNICO COMMIT QUE IMPORTA: O se guarda todo, o no se guarda nada.
-            conn.commit() 
-            flash(f'Año {anio} procesado correctamente en modo {modo_carga}.', 'success')
+            # Actualizar estatus a 'FINALIZADO'
+            cursor.execute(
+                "UPDATE cargas_zip SET estatus_carga = 'FINALIZADO' WHERE id = %s",
+                (carga_id,),
+            )
+            conn.commit()
+            print(f"✅ Proceso terminado con éxito para {filename}")
 
         except Exception as e:
-            conn.rollback() # Si algo falla, el DELETE del principio se deshace automáticamente
-            flash(f'Error crítico: {str(e)}', 'danger')
-            print(f"❌ Error en la carga: {e}")
+            conn.rollback()
+            cursor.execute(
+                "UPDATE cargas_zip SET estatus_carga = 'ERROR' WHERE id = %s",
+                (carga_id,),
+            )
+            conn.commit()
+            print(f"❌ Error en la carga en segundo plano: {e}")
         finally:
             cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
             cursor.close()
 
-        return redirect(url_for('admin.subir_zip_egresos'))
 
-    return render_template('admin/subir_zip_egresos.html')
+@admin.route("/upload_zip_egresos", methods=["GET", "POST"])
+@login_required
+def subir_zip_egresos():
+    if request.method == "POST":
+        anio = int(request.form.get("anio"))
+        fecha_actualizacion = request.form.get("fecha_actualizacion")
+        estatus = request.form.get("estatus")
+        estatus_inicio = request.form.get("estatus_inicio")
+        modo_carga = request.form.get("modo_carga")
+
+        if "file" not in request.files:
+            flash("No hay archivo en la solicitud", "danger")
+            return redirect(url_for("admin.subir_zip_egresos"))
+
+        file = request.files["file"]
+        if file.filename == "" or not (
+            file and archivo_permitido(file.filename)
+        ):
+            flash("Archivo no válido o no seleccionado", "danger")
+            return redirect(url_for("admin.subir_zip_egresos"))
+
+        carpeta_nombre = f"egresos_{anio}"
+        carpeta_destino = os.path.join(
+            current_app.root_path, "uploads", carpeta_nombre
+        )
+
+        if modo_carga == "actualizar" and os.path.exists(carpeta_destino):
+            shutil.rmtree(carpeta_destino)
+        os.makedirs(carpeta_destino, exist_ok=True)
+
+        filename = secure_filename(file.filename)
+        zip_path = os.path.join(carpeta_destino, filename)
+        file.save(zip_path)
+
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall(carpeta_destino)
+
+        # Iniciar el hilo en segundo plano
+        app = current_app._get_current_object()
+        user_id = session.get("user_id")
+
+        threading.Thread(
+            target=tarea_segundo_plano_egresos,
+            args=(
+                app,
+                anio,
+                modo_carga,
+                fecha_actualizacion,
+                estatus,
+                estatus_inicio,
+                carpeta_destino,
+                carpeta_nombre,
+                filename,
+                user_id,
+            ),
+        ).start()
+
+        flash(
+            f"El archivo para {anio} fue subido. El procesamiento ha iniciado en segundo plano.",
+            "info",
+        )
+        return redirect(url_for("admin.subir_zip_egresos"))
+
+    return render_template("admin/subir_zip_egresos.html")
 
 
 
