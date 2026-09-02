@@ -133,12 +133,10 @@
         Chart.register(ChartDataLabels);
     }
 
-    /* 1. INYECCIÓN DE DATOS Y VALORES PREMETERMINADOS DESDE FLASK */
+    /* 1. INYECCIÓN DE DATOS Y VALORES PREDETERMINADOS DESDE FLASK */
     const controlAnual = JSON.parse('{{ (control_anual | default([])) | tojson | safe }}');
     const sisResultadosIniciales = JSON.parse('{{ (resultados | default([])) | tojson | safe }}');
     const DICCIONARIO_VARIABLES = JSON.parse('{{ (catalogo_variables | default({})) | tojson | safe }}');
-    
-    // CORRECCIÓN 1: Recibir los valores predeterminados
     const VARIABLES_DEFAULT = JSON.parse('{{ (variables_default | default({})) | tojson | safe }}');
 
     const FILAS_POR_PAGINA = 15;
@@ -149,8 +147,6 @@
     let anioActivo = null;
 
     let mostrarValoresMensual = false;
-    
-    // CORRECCIÓN 2: Clonar los defaults como estado inicial
     let variablesPersonalizadasEstado = JSON.parse(JSON.stringify(VARIABLES_DEFAULT));
 
     let graficaAnio = null;
@@ -191,22 +187,25 @@
 
         const seleccionadasModulo = variablesPersonalizadasEstado[modulo];
 
-        let html = "";
+        // Usar Fragmento de Documento en memoria para renderizado ultra rápido del DOM
+        const fragment = document.createDocumentFragment();
+
         estructuraModulo.forEach(grupo => {
-            html += `
-                <div class="mb-3 p-2 bg-white rounded border">
-                    <div class="fw-bold text-primary mb-1 border-bottom pb-1 small">
-                        📁 Apartado: ${grupo.apartado} — <span class="text-dark">${grupo.descripcion_apartado || 'Sin descripción'}</span>
-                    </div>
-                    <div class="d-flex flex-wrap gap-2 pt-1">`;
+            const divGrupo = document.createElement("div");
+            divGrupo.className = "mb-3 p-2 bg-white rounded border";
+
+            let htmlGrupo = `
+                <div class="fw-bold text-primary mb-1 border-bottom pb-1 small">
+                    📁 Apartado: ${grupo.apartado} — <span class="text-dark">${grupo.descripcion_apartado || 'Sin descripción'}</span>
+                </div>
+                <div class="d-flex flex-wrap gap-2 pt-1">`;
 
             (grupo.variables || []).forEach(v => {
-                // CORRECCIÓN 3: Verificar contra la lista seleccionada activa o default
                 const isChecked = (seleccionadasModulo === undefined || seleccionadasModulo === null) 
                     ? true 
                     : seleccionadasModulo.includes(v.codigo);
 
-                html += `
+                htmlGrupo += `
                     <div class="form-check form-check-inline me-3 mb-1" title="${v.nombre}">
                         <input class="form-check-input chk-subvar" type="checkbox" id="sub_${v.codigo}" value="${v.codigo}" ${isChecked ? 'checked' : ''}>
                         <label class="form-check-label small" for="sub_${v.codigo}">
@@ -215,17 +214,19 @@
                     </div>`;
             });
 
-            html += `
-                    </div>
-                </div>`;
+            htmlGrupo += `</div>`;
+            divGrupo.innerHTML = htmlGrupo;
+            fragment.appendChild(divGrupo);
         });
 
-        contenedor.innerHTML = html;
+        contenedor.innerHTML = "";
+        contenedor.appendChild(fragment);
 
+        // Al cambiar un checkbox solo actualizamos el estado local (asíncrono/debounce)
         contenedor.querySelectorAll('.chk-subvar').forEach(cb => {
             cb.addEventListener('change', () => {
                 guardarEstadoVariablesActuales();
-                window.ejecutarFiltradoSis();
+                window.ejecutarFiltradoSis(300); // Debounce de 300ms para evitar múltiples peticiones
             });
         });
     }
@@ -239,12 +240,13 @@
         variablesPersonalizadasEstado[modulo] = checkeds;
     }
 
-    /* 3. PROCESAMIENTO Y FILTRADO MEDIANTE PETICIÓN AL BACKEND */
+    /* 3. PROCESAMIENTO Y FILTRADO */
     function agruparDatos(data) {
         const mapa = {};
         const nivelAgrupacion = document.getElementById('selectNivelAgrupacion')?.value || 'clues';
 
-        data.forEach(r => {
+        for (let i = 0; i < data.length; i++) {
+            const r = data[i];
             const jur = r.jurisdiccion ? String(r.jurisdiccion).trim() : 'Sin Especificar';
             const mun = r.municipio ? String(r.municipio).trim() : 'Sin Especificar';
             const clues = r.clues || 'Sin CLUES';
@@ -279,7 +281,7 @@
             mapa[key].tamiz += Number(r.tamiz) || 0;
             mapa[key].planificacion_familiar += Number(r.planificacion_familiar) || 0;
             mapa[key].detecciones += Number(r.detecciones) || 0;
-        });
+        }
 
         return Object.values(mapa);
     }
@@ -301,62 +303,63 @@
                 body: JSON.stringify(payload)
             });
 
-            if (!resp.ok) {
-                console.error("Error en servidor al filtrar:", resp.statusText);
-                return;
-            }
+            if (!resp.ok) return;
 
             const res = await resp.json();
             if (res.status === "success") {
                 datosFiltradosSis = res.data || [];
-                datosActuales = agruparDatos(datosFiltradosSis);
-                paginaActual = 1;
-
-                renderTabsAnios(datosActuales);
-                renderTablaSis();
-                renderGraficaPorAnio(datosActuales);
-                renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
-                renderGraficaTemporal(datosFiltradosSis);
+                actualizarVistas();
             }
         } catch (err) {
             console.error("Error al conectar con la API SIS:", err);
         }
     }
 
-    window.ejecutarFiltradoSis = function () {
+    function actualizarVistas() {
+        datosActuales = agruparDatos(datosFiltradosSis);
+        paginaActual = 1;
+
+        renderTabsAnios(datosActuales);
+        renderTablaSis();
+        renderGraficaPorAnio(datosActuales);
+        renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
+        renderGraficaTemporal(datosFiltradosSis);
+    }
+
+    window.ejecutarFiltradoSis = function (delay = 150) {
         if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => { realizarConsultaBackend(); }, 150);
+        debounceTimer = setTimeout(() => { realizarConsultaBackend(); }, delay);
     };
 
     /* 4. TABLA Y TABS DE AÑOS */
     function renderTabsAnios(data) {
         const tabs = document.getElementById("tabsAnios");
         if (!tabs) return;
-        tabs.innerHTML = "";
 
         const anios = [...new Set(data.map(r => r.anio))].sort((a, b) => b - a);
-        if (anios.length === 0) { anioActivo = null; return; }
+        if (anios.length === 0) { anioActivo = null; tabs.innerHTML = ""; return; }
 
-        anios.forEach((anio, i) => {
-            const li = document.createElement("li");
-            li.className = "nav-item";
-            li.innerHTML = `<button class="nav-link ${i === 0 ? 'active' : ''}">${anio}</button>`;
+        if (!anioActivo || !anios.includes(anioActivo)) anioActivo = anios[0];
 
-            li.querySelector("button").addEventListener("click", (e) => {
-                document.querySelectorAll("#tabsAnios .nav-link").forEach(b => b.classList.remove("active"));
+        let html = "";
+        anios.forEach((anio) => {
+            const activeClass = (anio === anioActivo) ? 'active' : '';
+            html += `<li class="nav-item"><button class="nav-link ${activeClass}" data-anio="${anio}">${anio}</button></li>`;
+        });
+        tabs.innerHTML = html;
+
+        tabs.querySelectorAll("button").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                tabs.querySelectorAll(".nav-link").forEach(b => b.classList.remove("active"));
                 e.target.classList.add("active");
 
-                anioActivo = anio;
+                anioActivo = Number(e.target.getAttribute("data-anio"));
                 paginaActual = 1;
 
                 renderTablaSis();
                 renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
             });
-
-            tabs.appendChild(li);
         });
-
-        if (!anioActivo || !anios.includes(anioActivo)) anioActivo = anios[0];
     }
 
     function renderTablaSis() {
@@ -366,7 +369,6 @@
         const infoPaging = document.getElementById("infoPaginacion");
 
         if (!tbody || !paginacion) return;
-        tbody.innerHTML = ""; paginacion.innerHTML = "";
 
         const datosFiltrados = datosActuales.filter(r => r.anio === anioActivo);
         const inicio = (paginaActual - 1) * FILAS_POR_PAGINA;
@@ -377,7 +379,8 @@
         }
 
         let filasHTML = "";
-        paginaDatos.forEach(r => {
+        for (let i = 0; i < paginaDatos.length; i++) {
+            const r = paginaDatos[i];
             filasHTML += `
                 <tr>
                     <td class="text-center fw-bold">${r.anio}</td>
@@ -391,30 +394,32 @@
                     <td class="text-center">${fmt(r.planificacion_familiar)}</td>
                     <td class="text-center">${fmt(r.detecciones)}</td>
                 </tr>`;
-        });
+        }
         tbody.innerHTML = filasHTML;
 
         const totalPaginas = Math.ceil(datosFiltrados.length / FILAS_POR_PAGINA);
+        let paginasHTML = "";
         for (let i = 1; i <= totalPaginas; i++) {
-            const li = document.createElement("li");
-            li.className = `page-item ${i === paginaActual ? "active" : ""}`;
-            li.innerHTML = `<button class="page-link">${i}</button>`;
-            li.onclick = () => { paginaActual = i; renderTablaSis(); };
-            paginacion.appendChild(li);
+            paginasHTML += `<li class="page-item ${i === paginaActual ? "active" : ""}"><button class="page-link" onclick="cambiarPagina(${i})">${i}</button></li>`;
         }
+        paginacion.innerHTML = paginasHTML;
     }
+
+    window.cambiarPagina = function(p) {
+        paginaActual = p;
+        renderTablaSis();
+    };
 
     /* 5. GRÁFICAS */
     function renderGraficaPorAnio(data = datosActuales) {
-        const arrSafe = data || [];
         const porAnio = {};
-
-        arrSafe.forEach(r => {
+        for (let i = 0; i < data.length; i++) {
+            const r = data[i];
             const sumaFila = (Number(r.consultas) || 0) + (Number(r.embarazadas) || 0) + (Number(r.mental) || 0) +
                 (Number(r.bucal) || 0) + (Number(r.tamiz) || 0) + (Number(r.planificacion_familiar) || 0) +
                 (Number(r.detecciones) || 0);
             porAnio[r.anio] = (porAnio[r.anio] || 0) + sumaFila;
-        });
+        }
 
         const anios = Object.keys(porAnio).sort();
         const colores = ['#4E79A7', '#59A14F', '#F28E2B', '#E15759', '#76B7B2', '#EDC948', '#B07AA1'];
@@ -428,6 +433,7 @@
             data: { labels: anios, datasets: [{ label: 'Total Acumulado', data: anios.map(a => porAnio[a]), backgroundColor: colores }] },
             options: {
                 responsive: true,
+                animation: false, // Desactivar animación mejora el rendimiento
                 scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
                 plugins: {
                     legend: { display: false },
@@ -467,6 +473,7 @@
             options: {
                 indexAxis: 'y',
                 responsive: true,
+                animation: false,
                 scales: { x: { stacked: true, ticks: { callback: v => fmt(v) } }, y: { stacked: true } },
                 plugins: {
                     datalabels: { color: '#fff', font: { weight: 'bold', size: 10 }, formatter: (val) => val > 0 ? fmt(val) : '' }
@@ -510,8 +517,7 @@
             }];
         } else {
             const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
-            const meses = Array.from({ length: 12 }, (_, i) => i + 1);
-            labels = meses.map(m => mesesNombres[m]);
+            labels = Object.values(mesesNombres);
 
             const resumen = {};
             data.forEach(r => {
@@ -527,7 +533,7 @@
 
             datasets = Object.keys(resumen).map(key => ({
                 label: key,
-                data: meses.map(m => Math.round(resumen[key][m] || 0)),
+                data: Array.from({ length: 12 }, (_, i) => Math.round(resumen[key][i + 1] || 0)),
                 tension: 0.3,
                 pointRadius: 4,
                 fill: false
@@ -542,6 +548,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: false,
                 scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
                 plugins: {
                     datalabels: {
@@ -558,8 +565,9 @@
 
     /* 6. INICIALIZACIÓN Y EVENTOS */
     document.addEventListener("DOMContentLoaded", () => {
+        // Renderizar usando los datos inyectados de origen (Cero espera al servidor de inicio)
         renderSubvariables();
-        window.ejecutarFiltradoSis();
+        actualizarVistas();
 
         document.getElementById("filtroSisDetalle")?.addEventListener("change", () => {
             renderSubvariables();
