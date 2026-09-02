@@ -1402,66 +1402,71 @@
         // ======================================================
         // 1.1 FILTRADO DE MUNICIPIOS CON BASE EN LA JURISDICCIÓN (CORREGIDO)
         // ======================================================
+        // ======================================================
+        // 1.1 FILTRADO EN CASCADA DE MUNICIPIOS Y UNIDADES
+        // ======================================================
         function actualizarRelacionJurisdiccionMunicipio() {
             const popoverMun = document.querySelector('[data-popover="municipio"]') || document.getElementById('popoverMunicipios');
             const popoverJur = document.querySelector('[data-popover="jurisdiccion"]') || document.getElementById('popoverJurisdicciones');
 
             if (!popoverMun) return;
 
+            // 1. Obtener Jurisdicciones seleccionadas
             let jurisdiccionesActivas = [];
             if (popoverJur) {
                 const checks = popoverJur.querySelectorAll('input[type="checkbox"]:checked');
                 jurisdiccionesActivas = Array.from(checks).map(cb => String(cb.value).trim().replace(/^0+/, ''));
             }
 
-            // Mapeo dinámico desde la data si no vienen atributos data-jurisdiccion en el HTML
-            let municipiosPermitidos = null;
-            const datasetGlobal = window.sisResultados || window.datosGlobales || window.datosOriginales || [];
+            // 2. Obtener el dataset global activo en window
+            const datasetGlobal = window.sisResultados || window.datosOriginales || window.datosGlobales || window.datos || [];
 
-            if (jurisdiccionesActivas.length > 0 && datasetGlobal.length > 0) {
-                municipiosPermitidos = new Set();
+            // 3. Crear set de municipios válidos cruzando datos
+            let municipiosValidos = new Set();
+
+            if (jurisdiccionesActivas.length > 0) {
                 datasetGlobal.forEach(row => {
-                    const jurRow = String(row.jurisdiccion || row.cve_jurisdiccion || '').trim().replace(/^0+/, '');
+                    // Extraer jurisdicción del registro (soporta varios formatos de API/JSON)
+                    const jurRow = String(row.jurisdiccion || row.cve_jurisdiccion || row.id_jurisdiccion || '').trim().replace(/^0+/, '');
+
                     if (jurisdiccionesActivas.includes(jurRow)) {
-                        const munVal = String(row.municipio || row.nom_municipio || '').trim().toLowerCase();
-                        if (munVal) municipiosPermitidos.add(munVal);
+                        const munTexto = String(row.municipio || row.nom_municipio || row.nombre_municipio || '').trim().toLowerCase();
+                        if (munTexto) {
+                            municipiosValidos.add(munTexto);
+                        }
                     }
                 });
             }
 
-            const itemsMunicipio = popoverMun.querySelectorAll('label, .form-check, .popover-item, div:has(> input)');
+            // 4. Filtrar visualmente los elementos del popover de Municipios
+            const itemsMunicipio = popoverMun.querySelectorAll('.popover-item, label, .form-check, div:has(> input)');
 
             itemsMunicipio.forEach(item => {
                 const cb = item.querySelector('input[type="checkbox"]');
                 if (!cb) return;
 
-                const jurAttr = item.dataset.jurisdiccion ||
-                    item.getAttribute('data-jurisdiccion') ||
-                    cb.dataset.jurisdiccion ||
-                    cb.getAttribute('data-jurisdiccion');
-
-                const nombreMun = (cb.value || item.textContent).trim().toLowerCase();
-                let mostrar = false;
-
+                // Si no hay jurisdicciones seleccionadas, muestra todos los municipios
                 if (jurisdiccionesActivas.length === 0) {
-                    mostrar = true; // Si no hay nada seleccionado, se muestra todo
-                } else if (jurAttr) {
-                    // Evaluación por atributo en HTML
-                    const valJurSinCeros = String(jurAttr).trim().replace(/^0+/, '');
-                    mostrar = jurisdiccionesActivas.includes(valJurSinCeros);
-                } else if (municipiosPermitidos) {
-                    // Evaluación por dataset global JS
-                    mostrar = municipiosPermitidos.has(nombreMun);
-                } else {
-                    mostrar = true;
+                    item.style.display = "";
+                    return;
                 }
 
-                if (mostrar) {
+                // Obtener texto del municipio desde el checkbox o el label
+                const textoMunicipio = (cb.value || item.textContent).trim().toLowerCase();
+
+                // Verificar si existe también un atributo HTML por si acaso
+                const jurAttr = item.dataset.jurisdiccion || cb.dataset.jurisdiccion;
+                const coincideAtributo = jurAttr && jurisdiccionesActivas.includes(String(jurAttr).trim().replace(/^0+/, ''));
+
+                // Evaluar si debe mostrarse
+                const esValido = coincideAtributo || municipiosValidos.has(textoMunicipio);
+
+                if (esValido) {
                     item.style.display = "";
                 } else {
                     item.style.display = "none";
                     if (cb.checked) {
-                        cb.checked = false; // Desmarca el municipio si queda oculto
+                        cb.checked = false; // Desmarca el municipio si deja de pertenecer a la jurisdicción
                     }
                 }
             });
