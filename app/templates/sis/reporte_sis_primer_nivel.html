@@ -279,13 +279,11 @@
     function procesarFiltradoInterno() {
         const anios = window.getAniosSeleccionados ? window.getAniosSeleccionados().map(String) : [];
         const meses = window.getMesesSeleccionados ? window.getMesesSeleccionados().map(Number) : [];
-        
-        // Obtención de filtros seleccionados
+
         const rawJur = window.getJurisdiccionesSeleccionadas ? window.getJurisdiccionesSeleccionadas() : [];
         const rawMun = window.getMunicipiosSeleccionados ? window.getMunicipiosSeleccionados() : [];
         const rawUni = window.getUnidadesSeleccionadas ? window.getUnidadesSeleccionadas() : [];
 
-        // Mapeo flexible de llaves
         const jurFiltros = rawJur.map(v => normalizarClave(v));
         const munFiltrosClaves = rawMun.map(v => normalizarClave(v));
         const munFiltrosTextos = rawMun.map(v => normalizarTexto(v));
@@ -301,15 +299,14 @@
             const matchAnio = anios.length === 0 || anios.includes(String(r.anio));
             const matchMes = meses.length === 0 || meses.includes(Number(r.mes));
             const matchJur = jurFiltros.length === 0 || jurFiltros.includes(jurClave);
-            
-            // Un municipio coincide por su ID/Clave o por su Nombre
-            const matchMun = munFiltrosClaves.length === 0 || 
-                             munFiltrosClaves.includes(munClave) || 
-                             munFiltrosTextos.includes(munTexto);
 
-            const matchUni = uniFiltros.length === 0 || 
-                             uniFiltros.includes(cluesTexto) || 
-                             uniFiltros.includes(nombreUnidadTexto);
+            const matchMun = munFiltrosClaves.length === 0 ||
+                munFiltrosClaves.includes(munClave) ||
+                munFiltrosTextos.includes(munTexto);
+
+            const matchUni = uniFiltros.length === 0 ||
+                uniFiltros.includes(cluesTexto) ||
+                uniFiltros.includes(nombreUnidadTexto);
 
             return matchAnio && matchMes && matchJur && matchMun && matchUni;
         });
@@ -334,6 +331,7 @@
     };
 
     window.cargarDatosSis = window.ejecutarFiltradoSis;
+    window.cargarTablaSis = window.ejecutarFiltradoSis;
 
     /* ==========================================================================
        4. TABLA Y TABS
@@ -580,10 +578,15 @@
     }
 
     /* ==========================================================================
-       6. INICIALIZACIÓN
+       6. INICIALIZACIÓN Y EVENT LISTENERS
        ========================================================================== */
     document.addEventListener("DOMContentLoaded", () => {
         window.ejecutarFiltradoSis();
+
+        // Conexión con el CustomEvent emitido desde menu.html
+        document.addEventListener("aplicarFiltroUnidades", () => {
+            window.ejecutarFiltradoSis();
+        });
 
         document.getElementById("filtroSisDetalle")?.addEventListener("change", () => {
             graficaSisPorMes(datosFiltradosSis);

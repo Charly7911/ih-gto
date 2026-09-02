@@ -1399,43 +1399,33 @@
 
         const buscarServicio = document.getElementById(`buscarServicio${sufijo}`) || document.getElementById("buscarServicio");
 
-
-
         // ======================================================
         // 1.1 FILTRADO DE MUNICIPIOS CON BASE EN LA JURISDICCIÓN
         // ======================================================
         function actualizarRelacionJurisdiccionMunicipio() {
-            // Si no existen los popovers en el DOM, no ejecuta nada
             const popoverMun = document.querySelector('[data-popover="municipio"]') || document.getElementById('popoverMunicipios');
             const popoverJur = document.querySelector('[data-popover="jurisdiccion"]') || document.getElementById('popoverJurisdicciones');
 
             if (!popoverMun) return;
 
-            // 1. Obtener jurisdicciones seleccionadas de forma normalizada
             let jurisdiccionesActivas = [];
             if (popoverJur) {
                 const checks = popoverJur.querySelectorAll('input[type="checkbox"]:checked');
-                jurisdiccionesActivas = Array.from(checks).map(cb => {
-                    const raw = String(cb.value).trim();
-                    return raw.replace(/^0+/, ''); // remueve ceros a la izquierda
-                });
+                jurisdiccionesActivas = Array.from(checks).map(cb => String(cb.value).trim().replace(/^0+/, ''));
             }
 
-            // 2. Iterar elementos de municipio en el popover
             const itemsMunicipio = popoverMun.querySelectorAll('label, .form-check, .popover-item, div:has(> input)');
 
             itemsMunicipio.forEach(item => {
                 const cb = item.querySelector('input[type="checkbox"]');
                 if (!cb) return;
 
-                // Extraer jurisdicción asociada desde cualquier posible atributo dataset
                 const jurAttr = item.dataset.jurisdiccion ||
                     item.getAttribute('data-jurisdiccion') ||
                     cb.dataset.jurisdiccion ||
                     cb.getAttribute('data-jurisdiccion');
 
                 if (!jurAttr || jurisdiccionesActivas.length === 0) {
-                    // Si no hay jurisdicción seleccionada, muestra todos los municipios
                     item.style.display = "";
                 } else {
                     const valJurSinCeros = String(jurAttr).trim().replace(/^0+/, '');
@@ -1443,7 +1433,6 @@
                     if (jurisdiccionesActivas.includes(valJurSinCeros)) {
                         item.style.display = "";
                     } else {
-                        // Si la jurisdicción no está activa, oculta el municipio y desmarca su checkbox
                         item.style.display = "none";
                         if (cb.checked) {
                             cb.checked = false;
@@ -1453,17 +1442,15 @@
             });
         }
 
-        // Delegación de eventos única en el document (cubre todos los casos)
+        // Delegación global para cambios en checkboxes de Jurisdicción
         document.addEventListener('change', (e) => {
             if (e.target.matches('#popoverJurisdicciones input[type="checkbox"], [data-popover="jurisdiccion"] input[type="checkbox"]')) {
                 actualizarRelacionJurisdiccionMunicipio();
             }
         });
 
-        // Sincronización al cargar la página
-        document.addEventListener('DOMContentLoaded', () => {
-            actualizarRelacionJurisdiccionMunicipio();
-        });
+        // Ejecución inicial al cargar la vista
+        actualizarRelacionJurisdiccionMunicipio();
 
         // ======================================================
         // 1.2 SELECTOR DE NIVEL DE AGRUPACIÓN (VER POR)
@@ -1493,7 +1480,6 @@
                     if (blockMunicipios) blockMunicipios.style.display = 'block';
                 }
 
-                // Disparar la recarga de datos al cambiar el agrupador
                 ejecutarCargaGraficaYDatos();
             });
         }
@@ -1616,7 +1602,11 @@
 
                     const texto = item.textContent.toLowerCase();
                     if (query === "") {
-                        item.style.display = "";
+                        if (contenedorPop === popoverMunicipios) {
+                            actualizarRelacionJurisdiccionMunicipio();
+                        } else {
+                            item.style.display = "";
+                        }
                     } else {
                         item.style.display = texto.includes(query) ? "" : "none";
                     }
@@ -1924,22 +1914,27 @@
         // ======================================================
         // 7. RESET GENERAL Y ESCUCHA DE CAMBIOS DIRECTOS
         // ======================================================
+
         document.addEventListener("click", function (e) {
             if (e.target.closest('#btnResetAll, #btnResetSis, #btnReset' + sufijo + ', .btn-reset, .btn-limpiar')) {
                 e.preventDefault();
 
-                document.querySelectorAll('.menu-filtros input[type="checkbox"]').forEach(cb => cb.checked = false);
+                // 1. Desmarcar todos los checkboxes del menú de filtros
+                document.querySelectorAll('.menu-filtros input[type="checkbox"], .popover-unidades input[type="checkbox"], .popover-content input[type="checkbox"]').forEach(cb => cb.checked = false);
 
+                // 2. Restaurar select de agrupación si existe
                 if (selectNivel) selectNivel.value = 'clues';
                 if (blockUnidades) blockUnidades.style.display = 'block';
                 if (blockJurisdicciones) blockJurisdicciones.style.display = 'none';
                 if (blockMunicipios) blockMunicipios.style.display = 'none';
 
+                // 3. Limpiar inputs de búsqueda y forzar el evento para mostrar todos los ítems
                 document.querySelectorAll('input[type="text"], input[type="search"]').forEach(inp => {
                     inp.value = "";
                     inp.dispatchEvent(new Event("input"));
                 });
 
+                // 4. Restaurar texto base de los botones
                 const btnUnidades = obtenerBotonUnidades();
                 if (btnUnidades) btnUnidades.textContent = "🔍 Seleccionar unidades";
                 if (btnJurisdicciones) btnJurisdicciones.textContent = "🔍 Seleccionar jurisdicciones";
@@ -1947,9 +1942,11 @@
                 if (btnServicio) btnServicio.textContent = "🔍 Seleccionar Egreso";
                 if (btnAfecciones) btnAfecciones.textContent = "🔍 Seleccionar afecciones";
 
+                // 5. Actualizar la relación Municipio-Jurisdicción y recargar la vista/gráficas
                 actualizarRelacionJurisdiccionMunicipio();
                 ejecutarCargaGraficaYDatos();
             }
         });
+
     });
 </script>
