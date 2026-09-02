@@ -5,7 +5,7 @@
 
         <h2 class="mb-3" id="sis-title">
             🏥 SIS - Primer Nivel
-            <span id="sis-meta" style="font-size: 18px;" data-control='{{ control_anual | tojson | safe }}'></span>
+            <span id="sis-meta" style="font-size: 18px;"></span>
         </h2>
 
         <!-- GRÁFICAS SUPERIORES -->
@@ -112,7 +112,7 @@
                             </div>
 
                             <div id="contenedorSubvariables" style="max-height: 250px; overflow-y: auto;">
-                                <!-- Se renderiza dinámicamente desde el catálogo traído por Backend -->
+                                <!-- Renderizado dinámico desde el catálogo -->
                             </div>
                         </div>
 
@@ -132,7 +132,6 @@
     if (typeof ChartDataLabels !== 'undefined') {
         Chart.register(ChartDataLabels);
     }
-
 
     /* 1. SE INYECTAN LOS DATOS Y CATÁLOGO DIRECTAMENTE DEL BACKEND (FLASK) */
     const controlAnual = JSON.parse('{{ (control_anual | default([])) | tojson | safe }}');
@@ -173,7 +172,6 @@
 
         if (!contenedor) return;
 
-        // Extrae directamente los datos del catálogo que mandó Flask
         const estructuraModulo = DICCIONARIO_VARIABLES[modulo] || [];
 
         subvariablesSeleccionadas = [];
