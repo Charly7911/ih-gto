@@ -1778,7 +1778,8 @@ def subir_csv_sis_primer_nivel():
             for i in range(0, len(valores), bloque_size):
                 cursor.executemany(sql_ins, valores[i : i + bloque_size])
 
-            # ⚙️ 7. Recálculo de Agregados SIS Primer Nivel (CORREGIDO)
+          
+            # ⚙️ 7. Recálculo de Agregados SIS Primer Nivel
             cursor.execute(
                 """
                 INSERT INTO sis_registros_agregados_primer_nivel (
@@ -1791,46 +1792,84 @@ def subir_csv_sis_primer_nivel():
                     sr.mes, 
                     sr.clues, 
                     cu.nombre_unidad,
-                    sr.jurisdiccion, -- Tomado del CSV en sr
-                    sr.municipio,    -- Tomado del CSV en sr
-                    SUM(CASE WHEN sr.variable IN ('CON01','CON02','CON03','CON04','CON05','CON06','CON07','CON08','CON09','CON10',
+                    sr.jurisdiccion,
+                    sr.municipio,
+
+                    -- 1. Consultas
+                    SUM(CASE WHEN sr.variable IN (
+                        'CON01','CON02','CON03','CON04','CON05','CON06','CON07','CON08','CON09','CON10',
                         'CON11','CON12','CON13','CON14','CON15','CON16','CON17','CON18','CON19','CON20',
                         'CON21','CON22','CON23','CON24','CON25','CON26','CON27','CON28','CON29','CON30',
                         'CON31','CON32','CON33','CON34','CON35','CON36','CON37','CON38','CON39','CON40',
-                        'CON41','CON42','CON43','CON44','CON45','CON46','CON47','COD01','COD02')
-                    THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+                        'CON41','CON42','CON44','CON45','CON47','COD01','COD02'
+                    ) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
                     
-                    SUM(CASE WHEN sr.variable IN ('CPP07','CPP14') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
-                    SUM(CASE WHEN sr.variable IN ('CPP06','CPP13','COD01','COD02') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
-                    SUM(CASE WHEN sr.variable IN ('EMB01','EMB02','EMB03','EMB04','EMB05','EMB06') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+                    -- 2. Salud Mental (Valores oficiales por defecto)
+                    SUM(CASE WHEN sr.variable IN ('CPP07','CPP14') 
+                        THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+
+                    -- 3. Salud Bucal (Sintaxis corregida)
+                    SUM(CASE WHEN sr.variable IN ('CPP06','CPP13','COD01','COD02') 
+                        THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+
+                    -- 4. Embarazadas
+                    SUM(CASE WHEN sr.variable IN ('EMB01','EMB02','EMB03','EMB04','EMB05','EMB06') 
+                        THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+
+                    -- 5. Planificación Familiar
                     SUM(CASE WHEN sr.variable IN (
                         'PFC01','PFC02','PFC03','PFC04','PFC05','PFC06','PFC07','PFC08','PFC10',
                         'PFC11','PFC12','PFC13','PFC14','PFC15','PFC16','PFC17','PFC19','PFC20',
                         'PFC21','PFC22','PFC23','PFC24','PFC25','PFC26','PFC27','PFC28','PFC29',
-                        'PFC30', 'PFC31','PFC32')
-                    THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+                        'PFC30','PFC31','PFC32'
+                    ) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+
+                    -- 6. Detecciones
                     SUM(CASE WHEN sr.variable IN (
-                        'DET01','DET02','DET03','DET04','DET05','DET06','DET07','DET08','DET09','DET11', 'DET12', 'DET13', 'DET14', 'DET15', 'DET16', 'DET17', 'DET18', 'DET19',
-                        'DET21','DET22','DET23','DET24','DET25','DET26','DET27','DET28','DET29','DET31', 'DET32', 'DET33', 'DET34', 'DET35', 'DET36', 'DET37', 'DET38', 'DET39',
-                        'DET41','DET42','DET43','DET44','DET45','DET46','DET47','DET48','DET49','DET51', 'DET52', 'DET53', 'DET54', 'DET55', 'DET56', 'DET57', 'DET58', 'DET59',
-                        'DET61','DET62','DET63','DET64','DET65','DET66','DET67','DET68','DET69','DET71', 'DET72', 'DET73', 'DET74', 'DET75', 'DET76', 'DET77', 'DET78', 'DET79',
-                        'DET81','DET82','DET83','DET84','DET85','DET86','DET87','DET88','DET89','DET91', 'DET92', 'DET93', 'DET94', 'DET95', 'DET96', 'DET97', 'DET98', 'DET99',
-                        'DTO01','DTO02','DTO03','DTO04','DTO05','DTO06','DTO07','DTO08','DTO09','DTO11', 'DTO12', 'DTO13', 'DTO14', 'DTO15', 'DTO16', 'DTO17', 'DTO18', 'DTO19',
-                        'DTO21','DTO22','DTO23','DTO24','DTO25','DTO26','DTO27','DTO28','DTO29','DTO31', 'DTO32', 'DTO33', 'DTO34', 'DTO35', 'DTO36', 'DTO37', 'DTO38', 'DTO39',
-                        'DTO41','DTO42','DTO43','DTO44','DTO45','DTO46','DTO47','DTO48','DTO49','DTO51', 'DTO52', 'DTO53', 'DTO54', 'DTO55', 'DTO56', 'DTO57', 'DTO58', 'DTO59',
-                        'DTO61','DTO62','DTO63','DTO64','DTO65','DTO66','DTO67','DTO68','DTO69','DTO71', 'DTO72', 'DTO73', 'DTO74', 'DTO75', 'DTO76', 'DTO77', 'DTO78', 'DTO79',
-                        'DTO81','DTO82','DTO83','DTO84','DTO85','DTO86','DTO87','DTO88','DTO89','DTO91', 'DTO92', 'DTO93', 'DTO94', 'DTO95', 'DTO96', 'DTO97', 'DTO98', 'DTO99',
-                        'DTI01','DTI02','DTI03','DTI04','DTI05','DTI06','DTI07','DTI08','DTI09','DTI11', 'DTI12', 'DTI13', 'DTI14', 'DTI15', 'DTI16', 'DTI17', 'DTI18', 'DTI19',
-                        'DTI21','DTI22','DTI23','DTI24','DTI25','DTI26','DTI27','DTI28','DTI29','DTI31', 'DTI32', 'DTI33', 'DTI34', 'DTI35', 'DTI36', 'DTI37', 'DTI38', 'DTI39',
-                        'DTI41','DTI42','DTI43','DTI44','DTI45','DTI46','DTI47','DTI48','DTI49','DTI51', 'DTI52', 'DTI53', 'DTI54', 'DTI55', 'DTI56', 'DTI57', 'DTI58', 'DTI59',
-                        'DTI61','DTI62','DTI63','DTI64','DTI65','DTI66','DTI67','DTI68','DTI69','DTI71', 'DTI72', 'DTI73', 'DTI74', 'DTI75', 'DTI76', 'DTI77', 'DTI78', 'DTI79',
-                        'DTE01','DTE02','DTE03','DTE04','DTE05','DTE06','DTE07','DTE08','DTE09','DTE11', 'DTE12', 'DTE13', 'DTE14', 'DTE15', 'DTE16', 'DTE17', 'DTE18', 'DTE19',
-                        'DTE21','DTE22','DTE23','DTE24','DTE25','DTE26','DTE27','DTE28','DTE29','DTE31', 'DTE32', 'DTE33', 'DTE34', 'DTE35', 'DTE36', 'DTE37', 'DTE38', 'DTE39',
-                        'DTE41','DTE42','DTE43','DTE44','DTE45','DTE46','DTE47','DTE48','DTE49','DTE51', 'DTE52', 'DTE53', 'DTE54', 'DTE55', 'DTE56', 'DTE57', 'DTE58', 'DTE59',
-                        'DTE61','DTE62','DTE63','DTE64','DTE65','DTE66','DTE67','DTE68','DTE69','DTE71', 'DTE72', 'DTE73', 'DTE74', 'DTE75', 'DTE76', 'DTE77', 'DTE78', 'DTE79'
-                        )
-                    THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
-                    SUM(CASE WHEN sr.variable IN ('RNL06') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END)
+                        -- DET
+                        'DET01','DET02','DET03','DET04','DET05','DET06','DET07','DET08','DET09',
+                        'DET11','DET12','DET16','DET17','DET18','DET19','DET21','DET22','DET25',
+                        'DET26','DET27','DET28','DET29','DET30','DET31','DET33','DET34','DET35',
+                        'DET36','DET39','DET40','DET42','DET43','DET44','DET45','DET47','DET50',
+                        'DET51','DET52','DET53','DET54','DET57','DET58','DET59','DET60','DET61',
+                        'DET62','DET63','DET64','DET73','DET74','DET85','DET86','DET87','DET88',
+                        'DET89','DET90','DET91','DET92','DET93','DET94','DET95','DET96','DET97',
+                        'DET98','DET99',
+
+                        -- DT0 / DT1
+                        'DT001','DT002','DT003','DT004','DT005','DT006','DT007','DT008','DT009','DT010',
+                        'DT011','DT012','DT013','DT014','DT015','DT016','DT017','DT018','DT019','DT020',
+                        'DT021','DT022','DT023','DT024','DT025','DT026','DT027','DT028','DT030','DT031',
+                        'DT032','DT033','DT034','DT035','DT036','DT037','DT038','DT039','DT040','DT041',
+                        'DT042','DT043','DT044','DT045','DT046','DT047','DT048','DT049','DT050','DT051',
+                        'DT053','DT054','DT055','DT056','DT059','DT060','DT061','DT062','DT063','DT064',
+                        'DT065','DT066','DT067','DT068','DT069','DT070','DT071','DT072','DT073','DT074',
+                        'DT075','DT076','DT077','DT078','DT079','DT080','DT081','DT082','DT083','DT084',
+                        'DT085','DT086','DT087','DT088','DT089','DT090','DT091','DT092','DT093','DT094',
+                        'DT095','DT096','DT097','DT098','DT099','DT100','DT101','DT102','DT103','DT104',
+                        'DT105','DT106','DT107','DT108','DT109','DT110','DT111','DT112','DT113','DT114',
+                        'DT115','DT116','DT117','DT118','DT119','DT120','DT121','DT122','DT123','DT124',
+                        'DT125','DT126','DT127','DT128','DT129','DT130','DT131','DT132','DT133','DT134',
+                        'DT135','DT136','DT137','DT138','DT139','DT140','DT141','DT142','DT143','DT144',
+                        'DT145','DT146','DT147','DT148','DT149','DT150','DT151','DT152','DT153','DT154',
+                        'DT155','DT156','DT157','DT158','DT159','DT160','DT161','DT162','DT163','DT165',
+                        'DT166','DT167','DT168','DT169','DT170','DT171','DT172','DT173','DT174','DT175',
+                        'DT176','DT177','DT178',
+
+                        -- DTE
+                        'DTE01','DTE02','DTE03','DTE04','DTE05','DTE06','DTE07','DTE08','DTE09','DTE10',
+                        'DTE11','DTE12','DTE14','DTE15','DTE16','DTE17','DTE18','DTE19','DTE20','DTE21',
+                        'DTE22','DTE23','DTE24','DTE25','DTE32','DTE33','DTE37','DTE38','DTE40','DTE41',
+                        'DTE42','DTE43','DTE44','DTE45','DTE46','DTE47','DTE48','DTE49','DTE56','DTE57',
+                        'DTE61','DTE62','DTE64','DTE65','DTE66','DTE67','DTE68','DTE69','DTE70','DTE71',
+                        'DTE72','DTE73','DTE74','DTE75','DTE76','DTE77','DTE78','DTE79','DTE80','DTE81',
+                        'DTE82','DTE83','DTE84','DTE85','DTE86','DTE87','DTE88','DTE89','DTE90','DTE91',
+                        'DTE92','DTE93','DTE94','DTE95','DTE96','DTE97','DTE98','DTE99'
+                    ) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+
+                    -- 7. Tamiz (Asegurado como RNL06)
+                    SUM(CASE WHEN sr.variable IN ('RNL06') 
+                        THEN CAST(sr.total AS UNSIGNED) ELSE 0 END)
                     
                 FROM sis_registros_primer_nivel sr
                 LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
