@@ -1399,8 +1399,7 @@
 
         const buscarServicio = document.getElementById(`buscarServicio${sufijo}`) || document.getElementById("buscarServicio");
 
-        // Variable global para mantener en memoria las jurisdicciones seleccionadas
-        let jurisdiccionesGuardadas = [];
+
 
         // ======================================================
         // 1.1 FILTRADO DE MUNICIPIOS CON BASE EN LA JURISDICCIÓN
@@ -1408,33 +1407,47 @@
         function actualizarRelacionJurisdiccionMunicipio() {
             if (!popoverMunicipios) return;
 
-            // Consultar directamente del popover de jurisdicciones
+            // Obtener jurisdicciones seleccionadas normalizadas (limpias de espacios y ceros iniciales)
+            let jurisdiccionesActivas = [];
             if (popoverJurisdicciones) {
                 const checks = popoverJurisdicciones.querySelectorAll('input[type="checkbox"]:checked');
-                if (checks.length > 0) {
-                    jurisdiccionesGuardadas = Array.from(checks).map(cb => String(cb.value).trim());
-                } else {
-                    jurisdiccionesGuardadas = [];
-                }
+                jurisdiccionesActivas = Array.from(checks).map(cb => {
+                    const val = String(cb.value).trim();
+                    return [val, val.replace(/^0+/, '')]; // guarda valor original y sin ceros a la izquierda
+                }).flat();
             }
 
-            const itemsMunicipio = popoverMunicipios.querySelectorAll('.popover-item, label, .form-check');
+            // Buscar todos los elementos navegables de municipio
+            const itemsMunicipio = popoverMunicipios.querySelectorAll('.popover-item, label, .form-check, div:has(> input)');
 
             itemsMunicipio.forEach(item => {
-                if (item.closest('.popover-actions') || item.classList.contains('filter-label') || item.classList.contains('popover-header')) {
+                // Ignorar acciones principales
+                if (item.classList.contains('popover-actions') || item.classList.contains('filter-label') || item.classList.contains('popover-header')) {
                     return;
                 }
 
-                const jurAsociada = item.dataset.jurisdiccion || item.getAttribute('data-jurisdiccion');
                 const cb = item.querySelector('input[type="checkbox"]');
+                if (!cb && !item.hasAttribute('data-jurisdiccion')) return;
 
-                if (jurisdiccionesGuardadas.length === 0) {
-                    item.style.display = "";
-                } else if (jurAsociada && jurisdiccionesGuardadas.includes(String(jurAsociada).trim())) {
+                // Extraer jurisdicción vinculada desde dataset o el propio checkbox
+                const jurAttr = item.dataset.jurisdiccion ||
+                    item.getAttribute('data-jurisdiccion') ||
+                    (cb ? cb.dataset.jurisdiccion : null) ||
+                    (cb ? cb.getAttribute('data-jurisdiccion') : null);
+
+                if (!jurAttr || jurisdiccionesActivas.length === 0) {
+                    // Si no hay filtro de jurisdicción activo, se muestran todos los municipios
                     item.style.display = "";
                 } else {
-                    item.style.display = "none";
-                    if (cb) cb.checked = false; 
+                    const valJurClean = String(jurAttr).trim();
+                    const valJurSinCeros = valJurClean.replace(/^0+/, '');
+
+                    if (jurisdiccionesActivas.includes(valJurClean) || jurisdiccionesActivas.includes(valJurSinCeros)) {
+                        item.style.display = "";
+                    } else {
+                        item.style.display = "none";
+                        if (cb) cb.checked = false;
+                    }
                 }
             });
         }
@@ -1463,12 +1476,12 @@
                     if (blockUnidades) blockUnidades.style.display = 'block';
                     if (blockJurisdicciones) blockJurisdicciones.style.display = 'block';
                     if (blockMunicipios) blockMunicipios.style.display = 'block';
-                } 
+                }
                 else if (val === 'jurisdiccion') {
                     if (blockUnidades) blockUnidades.style.display = 'none';
                     if (blockJurisdicciones) blockJurisdicciones.style.display = 'block';
                     if (blockMunicipios) blockMunicipios.style.display = 'block';
-                } 
+                }
                 else if (val === 'municipio') {
                     if (blockUnidades) blockUnidades.style.display = 'none';
                     if (blockJurisdicciones) blockJurisdicciones.style.display = 'none';

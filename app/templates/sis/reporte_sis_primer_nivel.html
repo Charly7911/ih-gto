@@ -216,15 +216,14 @@
         const nivelAgrupacion = document.getElementById('selectNivelAgrupacion')?.value || 'clues';
 
         data.forEach(r => {
-            const jur = r.jurisdiccion !== undefined && r.jurisdiccion !== null ? String(r.jurisdiccion) : 'Sin Especificar';
-            const mun = r.municipio !== undefined && r.municipio !== null ? String(r.municipio) : 'Sin Especificar';
+            const jur = r.jurisdiccion !== undefined && r.jurisdiccion !== null ? String(r.jurisdiccion).trim() : 'Sin Especificar';
+            const mun = r.municipio !== undefined && r.municipio !== null ? String(r.municipio).trim() : 'Sin Especificar';
             const clues = r.clues || 'Sin CLUES';
             const nombreUnidad = r.nombre_unidad || clues;
 
             let key = "";
             let nombreEtiqueta = "";
 
-            // Definición de llave de agrupación según el selector
             if (nivelAgrupacion === 'jurisdiccion') {
                 key = `${r.anio}-JUR-${jur}`;
                 nombreEtiqueta = `Jurisdicción ${jur}`;
@@ -232,7 +231,6 @@
                 key = `${r.anio}-MUN-${mun}`;
                 nombreEtiqueta = mun;
             } else {
-                // Nivel por defecto: CLUES / Unidad
                 key = `${r.anio}-${jur}-${mun}-${clues}`;
                 nombreEtiqueta = nombreUnidad;
             }
@@ -269,15 +267,18 @@
     window.ejecutarFiltradoSis = function () {
         const anios = window.getAniosSeleccionados ? window.getAniosSeleccionados().map(String) : [];
         const meses = window.getMesesSeleccionados ? window.getMesesSeleccionados().map(Number) : [];
-        const jurisdicciones = window.getJurisdiccionesSeleccionadas ? window.getJurisdiccionesSeleccionadas().map(String) : [];
-        const municipios = window.getMunicipiosSeleccionados ? window.getMunicipiosSeleccionados().map(String) : [];
+        const jurisdicciones = window.getJurisdiccionesSeleccionadas ? window.getJurisdiccionesSeleccionadas().map(v => String(v).trim()) : [];
+        const municipios = window.getMunicipiosSeleccionados ? window.getMunicipiosSeleccionados().map(v => String(v).trim()) : [];
         const unidades = window.getUnidadesSeleccionadas ? window.getUnidadesSeleccionadas().map(String) : [];
 
         const filtrados = sisResultados.filter(r => {
+            const jurStr = r.jurisdiccion !== undefined && r.jurisdiccion !== null ? String(r.jurisdiccion).trim() : "";
+            const munStr = r.municipio !== undefined && r.municipio !== null ? String(r.municipio).trim() : "";
+
             const matchAnio = anios.length === 0 || anios.includes(String(r.anio));
             const matchMes = meses.length === 0 || meses.includes(Number(r.mes));
-            const matchJur = jurisdicciones.length === 0 || jurisdicciones.includes(String(r.jurisdiccion));
-            const matchMun = municipios.length === 0 || municipios.includes(String(r.municipio));
+            const matchJur = jurisdicciones.length === 0 || jurisdicciones.includes(jurStr) || jurisdicciones.includes(jurStr.replace(/^0+/, ''));
+            const matchMun = municipios.length === 0 || municipios.includes(munStr) || municipios.includes(munStr.replace(/^0+/, ''));
             const matchUni = unidades.length === 0 || unidades.includes(String(r.clues)) || unidades.includes(String(r.nombre_unidad));
 
             return matchAnio && matchMes && matchJur && matchMun && matchUni;
@@ -383,11 +384,12 @@
     }
 
     /* ==========================================================================
-       5. RENDERIZADO DE GRÁFICAS
+       5. RENDERIZADO DE GRÁFICAS (SOPORTE DE PARÁMETRO VACÍO)
        ========================================================================== */
-    function renderGraficaPorAnio(data) {
+    function renderGraficaPorAnio(data = datosActuales) {
+        const arrSafe = data || [];
         const porAnio = {};
-        data.forEach(r => {
+        arrSafe.forEach(r => {
             porAnio[r.anio] = (porAnio[r.anio] || 0) + (Number(r.consultas) || 0);
         });
 
@@ -427,7 +429,7 @@
         });
     }
 
-    function renderGraficaPorUnidad(data) {
+    function renderGraficaPorUnidad(data = datosActuales.filter(r => r.anio === anioActivo)) {
         const arrSafe = data || [];
         let labels = [];
         let datasetsData = {
@@ -435,30 +437,14 @@
             tamiz: [], planificacion_familiar: [], detecciones: []
         };
 
-        const unidadesSeleccionadas = window.getUnidadesSeleccionadas ? window.getUnidadesSeleccionadas() : [];
-
-        // Si no hay unidades filtradas manualmente o el resultado supera 1 solo registro agrupado
-        if (unidadesSeleccionadas.length === 0 && arrSafe.length > 10) {
-            // Se agrupa un total para evitar saturate la pantalla con demasiadas barras
-            labels = ['Total General'];
-            datasetsData.consultas = [arrSafe.reduce((s, r) => s + (Number(r?.consultas) || 0), 0)];
-            datasetsData.embarazadas = [arrSafe.reduce((s, r) => s + (Number(r?.embarazadas) || 0), 0)];
-            datasetsData.mental = [arrSafe.reduce((s, r) => s + (Number(r?.mental) || 0), 0)];
-            datasetsData.bucal = [arrSafe.reduce((s, r) => s + (Number(r?.bucal) || 0), 0)];
-            datasetsData.tamiz = [arrSafe.reduce((s, r) => s + (Number(r?.tamiz) || 0), 0)];
-            datasetsData.planificacion_familiar = [arrSafe.reduce((s, r) => s + (Number(r?.planificacion_familiar) || 0), 0)];
-            datasetsData.detecciones = [arrSafe.reduce((s, r) => s + (Number(r?.detecciones) || 0), 0)];
-        } else {
-            // Renderiza los desgloses según el nivel seleccionado (ya sea por Municipo, Jurisdicción o CLUES)
-            labels = arrSafe.map(r => r.nombre_unidad || r.clues);
-            datasetsData.consultas = arrSafe.map(r => Number(r?.consultas) || 0);
-            datasetsData.embarazadas = arrSafe.map(r => Number(r?.embarazadas) || 0);
-            datasetsData.mental = arrSafe.map(r => Number(r?.mental) || 0);
-            datasetsData.bucal = arrSafe.map(r => Number(r?.bucal) || 0);
-            datasetsData.tamiz = arrSafe.map(r => Number(r?.tamiz) || 0);
-            datasetsData.planificacion_familiar = arrSafe.map(r => Number(r?.planificacion_familiar) || 0);
-            datasetsData.detecciones = arrSafe.map(r => Number(r?.detecciones) || 0);
-        }
+        labels = arrSafe.map(r => r.nombre_unidad || r.clues);
+        datasetsData.consultas = arrSafe.map(r => Number(r?.consultas) || 0);
+        datasetsData.embarazadas = arrSafe.map(r => Number(r?.embarazadas) || 0);
+        datasetsData.mental = arrSafe.map(r => Number(r?.mental) || 0);
+        datasetsData.bucal = arrSafe.map(r => Number(r?.bucal) || 0);
+        datasetsData.tamiz = arrSafe.map(r => Number(r?.tamiz) || 0);
+        datasetsData.planificacion_familiar = arrSafe.map(r => Number(r?.planificacion_familiar) || 0);
+        datasetsData.detecciones = arrSafe.map(r => Number(r?.detecciones) || 0);
 
         if (graficaUnidad) graficaUnidad.destroy();
 
@@ -499,7 +485,7 @@
         actualizarTituloGabineteTotal(graficaUnidad);
     }
 
-    function graficaSisPorMes(data) {
+    function graficaSisPorMes(data = datosFiltradosSis) {
         const detalle = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const ctx = document.getElementById("graficaSisMensual");
 
@@ -568,10 +554,6 @@
 
         document.getElementById("filtroSisDetalle")?.addEventListener("change", () => {
             graficaSisPorMes(datosFiltradosSis);
-        });
-
-        document.getElementById("selectNivelAgrupacion")?.addEventListener("change", () => {
-            window.ejecutarFiltradoSis();
         });
 
         document.getElementById("btnToggleValoresMensual")?.addEventListener("click", (e) => {
