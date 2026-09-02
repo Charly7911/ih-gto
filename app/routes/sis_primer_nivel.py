@@ -5,7 +5,6 @@ from app import mysql
 
 sis_pn = Blueprint('sis_pn', __name__, url_prefix='/sis_primer_nivel')
 
-
 @sis_pn.route("/")
 @login_required
 def dashboard_sis_primer_nivel():
@@ -42,23 +41,26 @@ def dashboard_sis_primer_nivel():
         key=lambda x: x["nombre"]
     )
 
-    # 4. Control Anual
+    # 4. Control Anual (CONVERSIÓN DE FECHA A TEXTO PARA EVITAR ERROR 500)
     cursor.execute("""
         SELECT anio, estatus_inicio, fecha_actualizacion, estatus
         FROM sis_control_anual
         ORDER BY anio
     """)
-    control_anual = cursor.fetchall() or []
+    rows_control = cursor.fetchall() or []
+    control_anual = []
+    for row in rows_control:
+        if row.get("fecha_actualizacion"):
+            row["fecha_actualizacion"] = str(row["fecha_actualizacion"])
+        control_anual.append(row)
 
-    # 5. CATÁLOGO DE VARIABLES (Incluimos la columna modulo)
-    # *Nota: Si tu columna no se llama 'modulo', cámbiala por su nombre real (ej. seccion, area, etc.)
+    # 5. CATÁLOGO DE VARIABLES
     cursor.execute("""
         SELECT modulo, variable, descripcion, apartado, descripcion_apartado
         FROM catalogo_variables
         ORDER BY modulo, apartado, variable
     """)
     filas_catalogo = cursor.fetchall() or []
-
 
     catalogo_estructurado = {}
 
@@ -84,7 +86,7 @@ def dashboard_sis_primer_nivel():
             "nombre": nombre_var
         })
 
-    # Convertimos los apartados de cada módulo de diccionario a una lista simple
+    # Convertimos los apartados de cada módulo a lista
     catalogo_variables = {
         mod: list(apartados.values()) 
         for mod, apartados in catalogo_estructurado.items()
@@ -100,7 +102,7 @@ def dashboard_sis_primer_nivel():
         jurisdicciones_disponibles=jurisdicciones_disponibles,
         municipios_disponibles=municipios_disponibles,
         control_anual=control_anual,
-        catalogo_variables=catalogo_variables,  # <-- Enviado listo para ser renderizado
+        catalogo_variables=catalogo_variables,
         tipo="sis",
         title="Reporte SIS - Primer Nivel"
     )
