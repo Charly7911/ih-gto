@@ -61,7 +61,7 @@
                     </nav>
                 </div>
 
-                <!-- GRÁFICA TEMPORAL -->
+                <!-- GRÁFICA TEMPORAL Y CATÁLOGO DE VARIABLES -->
                 <hr class="my-4">
                 <div class="card mb-2">
                     <div class="card-body">
@@ -146,7 +146,7 @@
     let anioActivo = null;
 
     let mostrarValoresMensual = false;
-    let variablesPersonalizadasEstado = {}; // Objeto que guarda el estado de selección de variables por módulo
+    let variablesPersonalizadasEstado = {}; // Objeto que guarda el estado de selección por módulo
 
     let graficaAnio = null;
     let graficaUnidad = null;
@@ -162,7 +162,7 @@
         meta.textContent = registro ? ` | ${registro.estatus_inicio} · ${registro.estatus}` : "";
     }
 
-    /* 2. DIBUJAR APARTADOS Y CHECKBOXES */
+    /* 2. DIBUJAR APARTADOS Y CHECKBOXES DE VARIABLES */
     function renderSubvariables() {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const contenedor = document.getElementById("contenedorSubvariables");
@@ -179,14 +179,15 @@
 
         if (lbl) lbl.innerHTML = `📋 Desglose de Apartados en <strong>${nombreModulo}</strong> (${totalVariablesModulo} variables en catálogo):`;
 
-        let html = "";
         if (estructuraModulo.length === 0) {
             contenedor.innerHTML = `<span class="text-muted small">No hay variables configuradas en el catálogo para este módulo.</span>`;
             return;
         }
 
-        const seleccionadasModulo = variablesPersonalizadasEstado[modulo] || null;
+        // Si es la primera vez que se accede al módulo, el estado es undefined/null
+        const seleccionadasModulo = variablesPersonalizadasEstado[modulo];
 
+        let html = "";
         estructuraModulo.forEach(grupo => {
             html += `
                 <div class="mb-3 p-2 bg-white rounded border">
@@ -196,7 +197,11 @@
                     <div class="d-flex flex-wrap gap-2 pt-1">`;
 
             (grupo.variables || []).forEach(v => {
-                const isChecked = seleccionadasModulo === null || seleccionadasModulo.includes(v.codigo);
+                // Si no hay un estado personalizado explícito, se marcan todas por defecto
+                const isChecked = (seleccionadasModulo === undefined || seleccionadasModulo === null) 
+                    ? true 
+                    : seleccionadasModulo.includes(v.codigo);
+
                 html += `
                     <div class="form-check form-check-inline me-3 mb-1" title="${v.nombre}">
                         <input class="form-check-input chk-subvar" type="checkbox" id="sub_${v.codigo}" value="${v.codigo}" ${isChecked ? 'checked' : ''}>
@@ -213,6 +218,7 @@
 
         contenedor.innerHTML = html;
 
+        // Escuchar evento individual
         contenedor.querySelectorAll('.chk-subvar').forEach(cb => {
             cb.addEventListener('change', () => {
                 guardarEstadoVariablesActuales();
@@ -288,9 +294,16 @@
         try {
             const resp = await fetch("/sis_primer_nivel/api/filtrar", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json"
+                },
                 body: JSON.stringify(payload)
             });
+
+            if (!resp.ok) {
+                console.error("Error en servidor al filtrar:", resp.statusText);
+                return;
+            }
 
             const res = await resp.json();
             if (res.status === "success") {
@@ -305,7 +318,7 @@
                 renderGraficaTemporal(datosFiltradosSis);
             }
         } catch (err) {
-            console.error("Error al filtrar datos SIS:", err);
+            console.error("Error al conectar con la API SIS:", err);
         }
     }
 
@@ -314,7 +327,7 @@
         debounceTimer = setTimeout(() => { realizarConsultaBackend(); }, 150);
     };
 
-    /* 4. TABLA Y TABS */
+    /* 4. TABLA Y TABS DE AÑOS */
     function renderTabsAnios(data) {
         const tabs = document.getElementById("tabsAnios");
         if (!tabs) return;
@@ -547,6 +560,7 @@
         renderSubvariables();
         window.ejecutarFiltradoSis();
 
+        // Cambiar de módulo al seleccionar en la lista desplegable
         document.getElementById("filtroSisDetalle")?.addEventListener("change", () => {
             renderSubvariables();
             renderGraficaTemporal(datosFiltradosSis);
@@ -562,15 +576,26 @@
             renderGraficaTemporal(datosFiltradosSis);
         });
 
+        // Botón: Marca todas las casillas del módulo actual
         document.getElementById("btnSeleccionarTodasSub")?.addEventListener("click", () => {
+            const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
             document.querySelectorAll("#contenedorSubvariables .chk-subvar").forEach(cb => cb.checked = true);
-            guardarEstadoVariablesActuales();
+            
+            // Guardar todas las variables del módulo actual
+            const todas = Array.from(document.querySelectorAll("#contenedorSubvariables .chk-subvar")).map(cb => cb.value);
+            variablesPersonalizadasEstado[modulo] = todas;
+            
             window.ejecutarFiltradoSis();
         });
 
+        // Botón: Desmarca todas las casillas del módulo actual
         document.getElementById("btnDesmarcarTodasSub")?.addEventListener("click", () => {
+            const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
             document.querySelectorAll("#contenedorSubvariables .chk-subvar").forEach(cb => cb.checked = false);
-            guardarEstadoVariablesActuales();
+            
+            // Forzar lista vacía [] en el módulo actual
+            variablesPersonalizadasEstado[modulo] = [];
+            
             window.ejecutarFiltradoSis();
         });
     });
