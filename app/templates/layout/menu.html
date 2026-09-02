@@ -1271,7 +1271,6 @@
 
 </div>
 
-
 <script>
     const tipo = "{{ tipo }}"; // morbi | morta | urg | urgencias | sis | egresos | ind | indicadores
     const sufijo = tipo ? (tipo.charAt(0).toUpperCase() + tipo.slice(1)) : "";
@@ -1400,15 +1399,24 @@
 
         const buscarServicio = document.getElementById(`buscarServicio${sufijo}`) || document.getElementById("buscarServicio");
 
+        // Variable global para mantener en memoria las jurisdicciones seleccionadas
+        let jurisdiccionesGuardadas = [];
+
         // ======================================================
-        // 1.1 FILTRADO DE MUNICIPIOS CON BASE EN LA JURISDICCIÓN SELECCIONADA
+        // 1.1 FILTRADO DE MUNICIPIOS CON BASE EN LA JURISDICCIÓN
         // ======================================================
         function actualizarRelacionJurisdiccionMunicipio() {
-            if (!popoverJurisdicciones || !popoverMunicipios) return;
+            if (!popoverMunicipios) return;
 
-            const jursSeleccionadas = Array.from(
-                popoverJurisdicciones.querySelectorAll('input[type="checkbox"]:checked')
-            ).map(cb => String(cb.value).trim());
+            // Consultar directamente del popover de jurisdicciones
+            if (popoverJurisdicciones) {
+                const checks = popoverJurisdicciones.querySelectorAll('input[type="checkbox"]:checked');
+                if (checks.length > 0) {
+                    jurisdiccionesGuardadas = Array.from(checks).map(cb => String(cb.value).trim());
+                } else {
+                    jurisdiccionesGuardadas = [];
+                }
+            }
 
             const itemsMunicipio = popoverMunicipios.querySelectorAll('.popover-item, label, .form-check');
 
@@ -1420,13 +1428,13 @@
                 const jurAsociada = item.dataset.jurisdiccion || item.getAttribute('data-jurisdiccion');
                 const cb = item.querySelector('input[type="checkbox"]');
 
-                if (jursSeleccionadas.length === 0) {
+                if (jurisdiccionesGuardadas.length === 0) {
                     item.style.display = "";
-                } else if (jurAsociada && jursSeleccionadas.includes(String(jurAsociada).trim())) {
+                } else if (jurAsociada && jurisdiccionesGuardadas.includes(String(jurAsociada).trim())) {
                     item.style.display = "";
                 } else {
                     item.style.display = "none";
-                    if (cb) cb.checked = false; // Desmarcar si queda oculto por el filtro
+                    if (cb) cb.checked = false; 
                 }
             });
         }
@@ -1451,24 +1459,24 @@
             selectNivel.addEventListener('change', function () {
                 const val = this.value;
 
-                // Si agrupa por CLUES: muestra Unidades, Jurisdicciones y Municipios (Filtro completo)
                 if (val === 'clues') {
                     if (blockUnidades) blockUnidades.style.display = 'block';
                     if (blockJurisdicciones) blockJurisdicciones.style.display = 'block';
                     if (blockMunicipios) blockMunicipios.style.display = 'block';
-                }
-                // Si agrupa por Jurisdicción: permite filtrar Jurisdicciones y Municipios pertenecientes
+                } 
                 else if (val === 'jurisdiccion') {
                     if (blockUnidades) blockUnidades.style.display = 'none';
                     if (blockJurisdicciones) blockJurisdicciones.style.display = 'block';
                     if (blockMunicipios) blockMunicipios.style.display = 'block';
-                }
-                // Si agrupa por Municipio: oculta Unidades y Jurisdicciones
+                } 
                 else if (val === 'municipio') {
                     if (blockUnidades) blockUnidades.style.display = 'none';
                     if (blockJurisdicciones) blockJurisdicciones.style.display = 'none';
                     if (blockMunicipios) blockMunicipios.style.display = 'block';
                 }
+
+                // Disparar la recarga de datos al cambiar el agrupador
+                ejecutarCargaGraficaYDatos();
             });
         }
 
@@ -1486,15 +1494,15 @@
                 pop.classList.add("open");
                 pop.style.display = "block";
 
-                const items = pop.querySelectorAll(".popover-item, label, .form-check, .check-unidad, div");
-                items.forEach(item => {
-                    if (!item.closest('.popover-actions') && !item.classList.contains('filter-label')) {
-                        item.style.display = "";
-                    }
-                });
-
                 if (pop === popoverMunicipios) {
                     actualizarRelacionJurisdiccionMunicipio();
+                } else {
+                    const items = pop.querySelectorAll(".popover-item, label, .form-check, .check-unidad, div");
+                    items.forEach(item => {
+                        if (!item.closest('.popover-actions') && !item.classList.contains('filter-label')) {
+                            item.style.display = "";
+                        }
+                    });
                 }
 
                 const inputBusqueda = pop.querySelector('input[type="text"], input[type="search"]');
@@ -1923,9 +1931,7 @@
 
                 actualizarRelacionJurisdiccionMunicipio();
                 ejecutarCargaGraficaYDatos();
-                document.dispatchEvent(new CustomEvent("solicitarResetFiltros"));
             }
         });
-
     });
 </script>
