@@ -14,19 +14,19 @@ def obtener_modulo_por_apartado(apartado_raw, variable_code=""):
     var = str(variable_code or "").upper()
 
     # Evaluación por número de apartado o prefijo directo
-    if apt in ["01", "02", "03", "04"]:
+    if apt in ["1", "215"]:
         return "consultas"
-    elif apt in ["05", "06"] or var.startswith("EMB"):
+    elif apt in ["24"] or var.startswith("EMB"):
         return "embarazadas"
-    elif apt in ["07"] or var.startswith(("PFC", "PLA")):
+    elif apt in ["36"] or var.startswith(("PFC", "PLA")):
         return "planificacion_familiar"
-    elif apt in ["08", "09"] or var.startswith(("DET", "DTO")):
+    elif apt in ["56"] or var.startswith(("DET", "DTO")):
         return "detecciones"
-    elif apt in ["10"] or var.startswith(("RNL", "TAM")):
+    elif apt in ["111"] or var.startswith(("RNL", "TAM")):
         return "tamiz"
-    elif apt in ["11"] or var.startswith("ODONT"):
+    elif apt in ["2","215"] or var.startswith("ODONT"):
         return "bucal"
-    elif apt in ["12"] or var.startswith("PSIC"):
+    elif apt in ["2"] or var.startswith("PSIC"):
         return "mental"
     else:
         return "consultas"  # Módulo por defecto
