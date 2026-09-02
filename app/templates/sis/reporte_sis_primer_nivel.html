@@ -206,7 +206,7 @@
     }
 
     /* ==========================================================================
-       3. PROCESAMIENTO, FILTRADO Y POBLADO DE SELECTS
+       3. PROCESAMIENTO Y FILTRADO USANDO LOS GETTERS GLOBALES DE MENU.HTML
        ========================================================================== */
     function agruparDatos(data) {
         const mapa = {};
@@ -245,41 +245,12 @@
         return Object.values(mapa);
     }
 
-    function popularFiltrosDinamicos() {
-        const jurisdicciones = [...new Set(sisResultados.map(r => r.jurisdiccion).filter(Boolean))].sort();
-        const municipios = [...new Set(sisResultados.map(r => r.municipio).filter(Boolean))].sort();
-
-        const contJur = document.getElementById("contenedorFiltroJurisdiccion");
-        if (contJur) {
-            contJur.innerHTML = jurisdicciones.map(j => `
-                <div class="form-check">
-                    <input class="form-check-input filtro-jurisdiccion" type="checkbox" value="${j}" id="jur_${j}">
-                    <label class="form-check-label" for="jur_${j}">Jurisdicción ${j}</label>
-                </div>
-            `).join('');
-        }
-
-        const contMun = document.getElementById("contenedorFiltroMunicipio");
-        if (contMun) {
-            contMun.innerHTML = municipios.map(m => `
-                <div class="form-check">
-                    <input class="form-check-input filtro-municipio" type="checkbox" value="${m}" id="mun_${m}">
-                    <label class="form-check-label" for="mun_${m}">${m}</label>
-                </div>
-            `).join('');
-        }
-    }
-
-    function obtenerSeleccionados(selector) {
-        return [...document.querySelectorAll(selector + ":checked")].map(cb => cb.value);
-    }
-
-    function ejecutarFiltradoSis() {
-        const anios = obtenerSeleccionados(".sis-filtro-anio");
-        const meses = obtenerSeleccionados(".sis-filtro-mes").map(Number);
-        const jurisdicciones = obtenerSeleccionados(".filtro-jurisdiccion");
-        const municipios = obtenerSeleccionados(".filtro-municipio");
-        const unidades = window.getUnidadesSeleccionadas?.() || [];
+    window.ejecutarFiltradoSis = function() {
+        const anios = window.getAniosSeleccionados ? window.getAniosSeleccionados() : [];
+        const meses = window.getMesesSeleccionados ? window.getMesesSeleccionados().map(Number) : [];
+        const jurisdicciones = window.getJurisdiccionesSeleccionadas ? window.getJurisdiccionesSeleccionadas() : [];
+        const municipios = window.getMunicipiosSeleccionados ? window.getMunicipiosSeleccionados() : [];
+        const unidades = window.getUnidadesSeleccionadas ? window.getUnidadesSeleccionadas() : [];
 
         const filtrados = sisResultados.filter(r => {
             const matchAnio = anios.length === 0 || anios.includes(String(r.anio));
@@ -301,7 +272,9 @@
         renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
 
         graficaSisPorMes(datosFiltradosSis);
-    }
+    };
+
+    window.cargarDatosSis = window.ejecutarFiltradoSis;
 
     /* ==========================================================================
        4. TABLA Y TABS
@@ -337,7 +310,6 @@
             tabs.appendChild(li);
         });
 
-        // Asegurar que exista un año activo seleccionado por defecto
         if (!anioActivo || !anios.includes(anioActivo)) {
             anioActivo = anios[0];
         }
@@ -442,7 +414,7 @@
             tamiz: [], planificacion_familiar: [], detecciones: []
         };
 
-        const unidadesSeleccionadas = window.getUnidadesSeleccionadas?.() || [];
+        const unidadesSeleccionadas = window.getUnidadesSeleccionadas ? window.getUnidadesSeleccionadas() : [];
 
         if (unidadesSeleccionadas.length === 0) {
             labels = ['Total General'];
@@ -566,35 +538,15 @@
     }
 
     /* ==========================================================================
-       6. INICIALIZACIÓN Y EVENT LISTENERS
+       6. INICIALIZACIÓN
        ========================================================================== */
     document.addEventListener("DOMContentLoaded", () => {
-        // Inicialización de estructura y datos
-        datosActuales = agruparDatos(sisResultados);
+        window.ejecutarFiltradoSis();
 
-        popularFiltrosDinamicos();
-        renderTabsAnios(datosActuales);
-        renderTablaSis();
-        renderGraficaPorAnio(datosActuales);
-        renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
-        graficaSisPorMes(datosFiltradosSis);
-
-        // 🔹 Evento para el botón principal de Filtrado
-        document.getElementById("btnFiltrarSis")?.addEventListener("click", ejecutarFiltradoSis);
-
-        // 🔹 Delegación de eventos para checkboxes de Jurisdicción y Municipio
-        document.addEventListener("change", (e) => {
-            if (e.target.classList.contains("filtro-jurisdiccion") || e.target.classList.contains("filtro-municipio")) {
-                ejecutarFiltradoSis();
-            }
-        });
-
-        // 🔹 Evento al cambiar la métrica de la gráfica mensual
         document.getElementById("filtroSisDetalle")?.addEventListener("change", () => {
             graficaSisPorMes(datosFiltradosSis);
         });
 
-        // 🔹 Evento al conmutar 'Mostrar/Ocultar Valores'
         document.getElementById("btnToggleValoresMensual")?.addEventListener("click", (e) => {
             mostrarValoresMensual = !mostrarValoresMensual;
             e.target.textContent = mostrarValoresMensual ? "Ocultar valores" : "Mostrar valores";

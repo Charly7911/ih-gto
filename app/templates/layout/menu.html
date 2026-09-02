@@ -1269,7 +1269,6 @@
 </div>
 
 
-
 <script>
     const tipo = "{{ tipo }}"; // morbi | morta | urg | urgencias | sis | egresos | ind | indicadores
     const sufijo = tipo ? (tipo.charAt(0).toUpperCase() + tipo.slice(1)) : "";
@@ -1282,29 +1281,22 @@
             searchInput.addEventListener("input", function (e) {
                 const query = e.target.value;
 
-                // 1. Emitimos evento global para la gráfica si está escuchando externamente
                 document.dispatchEvent(new CustomEvent("busquedaGlobalUnidades", {
                     detail: { query: query }
                 }));
 
-                // 2. Ejecutamos el filtro local evitando el bloque de AÑOS
                 const contenedorGrafica = document.getElementById("sidebar") || document;
                 filtrarContenedorGeneral(contenedorGrafica, query.toLowerCase().trim());
             });
         }
 
-        // ======================================================
-        // FUNCIÓN DE FILTRADO (EXCLUYE AÑOS Y ABRE TODOS LOS ACORDEONES)
-        // ======================================================
         function filtrarContenedorGeneral(contenedor, query) {
             if (!contenedor) return;
 
             const selectorElementos = ".unidad-item-grafica, .unidad-item, .searchable-item, .indicador-item, div[data-clues]";
-
             const labels = contenedor.querySelectorAll(selectorElementos);
             const subAcordeones = contenedor.querySelectorAll("details.sub-acordeon, details");
 
-            // Restauración al borrar la búsqueda
             if (query === "") {
                 labels.forEach(el => {
                     if (!el.closest('#bloqueAnios, .bloque-anios, .anios-container')) {
@@ -1314,13 +1306,12 @@
                 subAcordeones.forEach(acc => {
                     if (!acc.closest('#bloqueAnios, .bloque-anios')) {
                         acc.style.display = "";
-                        acc.open = false; // Cierra los acordeones al limpiar
+                        acc.open = false;
                     }
                 });
                 return;
             }
 
-            // Ocultar todos los acordeones temporalmente antes de la búsqueda
             subAcordeones.forEach(acc => {
                 if (!acc.closest('#bloqueAnios, .bloque-anios')) {
                     acc.style.display = "none";
@@ -1328,7 +1319,6 @@
                 }
             });
 
-            // Filtrado de elementos e investigación de coincidencias
             labels.forEach(item => {
                 if (item.closest('#bloqueAnios, .bloque-anios, .anios-container')) return;
 
@@ -1347,7 +1337,6 @@
                 }
             });
         }
-
 
         // ======================================================
         // 1. OBTENCIÓN ROBUSTA DE POPOVERS Y BOTONES
@@ -1409,7 +1398,46 @@
         const buscarServicio = document.getElementById(`buscarServicio${sufijo}`) || document.getElementById("buscarServicio");
 
         // ======================================================
-        // 1.1 CONTROL DEL SELECTOR DE NIVEL DE AGRUPACIÓN (VER POR)
+        // 1.1 FILTRADO DE MUNICIPIOS CON BASE EN LA JURISDICCIÓN SELECCIONADA
+        // ======================================================
+        function actualizarRelacionJurisdiccionMunicipio() {
+            if (!popoverJurisdicciones || !popoverMunicipios) return;
+
+            const jursSeleccionadas = Array.from(
+                popoverJurisdicciones.querySelectorAll('input[type="checkbox"]:checked')
+            ).map(cb => String(cb.value).trim());
+
+            const itemsMunicipio = popoverMunicipios.querySelectorAll('.popover-item, label, .form-check');
+
+            itemsMunicipio.forEach(item => {
+                if (item.closest('.popover-actions') || item.classList.contains('filter-label') || item.classList.contains('popover-header')) {
+                    return;
+                }
+
+                const jurAsociada = item.dataset.jurisdiccion || item.getAttribute('data-jurisdiccion');
+                const cb = item.querySelector('input[type="checkbox"]');
+
+                if (jursSeleccionadas.length === 0) {
+                    item.style.display = "";
+                } else if (jurAsociada && jursSeleccionadas.includes(String(jurAsociada).trim())) {
+                    item.style.display = "";
+                } else {
+                    item.style.display = "none";
+                    if (cb) cb.checked = false; // Desmarcar si queda oculto por el filtro
+                }
+            });
+        }
+
+        if (popoverJurisdicciones) {
+            popoverJurisdicciones.addEventListener("change", (e) => {
+                if (e.target.matches('input[type="checkbox"]')) {
+                    actualizarRelacionJurisdiccionMunicipio();
+                }
+            });
+        }
+
+        // ======================================================
+        // 1.2 SELECTOR DE NIVEL DE AGRUPACIÓN (VER POR)
         // ======================================================
         const selectNivel = document.getElementById('selectNivelAgrupacion');
         const blockUnidades = document.getElementById('blockUnidades');
@@ -1424,7 +1452,6 @@
                 if (blockJurisdicciones) blockJurisdicciones.style.display = (val === 'jurisdiccion') ? 'block' : 'none';
                 if (blockMunicipios) blockMunicipios.style.display = (val === 'municipio') ? 'block' : 'none';
 
-                // Cerrar popovers e invisibilizarlos al cambiar
                 const popUnidades = obtenerPopoverUnidades();
                 if (popUnidades) {
                     popUnidades.classList.remove('open');
@@ -1442,7 +1469,7 @@
         }
 
         // ======================================================
-        // 1.2 TOGGLES DE APERTURA Y CIERRE DE POPOVERS
+        // 1.3 TOGGLES DE APERTURA Y CIERRE DE POPOVERS
         // ======================================================
         const togglePopoverVisibilidad = (pop) => {
             if (!pop) return;
@@ -1455,15 +1482,17 @@
                 pop.classList.add("open");
                 pop.style.display = "block";
 
-                // FORZAR VISIBILIDAD DE ELEMENTOS AL ABRIR
                 const items = pop.querySelectorAll(".popover-item, label, .form-check, .check-unidad, div");
                 items.forEach(item => {
-                    if (!item.classList.contains('popover-actions') && !item.classList.contains('filter-label')) {
+                    if (!item.closest('.popover-actions') && !item.classList.contains('filter-label')) {
                         item.style.display = "";
                     }
                 });
 
-                // Limpiar el input de búsqueda del popover al abrir
+                if (pop === popoverMunicipios) {
+                    actualizarRelacionJurisdiccionMunicipio();
+                }
+
                 const inputBusqueda = pop.querySelector('input[type="text"], input[type="search"]');
                 if (inputBusqueda) {
                     inputBusqueda.value = "";
@@ -1486,7 +1515,6 @@
         bindToggle(btnJurisdicciones, popoverJurisdicciones);
         bindToggle(btnMunicipios, popoverMunicipios);
 
-        // Toggle global para botones de Unidades dinámicos
         document.addEventListener("click", function (e) {
             const targetBtnUnidades = e.target.closest("#btnUnidades, #btnUnidadesSis, #btnUnidadesUrg, #btnUnidadesUrgencias, [id^='btnUnidades']");
             if (targetBtnUnidades) {
@@ -1497,7 +1525,6 @@
             }
         });
 
-        // Cerrar popovers al hacer clic fuera
         document.addEventListener("click", (e) => {
             const popUnidadesActual = obtenerPopoverUnidades();
             const btnUnidadesActual = obtenerBotonUnidades();
@@ -1518,7 +1545,7 @@
         });
 
         // ======================================================
-        // 1.3 COMPORTAMIENTO EXCLUSIVO DE SUB-ACORDEONES
+        // 1.4 SUB-ACORDEONES EXCLUSIVOS
         // ======================================================
         document.addEventListener("toggle", function (e) {
             const targetDetail = e.target;
@@ -1538,7 +1565,7 @@
         }, true);
 
         // ======================================================
-        // 2. BUSCADORES INTERNOS LOCALES DE CADA POPOVER
+        // 2. BUSCADORES INTERNOS LOCALES
         // ======================================================
         function asociarBuscadorInterno(inputIdOrEl, obtenerPopFn) {
             const inputEl = typeof inputIdOrEl === "string" ? document.getElementById(inputIdOrEl) : inputIdOrEl;
@@ -1574,7 +1601,7 @@
         asociarBuscadorInterno(typeof buscarAfeccion !== "undefined" ? buscarAfeccion : "buscarAfeccion", typeof popoverAfecciones !== "undefined" ? popoverAfecciones : "popoverAfecciones");
 
         // ======================================================
-        // 3. RECUPERACIÓN AISLADA DE UNIDADES Y LIMPIEZA DE NOMBRES
+        // 3. RECUPERACIÓN AISLADA DE UNIDADES Y DRAG & DROP
         // ======================================================
         function obtenerCheckboxesUnidades() {
             const pop = obtenerPopoverUnidades();
@@ -1649,7 +1676,7 @@
         }
 
         // ======================================================
-        // 4. GETTERS GLOBALES (CON PROTECCIÓN DE CONTEXTO)
+        // 4. GETTERS GLOBALES
         // ======================================================
         function obtenerCheckboxesUnidadesGlobal() {
             const checkboxes = obtenerCheckboxesUnidades();
@@ -1668,7 +1695,6 @@
             return Array.from(checkboxes).map(cb => cb.value);
         }
 
-        // --- NUEVAS FUNCIONES PARA AÑOS Y MESES ---
         function obtenerAniosSeleccionadosGlobal() {
             const checkboxes = document.querySelectorAll('.sis-filtro-anio:checked, input[name="anio"]:checked, input[name="anios"]:checked');
             return Array.from(checkboxes).map(cb => cb.value);
@@ -1715,7 +1741,6 @@
             if (typeof renderGraficaPorUnidad === "function") renderGraficaPorUnidad();
             if (typeof renderGraficaPorAnio === "function") renderGraficaPorAnio();
             if (typeof renderGraficaMensual === "function") renderGraficaMensual();
-
             if (typeof renderGraficaSis === "function") renderGraficaSis();
             if (typeof actualizarGraficaSis === "function") actualizarGraficaSis();
             if (typeof cargarGraficaSis === "function") cargarGraficaSis();
@@ -1754,7 +1779,6 @@
 
             const agruparPorVal = selectNivel ? selectNivel.value : 'clues';
 
-            // ASIGNAR VALORES AL OBJETO GLOBAL DE FILTROS
             const payloadFiltros = {
                 agrupar_por: agruparPorVal,
                 anios: obtenerAniosSeleccionadosGlobal(),
@@ -1769,8 +1793,8 @@
             window.filtrosSis = Object.assign(window.filtrosSis || {}, payloadFiltros);
             window.filtros = Object.assign(window.filtros || {}, payloadFiltros);
 
-            // EJECUTAR FUNCIONES DE RECARGA DE VISTA
-            if (typeof cargarDatosSis === "function") cargarDatosSis();
+            if (typeof window.cargarDatosSis === "function") window.cargarDatosSis();
+            if (typeof window.ejecutarFiltradoSis === "function") window.ejecutarFiltradoSis();
             if (typeof cargarTablaSis === "function") cargarTablaSis();
             if (typeof cargarDatos === "function") cargarDatos();
             if (typeof cargarDatosUrgencias === "function") cargarDatosUrgencias();
@@ -1789,7 +1813,9 @@
             setTimeout(ejecutarGraficasSis, 800);
         }
 
-        // LISTA EXTENDIDA DE SELECTORES
+        // ======================================================
+        // 6. DISPARO POR BOTONES DE ACCIÓN
+        // ======================================================
         const selectoresBotonesAccion = [
             `#aplicarUnidades${sufijo}`, "#aplicarUnidades", "#aplicarUnidadesSis", "#btnAplicarSis",
             "#aplicarUnidadesUrgencias", "#aplicarUnidadesIndicadores", "#aplicarUnidadesEgresos",
@@ -1821,10 +1847,11 @@
             }
         });
 
-        // Eventos de botones "Limpiar" por popover
+        // Limpiadores individuales
         document.getElementById("limpiarJurisdicciones")?.addEventListener("click", () => {
             if (popoverJurisdicciones) {
                 popoverJurisdicciones.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+                actualizarRelacionJurisdiccionMunicipio();
             }
         });
 
@@ -1855,9 +1882,6 @@
             }
         });
 
-        // ======================================================
-        // 6. EVENTO DEL SELECTOR DE INDICADOR
-        // ======================================================
         const selectorIndicador = document.getElementById("filtroIndicador");
         if (selectorIndicador) {
             selectorIndicador.addEventListener("change", function () {
@@ -1868,13 +1892,12 @@
         }
 
         // ======================================================
-        // 7. BOTÓN RESET / LIMPIAR GLOBAL
+        // 7. RESET GENERAL Y ESCUCHA DE CAMBIOS DIRECTOS
         // ======================================================
         document.addEventListener("click", function (e) {
             if (e.target.closest('#btnResetAll, #btnResetSis, #btnReset' + sufijo + ', .btn-reset, .btn-limpiar')) {
                 e.preventDefault();
 
-                // Limpiar todos los checkboxes del sidebar
                 document.querySelectorAll('.menu-filtros input[type="checkbox"]').forEach(cb => cb.checked = false);
 
                 if (selectNivel) selectNivel.value = 'clues';
@@ -1894,6 +1917,7 @@
                 if (btnServicio) btnServicio.textContent = "🔍 Seleccionar Egreso";
                 if (btnAfecciones) btnAfecciones.textContent = "🔍 Seleccionar afecciones";
 
+                actualizarRelacionJurisdiccionMunicipio();
                 ejecutarCargaGraficaYDatos();
                 document.dispatchEvent(new CustomEvent("solicitarResetFiltros"));
             }
