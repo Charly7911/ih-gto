@@ -41,8 +41,7 @@ def dashboard_sis_primer_nivel():
     # 3. Catálogo de Jurisdicciones
     jurisdicciones_disponibles = sorted({str(r["jurisdiccion"]) for r in resultados if r.get("jurisdiccion") is not None})
 
-    # 3.1 Catálogo de Municipios CON JURISDICCIÓN (CORREGIDO)
-    # Creamos un conjunto de tuplas para evitar duplicados y luego lo convertimos a lista de diccionarios
+    # 3.1 Catálogo de Municipios CON JURISDICCIÓN
     municipios_set = {
         (r["municipio"], str(r["jurisdiccion"])) 
         for r in resultados 
@@ -62,6 +61,23 @@ def dashboard_sis_primer_nivel():
     """)
     control_anual = cursor.fetchall() or []
 
+    # 5. NUEVO: Catálogo de Variables (Obtenemos apartado, descripcion_apartado, variable y descripcion)
+    cursor.execute("""
+        SELECT variable, descripcion, apartado, descripcion_apartado
+        FROM catalogo_variables
+    """)
+    filas_catalogo = cursor.fetchall() or []
+
+    # Mapeamos los datos en un diccionario usando la 'variable' como clave
+    catalogo_variables = {
+        row["variable"]: {
+            "descripcion": row["descripcion"],
+            "apartado": row["apartado"],
+            "desc_apartado": row["descripcion_apartado"]
+        }
+        for row in filas_catalogo
+    }
+
     cursor.close()
 
     return render_template(
@@ -70,8 +86,9 @@ def dashboard_sis_primer_nivel():
         anios_disponibles=anios_disponibles,
         unidades_disponibles=unidades_disponibles,
         jurisdicciones_disponibles=jurisdicciones_disponibles,
-        municipios_disponibles=municipios_disponibles,  # Ahora envía [{'nombre': '...', 'jurisdiccion': '...'}, ...]
+        municipios_disponibles=municipios_disponibles,
         control_anual=control_anual,
+        catalogo_variables=catalogo_variables,  # <-- Inyectado hacia la vista Jinja2/JS
         tipo="sis",
         title="Reporte SIS - Primer Nivel"
     )
