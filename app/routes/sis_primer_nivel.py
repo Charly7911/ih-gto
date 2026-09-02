@@ -13,19 +13,8 @@ def dashboard_sis_primer_nivel():
 
     query = """
         SELECT 
-            anio,
-            mes,
-            clues,
-            nombre_unidad,
-            jurisdiccion,
-            municipio,
-            consultas,
-            mental,
-            bucal,
-            embarazadas,
-            planificacion_familiar,
-            detecciones,
-            tamiz
+            anio, mes, clues, nombre_unidad, jurisdiccion, municipio,
+            consultas, mental, bucal, embarazadas, planificacion_familiar, detecciones, tamiz
         FROM sis_registros_agregados_primer_nivel
         ORDER BY anio, mes, clues
     """
@@ -61,21 +50,44 @@ def dashboard_sis_primer_nivel():
     """)
     control_anual = cursor.fetchall() or []
 
-    # 5. NUEVO: Catálogo de Variables (Obtenemos apartado, descripcion_apartado, variable y descripcion)
+    # 5. CATÁLOGO DE VARIABLES (Incluimos la columna modulo)
+    # *Nota: Si tu columna no se llama 'modulo', cámbiala por su nombre real (ej. seccion, area, etc.)
     cursor.execute("""
-        SELECT variable, descripcion, apartado, descripcion_apartado
+        SELECT modulo, variable, descripcion, apartado, descripcion_apartado
         FROM catalogo_variables
+        ORDER BY modulo, apartado, variable
     """)
     filas_catalogo = cursor.fetchall() or []
 
-    # Mapeamos los datos en un diccionario usando la 'variable' como clave
+
+    catalogo_estructurado = {}
+
+    for row in filas_catalogo:
+        mod = row.get("modulo") or "varios"
+        apt = str(row.get("apartado") or "00")
+        desc_apt = row.get("descripcion_apartado") or "Sin Descripción"
+        code = row.get("variable")
+        nombre_var = row.get("descripcion") or code
+
+        if mod not in catalogo_estructurado:
+            catalogo_estructurado[mod] = {}
+
+        if apt not in catalogo_estructurado[mod]:
+            catalogo_estructurado[mod][apt] = {
+                "apartado": apt,
+                "descripcion_apartado": desc_apt,
+                "variables": []
+            }
+
+        catalogo_estructurado[mod][apt]["variables"].append({
+            "codigo": code,
+            "nombre": nombre_var
+        })
+
+    # Convertimos los apartados de cada módulo de diccionario a una lista simple
     catalogo_variables = {
-        row["variable"]: {
-            "descripcion": row["descripcion"],
-            "apartado": row["apartado"],
-            "desc_apartado": row["descripcion_apartado"]
-        }
-        for row in filas_catalogo
+        mod: list(apartados.values()) 
+        for mod, apartados in catalogo_estructurado.items()
     }
 
     cursor.close()
@@ -88,7 +100,7 @@ def dashboard_sis_primer_nivel():
         jurisdicciones_disponibles=jurisdicciones_disponibles,
         municipios_disponibles=municipios_disponibles,
         control_anual=control_anual,
-        catalogo_variables=catalogo_variables,  # <-- Inyectado hacia la vista Jinja2/JS
+        catalogo_variables=catalogo_variables,  # <-- Enviado listo para ser renderizado
         tipo="sis",
         title="Reporte SIS - Primer Nivel"
     )

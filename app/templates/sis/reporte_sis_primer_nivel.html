@@ -5,8 +5,7 @@
 
         <h2 class="mb-3" id="sis-title">
             🏥 SIS - Primer Nivel
-            <span id="sis-meta" style="font-size: 18px;" data-control='{{ control_anual | tojson | safe }}'>
-            </span>
+            <span id="sis-meta" style="font-size: 18px;" data-control='{{ control_anual | tojson | safe }}'></span>
         </h2>
 
         <!-- GRÁFICAS SUPERIORES -->
@@ -30,7 +29,7 @@
             </div>
         </div>
 
-        <!-- TABLA -->
+        <!-- TABLA DE RESULTADOS -->
         <div class="card">
             <div class="card-body">
                 <ul class="nav nav-tabs mb-3" id="tabsAnios"></ul>
@@ -62,7 +61,7 @@
                     </nav>
                 </div>
 
-                <!-- GRÁFICA TEMPORAL (MENSUAL / ANUAL) -->
+                <!-- GRÁFICA TEMPORAL -->
                 <hr class="my-4">
                 <div class="card mb-2">
                     <div class="card-body">
@@ -70,13 +69,11 @@
                             <h5 class="mb-0">📈 Evolución Temporal SIS</h5>
 
                             <div class="d-flex gap-2 align-items-center flex-wrap">
-                                <!-- SWITCH VISTA TEMPORAL -->
                                 <select id="selectTipoVistaTemporal" class="form-select form-select-sm w-auto fw-bold text-primary border-primary">
                                     <option value="mes" selected>Vista Mensual</option>
                                     <option value="anio">Vista Anual (Acumulado)</option>
                                 </select>
 
-                                <!-- SELECTOR DE MÓDULO/VARIABLE -->
                                 <select id="filtroSisDetalle" class="form-select form-select-sm w-auto fw-bold">
                                     <option value="consultas" selected>Consultas</option>
                                     <option value="embarazadas">Embarazadas</option>
@@ -97,19 +94,20 @@
                             <canvas id="graficaSisMensual"></canvas>
                         </div>
 
-                        <!-- DESGLOSE DINÁMICO DE SUB-VARIABLES (ABAJO DE LA GRÁFICA) -->
+                        <!-- DESGLOSE DINÁMICO DESDE CATÁLOGO DE BD -->
                         <div class="mt-3 pt-3 border-top bg-light p-3 rounded">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <label class="form-label font-weight-bold mb-0 text-secondary" id="lblSubvariablesModulo">
-                                    📋 Sub-variables de Consultas:
+                                    📋 Apartados y Variables del Catálogo:
                                 </label>
                                 <div>
                                     <button type="button" class="btn btn-xs btn-outline-secondary py-0" id="btnSeleccionarTodasSub">Todas</button>
                                     <button type="button" class="btn btn-xs btn-outline-secondary py-0" id="btnDesmarcarTodasSub">Ninguna</button>
                                 </div>
                             </div>
-                            <div class="d-flex flex-wrap gap-2" id="contenedorSubvariables" style="max-height: 140px; overflow-y: auto;">
-                                <!-- Se llena dinámicamente según el módulo seleccionado -->
+                            
+                            <div id="contenedorSubvariables" style="max-height: 250px; overflow-y: auto;">
+                                <!-- Se renderiza dinámicamente desde el catálogo traído por Backend -->
                             </div>
                         </div>
 
@@ -130,31 +128,14 @@
         Chart.register(ChartDataLabels);
     }
 
-    /* 1. MAPA DE DICCIONARIO DE SUBVARIABLES DE CADA MÓDULO */
-    const MAPA_SUBVARIABLES = {
-        consultas: Array.from({length: 47}, (_, i) => `CON${String(i + 1).padStart(2, '0')}`).concat(['COD01', 'COD02']),
-        mental: ['CPP07', 'CPP14'],
-        bucal: ['CPP06', 'CPP13', 'COD01', 'COD02'],
-        embarazadas: ['EMB01', 'EMB02', 'EMB03', 'EMB04', 'EMB05', 'EMB06'],
-        planificacion_familiar: [
-            'PFC01','PFC02','PFC03','PFC04','PFC05','PFC06','PFC07','PFC08','PFC10',
-            'PFC11','PFC12','PFC13','PFC14','PFC15','PFC16','PFC17','PFC19','PFC20',
-            'PFC21','PFC22','PFC23','PFC24','PFC25','PFC26','PFC27','PFC28','PFC29',
-            'PFC30','PFC31','PFC32'
-        ],
-        detecciones: [
-            ...Array.from({length: 99}, (_, i) => `DET${String(i + 1).padStart(2, '0')}`),
-            ...Array.from({length: 99}, (_, i) => `DTO${String(i + 1).padStart(2, '0')}`),
-            ...Array.from({length: 79}, (_, i) => `DTI${String(i + 1).padStart(2, '0')}`),
-            ...Array.from({length: 79}, (_, i) => `DTE${String(i + 1).padStart(2, '0')}`)
-        ],
-        tamiz: ['RNL06']
-    };
-
-    /* 2. ESTADO GLOBAL */
+    /* 1. SE INYECTAN LOS DATOS Y CATÁLOGO DIRECTAMENTE DEL BACKEND (FLASK) */
     const controlAnual = JSON.parse(document.getElementById("sis-meta")?.dataset.control || "[]");
     const sisResultados = JSON.parse('{{ resultados | tojson | safe }}');
     
+    // Aquí recibes la estructura del catálogo directamente desde tu backend
+    // Estructura esperada: { modulo_x: [ { apartado: "...", descripcion_apartado: "...", variables: [...] } ] }
+    const DICCIONARIO_VARIABLES = JSON.parse('{{ catalogo_variables | tojson | safe }}') || {};
+
     const FILAS_POR_PAGINA = 15; 
 
     let datosActuales = [];
@@ -181,7 +162,7 @@
         meta.textContent = registro ? ` | ${registro.estatus_inicio} · ${registro.estatus}` : "";
     }
 
-    /* 3. DIBUJAR CHECKBOXES DINÁMICOS DE SUB-VARIABLES */
+    /* 2. DIBUJAR APARTADOS Y CHECKBOXES USANDO EL CATÁLOGO DINÁMICO */
     function renderSubvariables() {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const contenedor = document.getElementById("contenedorSubvariables");
@@ -189,33 +170,59 @@
 
         if (!contenedor) return;
 
-        const listaCodes = MAPA_SUBVARIABLES[modulo] || [];
-        subvariablesSeleccionadas = [...listaCodes]; // Por defecto todos seleccionados
+        // Extrae directamente los datos del catálogo que mandó Flask
+        const estructuraModulo = DICCIONARIO_VARIABLES[modulo] || [];
+        
+        subvariablesSeleccionadas = [];
+        estructuraModulo.forEach(grupo => {
+            (grupo.variables || []).forEach(v => subvariablesSeleccionadas.push(v.codigo));
+        });
 
-        const nombreModulo = document.getElementById("filtroSisDetalle")?.options[document.getElementById("filtroSisDetalle").selectedIndex]?.text;
-        if (lbl) lbl.innerHTML = `📋 Desglose de Códigos en <strong>${nombreModulo}</strong> (${listaCodes.length}):`;
+        const selectEl = document.getElementById("filtroSisDetalle");
+        const nombreModulo = selectEl ? selectEl.options[selectEl.selectedIndex]?.text : modulo;
+        if (lbl) lbl.innerHTML = `📋 Desglose de Apartados en <strong>${nombreModulo}</strong> (${subvariablesSeleccionadas.length} variables en catálogo):`;
 
         let html = "";
-        listaCodes.forEach(code => {
+
+        if (estructuraModulo.length === 0) {
+            contenedor.innerHTML = `<span class="text-muted small">No hay variables configuradas en el catálogo para este módulo.</span>`;
+            return;
+        }
+
+        estructuraModulo.forEach(grupo => {
             html += `
-                <div class="form-check form-check-inline me-2 mb-1">
-                    <input class="form-check-input chk-subvar" type="checkbox" id="sub_${code}" value="${code}" checked>
-                    <label class="form-check-label small" for="sub_${code}">${code}</label>
+                <div class="mb-3 p-2 bg-white rounded border">
+                    <div class="fw-bold text-primary mb-1 border-bottom pb-1 small">
+                        📁 Apartado: ${grupo.apartado} — <span class="text-dark">${grupo.descripcion_apartado || 'Sin descripción'}</span>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 pt-1">`;
+            
+            (grupo.variables || []).forEach(v => {
+                html += `
+                    <div class="form-check form-check-inline me-3 mb-1" title="${v.nombre}">
+                        <input class="form-check-input chk-subvar" type="checkbox" id="sub_${v.codigo}" value="${v.codigo}" checked>
+                        <label class="form-check-label small" for="sub_${v.codigo}">
+                            <strong>${v.codigo}</strong>: ${v.nombre}
+                        </label>
+                    </div>`;
+            });
+
+            html += `
+                    </div>
                 </div>`;
         });
+
         contenedor.innerHTML = html;
 
-        // Listener para cambios individuales
         contenedor.querySelectorAll('.chk-subvar').forEach(cb => {
             cb.addEventListener('change', () => {
-                const checked = Array.from(contenedor.querySelectorAll('.chk-subvar:checked')).map(c => c.value);
-                subvariablesSeleccionadas = checked;
+                subvariablesSeleccionadas = Array.from(contenedor.querySelectorAll('.chk-subvar:checked')).map(c => c.value);
                 renderGraficaTemporal(datosFiltradosSis);
             });
         });
     }
 
-    /* 4. PROCESAMIENTO DE DATOS */
+    /* 3. PROCESAMIENTO Y FILTRADO DE DATOS */
     function agruparDatos(data) {
         const mapa = {};
         const nivelAgrupacion = document.getElementById('selectNivelAgrupacion')?.value || 'clues';
@@ -305,7 +312,7 @@
         debounceTimer = setTimeout(() => { procesarFiltradoInterno(); }, 60);
     };
 
-    /* 5. TABLA Y TABS */
+    /* 4. TABLA Y TABS */
     function renderTabsAnios(data) {
         const tabs = document.getElementById("tabsAnios");
         if (!tabs) return;
@@ -381,7 +388,7 @@
         }
     }
 
-    /* 6. GRÁFICAS */
+    /* 5. GRÁFICAS */
     function renderGraficaPorAnio(data = datosActuales) {
         const arrSafe = data || [];
         const porAnio = {};
@@ -468,8 +475,10 @@
             return;
         }
 
-        // Calcular proporción con base en las subvariables seleccionadas
-        const totalCodigosModulo = (MAPA_SUBVARIABLES[modulo] || []).length;
+        const estructuraModulo = DICCIONARIO_VARIABLES[modulo] || [];
+        let totalCodigosModulo = 0;
+        estructuraModulo.forEach(g => totalCodigosModulo += (g.variables || []).length);
+
         const codigosSeleccionadosCount = subvariablesSeleccionadas.length;
         const factorProporcion = totalCodigosModulo > 0 ? (codigosSeleccionadosCount / totalCodigosModulo) : 1;
 
@@ -480,13 +489,20 @@
             const acumuladoAnual = {};
             data.forEach(r => {
                 const anio = r.anio;
-                const val = (Number(r[modulo]) || 0) * factorProporcion;
+                let val = 0;
+                if (r.detalle_subvariables) {
+                    subvariablesSeleccionadas.forEach(code => {
+                        val += Number(r.detalle_subvariables[code]) || 0;
+                    });
+                } else {
+                    val = (Number(r[modulo]) || 0) * factorProporcion;
+                }
                 acumuladoAnual[anio] = (acumuladoAnual[anio] || 0) + val;
             });
 
             labels = Object.keys(acumuladoAnual).sort();
             datasets = [{
-                label: `Total Filtrado (${codigosSeleccionadosCount}/${totalCodigosModulo} códigos)`,
+                label: `Total Filtrado (${codigosSeleccionadosCount}/${totalCodigosModulo} variables)`,
                 data: labels.map(a => Math.round(acumuladoAnual[a])),
                 backgroundColor: '#4E79A7'
             }];
@@ -500,7 +516,16 @@
                 if (!r.mes) return;
                 const mes = Number(r.mes);
                 const anio = r.anio;
-                const valor = (Number(r[modulo]) || 0) * factorProporcion;
+                
+                let valor = 0;
+                if (r.detalle_subvariables) {
+                    subvariablesSeleccionadas.forEach(code => {
+                        valor += Number(r.detalle_subvariables[code]) || 0;
+                    });
+                } else {
+                    valor = (Number(r[modulo]) || 0) * factorProporcion;
+                }
+                
                 const key = `Año ${anio}`;
 
                 if (!resumen[key]) resumen[key] = {};
@@ -538,12 +563,11 @@
         });
     }
 
-    /* 7. INICIALIZACIÓN Y EVENTOS */
+    /* 6. INICIALIZACIÓN Y EVENTOS */
     document.addEventListener("DOMContentLoaded", () => {
         renderSubvariables();
         window.ejecutarFiltradoSis();
 
-        // Al cambiar de módulo en el select
         document.getElementById("filtroSisDetalle")?.addEventListener("change", () => {
             renderSubvariables();
             renderGraficaTemporal(datosFiltradosSis);
@@ -553,21 +577,19 @@
             renderGraficaTemporal(datosFiltradosSis);
         });
 
-        document.getElementById("btnFiltrarSis")?.addEventListener("click", () => {
-            window.ejecutarFiltradoSis();
-        });
-
         document.getElementById("btnToggleValoresMensual")?.addEventListener("click", (e) => {
             mostrarValoresMensual = !mostrarValoresMensual;
             e.target.textContent = mostrarValoresMensual ? "Ocultar valores" : "Mostrar valores";
             renderGraficaTemporal(datosFiltradosSis);
         });
 
-        // Seleccionar / Desmarcar todas las sub-variables
         document.getElementById("btnSeleccionarTodasSub")?.addEventListener("click", () => {
             document.querySelectorAll("#contenedorSubvariables .chk-subvar").forEach(cb => cb.checked = true);
             const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
-            subvariablesSeleccionadas = [...(MAPA_SUBVARIABLES[modulo] || [])];
+            subvariablesSeleccionadas = [];
+            (DICCIONARIO_VARIABLES[modulo] || []).forEach(g => {
+                (g.variables || []).forEach(v => subvariablesSeleccionadas.push(v.codigo));
+            });
             renderGraficaTemporal(datosFiltradosSis);
         });
 
