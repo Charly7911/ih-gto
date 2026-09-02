@@ -1400,9 +1400,6 @@
         const buscarServicio = document.getElementById(`buscarServicio${sufijo}`) || document.getElementById("buscarServicio");
 
         // ======================================================
-        // 1.1 FILTRADO DE MUNICIPIOS CON BASE EN LA JURISDICCIÓN (CORREGIDO)
-        // ======================================================
-        // ======================================================
         // 1.1 FILTRADO EN CASCADA DE MUNICIPIOS Y UNIDADES
         // ======================================================
         function actualizarRelacionJurisdiccionMunicipio() {
@@ -1418,55 +1415,56 @@
                 jurisdiccionesActivas = Array.from(checks).map(cb => String(cb.value).trim().replace(/^0+/, ''));
             }
 
-            // 2. Obtener el dataset global activo en window
-            const datasetGlobal = window.sisResultados || window.datosOriginales || window.datosGlobales || window.datos || [];
-
-            // 3. Crear set de municipios válidos cruzando datos
-            let municipiosValidos = new Set();
-
-            if (jurisdiccionesActivas.length > 0) {
-                datasetGlobal.forEach(row => {
-                    // Extraer jurisdicción del registro (soporta varios formatos de API/JSON)
-                    const jurRow = String(row.jurisdiccion || row.cve_jurisdiccion || row.id_jurisdiccion || '').trim().replace(/^0+/, '');
-
-                    if (jurisdiccionesActivas.includes(jurRow)) {
-                        const munTexto = String(row.municipio || row.nom_municipio || row.nombre_municipio || '').trim().toLowerCase();
-                        if (munTexto) {
-                            municipiosValidos.add(munTexto);
-                        }
-                    }
-                });
+            // Si no hay jurisdicciones seleccionadas, mostramos todos los municipios de inmediato
+            if (jurisdiccionesActivas.length === 0) {
+                const items = popoverMun.querySelectorAll('.popover-item, label, .form-check, div:has(> input)');
+                items.forEach(item => item.style.display = "");
+                return;
             }
 
-            // 4. Filtrar visualmente los elementos del popover de Municipios
+            // 2. Buscar si existe alguna variable de datos global disponible
+            const datasetGlobal = window.datos || window.datosGlobales || window.datosOriginales || window.dataset || [];
+
+            // 3. Filtrar los elementos visuales en el DOM
             const itemsMunicipio = popoverMun.querySelectorAll('.popover-item, label, .form-check, div:has(> input)');
 
             itemsMunicipio.forEach(item => {
                 const cb = item.querySelector('input[type="checkbox"]');
                 if (!cb) return;
 
-                // Si no hay jurisdicciones seleccionadas, muestra todos los municipios
-                if (jurisdiccionesActivas.length === 0) {
-                    item.style.display = "";
-                    return;
+                // Intentar obtener la jurisdicción asociada al municipio directamente desde los atributos HTML
+                const jurAttr = item.dataset.jurisdiccion ||
+                    cb.dataset.jurisdiccion ||
+                    item.getAttribute('data-jurisdiccion') ||
+                    cb.getAttribute('data-jurisdiccion') ||
+                    item.dataset.jur ||
+                    cb.dataset.jur;
+
+                let coincide = false;
+
+                if (jurAttr) {
+                    // Comparación directa por atributo HTML (ej. data-jurisdiccion="1")
+                    const valJurSinCeros = String(jurAttr).trim().replace(/^0+/, '');
+                    coincide = jurisdiccionesActivas.includes(valJurSinCeros);
+                } else if (datasetGlobal.length > 0) {
+                    // Si hay datos en memoria, intentamos cruzar con la base de datos
+                    const nombreMun = (cb.value || item.textContent).trim().toLowerCase();
+                    coincide = datasetGlobal.some(row => {
+                        const jurRow = String(row.jurisdiccion || row.cve_jurisdiccion || '').trim().replace(/^0+/, '');
+                        const munRow = String(row.municipio || row.nom_municipio || '').trim().toLowerCase();
+                        return jurisdiccionesActivas.includes(jurRow) && munRow === nombreMun;
+                    });
+                } else {
+                    // Respeta la visibilidad si no hay información de mapeo disponible
+                    coincide = true;
                 }
 
-                // Obtener texto del municipio desde el checkbox o el label
-                const textoMunicipio = (cb.value || item.textContent).trim().toLowerCase();
-
-                // Verificar si existe también un atributo HTML por si acaso
-                const jurAttr = item.dataset.jurisdiccion || cb.dataset.jurisdiccion;
-                const coincideAtributo = jurAttr && jurisdiccionesActivas.includes(String(jurAttr).trim().replace(/^0+/, ''));
-
-                // Evaluar si debe mostrarse
-                const esValido = coincideAtributo || municipiosValidos.has(textoMunicipio);
-
-                if (esValido) {
+                if (coincide) {
                     item.style.display = "";
                 } else {
                     item.style.display = "none";
                     if (cb.checked) {
-                        cb.checked = false; // Desmarca el municipio si deja de pertenecer a la jurisdicción
+                        cb.checked = false; // Desmarca si se oculta
                     }
                 }
             });
