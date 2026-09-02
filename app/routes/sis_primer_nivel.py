@@ -35,12 +35,24 @@ def dashboard_sis_primer_nivel():
     # 1. Catálogo de Años
     anios_disponibles = sorted({r["anio"] for r in resultados if r.get("anio")}, reverse=True)
     
-    # 2. Catálogo de Unidades (Lista simple ordenada de nombres/CLUES)
+    # 2. Catálogo de Unidades
     unidades_disponibles = sorted({r["nombre_unidad"] for r in resultados if r.get("nombre_unidad")})
 
-    # 3. Catálogo de Jurisdicciones y Municipios
+    # 3. Catálogo de Jurisdicciones
     jurisdicciones_disponibles = sorted({str(r["jurisdiccion"]) for r in resultados if r.get("jurisdiccion") is not None})
-    municipios_disponibles = sorted({r["municipio"] for r in resultados if r.get("municipio")})
+
+    # 3.1 Catálogo de Municipios CON JURISDICCIÓN (CORREGIDO)
+    # Creamos un conjunto de tuplas para evitar duplicados y luego lo convertimos a lista de diccionarios
+    municipios_set = {
+        (r["municipio"], str(r["jurisdiccion"])) 
+        for r in resultados 
+        if r.get("municipio") and r.get("jurisdiccion") is not None
+    }
+    
+    municipios_disponibles = sorted(
+        [{"nombre": mun, "jurisdiccion": jur} for mun, jur in municipios_set],
+        key=lambda x: x["nombre"]
+    )
 
     # 4. Control Anual
     cursor.execute("""
@@ -58,7 +70,7 @@ def dashboard_sis_primer_nivel():
         anios_disponibles=anios_disponibles,
         unidades_disponibles=unidades_disponibles,
         jurisdicciones_disponibles=jurisdicciones_disponibles,
-        municipios_disponibles=municipios_disponibles,
+        municipios_disponibles=municipios_disponibles,  # Ahora envía [{'nombre': '...', 'jurisdiccion': '...'}, ...]
         control_anual=control_anual,
         tipo="sis",
         title="Reporte SIS - Primer Nivel"
@@ -87,7 +99,6 @@ def filtrar_datos_sis():
     """
     params = []
 
-    # Evaluaciones independientes para permitir combinación cruzada de filtros
     if unidades:
         query_base += f" AND (clues IN ({','.join(['%s'] * len(unidades))}) OR nombre_unidad IN ({','.join(['%s'] * len(unidades))}))"
         params.extend(unidades + unidades)

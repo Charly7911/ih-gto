@@ -447,22 +447,27 @@
                 </div>
 
                 <!-- Opción C: Municipios -->
+                <!-- Opción C: Municipios -->
                 <div class="filter-block" id="blockMunicipios" style="display: none;">
                     <label class="filter-label">Municipio</label>
                     <button type="button" class="btn-selector" id="btnMunicipios">🔍 Seleccionar municipios</button>
                 </div>
 
-                <!-- Reemplaza el bloque popoverMunicipios por este -->
                 <div class="popover-unidades" id="popoverMunicipios" style="display: none;">
                     <label class="filter-label">Buscar municipio</label>
                     <input type="text" id="buscarMunicipio" class="input-text" placeholder="Escribe para filtrar...">
                     <div class="popover-list">
                         {% for m in municipios_disponibles %}
-                        <label class="popover-item"
-                            data-jurisdiccion="{{ m.jurisdiccion if m.jurisdiccion is defined else '' }}">
+                        {% set jur_id = m.jurisdiccion if m.jurisdiccion is defined else (m.cve_jurisdiccion if
+                        m.cve_jurisdiccion is defined else (m['jurisdiccion'] if m is mapping and 'jurisdiccion' in m
+                        else '')) %}
+                        {% set mun_nombre = m.nombre if m.nombre is defined else (m.municipio if m.municipio is defined
+                        else (m['nombre'] if m is mapping and 'nombre' in m else m)) %}
+
+                        <label class="popover-item" data-jurisdiccion="{{ jur_id }}">
                             <input type="checkbox" class="sis-filtro-municipio" name="municipios"
-                                value="{{ m.nombre if m.nombre is defined else m }}">
-                            {{ m.nombre if m.nombre is defined else m }}
+                                data-jurisdiccion="{{ jur_id }}" value="{{ mun_nombre }}">
+                            {{ mun_nombre }}
                         </label>
                         {% endfor %}
                     </div>
