@@ -1405,60 +1405,65 @@
         // 1.1 FILTRADO DE MUNICIPIOS CON BASE EN LA JURISDICCIÓN
         // ======================================================
         function actualizarRelacionJurisdiccionMunicipio() {
-            if (!popoverMunicipios) return;
+            // Si no existen los popovers en el DOM, no ejecuta nada
+            const popoverMun = document.querySelector('[data-popover="municipio"]') || document.getElementById('popoverMunicipios');
+            const popoverJur = document.querySelector('[data-popover="jurisdiccion"]') || document.getElementById('popoverJurisdicciones');
 
-            // Obtener jurisdicciones seleccionadas normalizadas (limpias de espacios y ceros iniciales)
+            if (!popoverMun) return;
+
+            // 1. Obtener jurisdicciones seleccionadas de forma normalizada
             let jurisdiccionesActivas = [];
-            if (popoverJurisdicciones) {
-                const checks = popoverJurisdicciones.querySelectorAll('input[type="checkbox"]:checked');
+            if (popoverJur) {
+                const checks = popoverJur.querySelectorAll('input[type="checkbox"]:checked');
                 jurisdiccionesActivas = Array.from(checks).map(cb => {
-                    const val = String(cb.value).trim();
-                    return [val, val.replace(/^0+/, '')]; // guarda valor original y sin ceros a la izquierda
-                }).flat();
+                    const raw = String(cb.value).trim();
+                    return raw.replace(/^0+/, ''); // remueve ceros a la izquierda
+                });
             }
 
-            // Buscar todos los elementos navegables de municipio
-            const itemsMunicipio = popoverMunicipios.querySelectorAll('.popover-item, label, .form-check, div:has(> input)');
+            // 2. Iterar elementos de municipio en el popover
+            const itemsMunicipio = popoverMun.querySelectorAll('label, .form-check, .popover-item, div:has(> input)');
 
             itemsMunicipio.forEach(item => {
-                // Ignorar acciones principales
-                if (item.classList.contains('popover-actions') || item.classList.contains('filter-label') || item.classList.contains('popover-header')) {
-                    return;
-                }
-
                 const cb = item.querySelector('input[type="checkbox"]');
-                if (!cb && !item.hasAttribute('data-jurisdiccion')) return;
+                if (!cb) return;
 
-                // Extraer jurisdicción vinculada desde dataset o el propio checkbox
+                // Extraer jurisdicción asociada desde cualquier posible atributo dataset
                 const jurAttr = item.dataset.jurisdiccion ||
                     item.getAttribute('data-jurisdiccion') ||
-                    (cb ? cb.dataset.jurisdiccion : null) ||
-                    (cb ? cb.getAttribute('data-jurisdiccion') : null);
+                    cb.dataset.jurisdiccion ||
+                    cb.getAttribute('data-jurisdiccion');
 
                 if (!jurAttr || jurisdiccionesActivas.length === 0) {
-                    // Si no hay filtro de jurisdicción activo, se muestran todos los municipios
+                    // Si no hay jurisdicción seleccionada, muestra todos los municipios
                     item.style.display = "";
                 } else {
-                    const valJurClean = String(jurAttr).trim();
-                    const valJurSinCeros = valJurClean.replace(/^0+/, '');
+                    const valJurSinCeros = String(jurAttr).trim().replace(/^0+/, '');
 
-                    if (jurisdiccionesActivas.includes(valJurClean) || jurisdiccionesActivas.includes(valJurSinCeros)) {
+                    if (jurisdiccionesActivas.includes(valJurSinCeros)) {
                         item.style.display = "";
                     } else {
+                        // Si la jurisdicción no está activa, oculta el municipio y desmarca su checkbox
                         item.style.display = "none";
-                        if (cb) cb.checked = false;
+                        if (cb.checked) {
+                            cb.checked = false;
+                        }
                     }
                 }
             });
         }
 
-        if (popoverJurisdicciones) {
-            popoverJurisdicciones.addEventListener("change", (e) => {
-                if (e.target.matches('input[type="checkbox"]')) {
-                    actualizarRelacionJurisdiccionMunicipio();
-                }
-            });
-        }
+        // Delegación de eventos única en el document (cubre todos los casos)
+        document.addEventListener('change', (e) => {
+            if (e.target.matches('#popoverJurisdicciones input[type="checkbox"], [data-popover="jurisdiccion"] input[type="checkbox"]')) {
+                actualizarRelacionJurisdiccionMunicipio();
+            }
+        });
+
+        // Sincronización al cargar la página
+        document.addEventListener('DOMContentLoaded', () => {
+            actualizarRelacionJurisdiccionMunicipio();
+        });
 
         // ======================================================
         // 1.2 SELECTOR DE NIVEL DE AGRUPACIÓN (VER POR)

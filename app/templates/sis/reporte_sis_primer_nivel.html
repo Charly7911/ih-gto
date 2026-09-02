@@ -156,11 +156,23 @@
     let graficaUnidad = null;
     let graficaSisMensual = null;
 
+    let debounceTimer = null;
+
     /* ==========================================================================
        2. FUNCIONES DE UTILIDAD
        ========================================================================== */
     function fmt(n) {
         return Number(n || 0).toLocaleString("es-MX");
+    }
+
+    function normalizarTexto(val) {
+        if (val === null || val === undefined) return "";
+        return String(val).trim().toLowerCase();
+    }
+
+    function normalizarClave(val) {
+        if (val === null || val === undefined) return "";
+        return String(val).trim().replace(/^0+/, '');
     }
 
     function formatearFechaES(fechaStr) {
@@ -209,7 +221,7 @@
     }
 
     /* ==========================================================================
-       3. PROCESAMIENTO Y FILTRADO USANDO LOS GETTERS GLOBALES DE MENU.HTML
+       3. PROCESAMIENTO Y FILTRADO ROBUSTO
        ========================================================================== */
     function agruparDatos(data) {
         const mapa = {};
@@ -264,22 +276,40 @@
         return Object.values(mapa);
     }
 
-    window.ejecutarFiltradoSis = function () {
+    function procesarFiltradoInterno() {
         const anios = window.getAniosSeleccionados ? window.getAniosSeleccionados().map(String) : [];
         const meses = window.getMesesSeleccionados ? window.getMesesSeleccionados().map(Number) : [];
-        const jurisdicciones = window.getJurisdiccionesSeleccionadas ? window.getJurisdiccionesSeleccionadas().map(v => String(v).trim()) : [];
-        const municipios = window.getMunicipiosSeleccionados ? window.getMunicipiosSeleccionados().map(v => String(v).trim()) : [];
-        const unidades = window.getUnidadesSeleccionadas ? window.getUnidadesSeleccionadas().map(String) : [];
+        
+        // Obtención de filtros seleccionados
+        const rawJur = window.getJurisdiccionesSeleccionadas ? window.getJurisdiccionesSeleccionadas() : [];
+        const rawMun = window.getMunicipiosSeleccionados ? window.getMunicipiosSeleccionados() : [];
+        const rawUni = window.getUnidadesSeleccionadas ? window.getUnidadesSeleccionadas() : [];
+
+        // Mapeo flexible de llaves
+        const jurFiltros = rawJur.map(v => normalizarClave(v));
+        const munFiltrosClaves = rawMun.map(v => normalizarClave(v));
+        const munFiltrosTextos = rawMun.map(v => normalizarTexto(v));
+        const uniFiltros = rawUni.map(v => normalizarTexto(v));
 
         const filtrados = sisResultados.filter(r => {
-            const jurStr = r.jurisdiccion !== undefined && r.jurisdiccion !== null ? String(r.jurisdiccion).trim() : "";
-            const munStr = r.municipio !== undefined && r.municipio !== null ? String(r.municipio).trim() : "";
+            const jurClave = normalizarClave(r.jurisdiccion);
+            const munClave = normalizarClave(r.municipio);
+            const munTexto = normalizarTexto(r.municipio);
+            const cluesTexto = normalizarTexto(r.clues);
+            const nombreUnidadTexto = normalizarTexto(r.nombre_unidad);
 
             const matchAnio = anios.length === 0 || anios.includes(String(r.anio));
             const matchMes = meses.length === 0 || meses.includes(Number(r.mes));
-            const matchJur = jurisdicciones.length === 0 || jurisdicciones.includes(jurStr) || jurisdicciones.includes(jurStr.replace(/^0+/, ''));
-            const matchMun = municipios.length === 0 || municipios.includes(munStr) || municipios.includes(munStr.replace(/^0+/, ''));
-            const matchUni = unidades.length === 0 || unidades.includes(String(r.clues)) || unidades.includes(String(r.nombre_unidad));
+            const matchJur = jurFiltros.length === 0 || jurFiltros.includes(jurClave);
+            
+            // Un municipio coincide por su ID/Clave o por su Nombre
+            const matchMun = munFiltrosClaves.length === 0 || 
+                             munFiltrosClaves.includes(munClave) || 
+                             munFiltrosTextos.includes(munTexto);
+
+            const matchUni = uniFiltros.length === 0 || 
+                             uniFiltros.includes(cluesTexto) || 
+                             uniFiltros.includes(nombreUnidadTexto);
 
             return matchAnio && matchMes && matchJur && matchMun && matchUni;
         });
@@ -294,6 +324,13 @@
         renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
 
         graficaSisPorMes(datosFiltradosSis);
+    }
+
+    window.ejecutarFiltradoSis = function () {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            procesarFiltradoInterno();
+        }, 60);
     };
 
     window.cargarDatosSis = window.ejecutarFiltradoSis;
@@ -384,7 +421,7 @@
     }
 
     /* ==========================================================================
-       5. RENDERIZADO DE GRÁFICAS (SOPORTE DE PARÁMETRO VACÍO)
+       5. RENDERIZADO DE GRÁFICAS
        ========================================================================== */
     function renderGraficaPorAnio(data = datosActuales) {
         const arrSafe = data || [];
@@ -431,20 +468,16 @@
 
     function renderGraficaPorUnidad(data = datosActuales.filter(r => r.anio === anioActivo)) {
         const arrSafe = data || [];
-        let labels = [];
+        let labels = arrSafe.map(r => r.nombre_unidad || r.clues);
         let datasetsData = {
-            consultas: [], embarazadas: [], mental: [], bucal: [],
-            tamiz: [], planificacion_familiar: [], detecciones: []
+            consultas: arrSafe.map(r => Number(r?.consultas) || 0),
+            embarazadas: arrSafe.map(r => Number(r?.embarazadas) || 0),
+            mental: arrSafe.map(r => Number(r?.mental) || 0),
+            bucal: arrSafe.map(r => Number(r?.bucal) || 0),
+            tamiz: arrSafe.map(r => Number(r?.tamiz) || 0),
+            planificacion_familiar: arrSafe.map(r => Number(r?.planificacion_familiar) || 0),
+            detecciones: arrSafe.map(r => Number(r?.detecciones) || 0)
         };
-
-        labels = arrSafe.map(r => r.nombre_unidad || r.clues);
-        datasetsData.consultas = arrSafe.map(r => Number(r?.consultas) || 0);
-        datasetsData.embarazadas = arrSafe.map(r => Number(r?.embarazadas) || 0);
-        datasetsData.mental = arrSafe.map(r => Number(r?.mental) || 0);
-        datasetsData.bucal = arrSafe.map(r => Number(r?.bucal) || 0);
-        datasetsData.tamiz = arrSafe.map(r => Number(r?.tamiz) || 0);
-        datasetsData.planificacion_familiar = arrSafe.map(r => Number(r?.planificacion_familiar) || 0);
-        datasetsData.detecciones = arrSafe.map(r => Number(r?.detecciones) || 0);
 
         if (graficaUnidad) graficaUnidad.destroy();
 
@@ -556,6 +589,10 @@
             graficaSisPorMes(datosFiltradosSis);
         });
 
+        document.getElementById("selectNivelAgrupacion")?.addEventListener("change", () => {
+            window.ejecutarFiltradoSis();
+        });
+
         document.getElementById("btnToggleValoresMensual")?.addEventListener("click", (e) => {
             mostrarValoresMensual = !mostrarValoresMensual;
             e.target.textContent = mostrarValoresMensual ? "Ocultar valores" : "Mostrar valores";
@@ -563,4 +600,5 @@
         });
     });
 </script>
+
 {% endblock %}
