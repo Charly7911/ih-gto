@@ -2,7 +2,7 @@
 {% block content %}
 <div class="main-content">
     <div class="container-fluid mt-4 ps-4 pe-4">
-        
+
         <h2 class="mb-3" id="sis-title">
             🏥 SIS - Primer Nivel
             <span id="sis-meta" style="font-size: 18px;" data-control='{{ control_anual | tojson | safe }}'>
@@ -19,14 +19,16 @@
                     <!-- Contenedor donde JS inyectará los Checkboxes de Jurisdicción -->
                     <div class="col-md-6 mb-2">
                         <label class="form-label font-weight-bold">Jurisdicción:</label>
-                        <div id="contenedorFiltroJurisdiccion" class="border p-2 rounded" style="max-height: 120px; overflow-y: auto;">
+                        <div id="contenedorFiltroJurisdiccion" class="border p-2 rounded"
+                            style="max-height: 120px; overflow-y: auto;">
                         </div>
                     </div>
 
                     <!-- Contenedor donde JS inyectará los Checkboxes de Municipio -->
                     <div class="col-md-6 mb-2">
                         <label class="form-label font-weight-bold">Municipio:</label>
-                        <div id="contenedorFiltroMunicipio" class="border p-2 rounded" style="max-height: 120px; overflow-y: auto;">
+                        <div id="contenedorFiltroMunicipio" class="border p-2 rounded"
+                            style="max-height: 120px; overflow-y: auto;">
                         </div>
                     </div>
                 </div>
@@ -107,7 +109,8 @@
                                 </select>
 
                                 <!-- BOTÓN DE MOSTRAR / OCULTAR VALORES -->
-                                <button type="button" class="btn btn-outline-primary btn-sm" id="btnToggleValoresMensual">
+                                <button type="button" class="btn btn-outline-primary btn-sm"
+                                    id="btnToggleValoresMensual">
                                     Mostrar valores
                                 </button>
                             </div>
@@ -210,19 +213,37 @@
        ========================================================================== */
     function agruparDatos(data) {
         const mapa = {};
+        const nivelAgrupacion = document.getElementById('selectNivelAgrupacion')?.value || 'clues';
 
         data.forEach(r => {
             const jur = r.jurisdiccion ? String(r.jurisdiccion) : 'Sin Especificar';
             const mun = r.municipio ? String(r.municipio) : 'Sin Especificar';
-            const key = `${r.anio}-${jur}-${mun}-${r.clues}`;
+            const clues = r.clues || 'Sin CLUES';
+            const nombreUnidad = r.nombre_unidad || clues;
+
+            let key = "";
+            let nombreEtiqueta = "";
+
+            // Definición de llave de agrupación según el selector
+            if (nivelAgrupacion === 'jurisdiccion') {
+                key = `${r.anio}-JUR-${jur}`;
+                nombreEtiqueta = `Jurisdicción ${jur}`;
+            } else if (nivelAgrupacion === 'municipio') {
+                key = `${r.anio}-MUN-${mun}`;
+                nombreEtiqueta = mun;
+            } else {
+                // Nivel por defecto: CLUES / Unidad
+                key = `${r.anio}-${jur}-${mun}-${clues}`;
+                nombreEtiqueta = nombreUnidad;
+            }
 
             if (!mapa[key]) {
                 mapa[key] = {
                     anio: r.anio,
                     jurisdiccion: jur,
                     municipio: mun,
-                    clues: r.clues,
-                    nombre_unidad: r.nombre_unidad || r.clues,
+                    clues: (nivelAgrupacion === 'clues') ? clues : '-',
+                    nombre_unidad: nombreEtiqueta,
                     consultas: 0,
                     embarazadas: 0,
                     mental: 0,
@@ -245,7 +266,7 @@
         return Object.values(mapa);
     }
 
-    window.ejecutarFiltradoSis = function() {
+    window.ejecutarFiltradoSis = function () {
         const anios = window.getAniosSeleccionados ? window.getAniosSeleccionados() : [];
         const meses = window.getMesesSeleccionados ? window.getMesesSeleccionados().map(Number) : [];
         const jurisdicciones = window.getJurisdiccionesSeleccionadas ? window.getJurisdiccionesSeleccionadas() : [];

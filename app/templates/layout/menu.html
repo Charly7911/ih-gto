@@ -452,14 +452,17 @@
                     <button type="button" class="btn-selector" id="btnMunicipios">🔍 Seleccionar municipios</button>
                 </div>
 
+                <!-- Reemplaza el bloque popoverMunicipios por este -->
                 <div class="popover-unidades" id="popoverMunicipios" style="display: none;">
                     <label class="filter-label">Buscar municipio</label>
                     <input type="text" id="buscarMunicipio" class="input-text" placeholder="Escribe para filtrar...">
                     <div class="popover-list">
                         {% for m in municipios_disponibles %}
-                        <label class="popover-item">
-                            <input type="checkbox" class="sis-filtro-municipio" name="municipios" value="{{ m }}"> {{ m
-                            }}
+                        <label class="popover-item"
+                            data-jurisdiccion="{{ m.jurisdiccion if m.jurisdiccion is defined else '' }}">
+                            <input type="checkbox" class="sis-filtro-municipio" name="municipios"
+                                value="{{ m.nombre if m.nombre is defined else m }}">
+                            {{ m.nombre if m.nombre is defined else m }}
                         </label>
                         {% endfor %}
                     </div>
@@ -1448,22 +1451,23 @@
             selectNivel.addEventListener('change', function () {
                 const val = this.value;
 
-                if (blockUnidades) blockUnidades.style.display = (val === 'clues') ? 'block' : 'none';
-                if (blockJurisdicciones) blockJurisdicciones.style.display = (val === 'jurisdiccion') ? 'block' : 'none';
-                if (blockMunicipios) blockMunicipios.style.display = (val === 'municipio') ? 'block' : 'none';
-
-                const popUnidades = obtenerPopoverUnidades();
-                if (popUnidades) {
-                    popUnidades.classList.remove('open');
-                    popUnidades.style.display = 'none';
+                // Si agrupa por CLUES: muestra Unidades, Jurisdicciones y Municipios (Filtro completo)
+                if (val === 'clues') {
+                    if (blockUnidades) blockUnidades.style.display = 'block';
+                    if (blockJurisdicciones) blockJurisdicciones.style.display = 'block';
+                    if (blockMunicipios) blockMunicipios.style.display = 'block';
                 }
-                if (popoverJurisdicciones) {
-                    popoverJurisdicciones.classList.remove('open');
-                    popoverJurisdicciones.style.display = 'none';
+                // Si agrupa por Jurisdicción: permite filtrar Jurisdicciones y Municipios pertenecientes
+                else if (val === 'jurisdiccion') {
+                    if (blockUnidades) blockUnidades.style.display = 'none';
+                    if (blockJurisdicciones) blockJurisdicciones.style.display = 'block';
+                    if (blockMunicipios) blockMunicipios.style.display = 'block';
                 }
-                if (popoverMunicipios) {
-                    popoverMunicipios.classList.remove('open');
-                    popoverMunicipios.style.display = 'none';
+                // Si agrupa por Municipio: oculta Unidades y Jurisdicciones
+                else if (val === 'municipio') {
+                    if (blockUnidades) blockUnidades.style.display = 'none';
+                    if (blockJurisdicciones) blockJurisdicciones.style.display = 'none';
+                    if (blockMunicipios) blockMunicipios.style.display = 'block';
                 }
             });
         }
