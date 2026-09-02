@@ -144,6 +144,12 @@ def dashboard_sis_primer_nivel():
 
             mod = obtener_modulo_por_apartado(apt, code)
 
+            # --- CORRECCIÓN: EVITAR QUE APARTADO 02 VAYA A CONSULTAS ---
+            # Si el código pertenece al apartado 02 pero la función devolvió 'consultas', lo excluimos de 'consultas'
+            if apt in ["2", "02"] and mod == "consultas":
+                continue
+            # -------------------------------------------------------------
+
             if mod not in catalogo_estructurado:
                 catalogo_estructurado[mod] = {}
 
@@ -176,6 +182,7 @@ def dashboard_sis_primer_nivel():
         municipios_disponibles=municipios_disponibles,
         control_anual=control_anual,
         catalogo_variables=catalogo_variables,
+        variables_default=VARIABLES_DEFAULT,  # <--- CAMBIO CLAVE: Se pasa la variable predeterminada
         tipo="sis",
         title="Reporte SIS - Primer Nivel"
     )

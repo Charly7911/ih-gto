@@ -133,10 +133,13 @@
         Chart.register(ChartDataLabels);
     }
 
-    /* 1. SE INYECTAN LOS DATOS Y CATÁLOGO INICIALES DESDE FLASK */
+    /* 1. INYECCIÓN DE DATOS Y VALORES PREMETERMINADOS DESDE FLASK */
     const controlAnual = JSON.parse('{{ (control_anual | default([])) | tojson | safe }}');
     const sisResultadosIniciales = JSON.parse('{{ (resultados | default([])) | tojson | safe }}');
     const DICCIONARIO_VARIABLES = JSON.parse('{{ (catalogo_variables | default({})) | tojson | safe }}');
+    
+    // CORRECCIÓN 1: Recibir los valores predeterminados
+    const VARIABLES_DEFAULT = JSON.parse('{{ (variables_default | default({})) | tojson | safe }}');
 
     const FILAS_POR_PAGINA = 15;
 
@@ -146,7 +149,9 @@
     let anioActivo = null;
 
     let mostrarValoresMensual = false;
-    let variablesPersonalizadasEstado = {}; // Objeto que guarda el estado de selección por módulo
+    
+    // CORRECCIÓN 2: Clonar los defaults como estado inicial
+    let variablesPersonalizadasEstado = JSON.parse(JSON.stringify(VARIABLES_DEFAULT));
 
     let graficaAnio = null;
     let graficaUnidad = null;
@@ -184,7 +189,6 @@
             return;
         }
 
-        // Si es la primera vez que se accede al módulo, el estado es undefined/null
         const seleccionadasModulo = variablesPersonalizadasEstado[modulo];
 
         let html = "";
@@ -197,7 +201,7 @@
                     <div class="d-flex flex-wrap gap-2 pt-1">`;
 
             (grupo.variables || []).forEach(v => {
-                // Si no hay un estado personalizado explícito, se marcan todas por defecto
+                // CORRECCIÓN 3: Verificar contra la lista seleccionada activa o default
                 const isChecked = (seleccionadasModulo === undefined || seleccionadasModulo === null) 
                     ? true 
                     : seleccionadasModulo.includes(v.codigo);
@@ -218,7 +222,6 @@
 
         contenedor.innerHTML = html;
 
-        // Escuchar evento individual
         contenedor.querySelectorAll('.chk-subvar').forEach(cb => {
             cb.addEventListener('change', () => {
                 guardarEstadoVariablesActuales();
@@ -294,9 +297,7 @@
         try {
             const resp = await fetch("/sis_primer_nivel/api/filtrar", {
                 method: "POST",
-                headers: { 
-                    "Content-Type": "application/json"
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
 
@@ -560,7 +561,6 @@
         renderSubvariables();
         window.ejecutarFiltradoSis();
 
-        // Cambiar de módulo al seleccionar en la lista desplegable
         document.getElementById("filtroSisDetalle")?.addEventListener("change", () => {
             renderSubvariables();
             renderGraficaTemporal(datosFiltradosSis);
@@ -576,24 +576,20 @@
             renderGraficaTemporal(datosFiltradosSis);
         });
 
-        // Botón: Marca todas las casillas del módulo actual
         document.getElementById("btnSeleccionarTodasSub")?.addEventListener("click", () => {
             const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
             document.querySelectorAll("#contenedorSubvariables .chk-subvar").forEach(cb => cb.checked = true);
             
-            // Guardar todas las variables del módulo actual
             const todas = Array.from(document.querySelectorAll("#contenedorSubvariables .chk-subvar")).map(cb => cb.value);
             variablesPersonalizadasEstado[modulo] = todas;
             
             window.ejecutarFiltradoSis();
         });
 
-        // Botón: Desmarca todas las casillas del módulo actual
         document.getElementById("btnDesmarcarTodasSub")?.addEventListener("click", () => {
             const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
             document.querySelectorAll("#contenedorSubvariables .chk-subvar").forEach(cb => cb.checked = false);
             
-            // Forzar lista vacía [] en el módulo actual
             variablesPersonalizadasEstado[modulo] = [];
             
             window.ejecutarFiltradoSis();
