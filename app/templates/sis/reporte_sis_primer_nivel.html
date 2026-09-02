@@ -9,9 +9,7 @@
             </span>
         </h2>
 
-        <!-- =================================================================== -->
-        <!-- CONTENEDORES DE FILTROS DINÁMICOS                                   -->
-        <!-- =================================================================== -->
+        <!-- FILTROS PRINCIPALES -->
         <div class="card mb-4">
             <div class="card-header font-weight-bold bg-light d-flex justify-content-between align-items-center">
                 <span>🔍 Filtros de Consulta</span>
@@ -31,20 +29,6 @@
                         <label class="form-label font-weight-bold">Municipio:</label>
                         <div id="contenedorFiltroMunicipio" class="border p-2 rounded" style="max-height: 120px; overflow-y: auto;">
                         </div>
-                    </div>
-                </div>
-
-                <!-- CHECKLIST DINÁMICO DE VARIABLES A EVALUAR -->
-                <div class="mt-2 pt-2 border-top">
-                    <label class="form-label font-weight-bold d-block mb-1">Variables Activas en Análisis:</label>
-                    <div class="d-flex flex-wrap gap-3" id="contenedorChecklistVariables">
-                        <label class="form-check-label"><input type="checkbox" class="chk-var-sis form-check-input" value="consultas" checked> Consultas</label>
-                        <label class="form-check-label"><input type="checkbox" class="chk-var-sis form-check-input" value="embarazadas" checked> Embarazadas</label>
-                        <label class="form-check-label"><input type="checkbox" class="chk-var-sis form-check-input" value="mental" checked> Salud Mental</label>
-                        <label class="form-check-label"><input type="checkbox" class="chk-var-sis form-check-input" value="bucal" checked> Salud Bucal</label>
-                        <label class="form-check-label"><input type="checkbox" class="chk-var-sis form-check-input" value="tamiz" checked> Tamiz</label>
-                        <label class="form-check-label"><input type="checkbox" class="chk-var-sis form-check-input" value="planificacion_familiar" checked> Planificación Fam.</label>
-                        <label class="form-check-label"><input type="checkbox" class="chk-var-sis form-check-input" value="detecciones" checked> Detecciones</label>
                     </div>
                 </div>
             </div>
@@ -117,9 +101,9 @@
                                     <option value="anio">Vista Anual (Acumulado)</option>
                                 </select>
 
-                                <!-- SELECTOR DE VARIABLE -->
-                                <select id="filtroSisDetalle" class="form-select form-select-sm w-auto">
-                                    <option value="consultas">Consultas</option>
+                                <!-- SELECTOR DE MÓDULO/VARIABLE -->
+                                <select id="filtroSisDetalle" class="form-select form-select-sm w-auto fw-bold">
+                                    <option value="consultas" selected>Consultas</option>
                                     <option value="embarazadas">Embarazadas</option>
                                     <option value="mental">Salud Mental</option>
                                     <option value="bucal">Salud Bucal</option>
@@ -137,6 +121,23 @@
                         <div style="height:350px">
                             <canvas id="graficaSisMensual"></canvas>
                         </div>
+
+                        <!-- DESGLOSE DINÁMICO DE SUB-VARIABLES (ABAJO DE LA GRÁFICA) -->
+                        <div class="mt-3 pt-3 border-top bg-light p-3 rounded">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label font-weight-bold mb-0 text-secondary" id="lblSubvariablesModulo">
+                                    📋 Sub-variables de Consultas:
+                                </label>
+                                <div>
+                                    <button type="button" class="btn btn-xs btn-outline-secondary py-0" id="btnSeleccionarTodasSub">Todas</button>
+                                    <button type="button" class="btn btn-xs btn-outline-secondary py-0" id="btnDesmarcarTodasSub">Ninguna</button>
+                                </div>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2" id="contenedorSubvariables" style="max-height: 140px; overflow-y: auto;">
+                                <!-- Se llena dinámicamente según el módulo seleccionado -->
+                            </div>
+                        </div>
+
                     </div>
                 </div>
 
@@ -154,11 +155,31 @@
         Chart.register(ChartDataLabels);
     }
 
-    /* 1. ESTADO GLOBAL Y CONFIGURACIÓN */
+    /* 1. MAPA DE DICCIONARIO DE SUBVARIABLES DE CADA MÓDULO */
+    const MAPA_SUBVARIABLES = {
+        consultas: Array.from({length: 47}, (_, i) => `CON${String(i + 1).padStart(2, '0')}`).concat(['COD01', 'COD02']),
+        mental: ['CPP07', 'CPP14'],
+        bucal: ['CPP06', 'CPP13', 'COD01', 'COD02'],
+        embarazadas: ['EMB01', 'EMB02', 'EMB03', 'EMB04', 'EMB05', 'EMB06'],
+        planificacion_familiar: [
+            'PFC01','PFC02','PFC03','PFC04','PFC05','PFC06','PFC07','PFC08','PFC10',
+            'PFC11','PFC12','PFC13','PFC14','PFC15','PFC16','PFC17','PFC19','PFC20',
+            'PFC21','PFC22','PFC23','PFC24','PFC25','PFC26','PFC27','PFC28','PFC29',
+            'PFC30','PFC31','PFC32'
+        ],
+        detecciones: [
+            ...Array.from({length: 99}, (_, i) => `DET${String(i + 1).padStart(2, '0')}`),
+            ...Array.from({length: 99}, (_, i) => `DTO${String(i + 1).padStart(2, '0')}`),
+            ...Array.from({length: 79}, (_, i) => `DTI${String(i + 1).padStart(2, '0')}`),
+            ...Array.from({length: 79}, (_, i) => `DTE${String(i + 1).padStart(2, '0')}`)
+        ],
+        tamiz: ['RNL06']
+    };
+
+    /* 2. ESTADO GLOBAL */
     const controlAnual = JSON.parse(document.getElementById("sis-meta")?.dataset.control || "[]");
     const sisResultados = JSON.parse('{{ resultados | tojson | safe }}');
     
-    // CAMBIO A 15 REGISTROS POR PÁGINA
     const FILAS_POR_PAGINA = 15; 
 
     let datosActuales = [];
@@ -167,72 +188,71 @@
     let anioActivo = null;
 
     let mostrarValoresMensual = false;
+    let subvariablesSeleccionadas = [];
 
     let graficaAnio = null;
     let graficaUnidad = null;
     let graficaSisMensual = null;
-
     let debounceTimer = null;
 
-    /* 2. FUNCIONES DE UTILIDAD */
-    function fmt(n) {
-        return Number(n || 0).toLocaleString("es-MX");
-    }
-
-    function normalizarTexto(val) {
-        if (val === null || val === undefined) return "";
-        return String(val).trim().toLowerCase();
-    }
-
-    function normalizarClave(val) {
-        if (val === null || val === undefined) return "";
-        return String(val).trim().replace(/^0+/, '');
-    }
-
-    function obtenerVariablesSeleccionadas() {
-        const checks = document.querySelectorAll('.chk-var-sis:checked');
-        return Array.from(checks).map(cb => cb.value);
-    }
+    function fmt(n) { return Number(n || 0).toLocaleString("es-MX"); }
+    function normalizarTexto(val) { return !val ? "" : String(val).trim().toLowerCase(); }
+    function normalizarClave(val) { return !val ? "" : String(val).trim().replace(/^0+/, ''); }
 
     function actualizarEncabezadoSIS(anio) {
         const meta = document.getElementById("sis-meta");
         if (!meta) return;
-
         const registro = controlAnual.find(r => r.anio === anio);
-        if (!registro) {
-            meta.textContent = "";
-            return;
-        }
-        meta.textContent = ` | ${registro.estatus_inicio} · ${registro.estatus}`;
+        meta.textContent = registro ? ` | ${registro.estatus_inicio} · ${registro.estatus}` : "";
     }
 
-    function actualizarTituloGabineteTotal(chart) {
-        const elTitulo = document.getElementById("tituloGraficaSis");
-        if (!elTitulo) return;
+    /* 3. DIBUJAR CHECKBOXES DINÁMICOS DE SUB-VARIABLES */
+    function renderSubvariables() {
+        const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
+        const contenedor = document.getElementById("contenedorSubvariables");
+        const lbl = document.getElementById("lblSubvariablesModulo");
 
-        let totalGeneral = 0;
-        chart.data.datasets.forEach((dataset, index) => {
-            if (chart.isDatasetVisible(index)) {
-                totalGeneral += dataset.data.reduce((acc, curr) => acc + (Number(curr) || 0), 0);
-            }
+        if (!contenedor) return;
+
+        const listaCodes = MAPA_SUBVARIABLES[modulo] || [];
+        subvariablesSeleccionadas = [...listaCodes]; // Por defecto todos seleccionados
+
+        const nombreModulo = document.getElementById("filtroSisDetalle")?.options[document.getElementById("filtroSisDetalle").selectedIndex]?.text;
+        if (lbl) lbl.innerHTML = `📋 Desglose de Códigos en <strong>${nombreModulo}</strong> (${listaCodes.length}):`;
+
+        let html = "";
+        listaCodes.forEach(code => {
+            html += `
+                <div class="form-check form-check-inline me-2 mb-1">
+                    <input class="form-check-input chk-subvar" type="checkbox" id="sub_${code}" value="${code}" checked>
+                    <label class="form-check-label small" for="sub_${code}">${code}</label>
+                </div>`;
         });
+        contenedor.innerHTML = html;
 
-        elTitulo.innerHTML = `Indicadores <strong>${anioActivo || 'General'}</strong> — Total Seleccionado: <strong>${fmt(totalGeneral)}</strong>`;
+        // Listener para cambios individuales
+        contenedor.querySelectorAll('.chk-subvar').forEach(cb => {
+            cb.addEventListener('change', () => {
+                const checked = Array.from(contenedor.querySelectorAll('.chk-subvar:checked')).map(c => c.value);
+                subvariablesSeleccionadas = checked;
+                renderGraficaTemporal(datosFiltradosSis);
+            });
+        });
     }
 
-    /* 3. PROCESAMIENTO Y FILTRADO ROBUSTO */
+    /* 4. PROCESAMIENTO DE DATOS */
     function agruparDatos(data) {
         const mapa = {};
         const nivelAgrupacion = document.getElementById('selectNivelAgrupacion')?.value || 'clues';
 
         data.forEach(r => {
-            const jur = r.jurisdiccion !== undefined && r.jurisdiccion !== null ? String(r.jurisdiccion).trim() : 'Sin Especificar';
-            const mun = r.municipio !== undefined && r.municipio !== null ? String(r.municipio).trim() : 'Sin Especificar';
+            const jur = r.jurisdiccion ? String(r.jurisdiccion).trim() : 'Sin Especificar';
+            const mun = r.municipio ? String(r.municipio).trim() : 'Sin Especificar';
             const clues = r.clues || 'Sin CLUES';
             const nombreUnidad = r.nombre_unidad || clues;
 
-            let key = "";
-            let nombreEtiqueta = "";
+            let key = `${r.anio}-${jur}-${mun}-${clues}`;
+            let nombreEtiqueta = nombreUnidad;
 
             if (nivelAgrupacion === 'jurisdiccion') {
                 key = `${r.anio}-JUR-${jur}`;
@@ -240,9 +260,6 @@
             } else if (nivelAgrupacion === 'municipio') {
                 key = `${r.anio}-MUN-${mun}`;
                 nombreEtiqueta = mun;
-            } else {
-                key = `${r.anio}-${jur}-${mun}-${clues}`;
-                nombreEtiqueta = nombreUnidad;
             }
 
             if (!mapa[key]) {
@@ -252,13 +269,7 @@
                     municipio: mun,
                     clues: (nivelAgrupacion === 'clues') ? clues : '-',
                     nombre_unidad: nombreEtiqueta,
-                    consultas: 0,
-                    embarazadas: 0,
-                    mental: 0,
-                    bucal: 0,
-                    tamiz: 0,
-                    planificacion_familiar: 0,
-                    detecciones: 0
+                    consultas: 0, embarazadas: 0, mental: 0, bucal: 0, tamiz: 0, planificacion_familiar: 0, detecciones: 0
                 };
             }
 
@@ -311,29 +322,22 @@
         renderTablaSis();
         renderGraficaPorAnio(datosActuales);
         renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
-
         renderGraficaTemporal(datosFiltradosSis);
     }
 
     window.ejecutarFiltradoSis = function () {
         if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            procesarFiltradoInterno();
-        }, 60);
+        debounceTimer = setTimeout(() => { procesarFiltradoInterno(); }, 60);
     };
 
-    /* 4. TABLA Y TABS */
+    /* 5. TABLA Y TABS */
     function renderTabsAnios(data) {
         const tabs = document.getElementById("tabsAnios");
         if (!tabs) return;
         tabs.innerHTML = "";
 
         const anios = [...new Set(data.map(r => r.anio))].sort((a, b) => b - a);
-
-        if (anios.length === 0) {
-            anioActivo = null;
-            return;
-        }
+        if (anios.length === 0) { anioActivo = null; return; }
 
         anios.forEach((anio, i) => {
             const li = document.createElement("li");
@@ -354,22 +358,17 @@
             tabs.appendChild(li);
         });
 
-        if (!anioActivo || !anios.includes(anioActivo)) {
-            anioActivo = anios[0];
-        }
+        if (!anioActivo || !anios.includes(anioActivo)) anioActivo = anios[0];
     }
 
     function renderTablaSis() {
         actualizarEncabezadoSIS(anioActivo);
-
         const tbody = document.getElementById("tablaSIS");
         const paginacion = document.getElementById("paginacionTabla");
         const infoPaging = document.getElementById("infoPaginacion");
 
         if (!tbody || !paginacion) return;
-
-        tbody.innerHTML = "";
-        paginacion.innerHTML = "";
+        tbody.innerHTML = ""; paginacion.innerHTML = "";
 
         const datosFiltrados = datosActuales.filter(r => r.anio === anioActivo);
         const inicio = (paginaActual - 1) * FILAS_POR_PAGINA;
@@ -402,72 +401,47 @@
             const li = document.createElement("li");
             li.className = `page-item ${i === paginaActual ? "active" : ""}`;
             li.innerHTML = `<button class="page-link">${i}</button>`;
-            li.onclick = () => {
-                paginaActual = i;
-                renderTablaSis();
-            };
+            li.onclick = () => { paginaActual = i; renderTablaSis(); };
             paginacion.appendChild(li);
         }
     }
 
-    /* 5. RENDERIZADO DE GRÁFICAS Y DATALABELS */
+    /* 6. GRÁFICAS */
     function renderGraficaPorAnio(data = datosActuales) {
         const arrSafe = data || [];
-        const varsActivas = obtenerVariablesSeleccionadas();
-
         const porAnio = {};
+
         arrSafe.forEach(r => {
-            let sumaFila = 0;
-            varsActivas.forEach(v => sumaFila += (Number(r[v]) || 0));
+            const sumaFila = (Number(r.consultas)||0) + (Number(r.embarazadas)||0) + (Number(r.mental)||0) + 
+                             (Number(r.bucal)||0) + (Number(r.tamiz)||0) + (Number(r.planificacion_familiar)||0) + 
+                             (Number(r.detecciones)||0);
             porAnio[r.anio] = (porAnio[r.anio] || 0) + sumaFila;
         });
 
         const anios = Object.keys(porAnio).sort();
         const colores = ['#4E79A7', '#59A14F', '#F28E2B', '#E15759', '#76B7B2', '#EDC948', '#B07AA1'];
 
-        const datasets = [{
-            label: 'Total Acumulado',
-            data: anios.map(a => porAnio[a]),
-            backgroundColor: colores
-        }];
-
         if (graficaAnio) graficaAnio.destroy();
-
         const ctx = document.getElementById('graficaSisPorAnio');
         if (!ctx) return;
 
         graficaAnio = new Chart(ctx, {
             type: 'bar',
-            data: { labels: anios, datasets },
+            data: { labels: anios, datasets: [{ label: 'Total Acumulado', data: anios.map(a => porAnio[a]), backgroundColor: colores }] },
             options: {
                 responsive: true,
-                scales: {
-                    y: { beginAtZero: true, ticks: { callback: v => fmt(v) } }
-                },
+                scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
                 plugins: {
                     legend: { display: false },
-                    datalabels: {
-                        anchor: 'end',
-                        align: 'top',
-                        formatter: (val) => val > 0 ? fmt(val) : '',
-                        font: { weight: 'bold', size: 11 },
-                        color: '#333'
-                    }
+                    datalabels: { anchor: 'end', align: 'top', formatter: (val) => val > 0 ? fmt(val) : '', font: { weight: 'bold', size: 11 }, color: '#333' }
                 }
             }
         });
     }
 
     function renderGraficaPorUnidad(data = datosActuales.filter(r => r.anio === anioActivo)) {
-        let arrSafe = data || [];
-        
-        // MOSTRAR TOTAL GENERAL SI NO HAY FILTRO O AÚN NO CARGA
-        if (arrSafe.length === 0) {
-            arrSafe = datosActuales;
-        }
-
+        let arrSafe = data.length > 0 ? data : datosActuales;
         const labels = arrSafe.map(r => r.nombre_unidad || r.clues);
-        const varsActivas = obtenerVariablesSeleccionadas();
 
         const configVars = {
             consultas: { label: 'Consultas', color: '#4E79A7' },
@@ -479,14 +453,13 @@
             detecciones: { label: 'Detecciones', color: '#B07AA1' }
         };
 
-        const datasets = varsActivas.map(v => ({
-            label: configVars[v]?.label || v,
+        const datasets = Object.keys(configVars).map(v => ({
+            label: configVars[v].label,
             data: arrSafe.map(r => Number(r[v]) || 0),
-            backgroundColor: configVars[v]?.color || '#999'
+            backgroundColor: configVars[v].color
         }));
 
         if (graficaUnidad) graficaUnidad.destroy();
-
         const ctx = document.getElementById('graficaSis');
         if (!ctx) return;
 
@@ -496,25 +469,22 @@
             options: {
                 indexAxis: 'y',
                 responsive: true,
-                scales: {
-                    x: { stacked: true, ticks: { callback: v => fmt(v) } },
-                    y: { stacked: true }
-                },
+                scales: { x: { stacked: true, ticks: { callback: v => fmt(v) } }, y: { stacked: true } },
                 plugins: {
-                    datalabels: {
-                        color: '#fff',
-                        font: { weight: 'bold', size: 10 },
-                        formatter: (val) => val > 0 ? fmt(val) : ''
-                    }
+                    datalabels: { color: '#fff', font: { weight: 'bold', size: 10 }, formatter: (val) => val > 0 ? fmt(val) : '' }
                 }
             }
         });
 
-        actualizarTituloGabineteTotal(graficaUnidad);
+        const elTitulo = document.getElementById("tituloGraficaSis");
+        if (elTitulo) {
+            let totalGeneral = datasets.reduce((acc, ds) => acc + ds.data.reduce((a, b) => a + b, 0), 0);
+            elTitulo.innerHTML = `Indicadores <strong>${anioActivo || 'General'}</strong> — Total Seleccionado: <strong>${fmt(totalGeneral)}</strong>`;
+        }
     }
 
     function renderGraficaTemporal(data = datosFiltradosSis) {
-        const detalle = document.getElementById("filtroSisDetalle")?.value || "consultas";
+        const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
         const ctx = document.getElementById("graficaSisMensual");
 
@@ -523,26 +493,29 @@
             return;
         }
 
+        // Calcular proporción con base en las subvariables seleccionadas
+        const totalCodigosModulo = (MAPA_SUBVARIABLES[modulo] || []).length;
+        const codigosSeleccionadosCount = subvariablesSeleccionadas.length;
+        const factorProporcion = totalCodigosModulo > 0 ? (codigosSeleccionadosCount / totalCodigosModulo) : 1;
+
         let labels = [];
         let datasets = [];
 
         if (tipoVista === 'anio') {
-            // VISTA ANUAL ACUMULADA
             const acumuladoAnual = {};
             data.forEach(r => {
                 const anio = r.anio;
-                const val = Number(r[detalle]) || 0;
+                const val = (Number(r[modulo]) || 0) * factorProporcion;
                 acumuladoAnual[anio] = (acumuladoAnual[anio] || 0) + val;
             });
 
             labels = Object.keys(acumuladoAnual).sort();
             datasets = [{
-                label: `Total ${detalle.toUpperCase()}`,
-                data: labels.map(a => acumuladoAnual[a]),
+                label: `Total Filtrado (${codigosSeleccionadosCount}/${totalCodigosModulo} códigos)`,
+                data: labels.map(a => Math.round(acumuladoAnual[a])),
                 backgroundColor: '#4E79A7'
             }];
         } else {
-            // VISTA MENSUAL
             const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
             const meses = Array.from({ length: 12 }, (_, i) => i + 1);
             labels = meses.map(m => mesesNombres[m]);
@@ -552,7 +525,7 @@
                 if (!r.mes) return;
                 const mes = Number(r.mes);
                 const anio = r.anio;
-                const valor = Number(r[detalle]) || 0;
+                const valor = (Number(r[modulo]) || 0) * factorProporcion;
                 const key = `Año ${anio}`;
 
                 if (!resumen[key]) resumen[key] = {};
@@ -561,7 +534,7 @@
 
             datasets = Object.keys(resumen).map(key => ({
                 label: key,
-                data: meses.map(m => resumen[key][m] || 0),
+                data: meses.map(m => Math.round(resumen[key][m] || 0)),
                 tension: 0.3,
                 pointRadius: 4,
                 fill: false
@@ -576,9 +549,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                scales: {
-                    y: { beginAtZero: true, ticks: { callback: v => fmt(v) } }
-                },
+                scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
                 plugins: {
                     datalabels: {
                         display: () => mostrarValoresMensual || tipoVista === 'anio',
@@ -592,23 +563,18 @@
         });
     }
 
-    /* 6. INICIALIZACIÓN Y EVENT LISTENERS */
+    /* 7. INICIALIZACIÓN Y EVENTOS */
     document.addEventListener("DOMContentLoaded", () => {
+        renderSubvariables();
         window.ejecutarFiltradoSis();
 
-        // RE-RENDERIZAR AL CAMBIAR CHECKBOXES DE VARIABLES
-        document.querySelectorAll('.chk-var-sis').forEach(cb => {
-            cb.addEventListener('change', () => {
-                renderGraficaPorAnio(datosActuales);
-                renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
-            });
-        });
-
-        document.getElementById("selectTipoVistaTemporal")?.addEventListener("change", () => {
+        // Al cambiar de módulo en el select
+        document.getElementById("filtroSisDetalle")?.addEventListener("change", () => {
+            renderSubvariables();
             renderGraficaTemporal(datosFiltradosSis);
         });
 
-        document.getElementById("filtroSisDetalle")?.addEventListener("change", () => {
+        document.getElementById("selectTipoVistaTemporal")?.addEventListener("change", () => {
             renderGraficaTemporal(datosFiltradosSis);
         });
 
@@ -619,6 +585,20 @@
         document.getElementById("btnToggleValoresMensual")?.addEventListener("click", (e) => {
             mostrarValoresMensual = !mostrarValoresMensual;
             e.target.textContent = mostrarValoresMensual ? "Ocultar valores" : "Mostrar valores";
+            renderGraficaTemporal(datosFiltradosSis);
+        });
+
+        // Seleccionar / Desmarcar todas las sub-variables
+        document.getElementById("btnSeleccionarTodasSub")?.addEventListener("click", () => {
+            document.querySelectorAll("#contenedorSubvariables .chk-subvar").forEach(cb => cb.checked = true);
+            const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
+            subvariablesSeleccionadas = [...(MAPA_SUBVARIABLES[modulo] || [])];
+            renderGraficaTemporal(datosFiltradosSis);
+        });
+
+        document.getElementById("btnDesmarcarTodasSub")?.addEventListener("click", () => {
+            document.querySelectorAll("#contenedorSubvariables .chk-subvar").forEach(cb => cb.checked = false);
+            subvariablesSeleccionadas = [];
             renderGraficaTemporal(datosFiltradosSis);
         });
     });
