@@ -1400,7 +1400,7 @@
         const buscarServicio = document.getElementById(`buscarServicio${sufijo}`) || document.getElementById("buscarServicio");
 
         // ======================================================
-        // 1.1 FILTRADO DE MUNICIPIOS CON BASE EN LA JURISDICCIÓN
+        // 1.1 FILTRADO DE MUNICIPIOS CON BASE EN LA JURISDICCIÓN (CORREGIDO)
         // ======================================================
         function actualizarRelacionJurisdiccionMunicipio() {
             const popoverMun = document.querySelector('[data-popover="municipio"]') || document.getElementById('popoverMunicipios');
@@ -1414,6 +1414,21 @@
                 jurisdiccionesActivas = Array.from(checks).map(cb => String(cb.value).trim().replace(/^0+/, ''));
             }
 
+            // Mapeo dinámico desde la data si no vienen atributos data-jurisdiccion en el HTML
+            let municipiosPermitidos = null;
+            const datasetGlobal = window.sisResultados || window.datosGlobales || window.datosOriginales || [];
+
+            if (jurisdiccionesActivas.length > 0 && datasetGlobal.length > 0) {
+                municipiosPermitidos = new Set();
+                datasetGlobal.forEach(row => {
+                    const jurRow = String(row.jurisdiccion || row.cve_jurisdiccion || '').trim().replace(/^0+/, '');
+                    if (jurisdiccionesActivas.includes(jurRow)) {
+                        const munVal = String(row.municipio || row.nom_municipio || '').trim().toLowerCase();
+                        if (munVal) municipiosPermitidos.add(munVal);
+                    }
+                });
+            }
+
             const itemsMunicipio = popoverMun.querySelectorAll('label, .form-check, .popover-item, div:has(> input)');
 
             itemsMunicipio.forEach(item => {
@@ -1425,18 +1440,28 @@
                     cb.dataset.jurisdiccion ||
                     cb.getAttribute('data-jurisdiccion');
 
-                if (!jurAttr || jurisdiccionesActivas.length === 0) {
+                const nombreMun = (cb.value || item.textContent).trim().toLowerCase();
+                let mostrar = false;
+
+                if (jurisdiccionesActivas.length === 0) {
+                    mostrar = true; // Si no hay nada seleccionado, se muestra todo
+                } else if (jurAttr) {
+                    // Evaluación por atributo en HTML
+                    const valJurSinCeros = String(jurAttr).trim().replace(/^0+/, '');
+                    mostrar = jurisdiccionesActivas.includes(valJurSinCeros);
+                } else if (municipiosPermitidos) {
+                    // Evaluación por dataset global JS
+                    mostrar = municipiosPermitidos.has(nombreMun);
+                } else {
+                    mostrar = true;
+                }
+
+                if (mostrar) {
                     item.style.display = "";
                 } else {
-                    const valJurSinCeros = String(jurAttr).trim().replace(/^0+/, '');
-
-                    if (jurisdiccionesActivas.includes(valJurSinCeros)) {
-                        item.style.display = "";
-                    } else {
-                        item.style.display = "none";
-                        if (cb.checked) {
-                            cb.checked = false;
-                        }
+                    item.style.display = "none";
+                    if (cb.checked) {
+                        cb.checked = false; // Desmarca el municipio si queda oculto
                     }
                 }
             });
