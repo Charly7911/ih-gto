@@ -407,6 +407,7 @@ def procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, an
 
 
 # 💡 AGREGADOS Y RESUMEN ANUAL
+# 💡 AGREGADOS Y RESUMEN ANUAL (CORREGIDO SIN %)
 def actualizar_urgencias_agregado(cursor, anio):
     cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
 
@@ -422,11 +423,11 @@ def actualizar_urgencias_agregado(cursor, anio):
             MAX(cu.tipologia),
             r.MES_ESTADISTICO,
             r.anio,
-            SUM(CASE WHEN tu.Descrip LIKE '%%CALIFICADA%%' AND tu.Descrip NOT LIKE '%%NO%%' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN tu.Descrip LIKE '%%NO CALIFICADA%%' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN ma.Descrip LIKE '%%ACCIDENTES%%' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN LOCATE('CALIFICADA', tu.Descrip) > 0 AND LOCATE('NO', tu.Descrip) = 0 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN LOCATE('NO CALIFICADA', tu.Descrip) > 0 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN LOCATE('ACCIDENTES', ma.Descrip) > 0 THEN 1 ELSE 0 END),
             SUM(CASE WHEN ma.Descrip = 'MÉDICA' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN ma.Descrip LIKE '%%GINECO%%' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN LOCATE('GINECO', ma.Descrip) > 0 THEN 1 ELSE 0 END),
             SUM(CASE WHEN ma.Descrip = 'PEDIÁTRICA' THEN 1 ELSE 0 END),
             SUM(CASE WHEN ma.Descrip = 'NO ESPECIFICADO' THEN 1 ELSE 0 END),
             COUNT(*)
