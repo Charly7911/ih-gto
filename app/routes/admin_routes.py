@@ -164,13 +164,12 @@ def archivo_permitido(filename):
 # *****************************************************************************************
 # ************************* SUBIR CARPETA Y ARCHIVO DE URGENCIAS ***************************
 # *****************************************************************************************
-
 # 💡 RUTA PARA EL JAVASCRIPT
 @admin.route("/estado_carga_urgencias", methods=["GET"])
 @login_required
 def estado_carga_urgencias():
     try:
-        conn = mysql.connection  # ❌ NO USAR mysql.connect()
+        conn = mysql.connection  # Sin paréntesis
         cursor = conn.cursor()
         
         cursor.execute(
@@ -186,7 +185,7 @@ def estado_carga_urgencias():
         registro = cursor.fetchone()
         cursor.close()
 
-        if registro:
+        if registro and registro[0]:
             return jsonify({"estatus": registro[0]})
         return jsonify({"estatus": "Sin cargas registradas"})
     except Exception as e:
@@ -194,9 +193,10 @@ def estado_carga_urgencias():
 
 
 # 💡 TAREA EN SEGUNDO PLANO
+# 💡 TAREA EN SEGUNDO PLANO
 def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, estatus_inicio, carpeta_destino, filename, user_id):
     with app.app_context():
-        conn = mysql.connection  # 👈 CORREGIDO: Sin paréntesis ()
+        conn = mysql.connection  # 📌 CORREGIDO: mysql.connection SIN PARÉNTESIS
         cursor = conn.cursor()
         carga_id = None
         try:
@@ -207,15 +207,16 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
                 cursor.execute("DELETE FROM urgencias_registros WHERE anio = %s", (anio,))
                 cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
 
+            # 📌 INSERTAR EL REGISTRO CON PORCENTAJE INICIAL
             sql_historial = """
                 INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso) 
                 VALUES (%s, %s, %s, 'INICIANDO (0%)')
             """
             cursor.execute(sql_historial, (filename, carpeta_destino, user_id))
             carga_id = cursor.lastrowid
-            conn.commit()
+            conn.commit()  # 📌 GUARDAR EN BD PARA QUE APAREZCA EN MYSQL E INTERFAZ
 
-            # Procesar el archivo TXT
+            # Procesar el archivo TXT / CSV
             procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, anio)
 
             cursor.execute(
