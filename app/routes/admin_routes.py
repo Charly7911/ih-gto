@@ -1,16 +1,25 @@
-
-import numpy as np
-import pandas as pd
-import zipfile
 import os
 import shutil
 import threading
-import MySQLdb
-from flask import Blueprint, current_app, jsonify, render_template, request, redirect, session, url_for, flash
-from flask_login import login_required, current_user
-from app import mysql
+import zipfile
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
+from flask_login import current_user, login_required
+import numpy as np
+import pandas as pd
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
+
+from app import mysql
 
 
 admin = Blueprint('admin', __name__)
