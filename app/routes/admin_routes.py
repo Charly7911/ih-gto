@@ -6,7 +6,7 @@ import os
 import shutil
 import threading
 import MySQLdb
-from flask import Blueprint, current_app, render_template, request, redirect, session, url_for, flash
+from flask import Blueprint, current_app, jsonify, render_template, request, redirect, session, url_for, flash
 from flask_login import login_required, current_user
 from app import mysql
 from werkzeug.security import generate_password_hash
@@ -164,10 +164,40 @@ def archivo_permitido(filename):
 # ************************* SUBIR CARPETA Y ARCHIVO DE URGENCIAS ***************************
 # *****************************************************************************************
 
-# 💡 Función auxiliar para ejecutar el proceso pesado fuera de la petición Web
+# 💡 1. RUTA ENDPOINT PARA EL JAVASCRIPT (Sana el Error 404)
+@admin.route("/estado_carga_urgencias", methods=["GET"])
+@login_required
+def estado_carga_urgencias():
+    try:
+        conn = mysql.connection
+        cursor = conn.cursor()
+        user_id = session.get("user_id")
+        
+        cursor.execute(
+            """
+            SELECT estatus_proceso 
+            FROM cargas_zip 
+            WHERE usuario_id = %s 
+            ORDER BY id DESC 
+            LIMIT 1
+            """,
+            (user_id,)
+        )
+        registro = cursor.fetchone()
+        cursor.close()
+
+        if registro:
+            return jsonify({"estatus": registro[0]})
+        return jsonify({"estatus": "Sin cargas registradas"})
+    except Exception as e:
+        return jsonify({"estatus": f"Error: {str(e)}"}), 200
+
+
+# 💡 2. FUNCIÓN DE SEGUNDO PLANO CORREGIDA (Sana el Error 500)
 def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, estatus_inicio, carpeta_destino, filename, user_id):
     with app.app_context():
-        conn = mysql.connection
+        # Crear una conexión NUEVA y exclusiva para este hilo
+        conn = mysql.connect() 
         cursor = conn.cursor()
         carga_id = None
         try:
@@ -179,7 +209,7 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
                 cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
                 conn.commit()
 
-            # 📌 1. Registramos con estatus inicial
+            # 📌 Registrar con estatus inicial
             sql_historial = """
                 INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso) 
                 VALUES (%s, %s, %s, 'INICIANDO (0%)')
@@ -188,10 +218,10 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
             carga_id = cursor.lastrowid
             conn.commit()
 
-            # ⚙️ TUS MISMAS FUNCIONES (Pasando conn para guardar avances)
+            # Procesar registros TXT
             procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, anio)
             
-            # Actualizamos el estatus a la fase final de agrupamiento
+            # Actualizar estatus a agrupamiento
             cursor.execute("UPDATE cargas_zip SET estatus_proceso = 'CALCULANDO AGREGADOS (90%)' WHERE id = %s", (carga_id,))
             conn.commit()
 
@@ -209,7 +239,7 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
                 (anio, estatus_inicio, fecha_actualizacion, estatus),
             )
 
-            # 📌 2. Marcar como COMPLETADO cuando termine
+            # 📌 Marcar como COMPLETADO
             cursor.execute(
                 "UPDATE cargas_zip SET estatus_proceso = 'COMPLETADO (100%)' WHERE id = %s", 
                 (carga_id,)
@@ -227,8 +257,12 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
                 conn.commit()
             print(f"❌ Error en segundo plano: {e}")
         finally:
-            cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+            try:
+                cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+            except:
+                pass
             cursor.close()
+            conn.close()
 
 
 @admin.route("/upload_zip_urgencias", methods=["GET", "POST"])
@@ -264,7 +298,7 @@ def subir_zip_urgencias():
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             zip_ref.extractall(carpeta_destino)
 
-        # 🚀 INICIAR EL PROCESO EN SEGUNDO PLANO
+        # 🚀 Iniciar proceso en segundo plano
         app = current_app._get_current_object()
         user_id = session.get("user_id")
 
@@ -285,7 +319,7 @@ def subir_zip_urgencias():
         hilo.start()
 
         flash(
-            f"El archivo para {anio} se ha subido e iniciado su procesamiento en segundo plano. Puedes verificar el avance en el panel de cargas.",
+            f"El archivo para {anio} se ha subido e iniciado su procesamiento en segundo plano.",
             "info",
         )
         return redirect(url_for("admin.subir_zip_urgencias"))
@@ -293,9 +327,7 @@ def subir_zip_urgencias():
     return render_template("admin/subir_zip_urgencias.html")
 
 
-def procesar_txt_detallado_urgencias(
-    conn, cursor, carga_id, carpeta_destino, anio_seleccionado
-):
+def procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, anio_seleccionado):
     cursor.execute("SELECT clues FROM catalogo_unidades")
     clues_validas = set(row[0].upper().strip() for row in cursor.fetchall())
 
@@ -353,13 +385,11 @@ def procesar_txt_detallado_urgencias(
     columnas_sql = ", ".join(columnas_db)
     sql = f"INSERT INTO urgencias_registros ({columnas_sql}) VALUES ({placeholders})"
 
-    # 📊 Inserción en bloques con reporte de avance a la base de datos
     for i in range(0, total, bloque_size):
         bloque = valores[i : i + bloque_size]
         cursor.executemany(sql, bloque)
-        conn.commit()  # Guardar los registros en la base de datos inmediatamente
+        conn.commit()
 
-        # Calcular porcentaje e informar avance (repartido entre 0% y 85%)
         progreso = int(((i + len(bloque)) / total) * 85)
         cursor.execute(
             "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
@@ -368,6 +398,7 @@ def procesar_txt_detallado_urgencias(
         conn.commit()
 
 
+# 💡 3. CORRECCIÓN EN SQL LIKE (Dos signos de % en vez de cuatro)
 def actualizar_urgencias_agregado(conn, cursor, anio):
     cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
     conn.commit()
