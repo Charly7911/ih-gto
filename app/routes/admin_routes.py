@@ -165,15 +165,14 @@ def archivo_permitido(filename):
 # ************************* SUBIR CARPETA Y ARCHIVO DE URGENCIAS ***************************
 # *****************************************************************************************
 
-# 💡 1. ENDPOINT PARA EL JAVASCRIPT (Consulta el avance en vivo)
+# 💡 RUTA PARA EL JAVASCRIPT
 @admin.route("/estado_carga_urgencias", methods=["GET"])
 @login_required
 def estado_carga_urgencias():
     try:
-        conn = mysql.connection
+        conn = mysql.connection  # ❌ NO USAR mysql.connect()
         cursor = conn.cursor()
         
-        # Leemos el último registro del usuario activo
         cursor.execute(
             """
             SELECT estatus_proceso 
@@ -194,10 +193,10 @@ def estado_carga_urgencias():
         return jsonify({"estatus": f"Error: {str(e)}"}), 200
 
 
-# 💡 2. FUNCIÓN EN SEGUNDO PLANO
+# 💡 TAREA EN SEGUNDO PLANO
 def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, estatus_inicio, carpeta_destino, filename, user_id):
     with app.app_context():
-        conn = mysql.connection
+        conn = mysql.connection  # 👈 CORREGIDO: Sin paréntesis ()
         cursor = conn.cursor()
         carga_id = None
         try:
@@ -208,7 +207,6 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
                 cursor.execute("DELETE FROM urgencias_registros WHERE anio = %s", (anio,))
                 cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
 
-            # 📌 Registramos inicio al 0%
             sql_historial = """
                 INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso) 
                 VALUES (%s, %s, %s, 'INICIANDO (0%)')
@@ -217,10 +215,9 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
             carga_id = cursor.lastrowid
             conn.commit()
 
-            # 📌 Procesar registros y actualizar avance
+            # Procesar el archivo TXT
             procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, anio)
 
-            # 📌 Procesar agregados al 90%
             cursor.execute(
                 "UPDATE cargas_zip SET estatus_proceso = 'CALCULANDO AGREGADOS (90%)' WHERE id = %s", 
                 (carga_id,)
@@ -241,7 +238,6 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
                 (anio, estatus_inicio, fecha_actualizacion, estatus),
             )
 
-            # 📌 Marcar como COMPLETADO al 100%
             cursor.execute(
                 "UPDATE cargas_zip SET estatus_proceso = 'COMPLETADO (100%)' WHERE id = %s", 
                 (carga_id,)
@@ -264,7 +260,7 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
             cursor.close()
 
 
-# 💡 3. VISTA PRINCIPAL
+# 💡 RUTA DE SUBIDA DEL ARCHIVO
 @admin.route("/upload_zip_urgencias", methods=["GET", "POST"])
 @login_required
 def subir_zip_urgencias():
@@ -299,7 +295,7 @@ def subir_zip_urgencias():
             zip_ref.extractall(carpeta_destino)
 
         app = current_app._get_current_object()
-        user_id = current_user.id  # Usamos current_user directamente
+        user_id = current_user.id
 
         hilo = threading.Thread(
             target=tarea_segundo_plano,
@@ -324,125 +320,6 @@ def subir_zip_urgencias():
         return redirect(url_for("admin.subir_zip_urgencias"))
 
     return render_template("admin/subir_zip_urgencias.html")
-
-
-# 💡 4. PROCESAMIENTO CON REPORTE DE AVANCE REAL
-def procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, anio_seleccionado):
-    cursor.execute(
-        "UPDATE cargas_zip SET estatus_proceso = 'LEYENDO CATÁLOGOS (2%)' WHERE id = %s", 
-        (carga_id,)
-    )
-    conn.commit()
-
-    cursor.execute("SELECT clues FROM catalogo_unidades")
-    clues_validas = set(row[0].upper().strip() for row in cursor.fetchall())
-
-    cursor.execute("DESCRIBE urgencias_registros")
-    columnas_db = [
-        col[0]
-        for col in cursor.fetchall()
-        if "auto_increment" not in col[5].lower() and col[0] != "id"
-    ]
-
-    path_urg = None
-    for root, _, files in os.walk(carpeta_destino):
-        for f in files:
-            if f.lower().strip() == "urgencias.txt":
-                path_urg = os.path.join(root, f)
-                break
-
-    if not path_urg:
-        raise Exception("No se encontró el archivo urgencias.txt en el ZIP")
-
-    cursor.execute(
-        "UPDATE cargas_zip SET estatus_proceso = 'LEYENDO ARCHIVO CSV (5%)' WHERE id = %s", 
-        (carga_id,)
-    )
-    conn.commit()
-
-    df = pd.read_csv(path_urg, sep="|", encoding="utf-8-sig", dtype=str)
-
-    if "CLUES" in df.columns:
-        df["CLUES"] = df["CLUES"].astype(str).str.upper().str.strip()
-        df = df[df["CLUES"].isin(clues_validas)].copy()
-    else:
-        raise Exception("El archivo no contiene la columna 'CLUES'")
-
-    df["anio"] = anio_seleccionado
-    df["carga_id"] = carga_id
-
-    for col in columnas_db:
-        if col not in df.columns:
-            df[col] = None
-
-    df_final = df[columnas_db].copy()
-
-    columnas_hora = ["HORASESTANCIA", "hora_ingreso", "hora_alta"]
-    for col_h in columnas_hora:
-        if col_h in df_final.columns:
-            df_final[col_h] = df_final[col_h].replace(
-                ["99:99", "9999", "99:9", " : "], None
-            )
-
-    df_final = df_final.where(pd.notnull(df_final), None)
-
-    bloque_size = 3000
-    valores = [
-        tuple(None if pd.isna(x) else x for x in row)
-        for row in df_final.to_numpy()
-    ]
-    total = len(valores)
-
-    placeholders = ", ".join(["%s"] * len(columnas_db))
-    columnas_sql = ", ".join(columnas_db)
-    sql = f"INSERT INTO urgencias_registros ({columnas_sql}) VALUES ({placeholders})"
-
-    # Inserción por bloques calculando el porcentaje dinámico
-    for i in range(0, total, bloque_size):
-        bloque = valores[i : i + bloque_size]
-        cursor.executemany(sql, bloque)
-        
-        # Porcentaje escala del 5% al 85%
-        progreso = 5 + int(((i + len(bloque)) / total) * 80)
-        
-        cursor.execute(
-            "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s", 
-            (f"CARGANDO REGISTROS ({progreso}%)", carga_id)
-        )
-        conn.commit()  # Se confirma para que JavaScript lea el nuevo porcentaje
-
-
-def actualizar_urgencias_agregado(cursor, anio):
-    cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
-
-    sql = """
-        INSERT INTO urgencias_agregado (
-            clues, nombre_unidad, tipologia, mes_estadistico, anio,
-            calificada, no_calificada, accidentes, medica, 
-            ginecobstetricia, pediatrica, no_especificado, total
-        )
-        SELECT 
-            r.CLUES,
-            MAX(cu.nombre_unidad),
-            MAX(cu.tipologia),
-            r.MES_ESTADISTICO,
-            r.anio,
-            SUM(CASE WHEN tu.Descrip LIKE '%%CALIFICADA%%' AND tu.Descrip NOT LIKE '%%NO%%' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN tu.Descrip LIKE '%%NO CALIFICADA%%' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN ma.Descrip LIKE '%%ACCIDENTES%%' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN ma.Descrip = 'MÉDICA' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN ma.Descrip LIKE '%%GINECO%%' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN ma.Descrip = 'PEDIÁTRICA' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN ma.Descrip = 'NO ESPECIFICADO' THEN 1 ELSE 0 END),
-            COUNT(*)
-        FROM urgencias_registros r
-        LEFT JOIN catalogo_unidades cu ON cu.clues = r.CLUES
-        LEFT JOIN catalogo_motivo_atencion ma ON r.MOTATE = ma.IDMotAte
-        LEFT JOIN catalogo_tipourgencia tu ON r.TIPOURGENCIA = tu.IdTipoUrgencia
-        WHERE r.anio = %s
-        GROUP BY r.CLUES, r.MES_ESTADISTICO, r.anio
-    """
-    cursor.execute(sql, (anio,))
 
 #***************************************************************************************
 #************************* SUBIR CARPETA Y ARCHIVO DE EGRESOS****************************
