@@ -6,7 +6,7 @@ import os
 import shutil
 import threading
 import MySQLdb
-from flask import Blueprint, current_app, render_template, request, redirect, session, url_for, flash
+from flask import Blueprint, current_app, jsonify, render_template, request, redirect, session, url_for, flash
 from flask_login import login_required, current_user
 from app import mysql
 from werkzeug.security import generate_password_hash
@@ -159,15 +159,15 @@ ALLOWED_EXTENSIONS = {'zip'}
 def archivo_permitido(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-
 # *****************************************************************************************
 # ************************* SUBIR CARPETA Y ARCHIVO DE URGENCIAS ***************************
 # *****************************************************************************************
 
-# 💡 RUTA PARA EL JAVASCRIPT (Consulta de barra de progreso)
+# 💡 RUTA PARA EL JAVASCRIPT (Semiautomática y segura)
 @admin.route("/estado_carga_urgencias", methods=["GET"])
 @login_required
 def estado_carga_urgencias():
+    cursor = None
     try:
         conn = mysql.connection
         cursor = conn.cursor()
@@ -183,18 +183,25 @@ def estado_carga_urgencias():
             (current_user.id,),
         )
         registro = cursor.fetchone()
-        cursor.close()
 
         if registro and registro[0]:
-            return jsonify({"estatus": registro[0]})
-        return jsonify({"estatus": "Sin cargas registradas"})
+            return jsonify({"estatus": registro[0]}), 200
+        return jsonify({"estatus": "Sin cargas registradas"}), 200
+
     except Exception as e:
+        print(f"❌ Error consultando estado_carga_urgencias: {e}")
         return jsonify({"estatus": f"Error: {str(e)}"}), 200
 
+    finally:
+        if cursor:
+            cursor.close()
 
-# 💡 TAREA EN SEGUNDO PLANO
-def tarea_segundo_plano(app, conn, anio, modo_carga, fecha_actualizacion, estatus, estatus_inicio, carpeta_destino, filename, user_id):
+
+# 💡 TAREA EN SEGUNDO PLANO (Parámetro conn eliminado de la firma)
+def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, estatus_inicio, carpeta_destino, filename, user_id):
     with app.app_context():
+        # 📌 Se obtiene la conexión limpia propia de este hilo
+        conn = mysql.connection
         cursor = conn.cursor()
         carga_id = None
         try:
@@ -216,7 +223,7 @@ def tarea_segundo_plano(app, conn, anio, modo_carga, fecha_actualizacion, estatu
             conn.commit()
             print(f">>> 5. REGISTRO ID {carga_id} CREADO EN BD")
 
-            # ⚙️ Procesar TXT e insertar por bloques (actualiza a ~15% - 80%)
+            # ⚙️ Procesar TXT e insertar por bloques (actualiza a ~15% - 85%)
             procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, anio)
 
             # 📌 2. Actualizar estado a cálculo de agregados
@@ -305,18 +312,17 @@ def subir_zip_urgencias():
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             zip_ref.extractall(carpeta_destino)
 
-        # 🚀 Capturar objetos principales antes de iniciar el hilo
+        # 🚀 Capturar app de Flask y user_id
         app = current_app._get_current_object()
-        conn = mysql.connection
         user_id = current_user.id if hasattr(current_user, "id") else session.get("user_id")
 
         print(">>> 3. DESPACHANDO HILO DE PROCESAMIENTO...")
 
+        # 📌 CORREGIDO: No enviamos 'conn' como argumento del hilo
         hilo = threading.Thread(
             target=tarea_segundo_plano,
             args=(
                 app,
-                conn,
                 anio,
                 modo_carga,
                 fecha_actualizacion,
