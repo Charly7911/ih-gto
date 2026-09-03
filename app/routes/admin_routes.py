@@ -159,11 +159,12 @@ ALLOWED_EXTENSIONS = {'zip'}
 def archivo_permitido(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
 # *****************************************************************************************
 # ************************* SUBIR CARPETA Y ARCHIVO DE URGENCIAS ***************************
 # *****************************************************************************************
 
-# 💡 RUTA PARA EL JAVASCRIPT (Semiautomática y segura)
+# 💡 RUTA PARA EL JAVASCRIPT (Consulta el estatus actual en cargas_zip)
 @admin.route("/estado_carga_urgencias", methods=["GET"])
 @login_required
 def estado_carga_urgencias():
@@ -197,24 +198,24 @@ def estado_carga_urgencias():
             cursor.close()
 
 
-# 💡 TAREA EN SEGUNDO PLANO - URGENCIAS
-def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, estatus_inicio, carpeta_destino, filename, user_id):
+# 💡 FUNCIÓN PRINCIPAL DE PROCESAMIENTO (Estructura Síncrona)
+def ejecutar_procesamiento_urgencias(app, anio, modo_carga, fecha_actualizacion, estatus, estatus_inicio, carpeta_destino, filename, user_id):
     with app.app_context():
-        # 📌 Conexión aislada del hilo actual
         conn = mysql.connection
         cursor = conn.cursor()
-        carga_id = None  # 📌 Definir previamente para evitar UnboundLocalError en el except
+        carga_id = None  # Evita UnboundLocalError en el except
 
         try:
-            print(">>> 4. HILO INICIADO CORRECTAMENTE EN SEGUNDO PLANO")
+            print(f">>> INICIANDO PROCESAMIENTO DIRECTO PARA {filename}")
+            # Configuración para soportar archivos de mayor peso
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
-            cursor.execute("SET innodb_lock_wait_timeout = 300")
+            cursor.execute("SET innodb_lock_wait_timeout = 600")
 
             if modo_carga == "actualizar":
                 cursor.execute("DELETE FROM urgencias_registros WHERE anio = %s", (anio,))
                 cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
 
-            # 📌 1. Registrar inicio de proceso en cargas_zip
+            # 1. Registrar inicio de proceso en cargas_zip
             sql_historial = """
                 INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso) 
                 VALUES (%s, %s, %s, 'INICIANDO (0%)')
@@ -222,12 +223,11 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
             cursor.execute(sql_historial, (filename, carpeta_destino, user_id))
             carga_id = cursor.lastrowid
             conn.commit()
-            print(f">>> 5. REGISTRO ID {carga_id} CREADO EN BD")
 
-            # ⚙️ Procesar TXT e insertar registros
+            # 2. Procesar e insertar registros desde el TXT
             procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, anio)
 
-            # 📌 2. Notificar avance a cálculo de agregados
+            # 3. Notificar cambio a cálculo de agregados
             cursor.execute(
                 "UPDATE cargas_zip SET estatus_proceso = 'CALCULANDO AGREGADOS (90%)' WHERE id = %s", 
                 (carga_id,)
@@ -248,7 +248,7 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
                 (anio, estatus_inicio, fecha_actualizacion, estatus),
             )
 
-            # 📌 3. Finalización con éxito
+            # 4. Finalización exitosa
             cursor.execute(
                 "UPDATE cargas_zip SET estatus_proceso = 'COMPLETADO (100%)' WHERE id = %s", 
                 (carga_id,)
@@ -258,8 +258,7 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
 
         except Exception as e:
             conn.rollback()
-            print(f"❌ Error en segundo plano (Urgencias): {e}")
-            # 📌 Evaluación segura de variable asignada
+            print(f"❌ Error durante el procesamiento de urgencias: {e}")
             if carga_id is not None:
                 err_clean = str(e).replace("'", "").replace('"', "")[:100]
                 cursor.execute(
@@ -267,17 +266,18 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
                     (f"ERROR: {err_clean}", carga_id)
                 )
                 conn.commit()
+            raise e  # Re-lanza la excepción para ser atrapada en la ruta web
         finally:
             cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
             cursor.close()
 
 
-# 💡 RUTA DE SUBIDA DEL ARCHIVO
+# 💡 RUTA DE SUBIDA DEL ARCHIVO (Adaptada para ejecuciones síncronas en PythonAnywhere)
 @admin.route("/upload_zip_urgencias", methods=["GET", "POST"])
 @login_required
 def subir_zip_urgencias():
     if request.method == "POST":
-        print(">>> 1. PETICIÓN POST RECIBIDA EN SERVIDOR")
+        print(">>> PETICIÓN POST RECIBIDA")
         
         anio = int(request.form.get("anio"))
         modo_carga = request.form.get("modo_carga")
@@ -285,20 +285,15 @@ def subir_zip_urgencias():
         estatus = request.form.get("estatus")
         estatus_inicio = request.form.get("estatus_inicio")
 
-        # 📌 Compatibilidad con el campo 'archivo' del HTML (o 'file')
         file = request.files.get("archivo") or request.files.get("file")
 
         if not file or file.filename == "":
-            print(">>> ❌ ERROR: No se recibió ningún archivo en la petición")
             flash("No se seleccionó ningún archivo", "danger")
             return redirect(url_for("admin.subir_zip_urgencias"))
 
         if not archivo_permitido(file.filename):
-            print(f">>> ❌ ERROR: Formato de archivo no permitido ({file.filename})")
             flash("Formato de archivo no válido", "danger")
             return redirect(url_for("admin.subir_zip_urgencias"))
-
-        print(f">>> 2. ARCHIVO RECIBIDO VÁLIDO: {file.filename}")
 
         carpeta_nombre = f"urgencias_{anio}"
         carpeta_destino = os.path.join(current_app.root_path, "uploads", carpeta_nombre)
@@ -314,16 +309,12 @@ def subir_zip_urgencias():
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             zip_ref.extractall(carpeta_destino)
 
-        # 🚀 Capturar app de Flask y user_id
         app = current_app._get_current_object()
         user_id = current_user.id if hasattr(current_user, "id") else session.get("user_id")
 
-        print(">>> 3. DESPACHANDO HILO DE PROCESAMIENTO...")
-
-        # 📌 CORREGIDO: No enviamos 'conn' como argumento del hilo
-        hilo = threading.Thread(
-            target=tarea_segundo_plano,
-            args=(
+        # 🚀 EJECUCIÓN DIRECTA SÍNCRONA (Reemplaza a los hilos de threading)
+        try:
+            ejecutar_procesamiento_urgencias(
                 app,
                 anio,
                 modo_carga,
@@ -332,15 +323,12 @@ def subir_zip_urgencias():
                 estatus_inicio,
                 carpeta_destino,
                 filename,
-                user_id,
-            ),
-        )
-        hilo.start()
+                user_id
+            )
+            flash(f"El archivo para {anio} se ha procesado e insertado correctamente en la base de datos.", "success")
+        except Exception as e:
+            flash(f"Ocurrió un error al procesar el archivo: {e}", "danger")
 
-        flash(
-            f"El archivo para {anio} se ha subido e iniciado su procesamiento en segundo plano.",
-            "info",
-        )
         return redirect(url_for("admin.subir_zip_urgencias"))
 
     return render_template("admin/subir_zip_urgencias.html")
@@ -394,8 +382,8 @@ def procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, an
 
     df_final = df_final.where(pd.notnull(df_final), None)
 
-    # Inserción por bloques con avance de porcentaje
-    bloque_size = 3000
+    # 📌 Bloques aumentados a 5000 para acelerar la inserción cuando la información aumente a 12 meses
+    bloque_size = 5000
     valores = [
         tuple(None if pd.isna(x) else x for x in row)
         for row in df_final.to_numpy()
@@ -410,7 +398,6 @@ def procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, an
         bloque = valores[i : i + bloque_size]
         cursor.executemany(sql, bloque)
         
-        # Calcular porcentaje dinámico (Rango entre 15% y 85%)
         pct = 15 + int(((i + len(bloque)) / total) * 70) if total > 0 else 85
         cursor.execute(
             "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
