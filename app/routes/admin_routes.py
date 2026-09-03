@@ -6,7 +6,7 @@ import os
 import shutil
 import threading
 import MySQLdb
-from flask import Blueprint, current_app, jsonify, render_template, request, redirect, session, url_for, flash
+from flask import Blueprint, current_app, render_template, request, redirect, session, url_for, flash
 from flask_login import login_required, current_user
 from app import mysql
 from werkzeug.security import generate_password_hash
@@ -160,16 +160,16 @@ def archivo_permitido(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-
 # *****************************************************************************************
 # ************************* SUBIR CARPETA Y ARCHIVO DE URGENCIAS ***************************
 # *****************************************************************************************
-# 💡 RUTA PARA EL JAVASCRIPT
+
+# 💡 RUTA PARA EL JAVASCRIPT (Consulta de barra de progreso)
 @admin.route("/estado_carga_urgencias", methods=["GET"])
 @login_required
 def estado_carga_urgencias():
     try:
-        conn = mysql.connection  # Sin paréntesis
+        conn = mysql.connection
         cursor = conn.cursor()
         
         cursor.execute(
@@ -193,13 +193,12 @@ def estado_carga_urgencias():
 
 
 # 💡 TAREA EN SEGUNDO PLANO
-# 💡 TAREA EN SEGUNDO PLANO
-def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, estatus_inicio, carpeta_destino, filename, user_id):
+def tarea_segundo_plano(app, conn, anio, modo_carga, fecha_actualizacion, estatus, estatus_inicio, carpeta_destino, filename, user_id):
     with app.app_context():
-        conn = mysql.connection  # 📌 CORREGIDO: mysql.connection SIN PARÉNTESIS
         cursor = conn.cursor()
         carga_id = None
         try:
+            print(">>> 4. HILO INICIADO CORRECTAMENTE EN SEGUNDO PLANO")
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
             cursor.execute("SET innodb_lock_wait_timeout = 300")
 
@@ -207,18 +206,20 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
                 cursor.execute("DELETE FROM urgencias_registros WHERE anio = %s", (anio,))
                 cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
 
-            # 📌 INSERTAR EL REGISTRO CON PORCENTAJE INICIAL
+            # 📌 1. Registrar con porcentaje inicial para la interfaz
             sql_historial = """
                 INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso) 
                 VALUES (%s, %s, %s, 'INICIANDO (0%)')
             """
             cursor.execute(sql_historial, (filename, carpeta_destino, user_id))
             carga_id = cursor.lastrowid
-            conn.commit()  # 📌 GUARDAR EN BD PARA QUE APAREZCA EN MYSQL E INTERFAZ
+            conn.commit()
+            print(f">>> 5. REGISTRO ID {carga_id} CREADO EN BD")
 
-            # Procesar el archivo TXT / CSV
+            # ⚙️ Procesar TXT e insertar por bloques (actualiza a ~15% - 80%)
             procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, anio)
 
+            # 📌 2. Actualizar estado a cálculo de agregados
             cursor.execute(
                 "UPDATE cargas_zip SET estatus_proceso = 'CALCULANDO AGREGADOS (90%)' WHERE id = %s", 
                 (carga_id,)
@@ -239,15 +240,17 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
                 (anio, estatus_inicio, fecha_actualizacion, estatus),
             )
 
+            # 📌 3. Marcar como COMPLETADO
             cursor.execute(
                 "UPDATE cargas_zip SET estatus_proceso = 'COMPLETADO (100%)' WHERE id = %s", 
                 (carga_id,)
             )
             conn.commit()
-            print(f"✅ Urgencias {anio} completado con éxito.")
+            print(f"✅ Urgencias {anio} completado con éxito (ID Carga: {carga_id}).")
 
         except Exception as e:
             conn.rollback()
+            print(f"❌ Error en segundo plano: {e}")
             if carga_id:
                 err_clean = str(e).replace("'", "").replace('"', "")[:100]
                 cursor.execute(
@@ -255,7 +258,6 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
                     (f"ERROR: {err_clean}", carga_id)
                 )
                 conn.commit()
-            print(f"❌ Error en segundo plano: {e}")
         finally:
             cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
             cursor.close()
@@ -266,20 +268,28 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
 @login_required
 def subir_zip_urgencias():
     if request.method == "POST":
+        print(">>> 1. PETICIÓN POST RECIBIDA EN SERVIDOR")
+        
         anio = int(request.form.get("anio"))
         modo_carga = request.form.get("modo_carga")
         fecha_actualizacion = request.form.get("fecha_actualizacion")
         estatus = request.form.get("estatus")
         estatus_inicio = request.form.get("estatus_inicio")
 
-        if "file" not in request.files:
-            flash("No hay archivo en la solicitud", "danger")
+        # 📌 Compatibilidad con el campo 'archivo' del HTML (o 'file')
+        file = request.files.get("archivo") or request.files.get("file")
+
+        if not file or file.filename == "":
+            print(">>> ❌ ERROR: No se recibió ningún archivo en la petición")
+            flash("No se seleccionó ningún archivo", "danger")
             return redirect(url_for("admin.subir_zip_urgencias"))
 
-        file = request.files["file"]
-        if file.filename == "" or not (file and archivo_permitido(file.filename)):
-            flash("Archivo no válido o no seleccionado", "danger")
+        if not archivo_permitido(file.filename):
+            print(f">>> ❌ ERROR: Formato de archivo no permitido ({file.filename})")
+            flash("Formato de archivo no válido", "danger")
             return redirect(url_for("admin.subir_zip_urgencias"))
+
+        print(f">>> 2. ARCHIVO RECIBIDO VÁLIDO: {file.filename}")
 
         carpeta_nombre = f"urgencias_{anio}"
         carpeta_destino = os.path.join(current_app.root_path, "uploads", carpeta_nombre)
@@ -295,13 +305,18 @@ def subir_zip_urgencias():
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             zip_ref.extractall(carpeta_destino)
 
+        # 🚀 Capturar objetos principales antes de iniciar el hilo
         app = current_app._get_current_object()
-        user_id = current_user.id
+        conn = mysql.connection
+        user_id = current_user.id if hasattr(current_user, "id") else session.get("user_id")
+
+        print(">>> 3. DESPACHANDO HILO DE PROCESAMIENTO...")
 
         hilo = threading.Thread(
             target=tarea_segundo_plano,
             args=(
                 app,
+                conn,
                 anio,
                 modo_carga,
                 fecha_actualizacion,
@@ -321,6 +336,113 @@ def subir_zip_urgencias():
         return redirect(url_for("admin.subir_zip_urgencias"))
 
     return render_template("admin/subir_zip_urgencias.html")
+
+
+# 💡 FUNCIÓN DE PROCESAMIENTO E INSERCIÓN POR BLOQUES
+def procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, anio_seleccionado):
+    cursor.execute("SELECT clues FROM catalogo_unidades")
+    clues_validas = set(row[0].upper().strip() for row in cursor.fetchall())
+
+    cursor.execute("DESCRIBE urgencias_registros")
+    columnas_db = [
+        col[0]
+        for col in cursor.fetchall()
+        if "auto_increment" not in col[5].lower() and col[0] != "id"
+    ]
+
+    path_urg = None
+    for root, _, files in os.walk(carpeta_destino):
+        for f in files:
+            if f.lower().strip() == "urgencias.txt":
+                path_urg = os.path.join(root, f)
+                break
+
+    if not path_urg:
+        raise Exception("No se encontró el archivo urgencias.txt dentro del ZIP")
+
+    df = pd.read_csv(path_urg, sep="|", encoding="utf-8-sig", dtype=str)
+
+    if "CLUES" in df.columns:
+        df["CLUES"] = df["CLUES"].str.upper().str.strip()
+        df = df[df["CLUES"].isin(clues_validas)].copy()
+    else:
+        raise Exception("El archivo TXT no contiene la columna 'CLUES'")
+
+    df["anio"] = anio_seleccionado
+    df["carga_id"] = carga_id
+
+    for col in columnas_db:
+        if col not in df.columns:
+            df[col] = None
+
+    df_final = df[columnas_db].copy()
+
+    columnas_hora = ["HORASESTANCIA", "hora_ingreso", "hora_alta"]
+    for col_h in columnas_hora:
+        if col_h in df_final.columns:
+            df_final[col_h] = df_final[col_h].replace(
+                ["99:99", "9999", "99:9", " : "], None
+            )
+
+    df_final = df_final.where(pd.notnull(df_final), None)
+
+    # Inserción por bloques con avance de porcentaje
+    bloque_size = 3000
+    valores = [
+        tuple(None if pd.isna(x) else x for x in row)
+        for row in df_final.to_numpy()
+    ]
+    total = len(valores)
+
+    placeholders = ", ".join(["%s"] * len(columnas_db))
+    columnas_sql = ", ".join(columnas_db)
+    sql = f"INSERT INTO urgencias_registros ({columnas_sql}) VALUES ({placeholders})"
+
+    for i in range(0, total, bloque_size):
+        bloque = valores[i : i + bloque_size]
+        cursor.executemany(sql, bloque)
+        
+        # Calcular porcentaje dinámico (Rango entre 15% y 85%)
+        pct = 15 + int(((i + len(bloque)) / total) * 70) if total > 0 else 85
+        cursor.execute(
+            "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
+            (f"CARGANDO REGISTROS ({pct}%)", carga_id)
+        )
+        conn.commit()
+
+
+# 💡 AGREGADOS Y RESUMEN ANUAL
+def actualizar_urgencias_agregado(cursor, anio):
+    cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
+
+    sql = """
+        INSERT INTO urgencias_agregado (
+            clues, nombre_unidad, tipologia, mes_estadistico, anio,
+            calificada, no_calificada, accidentes, medica, 
+            ginecobstetricia, pediatrica, no_especificado, total
+        )
+        SELECT 
+            r.CLUES,
+            MAX(cu.nombre_unidad),
+            MAX(cu.tipologia),
+            r.MES_ESTADISTICO,
+            r.anio,
+            SUM(CASE WHEN tu.Descrip LIKE '%%CALIFICADA%%' AND tu.Descrip NOT LIKE '%%NO%%' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN tu.Descrip LIKE '%%NO CALIFICADA%%' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN ma.Descrip LIKE '%%ACCIDENTES%%' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN ma.Descrip = 'MÉDICA' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN ma.Descrip LIKE '%%GINECO%%' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN ma.Descrip = 'PEDIÁTRICA' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN ma.Descrip = 'NO ESPECIFICADO' THEN 1 ELSE 0 END),
+            COUNT(*)
+        FROM urgencias_registros r
+        LEFT JOIN catalogo_unidades cu ON cu.clues = r.CLUES
+        LEFT JOIN catalogo_motivo_atencion ma ON r.MOTATE = ma.IDMotAte
+        LEFT JOIN catalogo_tipourgencia tu ON r.TIPOURGENCIA = tu.IdTipoUrgencia
+        WHERE r.anio = %s
+        GROUP BY r.CLUES, r.MES_ESTADISTICO, r.anio
+    """
+    cursor.execute(sql, (anio,))
 
 #***************************************************************************************
 #************************* SUBIR CARPETA Y ARCHIVO DE EGRESOS****************************
