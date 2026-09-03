@@ -215,77 +215,72 @@ def tarea_segundo_plano(
     filename,
     user_id,
 ):
-    with app.app_context():
-        conn = mysql.connection
-        cursor = conn.cursor()
-        carga_id = None
-        try:
-            cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
-            cursor.execute("SET innodb_lock_wait_timeout = 300")
+    # Ya no es necesario 'with app.app_context()' porque se ejecuta en la misma petición
+    conn = mysql.connection
+    cursor = conn.cursor()
+    carga_id = None
+    try:
+        # Insertar registro de carga
+        sql_historial = """
+            INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso) 
+            VALUES (%s, %s, %s, 'INICIANDO (0%)')
+        """
+        cursor.execute(sql_historial, (filename, carpeta_destino, user_id))
+        carga_id = cursor.lastrowid
+        conn.commit()
 
-            if modo_carga == "actualizar":
-                cursor.execute(
-                    "DELETE FROM urgencias_registros WHERE anio = %s", (anio,)
-                )
-                cursor.execute(
-                    "DELETE FROM urgencias_agregado WHERE anio = %s", (anio,)
-                )
-                conn.commit()
+        # Si es actualizar, borrar datos anteriores
+        if modo_carga == "actualizar":
+            cursor.execute(
+                "DELETE FROM urgencias_registros WHERE anio = %s", (anio,)
+            )
+            cursor.execute(
+                "DELETE FROM urgencias_agregado WHERE anio = %s", (anio,)
+            )
+            conn.commit()
 
-            sql_historial = """
-                INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso) 
-                VALUES (%s, %s, %s, 'INICIANDO (0%)')
+        # Procesar el archivo TXT
+        procesar_txt_detallado_urgencias(
+            conn, cursor, carga_id, carpeta_destino, anio
+        )
+
+        # Calculando Agregados
+        cursor.execute(
+            "UPDATE cargas_zip SET estatus_proceso = 'CALCULANDO AGREGADOS (90%)' WHERE id = %s",
+            (carga_id,),
+        )
+        conn.commit()
+
+        actualizar_urgencias_agregado(conn, cursor, anio)
+
+        cursor.execute(
             """
-            cursor.execute(sql_historial, (filename, carpeta_destino, user_id))
-            carga_id = cursor.lastrowid
-            conn.commit()
+            INSERT INTO urgencias_control_anual (anio, estatus_inicio, fecha_actualizacion, estatus)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                fecha_actualizacion = VALUES(fecha_actualizacion),
+                estatus_inicio = VALUES(estatus_inicio),
+                estatus = VALUES(estatus)
+        """,
+            (anio, estatus_inicio, fecha_actualizacion, estatus),
+        )
 
-            procesar_txt_detallado_urgencias(
-                conn, cursor, carga_id, carpeta_destino, anio
-            )
+        cursor.execute(
+            "UPDATE cargas_zip SET estatus_proceso = 'COMPLETADO (100%)' WHERE id = %s",
+            (carga_id,),
+        )
+        conn.commit()
 
+    except Exception as e:
+        conn.rollback()
+        if carga_id:
+            err_clean = str(e).replace("'", "").replace('"', "")[:100]
             cursor.execute(
-                "UPDATE cargas_zip SET estatus_proceso = 'CALCULANDO AGREGADOS (90%)' WHERE id = %s",
-                (carga_id,),
-            )
-            conn.commit()
-
-            actualizar_urgencias_agregado(conn, cursor, anio)
-
-            cursor.execute(
-                """
-                INSERT INTO urgencias_control_anual (anio, estatus_inicio, fecha_actualizacion, estatus)
-                VALUES (%s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    fecha_actualizacion = VALUES(fecha_actualizacion),
-                    estatus_inicio = VALUES(estatus_inicio),
-                    estatus = VALUES(estatus)
-            """,
-                (anio, estatus_inicio, fecha_actualizacion, estatus),
-            )
-
-            cursor.execute(
-                "UPDATE cargas_zip SET estatus_proceso = 'COMPLETADO (100%)' WHERE id = %s",
-                (carga_id,),
+                "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
+                (f"ERROR: {err_clean}", carga_id),
             )
             conn.commit()
-
-        except Exception as e:
-            conn.rollback()
-            if carga_id:
-                error_clean = str(e).replace("'", "").replace('"', "")[:100]
-                cursor.execute(
-                    "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
-                    (f"ERROR: {error_clean}", carga_id),
-                )
-                conn.commit()
-            print(f"❌ Error en segundo plano: {e}")
-        finally:
-            try:
-                cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
-            except Exception:
-                pass
-            cursor.close()
+        print(f"❌ Error en carga: {e}")
 
 
 @admin.route("/upload_zip_urgencias", methods=["GET", "POST"])
@@ -326,21 +321,17 @@ def subir_zip_urgencias():
         app = current_app._get_current_object()
         user_id = session.get("user_id")
 
-        hilo = threading.Thread(
-            target=tarea_segundo_plano,
-            args=(
-                app,
-                anio,
-                modo_carga,
-                fecha_actualizacion,
-                estatus,
-                estatus_inicio,
-                carpeta_destino,
-                filename,
-                user_id,
-            ),
+        tarea_segundo_plano(
+            app,
+            anio,
+            modo_carga,
+            fecha_actualizacion,
+            estatus,
+            estatus_inicio,
+            carpeta_destino,
+            filename,
+            user_id,
         )
-        hilo.start()
 
         flash(
             f"El archivo para {anio} se ha subido e iniciado su procesamiento en segundo plano.",
