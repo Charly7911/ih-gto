@@ -164,6 +164,7 @@
     }
 
     /* 2. DIBUJAR APARTADOS Y CHECKBOXES DE VARIABLES */
+    /* 2. DIBUJAR APARTADOS Y CHECKBOXES DE VARIABLES (OPTIMIZADO) */
     function renderSubvariables() {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const contenedor = document.getElementById("contenedorSubvariables");
@@ -186,8 +187,6 @@
         }
 
         const seleccionadasModulo = variablesPersonalizadasEstado[modulo];
-
-        // Usar Fragmento de Documento en memoria para renderizado ultra rápido del DOM
         const fragment = document.createDocumentFragment();
 
         estructuraModulo.forEach(grupo => {
@@ -195,23 +194,23 @@
             divGrupo.className = "mb-3 p-2 bg-white rounded border";
 
             let htmlGrupo = `
-                <div class="fw-bold text-primary mb-1 border-bottom pb-1 small">
-                    📁 Apartado: ${grupo.apartado} — <span class="text-dark">${grupo.descripcion_apartado || 'Sin descripción'}</span>
-                </div>
-                <div class="d-flex flex-wrap gap-2 pt-1">`;
+            <div class="fw-bold text-primary mb-1 border-bottom pb-1 small">
+                📁 Apartado: ${grupo.apartado} — <span class="text-dark">${grupo.descripcion_apartado || 'Sin descripción'}</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2 pt-1">`;
 
             (grupo.variables || []).forEach(v => {
-                const isChecked = (seleccionadasModulo === undefined || seleccionadasModulo === null) 
-                    ? true 
+                const isChecked = (seleccionadasModulo === undefined || seleccionadasModulo === null)
+                    ? true
                     : seleccionadasModulo.includes(v.codigo);
 
                 htmlGrupo += `
-                    <div class="form-check form-check-inline me-3 mb-1" title="${v.nombre}">
-                        <input class="form-check-input chk-subvar" type="checkbox" id="sub_${v.codigo}" value="${v.codigo}" ${isChecked ? 'checked' : ''}>
-                        <label class="form-check-label small" for="sub_${v.codigo}">
-                            <strong>${v.codigo}</strong>: ${v.nombre}
-                        </label>
-                    </div>`;
+                <div class="form-check form-check-inline me-3 mb-1" title="${v.nombre}">
+                    <input class="form-check-input chk-subvar" type="checkbox" id="sub_${v.codigo}" value="${v.codigo}" ${isChecked ? 'checked' : ''}>
+                    <label class="form-check-label small" for="sub_${v.codigo}">
+                        <strong>${v.codigo}</strong>: ${v.nombre}
+                    </label>
+                </div>`;
             });
 
             htmlGrupo += `</div>`;
@@ -222,12 +221,13 @@
         contenedor.innerHTML = "";
         contenedor.appendChild(fragment);
 
-        // Al cambiar un checkbox solo actualizamos el estado local (asíncrono/debounce)
-        contenedor.querySelectorAll('.chk-subvar').forEach(cb => {
-            cb.addEventListener('change', () => {
+        // ✅ OPTIMIZACIÓN CRÍTICA: Un solo listener delegado en lugar de cientos individuales
+        contenedor.onclick = null; // Limpiar listener previo
+        contenedor.addEventListener('change', (e) => {
+            if (e.target && e.target.classList.contains('chk-subvar')) {
                 guardarEstadoVariablesActuales();
-                window.ejecutarFiltradoSis(300); // Debounce de 300ms para evitar múltiples peticiones
-            });
+                window.ejecutarFiltradoSis(400); // 400ms de tiempo de espera antes de pedir a Flask
+            }
         });
     }
 
@@ -405,7 +405,7 @@
         paginacion.innerHTML = paginasHTML;
     }
 
-    window.cambiarPagina = function(p) {
+    window.cambiarPagina = function (p) {
         paginaActual = p;
         renderTablaSis();
     };
@@ -488,6 +488,8 @@
         }
     }
 
+
+    /* 5. GRÁFICA TEMPORAL (OPTIMIZADA) */
     function renderGraficaTemporal(data = datosFiltradosSis) {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
@@ -540,27 +542,36 @@
             }));
         }
 
-        if (graficaSisMensual) graficaSisMensual.destroy();
+        // ✅ OPTIMIZACIÓN CRÍTICA: Reutilizar instancia si el tipo de gráfica es el mismo
+        const tipoChartRequerido = tipoVista === 'anio' ? 'bar' : 'line';
 
-        graficaSisMensual = new Chart(ctx, {
-            type: tipoVista === 'anio' ? 'bar' : 'line',
-            data: { labels, datasets },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: false,
-                scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
-                plugins: {
-                    datalabels: {
-                        display: () => mostrarValoresMensual || tipoVista === 'anio',
-                        align: 'top',
-                        anchor: 'end',
-                        formatter: (val) => val > 0 ? fmt(val) : '',
-                        font: { size: 10, weight: 'bold' }
+        if (graficaSisMensual && graficaSisMensual.config.type === tipoChartRequerido) {
+            graficaSisMensual.data.labels = labels;
+            graficaSisMensual.data.datasets = datasets;
+            graficaSisMensual.update('none'); // Modos sin renderizado pesado de animaciones
+        } else {
+            if (graficaSisMensual) graficaSisMensual.destroy();
+
+            graficaSisMensual = new Chart(ctx, {
+                type: tipoChartRequerido,
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
+                    plugins: {
+                        datalabels: {
+                            display: () => mostrarValoresMensual || tipoVista === 'anio',
+                            align: 'top',
+                            anchor: 'end',
+                            formatter: (val) => val > 0 ? fmt(val) : '',
+                            font: { size: 10, weight: 'bold' }
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
     }
 
     /* 6. INICIALIZACIÓN Y EVENTOS */
@@ -587,19 +598,19 @@
         document.getElementById("btnSeleccionarTodasSub")?.addEventListener("click", () => {
             const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
             document.querySelectorAll("#contenedorSubvariables .chk-subvar").forEach(cb => cb.checked = true);
-            
+
             const todas = Array.from(document.querySelectorAll("#contenedorSubvariables .chk-subvar")).map(cb => cb.value);
             variablesPersonalizadasEstado[modulo] = todas;
-            
+
             window.ejecutarFiltradoSis();
         });
 
         document.getElementById("btnDesmarcarTodasSub")?.addEventListener("click", () => {
             const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
             document.querySelectorAll("#contenedorSubvariables .chk-subvar").forEach(cb => cb.checked = false);
-            
+
             variablesPersonalizadasEstado[modulo] = [];
-            
+
             window.ejecutarFiltradoSis();
         });
     });
