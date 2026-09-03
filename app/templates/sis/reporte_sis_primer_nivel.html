@@ -165,6 +165,7 @@
     }
 
     /* 2. DIBUJAR APARTADOS Y CHECKBOXES DE VARIABLES */
+    /* 2. DIBUJAR APARTADOS Y CHECKBOXES (DESGLOSE COMPLETO COMPATIBLE) */
     function renderSubvariables() {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const contenedor = document.getElementById("contenedorSubvariables");
@@ -172,7 +173,6 @@
 
         if (!contenedor) return;
 
-        // Determinar qué módulos procesar
         let modulosAProcesar = [];
         if (modulo === "todas") {
             modulosAProcesar = Object.keys(DICCIONARIO_VARIABLES);
@@ -187,12 +187,12 @@
             const estructuraModulo = DICCIONARIO_VARIABLES[modKey] || [];
             if (estructuraModulo.length === 0) return;
 
-            // Título del módulo si elegimos "Todas"
+            // Banner delimitador si elegimos "Todas"
             if (modulo === "todas") {
                 const headerModulo = document.createElement("div");
-                headerModulo.className = "alert alert-primary py-1 px-3 mb-2 mt-3 fw-bold text-uppercase border-0 shadow-sm d-flex justify-content-between align-items-center";
+                headerModulo.className = "alert alert-secondary py-1 px-3 mb-2 mt-3 fw-bold text-uppercase border-0 shadow-sm";
                 headerModulo.style.fontSize = "0.85rem";
-                headerModulo.innerHTML = `<span>📂 Secciona: <strong>${modKey.replace('_', ' ')}</strong></span>`;
+                headerModulo.innerHTML = `📂 Módulo / Sección: <strong class="text-primary">${modKey.replace('_', ' ')}</strong>`;
                 fragment.appendChild(headerModulo);
             }
 
@@ -200,38 +200,36 @@
 
             estructuraModulo.forEach((grupo, idx) => {
                 totalVariablesMostradas += (grupo.variables || []).length;
-                const accordionId = `acc_${modKey}_${grupo.apartado}_${idx}`;
+                const accordionId = `acc_${modKey}_${grupo.apartado}_${idx}`.replace(/[^a-zA-Z0-9_-]/g, "");
 
-                // Conteo de seleccionados
                 const countSel = (grupo.variables || []).filter(v => seleccionadasModulo.includes(v.codigo)).length;
                 const totalGroup = (grupo.variables || []).length;
 
                 const cardGrupo = document.createElement("div");
-                cardGrupo.className = "card mb-2 border-0 shadow-sm";
+                cardGrupo.className = "card mb-2 border shadow-sm";
 
+                // Se fuerza que SIEMPRE aparezca desplegado ('show') por defecto
                 let htmlGrupo = `
-                <div class="card-header bg-white py-2 px-3 d-flex justify-content-between align-items-center border-start border-4 border-primary" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#${accordionId}">
+                <div class="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center border-start border-4 border-primary">
                     <div class="d-flex align-items-center gap-2">
-                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Apartado ${grupo.apartado}</span>
+                        <span class="badge bg-primary">Apartado ${grupo.apartado}</span>
                         <strong class="text-dark small">${grupo.descripcion_apartado || 'Sin descripción'}</strong>
                     </div>
                     <div>
-                        <span class="badge rounded-pill ${countSel > 0 ? 'bg-success' : 'bg-secondary'} me-2">
+                        <span class="badge rounded-pill ${countSel > 0 ? 'bg-success' : 'bg-secondary'}">
                             ${countSel}/${totalGroup} activas
                         </span>
-                        <span class="text-muted small">▼</span>
                     </div>
                 </div>
-                <div id="${accordionId}" class="collapse ${modulo !== 'todas' ? 'show' : ''}">
-                    <div class="card-body bg-light-subtle p-3">
-                        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-2">`;
+                <div id="${accordionId}" class="card-body bg-white p-3">
+                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-2">`;
 
                 (grupo.variables || []).forEach(v => {
                     const isChecked = seleccionadasModulo.includes(v.codigo);
 
                     htmlGrupo += `
                     <div class="col">
-                        <div class="form-check p-2 bg-white rounded border h-100 d-flex align-items-center shadow-2xs">
+                        <div class="form-check p-2 bg-light rounded border h-100 d-flex align-items-center">
                             <input class="form-check-input chk-subvar me-2 mt-0" 
                                    type="checkbox" 
                                    data-modulo="${modKey}" 
@@ -245,7 +243,6 @@
                 });
 
                 htmlGrupo += `
-                        </div>
                     </div>
                 </div>`;
 
@@ -256,13 +253,13 @@
 
         if (lbl) {
             const nombreVista = modulo === "todas" ? "Todas las Secciones" : modulo;
-            lbl.innerHTML = `📋 Desglose de Variables en <strong>${nombreVista.toUpperCase()}</strong> (${totalVariablesMostradas} variables registradas):`;
+            lbl.innerHTML = `📋 Desglose de Variables en <strong>${nombreVista.toUpperCase()}</strong> (${totalVariablesMostradas} variables en catálogo):`;
         }
 
         contenedor.innerHTML = "";
         contenedor.appendChild(fragment);
 
-        // Event Listener Delegado
+        // Event Listener Delegado para los Checkboxes
         contenedor.onclick = null;
         contenedor.addEventListener('change', (e) => {
             if (e.target && e.target.classList.contains('chk-subvar')) {
