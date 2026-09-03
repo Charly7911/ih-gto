@@ -67,6 +67,50 @@
     border-radius: 8px;
     list-style: none;
 }
+
+/* 📊 ESTILOS DE LA BARRA DE PROGRESO Y MONITOR */
+.tarjeta-progreso {
+    max-width: 500px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-left: 5px solid #007BFF;
+}
+
+.tarjeta-progreso h3 {
+    margin-top: 0;
+    font-size: 1.2rem;
+    color: #2c3e50;
+}
+
+.barra-contenedor {
+    width: 100%;
+    background-color: #e0e0e0;
+    border-radius: 10px;
+    height: 22px;
+    margin: 15px 0;
+    overflow: hidden;
+}
+
+.barra-relleno {
+    height: 100%;
+    width: 0%;
+    background-color: #28a745;
+    text-align: center;
+    line-height: 22px;
+    color: white;
+    font-size: 0.85rem;
+    font-weight: bold;
+    transition: width 0.4s ease;
+}
+
+.texto-estatus {
+    font-size: 0.95rem;
+    color: #555;
+    font-weight: 600;
+}
 </style>
 
 <div class="zona-formulario">
@@ -116,10 +160,59 @@
             </select>
 
             <input type="submit" value="Subir y Procesar">
-
         </form>
     </div>
 
+    <!-- 📌 TARJETA DE PROGRESO DE LA CARGA -->
+    <div class="tarjeta-progreso" id="contenedor-progreso">
+        <h3>Estado de la Carga</h3>
+        <p class="texto-estatus" id="texto-estatus">Consultando estado...</p>
+        <div class="barra-contenedor">
+            <div class="barra-relleno" id="barra-relleno">0%</div>
+        </div>
+    </div>
+
 </div>
+
+<script>
+// 🔄 Función AJAX para consultar el avance del proceso en segundo plano
+function consultarEstadoCarga() {
+    fetch("{{ url_for('admin.estado_carga_urgencias') }}")
+        .then(response => response.json())
+        .then(data => {
+            const textoEstatus = document.getElementById("texto-estatus");
+            const barraRelleno = document.getElementById("barra-relleno");
+
+            if (data.estatus) {
+                textoEstatus.textContent = "Estado actual: " + data.estatus;
+
+                // Extraer el porcentaje entre paréntesis si existe (ej. 45%)
+                const coincidencia = data.estatus.match(/\((\d+)%\)/);
+                if (coincidencia) {
+                    const porcentaje = coincidencia[1];
+                    barraRelleno.style.width = porcentaje + "%";
+                    barraRelleno.textContent = porcentaje + "%";
+                } else if (data.estatus.includes("COMPLETADO")) {
+                    barraRelleno.style.width = "100%";
+                    barraRelleno.textContent = "100%";
+                    barraRelleno.style.backgroundColor = "#28a745";
+                } else if (data.estatus.includes("ERROR")) {
+                    barraRelleno.style.backgroundColor = "#dc3545";
+                }
+            } else {
+                textoEstatus.textContent = "Sin procesos activos recientemente.";
+            }
+        })
+        .catch(err => {
+            console.error("Error al obtener estado:", err);
+        });
+}
+
+// Consultar cada 3 segundos (3000 ms)
+setInterval(consultarEstadoCarga, 3000);
+
+// Ejecutar inmediatamente al cargar la página
+document.addEventListener("DOMContentLoaded", consultarEstadoCarga);
+</script>
 
 {% endblock %}
