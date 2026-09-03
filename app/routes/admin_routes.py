@@ -163,6 +163,11 @@ def archivo_permitido(filename):
 # *****************************************************************************************
 # ************************* SUBIR CARPETA Y ARCHIVO DE URGENCIAS ***************************
 # *****************************************************************************************
+# *****************************************************************************************
+# ************************* SUBIR CARPETA Y ARCHIVO DE URGENCIAS ***************************
+# *****************************************************************************************
+
+
 # 💡 1. RUTA ENDPOINT PARA EL JAVASCRIPT
 @admin.route("/estado_carga_urgencias", methods=["GET"])
 @login_required
@@ -192,7 +197,7 @@ def estado_carga_urgencias():
         return jsonify({"estatus": f"Error: {str(e)}"}), 200
 
 
-# 💡 2. FUNCIÓN DE SEGUNDO PLANO (Conexión adaptada a subprocesos)
+# 💡 2. FUNCIÓN DE SEGUNDO PLANO
 def tarea_segundo_plano(
     app,
     anio,
@@ -205,12 +210,7 @@ def tarea_segundo_plano(
     user_id,
 ):
     with app.app_context():
-        # Obtenemos la conexión sin invocar como función ()
-        try:
-            conn = mysql.connection
-        except AttributeError:
-            conn = mysql.connect
-
+        conn = mysql.connection
         cursor = conn.cursor()
         carga_id = None
         try:
@@ -226,7 +226,6 @@ def tarea_segundo_plano(
                 )
                 conn.commit()
 
-            # Registrar con estatus inicial
             sql_historial = """
                 INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso) 
                 VALUES (%s, %s, %s, 'INICIANDO (0%)')
@@ -235,12 +234,10 @@ def tarea_segundo_plano(
             carga_id = cursor.lastrowid
             conn.commit()
 
-            # Procesar registros TXT
             procesar_txt_detallado_urgencias(
                 conn, cursor, carga_id, carpeta_destino, anio
             )
 
-            # Actualizar estatus
             cursor.execute(
                 "UPDATE cargas_zip SET estatus_proceso = 'CALCULANDO AGREGADOS (90%)' WHERE id = %s",
                 (carga_id,),
@@ -266,27 +263,161 @@ def tarea_segundo_plano(
                 (carga_id,),
             )
             conn.commit()
-            print(f"✅ Urgencias {anio} completado con éxito.")
 
         except Exception as e:
             conn.rollback()
             if carga_id:
-                error_str = str(e).replace("'", "").replace('"', "")[:100]
+                error_clean = str(e).replace("'", "").replace('"', "")[:100]
                 cursor.execute(
                     "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
-                    (f"ERROR: {error_str}", carga_id),
+                    (f"ERROR: {error_clean}", carga_id),
                 )
                 conn.commit()
             print(f"❌ Error en segundo plano: {e}")
         finally:
             try:
                 cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
-            except:
+            except Exception:
                 pass
             cursor.close()
 
 
-# 💡 3. CORRECCIÓN SINTAXIS LIKE (Uso de % estándar)
+@admin.route("/upload_zip_urgencias", methods=["GET", "POST"])
+@login_required
+def subir_zip_urgencias():
+    if request.method == "POST":
+        anio = int(request.form.get("anio"))
+        modo_carga = request.form.get("modo_carga")
+        fecha_actualizacion = request.form.get("fecha_actualizacion")
+        estatus = request.form.get("estatus")
+        estatus_inicio = request.form.get("estatus_inicio")
+
+        if "file" not in request.files:
+            flash("No hay archivo en la solicitud", "danger")
+            return redirect(url_for("admin.subir_zip_urgencias"))
+
+        file = request.files["file"]
+        if file.filename == "" or not (file and archivo_permitido(file.filename)):
+            flash("Archivo no válido o no seleccionado", "danger")
+            return redirect(url_for("admin.subir_zip_urgencias"))
+
+        carpeta_nombre = f"urgencias_{anio}"
+        carpeta_destino = os.path.join(
+            current_app.root_path, "uploads", carpeta_nombre
+        )
+
+        if modo_carga == "actualizar" and os.path.exists(carpeta_destino):
+            shutil.rmtree(carpeta_destino)
+        os.makedirs(carpeta_destino, exist_ok=True)
+
+        filename = secure_filename(file.filename)
+        zip_path = os.path.join(carpeta_destino, filename)
+        file.save(zip_path)
+
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall(carpeta_destino)
+
+        app = current_app._get_current_object()
+        user_id = session.get("user_id")
+
+        hilo = threading.Thread(
+            target=tarea_segundo_plano,
+            args=(
+                app,
+                anio,
+                modo_carga,
+                fecha_actualizacion,
+                estatus,
+                estatus_inicio,
+                carpeta_destino,
+                filename,
+                user_id,
+            ),
+        )
+        hilo.start()
+
+        flash(
+            f"El archivo para {anio} se ha subido e iniciado su procesamiento en segundo plano.",
+            "info",
+        )
+        return redirect(url_for("admin.subir_zip_urgencias"))
+
+    return render_template("admin/subir_zip_urgencias.html")
+
+
+def procesar_txt_detallado_urgencias(
+    conn, cursor, carga_id, carpeta_destino, anio_seleccionado
+):
+    cursor.execute("SELECT clues FROM catalogo_unidades")
+    clues_validas = set(row[0].upper().strip() for row in cursor.fetchall())
+
+    cursor.execute("DESCRIBE urgencias_registros")
+    columnas_db = [
+        col[0]
+        for col in cursor.fetchall()
+        if "auto_increment" not in col[5].lower() and col[0] != "id"
+    ]
+
+    path_urg = None
+    for root, _, files in os.walk(carpeta_destino):
+        for f in files:
+            if f.lower().strip() == "urgencias.txt":
+                path_urg = os.path.join(root, f)
+                break
+
+    if not path_urg:
+        raise Exception("No se encontró el archivo urgencias.txt en el ZIP")
+
+    df = pd.read_csv(path_urg, sep="|", encoding="utf-8-sig", dtype=str)
+
+    if "CLUES" in df.columns:
+        df["CLUES"] = df["CLUES"].str.upper().str.strip()
+        df = df[df["CLUES"].isin(clues_validas)].copy()
+    else:
+        raise Exception("El archivo no contiene la columna 'CLUES'")
+
+    df["anio"] = anio_seleccionado
+    df["carga_id"] = carga_id
+
+    for col in columnas_db:
+        if col not in df.columns:
+            df[col] = None
+
+    df_final = df[columnas_db].copy()
+
+    columnas_hora = ["HORASESTANCIA", "hora_ingreso", "hora_alta"]
+    for col_h in columnas_hora:
+        if col_h in df_final.columns:
+            df_final[col_h] = df_final[col_h].replace(
+                ["99:99", "9999", "99:9", " : "], None
+            )
+
+    df_final = df_final.where(pd.notnull(df_final), None)
+
+    bloque_size = 3000
+    valores = [
+        tuple(None if pd.isna(x) else x for x in row)
+        for row in df_final.to_numpy()
+    ]
+    total = len(valores)
+
+    placeholders = ", ".join(["%s"] * len(columnas_db))
+    columnas_sql = ", ".join(columnas_db)
+    sql = f"INSERT INTO urgencias_registros ({columnas_sql}) VALUES ({placeholders})"
+
+    for i in range(0, total, bloque_size):
+        bloque = valores[i : i + bloque_size]
+        cursor.executemany(sql, bloque)
+        conn.commit()
+
+        progreso = int(((i + len(bloque)) / total) * 85)
+        cursor.execute(
+            "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
+            (f"CARGANDO REGISTROS ({progreso}%)", carga_id),
+        )
+        conn.commit()
+
+
 def actualizar_urgencias_agregado(conn, cursor, anio):
     cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
     conn.commit()
