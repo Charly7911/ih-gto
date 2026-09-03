@@ -345,9 +345,18 @@ def subir_zip_urgencias():
     return render_template("admin/subir_zip_urgencias.html")
 
 
+
 def procesar_txt_detallado_urgencias(
     conn, cursor, carga_id, carpeta_destino, anio_seleccionado
 ):
+    # 📌 1. Notificar inicio
+    cursor.execute(
+        "UPDATE cargas_zip SET estatus_proceso = 'LEYENDO CATÁLOGOS (2%)' WHERE id = %s",
+        (carga_id,),
+    )
+    conn.commit()
+
+    # Cargar catálogos válidos
     cursor.execute("SELECT clues FROM catalogo_unidades")
     clues_validas = set(row[0].upper().strip() for row in cursor.fetchall())
 
@@ -358,6 +367,7 @@ def procesar_txt_detallado_urgencias(
         if "auto_increment" not in col[5].lower() and col[0] != "id"
     ]
 
+    # 📌 2. Ubicar archivo
     path_urg = None
     for root, _, files in os.walk(carpeta_destino):
         for f in files:
@@ -368,52 +378,90 @@ def procesar_txt_detallado_urgencias(
     if not path_urg:
         raise Exception("No se encontró el archivo urgencias.txt en el ZIP")
 
-    df = pd.read_csv(path_urg, sep="|", encoding="utf-8-sig", dtype=str)
+    # Contar total de líneas aproximadamente para la barra de progreso
+    cursor.execute(
+        "UPDATE cargas_zip SET estatus_proceso = 'ANALIZANDO TXT DE 52MB (5%)' WHERE id = %s",
+        (carga_id,),
+    )
+    conn.commit()
 
-    if "CLUES" in df.columns:
-        df["CLUES"] = df["CLUES"].str.upper().str.strip()
-        df = df[df["CLUES"].isin(clues_validas)].copy()
-    else:
-        raise Exception("El archivo no contiene la columna 'CLUES'")
+    with open(path_urg, "r", encoding="utf-8-sig", errors="ignore") as f:
+        total_lineas = sum(1 for _ in f) - 1  # Menos el encabezado
 
-    df["anio"] = anio_seleccionado
-    df["carga_id"] = carga_id
+    if total_lineas <= 0:
+        raise Exception("El archivo urgencias.txt está vacío")
 
-    for col in columnas_db:
-        if col not in df.columns:
-            df[col] = None
-
-    df_final = df[columnas_db].copy()
-
-    columnas_hora = ["HORASESTANCIA", "hora_ingreso", "hora_alta"]
-    for col_h in columnas_hora:
-        if col_h in df_final.columns:
-            df_final[col_h] = df_final[col_h].replace(
-                ["99:99", "9999", "99:9", " : "], None
-            )
-
-    df_final = df_final.where(pd.notnull(df_final), None)
-
-    bloque_size = 3000
-    valores = [
-        tuple(None if pd.isna(x) else x for x in row)
-        for row in df_final.to_numpy()
-    ]
-    total = len(valores)
-
+    # Prepared statement
     placeholders = ", ".join(["%s"] * len(columnas_db))
     columnas_sql = ", ".join(columnas_db)
-    sql = f"INSERT INTO urgencias_registros ({columnas_sql}) VALUES ({placeholders})"
+    sql_insert = f"INSERT INTO urgencias_registros ({columnas_sql}) VALUES ({placeholders})"
 
-    for i in range(0, total, bloque_size):
-        bloque = valores[i : i + bloque_size]
-        cursor.executemany(sql, bloque)
+    # 📌 3. Procesar por fragmentos (Chunks) de 10,000 filas
+    chunksize = 10000
+    lineas_procesadas = 0
+
+    reader = pd.read_csv(
+        path_urg,
+        sep="|",
+        encoding="utf-8-sig",
+        dtype=str,
+        chunksize=chunksize,
+        low_memory=False,
+        on_bad_lines="skip",
+    )
+
+    columnas_hora = ["HORASESTANCIA", "hora_ingreso", "hora_alta"]
+
+    for chunk in reader:
+        # Filtrar por CLUES
+        if "CLUES" in chunk.columns:
+            chunk["CLUES"] = chunk["CLUES"].str.upper().str.strip()
+            chunk = chunk[chunk["CLUES"].isin(clues_validas)].copy()
+        else:
+            raise Exception("El archivo no contiene la columna 'CLUES'")
+
+        if chunk.empty:
+            lineas_procesadas += chunksize
+            continue
+
+        chunk["anio"] = anio_seleccionado
+        chunk["carga_id"] = carga_id
+
+        # Asegurar columnas faltantes
+        for col in columnas_db:
+            if col not in chunk.columns:
+                chunk[col] = None
+
+        chunk = chunk[columnas_db].copy()
+
+        # Limpieza de horas
+        for col_h in columnas_hora:
+            if col_h in chunk.columns:
+                chunk[col_h] = chunk[col_h].replace(
+                    ["99:99", "9999", "99:9", " : "], None
+                )
+
+        # Convertir NaNs a None de Python (MySQL NULL)
+        chunk = chunk.where(pd.notnull(chunk), None)
+
+        # Preparar tuplas para MySQL
+        valores = [tuple(row) for row in chunk.to_numpy()]
+
+        # Insertar bloque
+        cursor.executemany(sql_insert, valores)
         conn.commit()
 
-        progreso = int(((i + len(bloque)) / total) * 85)
+        # Actualizar progreso
+        lineas_procesadas += len(chunk)
+        progreso = 5 + int((lineas_procesadas / total_lineas) * 80)
+        progreso = min(progreso, 85)  # Tope de 85% antes de agregados
+
         cursor.execute(
             "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
-            (f"CARGANDO REGISTROS ({progreso}%)", carga_id),
+            (
+                f"CARGANDO REGISTROS ({progreso}%) [{lineas_procesadas:,}/{total_lineas:,}]",
+                carga_id,
+            ),
         )
         conn.commit()
 
