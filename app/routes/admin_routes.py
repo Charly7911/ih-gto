@@ -6,7 +6,7 @@ import os
 import shutil
 import threading
 import MySQLdb
-from flask import Blueprint, current_app, jsonify, render_template, request, redirect, session, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, session, jsonify
 from flask_login import login_required, current_user
 from app import mysql
 from werkzeug.security import generate_password_hash
@@ -164,7 +164,6 @@ def archivo_permitido(filename):
 # ************************* SUBIR CARPETA Y ARCHIVO DE URGENCIAS ***************************
 # *****************************************************************************************
 
-# 💡 RUTA PARA EL JAVASCRIPT (Consulta el estatus actual en cargas_zip)
 @admin.route("/estado_carga_urgencias", methods=["GET"])
 @login_required
 def estado_carga_urgencias():
@@ -198,16 +197,15 @@ def estado_carga_urgencias():
             cursor.close()
 
 
-# 💡 FUNCIÓN PRINCIPAL DE PROCESAMIENTO (Estructura Síncrona)
+# 💡 FUNCIÓN PRINCIPAL DE PROCESAMIENTO
 def ejecutar_procesamiento_urgencias(app, anio, modo_carga, fecha_actualizacion, estatus, estatus_inicio, carpeta_destino, filename, user_id):
     with app.app_context():
         conn = mysql.connection
         cursor = conn.cursor()
-        carga_id = None  # Evita UnboundLocalError en el except
+        carga_id = None
 
         try:
             print(f">>> INICIANDO PROCESAMIENTO DIRECTO PARA {filename}")
-            # Configuración para soportar archivos de mayor peso
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
             cursor.execute("SET innodb_lock_wait_timeout = 600")
 
@@ -215,21 +213,18 @@ def ejecutar_procesamiento_urgencias(app, anio, modo_carga, fecha_actualizacion,
                 cursor.execute("DELETE FROM urgencias_registros WHERE anio = %s", (anio,))
                 cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
 
-            # 1. Registrar inicio de proceso en cargas_zip
             sql_historial = """
                 INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso) 
-                VALUES (%s, %s, %s, 'INICIANDO (0%)')
+                VALUES (%s, %s, %s, 'INICIANDO (0%%%%)')
             """
             cursor.execute(sql_historial, (filename, carpeta_destino, user_id))
             carga_id = cursor.lastrowid
             conn.commit()
 
-            # 2. Procesar e insertar registros desde el TXT
             procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, anio)
 
-            # 3. Notificar cambio a cálculo de agregados
             cursor.execute(
-                "UPDATE cargas_zip SET estatus_proceso = 'CALCULANDO AGREGADOS (90%)' WHERE id = %s", 
+                "UPDATE cargas_zip SET estatus_proceso = 'CALCULANDO AGREGADOS (90%%%%)' WHERE id = %s", 
                 (carga_id,)
             )
             conn.commit()
@@ -248,9 +243,8 @@ def ejecutar_procesamiento_urgencias(app, anio, modo_carga, fecha_actualizacion,
                 (anio, estatus_inicio, fecha_actualizacion, estatus),
             )
 
-            # 4. Finalización exitosa
             cursor.execute(
-                "UPDATE cargas_zip SET estatus_proceso = 'COMPLETADO (100%)' WHERE id = %s", 
+                "UPDATE cargas_zip SET estatus_proceso = 'COMPLETADO (100%%%%)' WHERE id = %s", 
                 (carga_id,)
             )
             conn.commit()
@@ -266,13 +260,13 @@ def ejecutar_procesamiento_urgencias(app, anio, modo_carga, fecha_actualizacion,
                     (f"ERROR: {err_clean}", carga_id)
                 )
                 conn.commit()
-            raise e  # Re-lanza la excepción para ser atrapada en la ruta web
+            raise e
         finally:
             cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
             cursor.close()
 
 
-# 💡 RUTA DE SUBIDA DEL ARCHIVO (Adaptada para ejecuciones síncronas en PythonAnywhere)
+# 💡 RUTA DE SUBIDA DEL ARCHIVO
 @admin.route("/upload_zip_urgencias", methods=["GET", "POST"])
 @login_required
 def subir_zip_urgencias():
@@ -312,7 +306,6 @@ def subir_zip_urgencias():
         app = current_app._get_current_object()
         user_id = current_user.id if hasattr(current_user, "id") else session.get("user_id")
 
-        # 🚀 EJECUCIÓN DIRECTA SÍNCRONA (Reemplaza a los hilos de threading)
         try:
             ejecutar_procesamiento_urgencias(
                 app,
@@ -399,10 +392,10 @@ def procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, an
         
         pct = 15 + int(((i + len(bloque)) / total) * 70) if total > 0 else 85
         
-        # 🔑 CORRECCIÓN: Se utiliza %%%% para escapar el signo % ante PyMySQL
+        # 🔑 CORRECCIÓN: Usar %%%% para mantener %% en MySQL tras la f-string
         cursor.execute(
             "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
-            (f"CARGANDO REGISTROS ({pct}%%)", carga_id)
+            (f"CARGANDO REGISTROS ({pct}%%%%)", carga_id)
         )
         conn.commit()
 
