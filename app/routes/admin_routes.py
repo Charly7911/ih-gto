@@ -197,13 +197,14 @@ def estado_carga_urgencias():
             cursor.close()
 
 
-# 💡 TAREA EN SEGUNDO PLANO (Parámetro conn eliminado de la firma)
+# 💡 TAREA EN SEGUNDO PLANO - URGENCIAS
 def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, estatus_inicio, carpeta_destino, filename, user_id):
     with app.app_context():
-        # 📌 Se obtiene la conexión limpia propia de este hilo
+        # 📌 Conexión aislada del hilo actual
         conn = mysql.connection
         cursor = conn.cursor()
-        carga_id = None
+        carga_id = None  # 📌 Definir previamente para evitar UnboundLocalError en el except
+
         try:
             print(">>> 4. HILO INICIADO CORRECTAMENTE EN SEGUNDO PLANO")
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
@@ -213,7 +214,7 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
                 cursor.execute("DELETE FROM urgencias_registros WHERE anio = %s", (anio,))
                 cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
 
-            # 📌 1. Registrar con porcentaje inicial para la interfaz
+            # 📌 1. Registrar inicio de proceso en cargas_zip
             sql_historial = """
                 INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso) 
                 VALUES (%s, %s, %s, 'INICIANDO (0%)')
@@ -223,10 +224,10 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
             conn.commit()
             print(f">>> 5. REGISTRO ID {carga_id} CREADO EN BD")
 
-            # ⚙️ Procesar TXT e insertar por bloques (actualiza a ~15% - 85%)
+            # ⚙️ Procesar TXT e insertar registros
             procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, anio)
 
-            # 📌 2. Actualizar estado a cálculo de agregados
+            # 📌 2. Notificar avance a cálculo de agregados
             cursor.execute(
                 "UPDATE cargas_zip SET estatus_proceso = 'CALCULANDO AGREGADOS (90%)' WHERE id = %s", 
                 (carga_id,)
@@ -247,7 +248,7 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
                 (anio, estatus_inicio, fecha_actualizacion, estatus),
             )
 
-            # 📌 3. Marcar como COMPLETADO
+            # 📌 3. Finalización con éxito
             cursor.execute(
                 "UPDATE cargas_zip SET estatus_proceso = 'COMPLETADO (100%)' WHERE id = %s", 
                 (carga_id,)
@@ -257,8 +258,9 @@ def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, est
 
         except Exception as e:
             conn.rollback()
-            print(f"❌ Error en segundo plano: {e}")
-            if carga_id:
+            print(f"❌ Error en segundo plano (Urgencias): {e}")
+            # 📌 Evaluación segura de variable asignada
+            if carga_id is not None:
                 err_clean = str(e).replace("'", "").replace('"', "")[:100]
                 cursor.execute(
                     "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s", 
@@ -453,7 +455,6 @@ def actualizar_urgencias_agregado(cursor, anio):
 #***************************************************************************************
 #************************* SUBIR CARPETA Y ARCHIVO DE EGRESOS****************************
 #****************************************************************************************
-
 def tarea_segundo_plano_egresos(
     app,
     anio,
@@ -469,8 +470,11 @@ def tarea_segundo_plano_egresos(
     with app.app_context():
         conn = mysql.connection
         cursor = conn.cursor()
+        carga_id = None  # 📌 Definir antes del try para evitar UnboundLocalError
+
         try:
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+            cursor.execute("SET innodb_lock_wait_timeout = 300")
 
             if modo_carga == "actualizar":
                 cursor.execute(
@@ -488,23 +492,21 @@ def tarea_segundo_plano_egresos(
                     (anio,),
                 )
 
-            # Insertar registro con estatus 'EN_PROCESO'
-            cursor.execute(
-                """
-                INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_carga)
-                VALUES (%s, %s, %s, %s)
-            """,
-                (filename, carpeta_nombre, user_id, "EN_PROCESO"),
-            )
+            # 📌 CORREGIDO: Cambiado estatus_carga -> estatus_proceso
+            sql_historial = """
+                INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso)
+                VALUES (%s, %s, %s, 'EN_PROCESO')
+            """
+            cursor.execute(sql_historial, (filename, carpeta_nombre, user_id))
             carga_id = cursor.lastrowid
             conn.commit()
 
-            # Tus funciones tal como las tienes
+            # Procesamiento de archivos e inserciones
             procesar_txt_detallado_egresos(
                 carga_id, carpeta_destino, anio, modo_carga
             )
-            recalcular_procedimiento_agregado(anio)
-            recalcular_egresos_agregado(anio)
+            recalcular_procedimiento_agregado(cursor, anio)
+            recalcular_egresos_agregado(cursor, anio)
 
             cursor.execute(
                 """
@@ -518,22 +520,25 @@ def tarea_segundo_plano_egresos(
                 (anio, estatus_inicio, fecha_actualizacion, estatus),
             )
 
-            # Actualizar estatus a 'FINALIZADO'
+            # 📌 CORREGIDO: Cambiado estatus_carga -> estatus_proceso
             cursor.execute(
-                "UPDATE cargas_zip SET estatus_carga = 'FINALIZADO' WHERE id = %s",
+                "UPDATE cargas_zip SET estatus_proceso = 'FINALIZADO' WHERE id = %s",
                 (carga_id,),
             )
             conn.commit()
-            print(f"✅ Proceso terminado con éxito para {filename}")
+            print(f"✅ Proceso egresos terminado con éxito para {filename}")
 
         except Exception as e:
             conn.rollback()
-            cursor.execute(
-                "UPDATE cargas_zip SET estatus_carga = 'ERROR' WHERE id = %s",
-                (carga_id,),
-            )
-            conn.commit()
-            print(f"❌ Error en la carga en segundo plano: {e}")
+            print(f"❌ Error en la carga de egresos en segundo plano: {e}")
+            # 📌 CORREGIDO: Solo se ejecuta el UPDATE si carga_id existe
+            if carga_id is not None:
+                err_clean = str(e).replace("'", "").replace('"', "")[:100]
+                cursor.execute(
+                    "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
+                    (f"ERROR: {err_clean}", carga_id),
+                )
+                conn.commit()
         finally:
             cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
             cursor.close()
