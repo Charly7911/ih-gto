@@ -433,10 +433,46 @@ def actualizar_urgencias_agregado(cursor, anio):
     """
     cursor.execute(sql, (anio,))
 
+
 #***************************************************************************************
 #************************* SUBIR CARPETA Y ARCHIVO DE EGRESOS****************************
 #****************************************************************************************
-def tarea_segundo_plano_egresos(
+# 💡 RUTA AJAX PARA ESTADO DE CARGA DE EGRESOS
+@admin.route("/estado_carga_egresos", methods=["GET"])
+@login_required
+def estado_carga_egresos():
+    cursor = None
+    try:
+        conn = mysql.connection
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            """
+            SELECT estatus_proceso 
+            FROM cargas_zip 
+            WHERE usuario_id = %s 
+            ORDER BY id DESC 
+            LIMIT 1
+            """,
+            (current_user.id,),
+        )
+        registro = cursor.fetchone()
+
+        if registro and registro[0]:
+            return jsonify({"estatus": registro[0]}), 200
+        return jsonify({"estatus": "Sin cargas registradas"}), 200
+
+    except Exception as e:
+        print(f"❌ Error consultando estado_carga_egresos: {e}")
+        return jsonify({"estatus": f"Error: {str(e)}"}), 200
+
+    finally:
+        if cursor:
+            cursor.close()
+
+
+# 💡 FUNCIÓN PRINCIPAL DE PROCESAMIENTO DE EGRESOS (SÍNCRONA)
+def ejecutar_procesamiento_egresos(
     app,
     anio,
     modo_carga,
@@ -451,44 +487,47 @@ def tarea_segundo_plano_egresos(
     with app.app_context():
         conn = mysql.connection
         cursor = conn.cursor()
-        carga_id = None  # 📌 Definir antes del try para evitar UnboundLocalError
+        carga_id = None
 
         try:
+            print(f">>> INICIANDO PROCESAMIENTO DIRECTO PARA EGRESOS: {filename}")
+            
+            # Desactivar restricciones para acelerar la inserción masiva
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
-            cursor.execute("SET innodb_lock_wait_timeout = 300")
+            cursor.execute("SET innodb_lock_wait_timeout = 600")
 
+            # 1. Si es modo actualizar, borrar datos previos del año
             if modo_carga == "actualizar":
-                cursor.execute(
-                    "DELETE FROM egresos_registros WHERE anio = %s", (anio,)
-                )
-                cursor.execute(
-                    "DELETE FROM procedimientos_registros WHERE anio = %s",
-                    (anio,),
-                )
-                cursor.execute(
-                    "DELETE FROM egresos_agregado WHERE anio = %s", (anio,)
-                )
-                cursor.execute(
-                    "DELETE FROM procedimiento_agregado WHERE anio = %s",
-                    (anio,),
-                )
+                cursor.execute("DELETE FROM egresos_registros WHERE anio = %s", (anio,))
+                cursor.execute("DELETE FROM procedimientos_registros WHERE anio = %s", (anio,))
+                cursor.execute("DELETE FROM egresos_agregado WHERE anio = %s", (anio,))
+                cursor.execute("DELETE FROM procedimiento_agregado WHERE anio = %s", (anio,))
+                conn.commit() # Confirmar borrado previo para liberar locks
 
-            # 📌 CORREGIDO: Cambiado estatus_carga -> estatus_proceso
+            # 2. Registrar inicio en historial
             sql_historial = """
                 INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso)
-                VALUES (%s, %s, %s, 'EN_PROCESO')
+                VALUES (%s, %s, %s, 'INICIANDO (0%%)')
             """
             cursor.execute(sql_historial, (filename, carpeta_nombre, user_id))
             carga_id = cursor.lastrowid
             conn.commit()
 
-            # Procesamiento de archivos e inserciones
-            procesar_txt_detallado_egresos(
-                carga_id, carpeta_destino, anio, modo_carga
+            # 3. Procesar archivos TXT (inserción por lotes)
+            procesar_txt_detallado_egresos(conn, cursor, carga_id, carpeta_destino, anio, modo_carga)
+
+            # 4. Actualizar estado e iniciar recálculo de agregados
+            cursor.execute(
+                "UPDATE cargas_zip SET estatus_proceso = 'CALCULANDO AGREGADOS (90%%)' WHERE id = %s", 
+                (carga_id,)
             )
+            conn.commit()
+
+            # Ejecución de procedimientos agregados y egresos agregados con la firma (cursor, anio)
             recalcular_procedimiento_agregado(cursor, anio)
             recalcular_egresos_agregado(cursor, anio)
 
+            # 5. Actualizar control anual
             cursor.execute(
                 """
                 INSERT INTO seul_control_anual (anio, estatus_inicio, fecha_actualizacion, estatus)
@@ -501,30 +540,41 @@ def tarea_segundo_plano_egresos(
                 (anio, estatus_inicio, fecha_actualizacion, estatus),
             )
 
-            # 📌 CORREGIDO: Cambiado estatus_carga -> estatus_proceso
+            # 6. Marcar como COMPLETADO
             cursor.execute(
-                "UPDATE cargas_zip SET estatus_proceso = 'FINALIZADO' WHERE id = %s",
+                "UPDATE cargas_zip SET estatus_proceso = 'COMPLETADO (100%%)' WHERE id = %s",
                 (carga_id,),
             )
+            
+            # Confirmar toda la transacción (Agregados + Control Anual + Estatus)
             conn.commit()
             print(f"✅ Proceso egresos terminado con éxito para {filename}")
 
         except Exception as e:
             conn.rollback()
-            print(f"❌ Error en la carga de egresos en segundo plano: {e}")
-            # 📌 CORREGIDO: Solo se ejecuta el UPDATE si carga_id existe
+            print(f"❌ Error en la carga de egresos: {e}")
             if carga_id is not None:
-                err_clean = str(e).replace("'", "").replace('"', "")[:100]
-                cursor.execute(
-                    "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
-                    (f"ERROR: {err_clean}", carga_id),
-                )
-                conn.commit()
+                try:
+                    err_clean = str(e).replace("'", "").replace('"', "")[:100]
+                    cursor.execute(
+                        "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
+                        (f"ERROR: {err_clean}", carga_id),
+                    )
+                    conn.commit()
+                except Exception as err_update:
+                    print(f"❌ No se pudo actualizar el estado de error en cargas_zip: {err_update}")
+            raise e
+
         finally:
-            cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+            # Restaurar restricciones siempre al finalizar
+            try:
+                cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+            except Exception:
+                pass
             cursor.close()
 
 
+# 💡 RUTA DE SUBIDA PARA EGRESOS
 @admin.route("/upload_zip_egresos", methods=["GET", "POST"])
 @login_required
 def subir_zip_egresos():
@@ -535,21 +585,18 @@ def subir_zip_egresos():
         estatus_inicio = request.form.get("estatus_inicio")
         modo_carga = request.form.get("modo_carga")
 
-        if "file" not in request.files:
-            flash("No hay archivo en la solicitud", "danger")
+        file = request.files.get("file") or request.files.get("archivo")
+
+        if not file or file.filename == "":
+            flash("No se seleccionó ningún archivo", "danger")
             return redirect(url_for("admin.subir_zip_egresos"))
 
-        file = request.files["file"]
-        if file.filename == "" or not (
-            file and archivo_permitido(file.filename)
-        ):
-            flash("Archivo no válido o no seleccionado", "danger")
+        if not archivo_permitido(file.filename):
+            flash("Formato de archivo no válido", "danger")
             return redirect(url_for("admin.subir_zip_egresos"))
 
         carpeta_nombre = f"egresos_{anio}"
-        carpeta_destino = os.path.join(
-            current_app.root_path, "uploads", carpeta_nombre
-        )
+        carpeta_destino = os.path.join(current_app.root_path, "uploads", carpeta_nombre)
 
         if modo_carga == "actualizar" and os.path.exists(carpeta_destino):
             shutil.rmtree(carpeta_destino)
@@ -562,13 +609,11 @@ def subir_zip_egresos():
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             zip_ref.extractall(carpeta_destino)
 
-        # Iniciar el hilo en segundo plano
         app = current_app._get_current_object()
-        user_id = session.get("user_id")
+        user_id = current_user.id if hasattr(current_user, "id") else session.get("user_id")
 
-        threading.Thread(
-            target=tarea_segundo_plano_egresos,
-            args=(
+        try:
+            ejecutar_procesamiento_egresos(
                 app,
                 anio,
                 modo_carga,
@@ -579,30 +624,27 @@ def subir_zip_egresos():
                 carpeta_nombre,
                 filename,
                 user_id,
-            ),
-        ).start()
+            )
+            flash(f"El archivo de Egresos para {anio} se ha procesado e insertado correctamente.", "success")
+        except Exception as e:
+            flash(f"Ocurrió un error al procesar el archivo: {e}", "danger")
 
-        flash(
-            f"El archivo para {anio} fue subido. El procesamiento ha iniciado en segundo plano.",
-            "info",
-        )
         return redirect(url_for("admin.subir_zip_egresos"))
 
     return render_template("admin/subir_zip_egresos.html")
 
 
 
-
-def procesar_txt_detallado_egresos(carga_id, carpeta_destino, anio, modo_carga='agregar', bloque_size=10000):
+# ==============================================================================
+# 1. PROCESAMIENTO E INSERCIÓN DE TXT (EGRESOS Y PROCEDIMIENTOS)
+# ==============================================================================
+def procesar_txt_detallado_egresos(conn, cursor, carga_id, carpeta_destino, anio, modo_carga='agregar', bloque_size=10000):
     import csv
     import os
-    print(f"➡️ Iniciando Procesamiento Inteligente. Año: {anio}")
+    print(f"➡️ Iniciando Procesamiento Inteligente de Egresos. Año: {anio}")
     
-    conn = mysql.connection
-    cursor = conn.cursor()
     egresos_por_id = {}
 
-    # 1. Función de limpieza (definida correctamente al inicio)
     def limpiar_dato(valor, columna=None):
         if valor is None:
             return None
@@ -610,20 +652,19 @@ def procesar_txt_detallado_egresos(carga_id, carpeta_destino, anio, modo_carga='
         v = str(valor).strip()
 
         if v == "" or v.upper() == "NULL":
-            # ⚠️ Para columnas clave, NO regreses 0
             if columna in ['CLUES', 'EGRESO']:
                 return None
             return 0
 
         try:
-            if '.' in v:
+            if '.' in v and columna not in ['CLUES', 'EGRESO']:
                 return int(float(v))
             return v
         except:
             return None if columna in ['CLUES', 'EGRESO'] else 0
 
     try:
-        # --- SECCIÓN EGRESOS ---
+        # --- SECCIÓN 1: EGRESOS ---
         path_egresos = None
         for root, _, files in os.walk(carpeta_destino):
             for archivo in files:
@@ -635,17 +676,25 @@ def procesar_txt_detallado_egresos(carga_id, carpeta_destino, anio, modo_carga='
             with open(path_egresos, 'r', encoding='utf-8-sig') as f:
                 lector = csv.DictReader(f, delimiter='|')
                 columnas_txt = lector.fieldnames
-                # Mapear ID a registro_id
+                
+                # Mapear 'ID' de TXT a 'registro_id' en BD SQL
                 columnas_sql = ['registro_id' if c.upper() == 'ID' else c for c in columnas_txt]
                 columnas_sql.extend(['anio', 'carga_id'])
 
-                sql_egre = f"INSERT INTO egresos_registros ({', '.join(columnas_sql)}) VALUES ({', '.join(['%s']*len(columnas_sql))}) ON DUPLICATE KEY UPDATE carga_id = VALUES(carga_id)"
+                sql_egre = f"""
+                    INSERT INTO egresos_registros ({', '.join(columnas_sql)}) 
+                    VALUES ({', '.join(['%s']*len(columnas_sql))}) 
+                    ON DUPLICATE KEY UPDATE carga_id = VALUES(carga_id)
+                """
 
                 bloque = []
+                registros_procesados = 0
+                
                 for fila_dict in lector:
                     valores = []
                     for col in columnas_txt:
                         val = limpiar_dato(fila_dict[col], col.upper())
+                        
                         # Normalizar SERVICIOEGRE
                         if col.upper() == 'SERVICIOEGRE':
                             try:
@@ -655,7 +704,8 @@ def procesar_txt_detallado_egresos(carga_id, carpeta_destino, anio, modo_carga='
                                 elif (300 <= c_srv <= 399) or (700 <= c_srv <= 799): val = '300'
                                 elif 400 <= c_srv <= 499: val = '400'
                                 elif 500 <= c_srv <= 599 or 800 <= c_srv <= 999: val = '500'
-                            except: pass
+                            except: 
+                                pass
                         valores.append(val)
 
                     f_egre = fila_dict.get('EGRESO', '')
@@ -663,15 +713,28 @@ def procesar_txt_detallado_egresos(carga_id, carpeta_destino, anio, modo_carga='
                     valores.extend([r_anio, carga_id])
                     
                     reg_id = fila_dict.get('ID')
-                    if reg_id: egresos_por_id[reg_id] = r_anio
+                    if reg_id: 
+                        egresos_por_id[reg_id] = r_anio
                     
                     bloque.append(tuple(valores))
+                    
                     if len(bloque) >= bloque_size:
                         cursor.executemany(sql_egre, bloque)
+                        registros_procesados += len(bloque)
+                        
+                        # Notificar avance (Rango 10% - 50%)
+                        cursor.execute(
+                            "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
+                            (f"CARGANDO EGRESOS ({registros_procesados} regs) (30%%%%)", carga_id)
+                        )
+                        conn.commit()
                         bloque = []
-                if bloque: cursor.executemany(sql_egre, bloque)
 
-        # --- SECCIÓN PROCEDIMIENTOS ---
+                if bloque: 
+                    cursor.executemany(sql_egre, bloque)
+                    conn.commit()
+
+        # --- SECCIÓN 2: PROCEDIMIENTOS ---
         path_proc = None
         for root, _, files in os.walk(carpeta_destino):
             for archivo in files:
@@ -686,45 +749,63 @@ def procesar_txt_detallado_egresos(carga_id, carpeta_destino, anio, modo_carga='
                 cols_p_sql = ['egreso_id' if c.upper() == 'ID' else c for c in cols_p_txt]
                 
                 has_anio = 'ANIO' in [c.upper() for c in cols_p_txt]
-                if not has_anio: cols_p_sql.append('anio')
+                if not has_anio: 
+                    cols_p_sql.append('anio')
                 cols_p_sql.append('carga_id')
 
-                sql_proc = f"INSERT INTO procedimientos_registros ({', '.join(cols_p_sql)}) VALUES ({', '.join(['%s']*len(cols_p_sql))})"
+                sql_proc = f"""
+                    INSERT INTO procedimientos_registros ({', '.join(cols_p_sql)}) 
+                    VALUES ({', '.join(['%s']*len(cols_p_sql))})
+                """
 
                 bloque_p = []
+                procs_procesados = 0
+                
                 for fila_p_dict in lector_p:
                     valores_p = [limpiar_dato(fila_p_dict[c]) for c in cols_p_txt]
+                    
                     if not has_anio:
                         valores_p.append(egresos_por_id.get(fila_p_dict.get('ID'), anio))
                     valores_p.append(carga_id)
                     
                     bloque_p.append(tuple(valores_p))
+                    
                     if len(bloque_p) >= bloque_size:
                         cursor.executemany(sql_proc, bloque_p)
+                        procs_procesados += len(bloque_p)
+                        
+                        # Notificar avance (Rango 50% - 80%)
+                        cursor.execute(
+                            "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
+                            (f"CARGANDO PROCEDIMIENTOS ({procs_procesados} regs) (70%%%%)", carga_id)
+                        )
+                        conn.commit()
                         bloque_p = []
-                if bloque_p: cursor.executemany(sql_proc, bloque_p)
+
+                if bloque_p: 
+                    cursor.executemany(sql_proc, bloque_p)
+                    conn.commit()
 
     except Exception as e:
-        print(f"❌ Error en la carga: {e}")
+        print(f"❌ Error en procesar_txt_detallado_egresos: {e}")
         raise e
     finally:
         egresos_por_id.clear()
 
-        
-            
-def recalcular_procedimiento_agregado(anio):
-    # Usamos la conexión existente sin crear commits locales
-    cursor = mysql.connection.cursor()
 
+# ==============================================================================
+# 2. RECÁLCULO DE AGREGADOS DE PROCEDIMIENTOS
+# ==============================================================================
+def recalcular_procedimiento_agregado(cursor, anio):
+    """
+    Recibe el cursor de la transacción global activa.
+    No realiza commit local para mantener el atomicidad.
+    """
     try:
-        # 1. Limpieza selectiva del año actual
         print(f"🧹 Limpiando datos de procedimientos para el año {anio}...")
-        sql_delete = "DELETE FROM procedimiento_agregado WHERE anio = %s"
-        cursor.execute(sql_delete, (anio,))
+        cursor.execute("DELETE FROM procedimiento_agregado WHERE anio = %s", (anio,))
 
-        # ===============================
-        # 1️⃣ PROCEDIMIENTOS DENTRO (QUIROF = 1)
-        # ===============================
+        # 1️⃣ PROCEDIMIENTOS DENTRO DE QUIRÓFANO (QUIROF = 1)
         print(f"⚙️ Calculando procedimientos dentro de quirófano {anio}...")
         sql_dentro = """
             INSERT INTO procedimiento_agregado (
@@ -754,18 +835,16 @@ def recalcular_procedimiento_agregado(anio):
             GROUP BY e.clues, p.anio, e.MES_ESTADISTICO
 
             ON DUPLICATE KEY UPDATE
-            med_int_proced_dentro = VALUES(med_int_proced_dentro),
-            cirugia_proced_dentro = VALUES(cirugia_proced_dentro),
-            gineco_proced_dentro = VALUES(gineco_proced_dentro),
-            pediatra_proced_dentro = VALUES(pediatra_proced_dentro),
-            otros_proced_dentro = VALUES(otros_proced_dentro),
-            total_proced_dentro = VALUES(total_proced_dentro)
+                med_int_proced_dentro = VALUES(med_int_proced_dentro),
+                cirugia_proced_dentro = VALUES(cirugia_proced_dentro),
+                gineco_proced_dentro = VALUES(gineco_proced_dentro),
+                pediatra_proced_dentro = VALUES(pediatra_proced_dentro),
+                otros_proced_dentro = VALUES(otros_proced_dentro),
+                total_proced_dentro = VALUES(total_proced_dentro)
         """
         cursor.execute(sql_dentro, (anio,))
 
-        # ===============================
-        # 2️⃣ PROCEDIMIENTOS FUERA (QUIROF = 2)
-        # ===============================
+        # 2️⃣ PROCEDIMIENTOS FUERA DE QUIRÓFANO (QUIROF = 2)
         print(f"⚙️ Actualizando procedimientos fuera de quirófano {anio}...")
         sql_fuera = """
             INSERT INTO procedimiento_agregado (
@@ -793,6 +872,7 @@ def recalcular_procedimiento_agregado(anio):
               AND p.quirof = 2
               AND p.anio = %s
             GROUP BY e.clues, p.anio, e.MES_ESTADISTICO
+
             ON DUPLICATE KEY UPDATE
                 med_int_proced_fuera = VALUES(med_int_proced_fuera),
                 cirugia_proced_fuera = VALUES(cirugia_proced_fuera),
@@ -803,9 +883,7 @@ def recalcular_procedimiento_agregado(anio):
         """
         cursor.execute(sql_fuera, (anio,))
 
-        # ===============================
         # 3️⃣ TOTALES GENERALES
-        # ===============================
         sql_totales = """
             UPDATE procedimiento_agregado
             SET total_procedimientos_gen = 
@@ -814,23 +892,18 @@ def recalcular_procedimiento_agregado(anio):
         """
         cursor.execute(sql_totales, (anio,))
 
-        # Eliminado: mysql.connection.commit()
-        print(f"✅ Cálculos de procedimientos para {anio} preparados en memoria.")
+        print(f"✅ Cálculos de procedimientos para {anio} preparados con éxito.")
 
     except Exception as e:
-        # Eliminado: mysql.connection.rollback()
         print(f"❌ Error al recalcular procedimientos: {e}")
-        raise e  # Lanzamos el error para que subir_zip_egresos haga el rollback global
-    finally:
-        # Importante: No cerramos el cursor aquí para que la siguiente función pueda seguir usándolo
-        pass
+        raise e
 
 
 
-def recalcular_egresos_agregado(anio):
-    # Usamos el cursor de la conexión actual
-    cursor = mysql.connection.cursor()
-    
+def recalcular_egresos_agregado(cursor, anio):
+    """
+    Recalcula la tabla egresos_agregado reutilizando el cursor de la transacción activa.
+    """
     try:
         print(f"🧹 Limpiando egresos_agregado para el año {anio}...")
         # Borramos los datos previos del año para evitar duplicados al insertar
@@ -1018,16 +1091,11 @@ def recalcular_egresos_agregado(anio):
         """
         
         cursor.execute(sql, (anio, anio))
-        # Eliminado: mysql.connection.commit()
-        print(f"✅ Cálculos de egresos_agregado para {anio} listos.")
+        print(f"✅ Cálculos de egresos_agregado para {anio} preparados.")
 
     except Exception as e:
-        # Eliminado: mysql.connection.rollback()
         print(f"❌ Error en recalcular_egresos_agregado: {str(e)}")
-        raise e # Relanzamos para activar el rollback global
-    finally:
-        # No cerramos el cursor aquí para evitar que falle el proceso final en la ruta principal
-        pass
+        raise e
 
 
 #********************************************************

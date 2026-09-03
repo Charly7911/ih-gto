@@ -1,7 +1,6 @@
 {% extends "layout/base.html" %}
 
 {% block content %}
-
 <style>
     .zona-formulario {
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -27,19 +26,23 @@
 
     .zona-formulario form label {
         display: block;
-        font-size: 1rem;
+        font-size: 0.95rem;
         color: #333;
-        margin-bottom: 10px;
+        margin-top: 15px;
+        margin-bottom: 5px;
         font-weight: 500;
     }
 
-    .zona-formulario form input[type="file"] {
+    .zona-formulario form input[type="file"],
+    .zona-formulario form input[type="number"],
+    .zona-formulario form input[type="date"],
+    .zona-formulario form select {
         width: 100%;
         padding: 10px;
-        border: 2px solid #ccc;
+        border: 1px solid #ccc;
         border-radius: 8px;
         background-color: #fafafa;
-        margin-bottom: 20px;
+        box-sizing: border-box;
     }
 
     .zona-formulario form input[type="submit"] {
@@ -51,13 +54,15 @@
         border-radius: 8px;
         font-size: 1rem;
         cursor: pointer;
+        margin-top: 25px;
+        font-weight: bold;
     }
 
     .zona-formulario form input[type="submit"]:hover {
         background-color: #0056b3;
     }
 
-    .zona-formulario ul {
+    .zona-formulario ul.flashed-messages {
         max-width: 500px;
         margin: 20px auto;
         padding: 15px;
@@ -67,63 +72,119 @@
         list-style-type: none;
         color: #2e7d32;
     }
+
+    /* Estilos para la barra de progreso */
+    #contenedor-progreso {
+        display: none;
+        margin-top: 20px;
+        text-align: center;
+    }
+
+    .progress-bar-bg {
+        width: 100%;
+        background-color: #e0e0e0;
+        border-radius: 10px;
+        overflow: hidden;
+        height: 22px;
+        margin-top: 8px;
+    }
+
+    .progress-bar-fill {
+        width: 0%;
+        height: 100%;
+        background-color: #28a745;
+        transition: width 0.4s ease;
+    }
 </style>
-</head>
 
-<body>
+<div class="zona-formulario">
+    <h1>Subir archivo ZIP de Egresos con archivos TXT</h1>
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <ul class="flashed-messages">
+        {% for category, msg in messages %}
+        <li>{{ msg }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    {% endwith %}
 
-    <!-- Todo el contenido del formulario aislado aquí -->
-    <div class="zona-formulario">
-        <h1>Subir archivo ZIP de Egresos con archivos TXT</h1>
+    <div class="form-container">
+        <form id="form-egresos" method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
+            <label for="file">Selecciona un archivo ZIP:</label>
+            <input type="file" name="file" id="file" accept=".zip" required>
 
-        {% with messages = get_flashed_messages() %}
-        {% if messages %}
-        <ul>
-            {% for msg in messages %}
-            <li>{{ msg }}</li>
-            {% endfor %}
-        </ul>
-        {% endif %}
-        {% endwith %}
+            <label for="anio">Año de la información:</label>
+            <input type="number" name="anio" id="anio" min="2015" max="2100" required>
 
-        <div class="form-container">
-            <form method="POST" enctype="multipart/form-data">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <label for="file">Selecciona un archivo ZIP:</label>
-                <input type="file" name="file" accept=".zip" required>
+            <label for="modo_carga">Modo de carga:</label>
+            <select name="modo_carga" id="modo_carga" required>
+                <option value="" disabled selected>Selecciona modo de carga</option>
+                <option value="agregar">Agregar</option>
+                <option value="actualizar">Remplazar año</option>
+            </select>
 
-                <label for="anio">Año de la información:</label>
-                <input type="number" name="anio" min="2015" max="2100" required>
+            <label for="estatus_inicio">Actualización ó Cierre:</label>
+            <select name="estatus_inicio" id="estatus_inicio" required>
+                <option value="Actualizado">Actualizado</option>
+                <option value="Cierre">Cierre</option>
+            </select>
 
+            <label for="fecha_actualizacion">Fecha de actualización:</label>
+            <input type="date" name="fecha_actualizacion" id="fecha_actualizacion" required>
 
-                <label>Modo de carga:</label>
-                <select name="modo_carga" required>
-                    <option value="" disabled selected>Selecciona modo de carga</option>
-                    <option value="agregar">Agregar</option>
-                    <option value="actualizar">Remplazar año</option>
-                </select>
+            <label for="estatus">Estatus del año:</label>
+            <select name="estatus" id="estatus" required>
+                <option value="PRELIMINAR">Preliminar</option>
+                <option value="CONSOLIDADO">Consolidado</option>
+            </select>
 
-                <label for="estatus">Actualizacion ó Cierre:</label>
-                <select name="estatus_inicio" required>
-                    <option value="Actualizado">Actualizado</option>
-                    <option value="Cierre">Cierre</option>
-                </select>
+            <input type="submit" id="btn-submit" value="Subir y Procesar">
+        </form>
 
-                <label for="fecha_actualizacion">Fecha de actualización:</label>
-                <input type="date" name="fecha_actualizacion" required>
-
-
-                <label for="estatus">Estatus del año:</label>
-                <select name="estatus" required>
-                    <option value="PRELIMINAR">Preliminar</option>
-                    <option value="CONSOLIDADO">Consolidado</option>
-                </select>
-
-                <input type="submit" style="margin-top: 100px;" value="Subir y Procesar">
-            </form>
+        <!-- UI del progreso -->
+        <div id="contenedor-progreso">
+            <span id="texto-estatus" style="font-weight: bold; color: #333;">Iniciando carga...</span>
+            <div class="progress-bar-bg">
+                <div id="barra-llenado" class="progress-bar-fill"></div>
+            </div>
         </div>
     </div>
+</div>
 
+<script>
+    document.getElementById("form-egresos").addEventListener("submit", function() {
+        const btn = document.getElementById("btn-submit");
+        const contenedor = document.getElementById("contenedor-progreso");
+        
+        btn.disabled = true;
+        btn.value = "Procesando...";
+        contenedor.style.display = "block";
 
-    {% endblock %}
+        const intervalId = setInterval(function() {
+            fetch("{{ url_for('admin.estado_carga_egresos') }}")
+                .then(response => response.json())
+                .then(data => {
+                    if (data.estatus) {
+                        document.getElementById("texto-estatus").innerText = data.estatus;
+
+                        // Extrae el valor numérico del estatus (ej. "CARGANDO REGISTROS (45%)" -> 45)
+                        const match = data.estatus.match(/(\d+)%/);
+                        if (match) {
+                            const pct = match[1];
+                            document.getElementById("barra-llenado").style.width = pct + "%";
+                        }
+
+                        if (data.estatus.includes("COMPLETADO") || data.estatus.includes("ERROR")) {
+                            clearInterval(intervalId);
+                        }
+                    }
+                })
+                .catch(err => console.error("Error consultando estado:", err));
+        }, 2000);
+    });
+</script>
+{% endblock %}
