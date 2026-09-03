@@ -1,11 +1,10 @@
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required
 from flask_mysqldb import MySQLdb
-from app import mysql, csrf  # Se importa csrf para eximir a la API REST
+from app import mysql, csrf
 
 sis_pn = Blueprint('sis_pn', __name__, url_prefix='/sis_primer_nivel')
 
-# DICCIONARIO DE VARIABLES POR DEFECTO PARA CADA MÓDULO
 VARIABLES_DEFAULT = {
     "consultas": [
         'CON01','CON02','CON03','CON04','CON05','CON06','CON07','CON08','CON09','CON10',
@@ -31,36 +30,45 @@ VARIABLES_DEFAULT = {
         'DET51','DET52','DET53','DET54','DET57','DET58','DET59','DET60','DET61',
         'DET62','DET63','DET64','DET73','DET74','DET85','DET86','DET87','DET88',
         'DET89','DET90','DET91','DET92','DET93','DET94','DET95','DET96','DET97',
-        'DET98','DET99',
-        'DT001','DT002','DT003','DT004','DT005','DT006','DT007','DT008','DT009','DT010',
-        'DT011','DT012','DT013','DT014','DT015','DT016','DT017','DT018','DT019','DT020',
-        'DT021','DT022','DT023','DT024','DT025','DT026','DT027','DT028','DT030','DT031',
-        'DT032','DT033','DT034','DT035','DT036','DT037','DT038','DT039','DT040','DT041',
-        'DT042','DT043','DT044','DT045','DT046','DT047','DT048','DT049','DT050','DT051',
-        'DT053','DT054','DT055','DT056','DT059','DT060','DT061','DT062','DT063','DT064',
-        'DT065','DT066','DT067','DT068','DT069','DT070','DT071','DT072','DT073','DT074',
-        'DT075','DT076','DT077','DT078','DT079','DT080','DT081','DT082','DT083','DT084',
-        'DT085','DT086','DT087','DT088','DT089','DT090','DT091','DT092','DT093','DT094',
-        'DT095','DT096','DT097','DT098','DT099','DT100','DT101','DT102','DT103','DT104',
-        'DT105','DT106','DT107','DT108','DT109','DT110','DT111','DT112','DT113','DT114',
-        'DT115','DT116','DT117','DT118','DT119','DT120','DT121','DT122','DT123','DT124',
-        'DT125','DT126','DT127','DT128','DT129','DT130','DT131','DT132','DT133','DT134',
-        'DT135','DT136','DT137','DT138','DT139','DT140','DT141','DT142','DT143','DT144',
-        'DT145','DT146','DT147','DT148','DT149','DT150','DT151','DT152','DT153','DT154',
-        'DT155','DT156','DT157','DT158','DT159','DT160','DT161','DT162','DT163','DT165',
-        'DT166','DT167','DT168','DT169','DT170','DT171','DT172','DT173','DT174','DT175',
-        'DT176','DT177','DT178',
-        'DTE01','DTE02','DTE03','DTE04','DTE05','DTE06','DTE07','DTE08','DTE09','DTE10',
-        'DTE11','DTE12','DTE14','DTE15','DTE16','DTE17','DTE18','DTE19','DTE20','DTE21',
-        'DTE22','DTE23','DTE24','DTE25','DTE32','DTE33','DTE37','DTE38','DTE40','DTE41',
-        'DTE42','DTE43','DTE44','DTE45','DTE46','DTE47','DTE48','DTE49','DTE56','DTE57',
-        'DTE61','DTE62','DTE64','DTE65','DTE66','DTE67','DTE68','DTE69','DTE70','DTE71',
-        'DTE72','DTE73','DTE74','DTE75','DTE76','DTE77','DTE78','DTE79','DTE80','DTE81',
-        'DTE82','DTE83','DTE84','DTE85','DTE86','DTE87','DTE88','DTE89','DTE90','DTE91',
-        'DTE92','DTE93','DTE94','DTE95','DTE96','DTE97','DTE98','DTE99'
+        'DET98','DET99','DT001','DT002','DT003','DT004','DT005','DT006','DT007',
+        'DT008','DT009','DT010','DT011','DT012','DT013','DT014','DT015','DT016',
+        'DT017','DT018','DT019','DT020','DT021','DT022','DT023','DT024','DT025',
+        'DT026','DT027','DT028','DT030','DT031','DT032','DT033','DT034','DT035',
+        'DT036','DT037','DT038','DT039','DT040','DT041','DT042','DT043','DT044',
+        'DT045','DT046','DT047','DT048','DT049','DT050','DT051','DT053','DT054',
+        'DT055','DT056','DT059','DT060','DT061','DT062','DT063','DT064','DT065',
+        'DT066','DT067','DT068','DT069','DT070','DT071','DT072','DT073','DT074',
+        'DT075','DT076','DT077','DT078','DT079','DT080','DT081','DT082','DT083',
+        'DT084','DT085','DT086','DT087','DT088','DT089','DT090','DT091','DT092',
+        'DT093','DT094','DT095','DT096','DT097','DT098','DT099','DT100','DT101',
+        'DT102','DT103','DT104','DT105','DT106','DT107','DT108','DT109','DT110',
+        'DT111','DT112','DT113','DT114','DT115','DT116','DT117','DT118','DT119',
+        'DT120','DT121','DT122','DT123','DT124','DT125','DT126','DT127','DT128',
+        'DT129','DT130','DT131','DT132','DT133','DT134','DT135','DT136','DT137',
+        'DT138','DT139','DT140','DT141','DT142','DT143','DT144','DT145','DT146',
+        'DT147','DT148','DT149','DT150','DT151','DT152','DT153','DT154','DT155',
+        'DT156','DT157','DT158','DT159','DT160','DT161','DT162','DT163','DT165',
+        'DT166','DT167','DT168','DT169','DT170','DT171','DT172','DT173','DT174',
+        'DT175','DT176','DT177','DT178','DTE01','DTE02','DTE03','DTE04','DTE05',
+        'DTE06','DTE07','DTE08','DTE09','DTE10','DTE11','DTE12','DTE14','DTE15',
+        'DTE16','DTE17','DTE18','DTE19','DTE20','DTE21','DTE22','DTE23','DTE24',
+        'DTE25','DTE32','DTE33','DTE37','DTE38','DTE40','DTE41','DTE42','DTE43',
+        'DTE44','DTE45','DTE46','DTE47','DTE48','DTE49','DTE56','DTE57','DTE61',
+        'DTE62','DTE64','DTE65','DTE66','DTE67','DTE68','DTE69','DTE70','DTE71',
+        'DTE72','DTE73','DTE74','DTE75','DTE76','DTE77','DTE78','DTE79','DTE80',
+        'DTE81','DTE82','DTE83','DTE84','DTE85','DTE86','DTE87','DTE88','DTE89',
+        'DTE90','DTE91','DTE92','DTE93','DTE94','DTE95','DTE96','DTE97','DTE98','DTE99'
     ],
     "tamiz": ['RNL06']
 }
+
+# --- FUNCIÓN AUXILIAR PARA SINTAXIS DINÁMICA SQL ---
+def _construir_clausula_in(columna, lista):
+    """Genera fragmento 'AND columna IN (%s, %s)' y la lista de valores asociadas."""
+    if not lista:
+        return "", []
+    placeholders = ','.join(['%s'] * len(lista))
+    return f" AND {columna} IN ({placeholders})", list(lista)
 
 
 def obtener_modulo_por_apartado(apartado_raw, variable_code=""):
@@ -91,16 +99,19 @@ def dashboard_sis_primer_nivel():
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
+        # Limitamos o cargamos solo el resumen inicial para evitar colapsar la memoria del servidor Python
         query = """
             SELECT 
                 anio, mes, clues, nombre_unidad, jurisdiccion, municipio,
                 consultas, mental, bucal, embarazadas, planificacion_familiar, detecciones, tamiz
             FROM sis_registros_agregados_primer_nivel
-            ORDER BY anio, mes, clues
+            ORDER BY anio DESC, mes DESC, clues
+            LIMIT 2000
         """
         cursor.execute(query)
         resultados = cursor.fetchall() or []
 
+        # Listas de desplegables extraídas eficientemente
         anios_disponibles = sorted({r["anio"] for r in resultados if r.get("anio")}, reverse=True)
         unidades_disponibles = sorted({r["nombre_unidad"] for r in resultados if r.get("nombre_unidad")})
         jurisdicciones_disponibles = sorted({str(r["jurisdiccion"]) for r in resultados if r.get("jurisdiccion") is not None})
@@ -115,18 +126,19 @@ def dashboard_sis_primer_nivel():
             key=lambda x: x["nombre"]
         )
 
+        # Control Anual
         cursor.execute("""
             SELECT anio, estatus_inicio, fecha_actualizacion, estatus
             FROM sis_control_anual_primer_nivel
             ORDER BY anio
         """)
         rows_control = cursor.fetchall() or []
-        control_anual = []
-        for row in rows_control:
-            if row.get("fecha_actualizacion"):
-                row["fecha_actualizacion"] = str(row["fecha_actualizacion"])
-            control_anual.append(row)
+        control_anual = [
+            {**row, "fecha_actualizacion": str(row["fecha_actualizacion"]) if row.get("fecha_actualizacion") else None}
+            for row in rows_control
+        ]
 
+        # Catálogo
         cursor.execute("""
             SELECT apartado, descripcion_apartado, variable, descripcion
             FROM catalogo_variables
@@ -135,7 +147,6 @@ def dashboard_sis_primer_nivel():
         filas_catalogo = cursor.fetchall() or []
 
         catalogo_estructurado = {}
-
         for row in filas_catalogo:
             code = row.get("variable")
             apt = str(row.get("apartado") or "00")
@@ -144,26 +155,14 @@ def dashboard_sis_primer_nivel():
 
             mod = obtener_modulo_por_apartado(apt, code)
 
-            # --- CORRECCIÓN: EVITAR QUE APARTADO 02 VAYA A CONSULTAS ---
-            # Si el código pertenece al apartado 02 pero la función devolvió 'consultas', lo excluimos de 'consultas'
             if apt in ["2", "02"] and mod == "consultas":
                 continue
-            # -------------------------------------------------------------
 
-            if mod not in catalogo_estructurado:
-                catalogo_estructurado[mod] = {}
-
-            if apt not in catalogo_estructurado[mod]:
-                catalogo_estructurado[mod][apt] = {
-                    "apartado": apt,
-                    "descripcion_apartado": desc_apt,
-                    "variables": []
-                }
-
-            catalogo_estructurado[mod][apt]["variables"].append({
-                "codigo": code,
-                "nombre": nombre_var
-            })
+            catalogo_estructurado.setdefault(mod, {}).setdefault(apt, {
+                "apartado": apt,
+                "descripcion_apartado": desc_apt,
+                "variables": []
+            })["variables"].append({"codigo": code, "nombre": nombre_var})
 
         catalogo_variables = {
             mod: list(apartados.values()) 
@@ -182,7 +181,7 @@ def dashboard_sis_primer_nivel():
         municipios_disponibles=municipios_disponibles,
         control_anual=control_anual,
         catalogo_variables=catalogo_variables,
-        variables_default=VARIABLES_DEFAULT,  # <--- CAMBIO CLAVE: Se pasa la variable predeterminada
+        variables_default=VARIABLES_DEFAULT,
         tipo="sis",
         title="Reporte SIS - Primer Nivel"
     )
@@ -190,7 +189,7 @@ def dashboard_sis_primer_nivel():
 
 @sis_pn.route("/api/filtrar", methods=["POST"])
 @login_required
-@csrf.exempt  # Previene error 400 Bad Request
+@csrf.exempt
 def filtrar_datos_sis():
     data = request.get_json(silent=True) or {}
 
@@ -199,19 +198,16 @@ def filtrar_datos_sis():
     municipios = data.get("municipios", []) or []
     anios = data.get("anios", []) or []
     meses = data.get("meses", []) or []
-    
     variables_seleccionadas = data.get("variables", {}) or {}
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
-        # Detecta si se pasaron listas de variables en el objeto de Javascript
         tiene_variables_custom = isinstance(variables_seleccionadas, dict) and any(
             isinstance(v, list) and len(v) > 0 for v in variables_seleccionadas.values()
         )
 
         if not tiene_variables_custom:
-            # OPCIÓN 1: CONSULTA RÁPIDA (Tabla agregada precalculada)
             query_base = """
                 SELECT 
                     anio, mes, clues, nombre_unidad, jurisdiccion, municipio,
@@ -221,89 +217,67 @@ def filtrar_datos_sis():
             """
             params = []
 
+            # Filtro mixto para unidades (CLUES o Nombre)
             if unidades:
-                query_base += f" AND (clues IN ({','.join(['%s'] * len(unidades))}) OR nombre_unidad IN ({','.join(['%s'] * len(unidades))}))"
+                placeholders = ','.join(['%s'] * len(unidades))
+                query_base += f" AND (clues IN ({placeholders}) OR nombre_unidad IN ({placeholders}))"
                 params.extend(unidades + unidades)
-            if jurisdicciones:
-                query_base += f" AND jurisdiccion IN ({','.join(['%s'] * len(jurisdicciones))})"
-                params.extend(jurisdicciones)
-            if municipios:
-                query_base += f" AND municipio IN ({','.join(['%s'] * len(municipios))})"
-                params.extend(municipios)
-            if anios:
-                query_base += f" AND anio IN ({','.join(['%s'] * len(anios))})"
-                params.extend(anios)
-            if meses:
-                query_base += f" AND mes IN ({','.join(['%s'] * len(meses))})"
-                params.extend(meses)
+
+            # Filtros dinámicos limpios
+            for col, lst in [('jurisdiccion', jurisdicciones), ('municipio', municipios), ('anio', anios), ('mes', meses)]:
+                clausula, vals = _construir_clausula_in(col, lst)
+                query_base += clausula
+                params.extend(vals)
 
             query_base += " ORDER BY anio, mes, clues"
             cursor.execute(query_base, params)
             datos_filtrados = cursor.fetchall() or []
 
         else:
-            # OPCIÓN 2: CÁLCULO DINÁMICO (Garantiza que listas vacías tengan al menos un valor de relleno '__NONE__')
             def resolver_vars(mod_key):
                 val = variables_seleccionadas.get(mod_key)
                 if val is None:
                     return VARIABLES_DEFAULT[mod_key]
                 return val if len(val) > 0 else ["__NONE__"]
 
-            vars_consultas = resolver_vars("consultas")
-            vars_mental = resolver_vars("mental")
-            vars_bucal = resolver_vars("bucal")
-            vars_embarazadas = resolver_vars("embarazadas")
-            vars_pf = resolver_vars("planificacion_familiar")
-            vars_detecciones = resolver_vars("detecciones")
-            vars_tamiz = resolver_vars("tamiz")
+            modulos = ["consultas", "mental", "bucal", "embarazadas", "planificacion_familiar", "detecciones", "tamiz"]
+            vars_map = {m: resolver_vars(m) for m in modulos}
+
+            # Construcción dinámica de columnas agregadas
+            select_sums = []
+            params = []
+            for mod_key, v_list in vars_map.items():
+                placeholders = ','.join(['%s'] * len(v_list))
+                select_sums.append(
+                    f"SUM(CASE WHEN sr.variable IN ({placeholders}) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS {mod_key}"
+                )
+                params.extend(v_list)
 
             query_base = f"""
                 SELECT 
-                    sr.anio, 
-                    sr.mes, 
-                    sr.clues, 
+                    sr.anio, sr.mes, sr.clues, 
                     COALESCE(cu.nombre_unidad, sr.clues) AS nombre_unidad,
-                    sr.jurisdiccion, 
-                    sr.municipio,
-                    SUM(CASE WHEN sr.variable IN ({','.join(['%s']*len(vars_consultas))}) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS consultas,
-                    SUM(CASE WHEN sr.variable IN ({','.join(['%s']*len(vars_mental))}) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS mental,
-                    SUM(CASE WHEN sr.variable IN ({','.join(['%s']*len(vars_bucal))}) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS bucal,
-                    SUM(CASE WHEN sr.variable IN ({','.join(['%s']*len(vars_embarazadas))}) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS embarazadas,
-                    SUM(CASE WHEN sr.variable IN ({','.join(['%s']*len(vars_pf))}) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS planificacion_familiar,
-                    SUM(CASE WHEN sr.variable IN ({','.join(['%s']*len(vars_detecciones))}) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS detecciones,
-                    SUM(CASE WHEN sr.variable IN ({','.join(['%s']*len(vars_tamiz))}) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS tamiz
+                    sr.jurisdiccion, sr.municipio,
+                    {', '.join(select_sums)}
                 FROM sis_registros_primer_nivel sr
                 LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
                 WHERE 1=1
             """
-            
-            params = []
-            params.extend(vars_consultas)
-            params.extend(vars_mental)
-            params.extend(vars_bucal)
-            params.extend(vars_embarazadas)
-            params.extend(vars_pf)
-            params.extend(vars_detecciones)
-            params.extend(vars_tamiz)
 
             if unidades:
-                query_base += f" AND (sr.clues IN ({','.join(['%s'] * len(unidades))}) OR cu.nombre_unidad IN ({','.join(['%s'] * len(unidades))}))"
+                placeholders = ','.join(['%s'] * len(unidades))
+                query_base += f" AND (sr.clues IN ({placeholders}) OR cu.nombre_unidad IN ({placeholders}))"
                 params.extend(unidades + unidades)
-            if jurisdicciones:
-                query_base += f" AND sr.jurisdiccion IN ({','.join(['%s'] * len(jurisdicciones))})"
-                params.extend(jurisdicciones)
-            if municipios:
-                query_base += f" AND sr.municipio IN ({','.join(['%s'] * len(municipios))})"
-                params.extend(municipios)
-            if anios:
-                query_base += f" AND sr.anio IN ({','.join(['%s'] * len(anios))})"
-                params.extend(anios)
-            if meses:
-                query_base += f" AND sr.mes IN ({','.join(['%s'] * len(meses))})"
-                params.extend(meses)
 
-            query_base += " GROUP BY sr.anio, sr.mes, sr.clues, cu.nombre_unidad, sr.jurisdiccion, sr.municipio"
-            query_base += " ORDER BY sr.anio, sr.mes, sr.clues"
+            for col, lst in [('sr.jurisdiccion', jurisdicciones), ('sr.municipio', municipios), ('sr.anio', anios), ('sr.mes', meses)]:
+                clausula, vals = _construir_clausula_in(col, lst)
+                query_base += clausula
+                params.extend(vals)
+
+            query_base += """
+                GROUP BY sr.anio, sr.mes, sr.clues, cu.nombre_unidad, sr.jurisdiccion, sr.municipio
+                ORDER BY sr.anio, sr.mes, sr.clues
+            """
 
             cursor.execute(query_base, params)
             datos_filtrados = cursor.fetchall() or []
@@ -311,7 +285,8 @@ def filtrar_datos_sis():
         return jsonify({"status": "success", "data": datos_filtrados})
 
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 400
+        # Evitamos revelar errores crudos de MySQL/Python al cliente web por seguridad
+        return jsonify({"status": "error", "message": "Ocurrió un error al procesar los datos de la consulta."}), 400
 
     finally:
         cursor.close()
