@@ -83,6 +83,7 @@
                                     <option value="tamiz">Tamiz</option>
                                     <option value="planificacion_familiar">Planificación Familiar</option>
                                     <option value="detecciones">Detecciones</option>
+                                    <option value="todas">Todas las Secciones</option>
                                 </select>
 
                                 <button type="button" class="btn btn-outline-primary btn-sm"
@@ -164,7 +165,6 @@
     }
 
     /* 2. DIBUJAR APARTADOS Y CHECKBOXES DE VARIABLES */
-    /* 2. DIBUJAR APARTADOS Y CHECKBOXES DE VARIABLES (OPTIMIZADO) */
     function renderSubvariables() {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const contenedor = document.getElementById("contenedorSubvariables");
@@ -172,72 +172,126 @@
 
         if (!contenedor) return;
 
-        const estructuraModulo = DICCIONARIO_VARIABLES[modulo] || [];
-        const selectEl = document.getElementById("filtroSisDetalle");
-        const nombreModulo = selectEl ? selectEl.options[selectEl.selectedIndex]?.text : modulo;
-
-        let totalVariablesModulo = 0;
-        estructuraModulo.forEach(g => totalVariablesModulo += (g.variables || []).length);
-
-        if (lbl) lbl.innerHTML = `📋 Desglose de Apartados en <strong>${nombreModulo}</strong> (${totalVariablesModulo} variables en catálogo):`;
-
-        if (estructuraModulo.length === 0) {
-            contenedor.innerHTML = `<span class="text-muted small">No hay variables configuradas en el catálogo para este módulo.</span>`;
-            return;
+        // Determinar qué módulos procesar
+        let modulosAProcesar = [];
+        if (modulo === "todas") {
+            modulosAProcesar = Object.keys(DICCIONARIO_VARIABLES);
+        } else {
+            modulosAProcesar = [modulo];
         }
 
-        const seleccionadasModulo = variablesPersonalizadasEstado[modulo];
+        let totalVariablesMostradas = 0;
         const fragment = document.createDocumentFragment();
 
-        estructuraModulo.forEach(grupo => {
-            const divGrupo = document.createElement("div");
-            divGrupo.className = "mb-3 p-2 bg-white rounded border";
+        modulosAProcesar.forEach((modKey) => {
+            const estructuraModulo = DICCIONARIO_VARIABLES[modKey] || [];
+            if (estructuraModulo.length === 0) return;
 
-            let htmlGrupo = `
-            <div class="fw-bold text-primary mb-1 border-bottom pb-1 small">
-                📁 Apartado: ${grupo.apartado} — <span class="text-dark">${grupo.descripcion_apartado || 'Sin descripción'}</span>
-            </div>
-            <div class="d-flex flex-wrap gap-2 pt-1">`;
+            // Título del módulo si elegimos "Todas"
+            if (modulo === "todas") {
+                const headerModulo = document.createElement("div");
+                headerModulo.className = "alert alert-primary py-1 px-3 mb-2 mt-3 fw-bold text-uppercase border-0 shadow-sm d-flex justify-content-between align-items-center";
+                headerModulo.style.fontSize = "0.85rem";
+                headerModulo.innerHTML = `<span>📂 Secciona: <strong>${modKey.replace('_', ' ')}</strong></span>`;
+                fragment.appendChild(headerModulo);
+            }
 
-            (grupo.variables || []).forEach(v => {
-                const isChecked = (seleccionadasModulo === undefined || seleccionadasModulo === null)
-                    ? true
-                    : seleccionadasModulo.includes(v.codigo);
+            const seleccionadasModulo = variablesPersonalizadasEstado[modKey] || [];
+
+            estructuraModulo.forEach((grupo, idx) => {
+                totalVariablesMostradas += (grupo.variables || []).length;
+                const accordionId = `acc_${modKey}_${grupo.apartado}_${idx}`;
+
+                // Conteo de seleccionados
+                const countSel = (grupo.variables || []).filter(v => seleccionadasModulo.includes(v.codigo)).length;
+                const totalGroup = (grupo.variables || []).length;
+
+                const cardGrupo = document.createElement("div");
+                cardGrupo.className = "card mb-2 border-0 shadow-sm";
+
+                let htmlGrupo = `
+                <div class="card-header bg-white py-2 px-3 d-flex justify-content-between align-items-center border-start border-4 border-primary" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#${accordionId}">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Apartado ${grupo.apartado}</span>
+                        <strong class="text-dark small">${grupo.descripcion_apartado || 'Sin descripción'}</strong>
+                    </div>
+                    <div>
+                        <span class="badge rounded-pill ${countSel > 0 ? 'bg-success' : 'bg-secondary'} me-2">
+                            ${countSel}/${totalGroup} activas
+                        </span>
+                        <span class="text-muted small">▼</span>
+                    </div>
+                </div>
+                <div id="${accordionId}" class="collapse ${modulo !== 'todas' ? 'show' : ''}">
+                    <div class="card-body bg-light-subtle p-3">
+                        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-2">`;
+
+                (grupo.variables || []).forEach(v => {
+                    const isChecked = seleccionadasModulo.includes(v.codigo);
+
+                    htmlGrupo += `
+                    <div class="col">
+                        <div class="form-check p-2 bg-white rounded border h-100 d-flex align-items-center shadow-2xs">
+                            <input class="form-check-input chk-subvar me-2 mt-0" 
+                                   type="checkbox" 
+                                   data-modulo="${modKey}" 
+                                   id="sub_${v.codigo}" 
+                                   value="${v.codigo}" ${isChecked ? 'checked' : ''}>
+                            <label class="form-check-label small text-truncate" for="sub_${v.codigo}" title="${v.codigo}: ${v.nombre}">
+                                <strong class="text-primary">${v.codigo}</strong> <span class="text-secondary">— ${v.nombre}</span>
+                            </label>
+                        </div>
+                    </div>`;
+                });
 
                 htmlGrupo += `
-                <div class="form-check form-check-inline me-3 mb-1" title="${v.nombre}">
-                    <input class="form-check-input chk-subvar" type="checkbox" id="sub_${v.codigo}" value="${v.codigo}" ${isChecked ? 'checked' : ''}>
-                    <label class="form-check-label small" for="sub_${v.codigo}">
-                        <strong>${v.codigo}</strong>: ${v.nombre}
-                    </label>
+                        </div>
+                    </div>
                 </div>`;
-            });
 
-            htmlGrupo += `</div>`;
-            divGrupo.innerHTML = htmlGrupo;
-            fragment.appendChild(divGrupo);
+                cardGrupo.innerHTML = htmlGrupo;
+                fragment.appendChild(cardGrupo);
+            });
         });
+
+        if (lbl) {
+            const nombreVista = modulo === "todas" ? "Todas las Secciones" : modulo;
+            lbl.innerHTML = `📋 Desglose de Variables en <strong>${nombreVista.toUpperCase()}</strong> (${totalVariablesMostradas} variables registradas):`;
+        }
 
         contenedor.innerHTML = "";
         contenedor.appendChild(fragment);
 
-        // ✅ OPTIMIZACIÓN CRÍTICA: Un solo listener delegado en lugar de cientos individuales
-        contenedor.onclick = null; // Limpiar listener previo
+        // Event Listener Delegado
+        contenedor.onclick = null;
         contenedor.addEventListener('change', (e) => {
             if (e.target && e.target.classList.contains('chk-subvar')) {
                 guardarEstadoVariablesActuales();
-                window.ejecutarFiltradoSis(400); // 400ms de tiempo de espera antes de pedir a Flask
+                window.ejecutarFiltradoSis(400);
             }
         });
     }
 
+    /* GUARDAR ESTADO MODIFICADO PARA MÚLTIPLES MÓDULOS */
     function guardarEstadoVariablesActuales() {
-        const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const contenedor = document.getElementById("contenedorSubvariables");
         if (!contenedor) return;
 
-        const checkeds = Array.from(contenedor.querySelectorAll('.chk-subvar:checked')).map(c => c.value);
-        variablesPersonalizadasEstado[modulo] = checkeds;
+        // Recorrer los checkboxes y agrupar sus estados por módulo correspondiente
+        contenedor.querySelectorAll('.chk-subvar').forEach(cb => {
+            const mod = cb.getAttribute('data-modulo');
+            if (mod) {
+                if (!variablesPersonalizadasEstado[mod]) variablesPersonalizadasEstado[mod] = [];
+
+                if (cb.checked) {
+                    if (!variablesPersonalizadasEstado[mod].includes(cb.value)) {
+                        variablesPersonalizadasEstado[mod].push(cb.value);
+                    }
+                } else {
+                    variablesPersonalizadasEstado[mod] = variablesPersonalizadasEstado[mod].filter(v => v !== cb.value);
+                }
+            }
+        });
     }
 
     /* 3. PROCESAMIENTO Y FILTRADO */
@@ -500,6 +554,15 @@
             return;
         }
 
+        // Si selecciona "Todas", sumar todas las categorías disponibles
+        const sumarCategorias = (r) => {
+            if (modulo === "todas") {
+                return (Number(r.consultas) || 0) + (Number(r.embarazadas) || 0) + (Number(r.mental) || 0) +
+                    (Number(r.bucal) || 0) + (Number(r.tamiz) || 0) + (Number(r.planificacion_familiar) || 0) + (Number(r.detecciones) || 0);
+            }
+            return Number(r[modulo]) || 0;
+        };
+
         let labels = [];
         let datasets = [];
 
@@ -507,13 +570,12 @@
             const acumuladoAnual = {};
             data.forEach(r => {
                 const anio = r.anio;
-                const val = Number(r[modulo]) || 0;
-                acumuladoAnual[anio] = (acumuladoAnual[anio] || 0) + val;
+                acumuladoAnual[anio] = (acumuladoAnual[anio] || 0) + sumarCategorias(r);
             });
 
             labels = Object.keys(acumuladoAnual).sort();
             datasets = [{
-                label: `Total Módulo ${modulo.toUpperCase()}`,
+                label: `Total ${modulo === 'todas' ? 'Todas las Secciones' : modulo.toUpperCase()}`,
                 data: labels.map(a => Math.round(acumuladoAnual[a])),
                 backgroundColor: '#4E79A7'
             }];
@@ -526,7 +588,7 @@
                 if (!r.mes) return;
                 const mes = Number(r.mes);
                 const anio = r.anio;
-                const valor = Number(r[modulo]) || 0;
+                const valor = sumarCategorias(r);
 
                 const key = `Año ${anio}`;
                 if (!resumen[key]) resumen[key] = {};
@@ -542,13 +604,12 @@
             }));
         }
 
-        // ✅ OPTIMIZACIÓN CRÍTICA: Reutilizar instancia si el tipo de gráfica es el mismo
         const tipoChartRequerido = tipoVista === 'anio' ? 'bar' : 'line';
 
         if (graficaSisMensual && graficaSisMensual.config.type === tipoChartRequerido) {
             graficaSisMensual.data.labels = labels;
             graficaSisMensual.data.datasets = datasets;
-            graficaSisMensual.update('none'); // Modos sin renderizado pesado de animaciones
+            graficaSisMensual.update('none');
         } else {
             if (graficaSisMensual) graficaSisMensual.destroy();
 
