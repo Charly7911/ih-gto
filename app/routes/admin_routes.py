@@ -1,25 +1,16 @@
+
+import numpy as np
+import pandas as pd
+import zipfile
 import os
 import shutil
 import threading
-import zipfile
-from flask import (
-    Blueprint,
-    current_app,
-    flash,
-    jsonify,
-    redirect,
-    render_template,
-    request,
-    session,
-    url_for,
-)
-from flask_login import current_user, login_required
-import numpy as np
-import pandas as pd
+import MySQLdb
+from flask import Blueprint, current_app, jsonify, render_template, request, redirect, session, url_for, flash
+from flask_login import login_required, current_user
+from app import mysql
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
-
-from app import mysql
 
 
 admin = Blueprint('admin', __name__)
@@ -174,15 +165,15 @@ def archivo_permitido(filename):
 # ************************* SUBIR CARPETA Y ARCHIVO DE URGENCIAS ***************************
 # *****************************************************************************************
 
-# 💡 1. RUTA ENDPOINT PARA EL JAVASCRIPT
+# 💡 1. ENDPOINT PARA EL JAVASCRIPT (Consulta el avance en vivo)
 @admin.route("/estado_carga_urgencias", methods=["GET"])
 @login_required
 def estado_carga_urgencias():
     try:
         conn = mysql.connection
         cursor = conn.cursor()
-        user_id = session.get("user_id")
-
+        
+        # Leemos el último registro del usuario activo
         cursor.execute(
             """
             SELECT estatus_proceso 
@@ -191,7 +182,7 @@ def estado_carga_urgencias():
             ORDER BY id DESC 
             LIMIT 1
             """,
-            (user_id,),
+            (current_user.id,),
         )
         registro = cursor.fetchone()
         cursor.close()
@@ -203,86 +194,77 @@ def estado_carga_urgencias():
         return jsonify({"estatus": f"Error: {str(e)}"}), 200
 
 
-# 💡 2. FUNCIÓN DE SEGUNDO PLANO
-def tarea_segundo_plano(
-    app,
-    anio,
-    modo_carga,
-    fecha_actualizacion,
-    estatus,
-    estatus_inicio,
-    carpeta_destino,
-    filename,
-    user_id,
-):
-    # Ya no es necesario 'with app.app_context()' porque se ejecuta en la misma petición
-    conn = mysql.connection
-    cursor = conn.cursor()
-    carga_id = None
-    try:
-        # Insertar registro de carga
-        sql_historial = """
-            INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso) 
-            VALUES (%s, %s, %s, 'INICIANDO (0%)')
-        """
-        cursor.execute(sql_historial, (filename, carpeta_destino, user_id))
-        carga_id = cursor.lastrowid
-        conn.commit()
+# 💡 2. FUNCIÓN EN SEGUNDO PLANO
+def tarea_segundo_plano(app, anio, modo_carga, fecha_actualizacion, estatus, estatus_inicio, carpeta_destino, filename, user_id):
+    with app.app_context():
+        conn = mysql.connection
+        cursor = conn.cursor()
+        carga_id = None
+        try:
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+            cursor.execute("SET innodb_lock_wait_timeout = 300")
 
-        # Si es actualizar, borrar datos anteriores
-        if modo_carga == "actualizar":
-            cursor.execute(
-                "DELETE FROM urgencias_registros WHERE anio = %s", (anio,)
-            )
-            cursor.execute(
-                "DELETE FROM urgencias_agregado WHERE anio = %s", (anio,)
-            )
-            conn.commit()
+            if modo_carga == "actualizar":
+                cursor.execute("DELETE FROM urgencias_registros WHERE anio = %s", (anio,))
+                cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
 
-        # Procesar el archivo TXT
-        procesar_txt_detallado_urgencias(
-            conn, cursor, carga_id, carpeta_destino, anio
-        )
-
-        # Calculando Agregados
-        cursor.execute(
-            "UPDATE cargas_zip SET estatus_proceso = 'CALCULANDO AGREGADOS (90%)' WHERE id = %s",
-            (carga_id,),
-        )
-        conn.commit()
-
-        actualizar_urgencias_agregado(conn, cursor, anio)
-
-        cursor.execute(
+            # 📌 Registramos inicio al 0%
+            sql_historial = """
+                INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso) 
+                VALUES (%s, %s, %s, 'INICIANDO (0%)')
             """
-            INSERT INTO urgencias_control_anual (anio, estatus_inicio, fecha_actualizacion, estatus)
-            VALUES (%s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE
-                fecha_actualizacion = VALUES(fecha_actualizacion),
-                estatus_inicio = VALUES(estatus_inicio),
-                estatus = VALUES(estatus)
-        """,
-            (anio, estatus_inicio, fecha_actualizacion, estatus),
-        )
+            cursor.execute(sql_historial, (filename, carpeta_destino, user_id))
+            carga_id = cursor.lastrowid
+            conn.commit()
 
-        cursor.execute(
-            "UPDATE cargas_zip SET estatus_proceso = 'COMPLETADO (100%)' WHERE id = %s",
-            (carga_id,),
-        )
-        conn.commit()
+            # 📌 Procesar registros y actualizar avance
+            procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, anio)
 
-    except Exception as e:
-        conn.rollback()
-        if carga_id:
-            err_clean = str(e).replace("'", "").replace('"', "")[:100]
+            # 📌 Procesar agregados al 90%
             cursor.execute(
-                "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
-                (f"ERROR: {err_clean}", carga_id),
+                "UPDATE cargas_zip SET estatus_proceso = 'CALCULANDO AGREGADOS (90%)' WHERE id = %s", 
+                (carga_id,)
             )
             conn.commit()
-        print(f"❌ Error en carga: {e}")
+            
+            actualizar_urgencias_agregado(cursor, anio)
+
+            cursor.execute(
+                """
+                INSERT INTO urgencias_control_anual (anio, estatus_inicio, fecha_actualizacion, estatus)
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    fecha_actualizacion = VALUES(fecha_actualizacion),
+                    estatus_inicio = VALUES(estatus_inicio),
+                    estatus = VALUES(estatus)
+            """,
+                (anio, estatus_inicio, fecha_actualizacion, estatus),
+            )
+
+            # 📌 Marcar como COMPLETADO al 100%
+            cursor.execute(
+                "UPDATE cargas_zip SET estatus_proceso = 'COMPLETADO (100%)' WHERE id = %s", 
+                (carga_id,)
+            )
+            conn.commit()
+            print(f"✅ Urgencias {anio} completado con éxito.")
+
+        except Exception as e:
+            conn.rollback()
+            if carga_id:
+                err_clean = str(e).replace("'", "").replace('"', "")[:100]
+                cursor.execute(
+                    "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s", 
+                    (f"ERROR: {err_clean}", carga_id)
+                )
+                conn.commit()
+            print(f"❌ Error en segundo plano: {e}")
+        finally:
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+            cursor.close()
 
 
+# 💡 3. VISTA PRINCIPAL
 @admin.route("/upload_zip_urgencias", methods=["GET", "POST"])
 @login_required
 def subir_zip_urgencias():
@@ -303,9 +285,7 @@ def subir_zip_urgencias():
             return redirect(url_for("admin.subir_zip_urgencias"))
 
         carpeta_nombre = f"urgencias_{anio}"
-        carpeta_destino = os.path.join(
-            current_app.root_path, "uploads", carpeta_nombre
-        )
+        carpeta_destino = os.path.join(current_app.root_path, "uploads", carpeta_nombre)
 
         if modo_carga == "actualizar" and os.path.exists(carpeta_destino):
             shutil.rmtree(carpeta_destino)
@@ -319,19 +299,23 @@ def subir_zip_urgencias():
             zip_ref.extractall(carpeta_destino)
 
         app = current_app._get_current_object()
-        user_id = session.get("user_id")
+        user_id = current_user.id  # Usamos current_user directamente
 
-        tarea_segundo_plano(
-            app,
-            anio,
-            modo_carga,
-            fecha_actualizacion,
-            estatus,
-            estatus_inicio,
-            carpeta_destino,
-            filename,
-            user_id,
+        hilo = threading.Thread(
+            target=tarea_segundo_plano,
+            args=(
+                app,
+                anio,
+                modo_carga,
+                fecha_actualizacion,
+                estatus,
+                estatus_inicio,
+                carpeta_destino,
+                filename,
+                user_id,
+            ),
         )
+        hilo.start()
 
         flash(
             f"El archivo para {anio} se ha subido e iniciado su procesamiento en segundo plano.",
@@ -342,18 +326,14 @@ def subir_zip_urgencias():
     return render_template("admin/subir_zip_urgencias.html")
 
 
-
-def procesar_txt_detallado_urgencias(
-    conn, cursor, carga_id, carpeta_destino, anio_seleccionado
-):
-    # 📌 1. Notificar inicio
+# 💡 4. PROCESAMIENTO CON REPORTE DE AVANCE REAL
+def procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, anio_seleccionado):
     cursor.execute(
-        "UPDATE cargas_zip SET estatus_proceso = 'LEYENDO CATÁLOGOS (2%)' WHERE id = %s",
-        (carga_id,),
+        "UPDATE cargas_zip SET estatus_proceso = 'LEYENDO CATÁLOGOS (2%)' WHERE id = %s", 
+        (carga_id,)
     )
     conn.commit()
 
-    # Cargar catálogos válidos
     cursor.execute("SELECT clues FROM catalogo_unidades")
     clues_validas = set(row[0].upper().strip() for row in cursor.fetchall())
 
@@ -364,7 +344,6 @@ def procesar_txt_detallado_urgencias(
         if "auto_increment" not in col[5].lower() and col[0] != "id"
     ]
 
-    # 📌 2. Ubicar archivo
     path_urg = None
     for root, _, files in os.walk(carpeta_destino):
         for f in files:
@@ -375,87 +354,66 @@ def procesar_txt_detallado_urgencias(
     if not path_urg:
         raise Exception("No se encontró el archivo urgencias.txt en el ZIP")
 
-    # Contar total de líneas aproximadamente para la barra de progreso
     cursor.execute(
-        "UPDATE cargas_zip SET estatus_proceso = 'ANALIZANDO TXT DE 52MB (5%)' WHERE id = %s",
-        (carga_id,),
+        "UPDATE cargas_zip SET estatus_proceso = 'LEYENDO ARCHIVO CSV (5%)' WHERE id = %s", 
+        (carga_id,)
     )
     conn.commit()
 
-    with open(path_urg, "r", encoding="utf-8-sig", errors="ignore") as f:
-        total_lineas = sum(1 for _ in f) - 1  # Menos el encabezado
+    df = pd.read_csv(path_urg, sep="|", encoding="utf-8-sig", dtype=str)
 
-    if total_lineas <= 0:
-        raise Exception("El archivo urgencias.txt está vacío")
+    if "CLUES" in df.columns:
+        df["CLUES"] = df["CLUES"].astype(str).str.upper().str.strip()
+        df = df[df["CLUES"].isin(clues_validas)].copy()
+    else:
+        raise Exception("El archivo no contiene la columna 'CLUES'")
 
-    # Prepared statement
+    df["anio"] = anio_seleccionado
+    df["carga_id"] = carga_id
+
+    for col in columnas_db:
+        if col not in df.columns:
+            df[col] = None
+
+    df_final = df[columnas_db].copy()
+
+    columnas_hora = ["HORASESTANCIA", "hora_ingreso", "hora_alta"]
+    for col_h in columnas_hora:
+        if col_h in df_final.columns:
+            df_final[col_h] = df_final[col_h].replace(
+                ["99:99", "9999", "99:9", " : "], None
+            )
+
+    df_final = df_final.where(pd.notnull(df_final), None)
+
+    bloque_size = 3000
+    valores = [
+        tuple(None if pd.isna(x) else x for x in row)
+        for row in df_final.to_numpy()
+    ]
+    total = len(valores)
+
     placeholders = ", ".join(["%s"] * len(columnas_db))
     columnas_sql = ", ".join(columnas_db)
-    sql_insert = f"INSERT INTO urgencias_registros ({columnas_sql}) VALUES ({placeholders})"
+    sql = f"INSERT INTO urgencias_registros ({columnas_sql}) VALUES ({placeholders})"
 
-    # Estimación ultra-rápida de líneas por tamaño de archivo
-    tamano_bytes = os.path.getsize(path_urg)
-    # Promedio de ~250 bytes por registro en urgencias.txt
-    total_lineas_estimadas = max(int(tamano_bytes / 250), 1000)
-
-    chunksize = 10000
-    lineas_procesadas = 0
-
-    reader = pd.read_csv(
-        path_urg,
-        sep="|",
-        encoding="utf-8-sig",
-        dtype=str,
-        chunksize=chunksize,
-        low_memory=False,
-        on_bad_lines="skip",
-    )
-
-    for chunk in reader:
-        # --- Tu lógica de filtrado por CLUES y limpieza ---
-        if "CLUES" in chunk.columns:
-            chunk["CLUES"] = chunk["CLUES"].str.upper().str.strip()
-            chunk = chunk[chunk["CLUES"].isin(clues_validas)].copy()
-
-        if chunk.empty:
-            lineas_procesadas += chunksize
-            continue
-
-        chunk["anio"] = anio_seleccionado
-        chunk["carga_id"] = carga_id
-
-        for col in columnas_db:
-            if col not in chunk.columns:
-                chunk[col] = None
-
-        chunk = chunk[columnas_db].copy()
-
-        for col_h in columnas_hora:
-            if col_h in chunk.columns:
-                chunk[col_h] = chunk[col_h].replace(
-                    ["99:99", "9999", "99:9", " : "], None
-                )
-
-        chunk = chunk.where(pd.notnull(chunk), None)
-        valores = [tuple(row) for row in chunk.to_numpy()]
-
-        cursor.executemany(sql_insert, valores)
-        conn.commit()  # <-- LIBERA CADA CHUNK PARA QUE AJAX LEA EL AVANCE
-
-        lineas_procesadas += len(chunk)
-        progreso = 5 + int((lineas_procesadas / total_lineas_estimadas) * 80)
-        progreso = min(progreso, 85)
-
+    # Inserción por bloques calculando el porcentaje dinámico
+    for i in range(0, total, bloque_size):
+        bloque = valores[i : i + bloque_size]
+        cursor.executemany(sql, bloque)
+        
+        # Porcentaje escala del 5% al 85%
+        progreso = 5 + int(((i + len(bloque)) / total) * 80)
+        
         cursor.execute(
-            "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
-            (f"CARGANDO REGISTROS ({progreso}%)", carga_id),
+            "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s", 
+            (f"CARGANDO REGISTROS ({progreso}%)", carga_id)
         )
-        conn.commit()  # <-- CONFIRMA EL CAMBIO DE PORCENTAJE
+        conn.commit()  # Se confirma para que JavaScript lea el nuevo porcentaje
 
 
-def actualizar_urgencias_agregado(conn, cursor, anio):
+def actualizar_urgencias_agregado(cursor, anio):
     cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
-    conn.commit()
 
     sql = """
         INSERT INTO urgencias_agregado (
@@ -469,11 +427,11 @@ def actualizar_urgencias_agregado(conn, cursor, anio):
             MAX(cu.tipologia),
             r.MES_ESTADISTICO,
             r.anio,
-            SUM(CASE WHEN tu.Descrip LIKE '%CALIFICADA%' AND tu.Descrip NOT LIKE '%NO%' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN tu.Descrip LIKE '%NO CALIFICADA%' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN ma.Descrip LIKE '%ACCIDENTES%' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN tu.Descrip LIKE '%%CALIFICADA%%' AND tu.Descrip NOT LIKE '%%NO%%' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN tu.Descrip LIKE '%%NO CALIFICADA%%' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN ma.Descrip LIKE '%%ACCIDENTES%%' THEN 1 ELSE 0 END),
             SUM(CASE WHEN ma.Descrip = 'MÉDICA' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN ma.Descrip LIKE '%GINECO%' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN ma.Descrip LIKE '%%GINECO%%' THEN 1 ELSE 0 END),
             SUM(CASE WHEN ma.Descrip = 'PEDIÁTRICA' THEN 1 ELSE 0 END),
             SUM(CASE WHEN ma.Descrip = 'NO ESPECIFICADO' THEN 1 ELSE 0 END),
             COUNT(*)
@@ -485,7 +443,6 @@ def actualizar_urgencias_agregado(conn, cursor, anio):
         GROUP BY r.CLUES, r.MES_ESTADISTICO, r.anio
     """
     cursor.execute(sql, (anio,))
-    conn.commit()
 
 #***************************************************************************************
 #************************* SUBIR CARPETA Y ARCHIVO DE EGRESOS****************************

@@ -175,51 +175,45 @@
 </div>
 
 <script>
-// 🔄 Función AJAX para consultar el avance
-function consultarEstadoCarga() {
-    fetch("{{ url_for('admin.estado_carga_urgencias') }}")
-        .then(response => response.json())
-        .then(data => {
-            const textoEstatus = document.getElementById("texto-estatus");
-            const barraRelleno = document.getElementById("barra-relleno");
+document.addEventListener("DOMContentLoaded", function () {
+    const intervalo = setInterval(function () {
+        fetch("{{ url_for('admin.estado_carga_urgencias') }}")
+            .then(response => response.json())
+            .then(data => {
+                const estatus = data.estatus;
+                
+                const barra = document.getElementById("barra-relleno");
+                const textoEstatus = document.getElementById("texto-estatus");
 
-            if (data && data.estatus) {
-                textoEstatus.textContent = "Estado actual: " + data.estatus;
+                // Actualizar siempre el texto informativo
+                if (textoEstatus) {
+                    textoEstatus.textContent = estatus;
+                }
 
-                // 1. Buscar porcentaje entre paréntesis "(XX%)"
-                const coincidencia = data.estatus.match(/\((\d+)%\)/);
-
-                if (coincidencia) {
+                // Extraer el porcentaje (ej. de "CARGANDO REGISTROS (45%)" toma 45)
+                const coincidencia = estatus.match(/\((\d+)%\)/);
+                if (coincidencia && barra) {
                     const porcentaje = coincidencia[1];
-                    barraRelleno.style.width = porcentaje + "%";
-                    barraRelleno.textContent = porcentaje + "%";
-                    barraRelleno.style.backgroundColor = "#28a745";
-                } 
-                // 2. Si dice INICIANDO o PENDIENTE dar un avance visual inicial
-                else if (data.estatus.includes("PENDIENTE") || data.estatus.includes("INICIANDO")) {
-                    barraRelleno.style.width = "5%";
-                    barraRelleno.textContent = "5%";
-                    barraRelleno.style.backgroundColor = "#0d6efd";
+                    barra.style.width = porcentaje + "%";
+                    barra.textContent = porcentaje + "%";
                 }
-                // 3. Completado
-                else if (data.estatus.includes("COMPLETADO")) {
-                    barraRelleno.style.width = "100%";
-                    barraRelleno.textContent = "100%";
-                    barraRelleno.style.backgroundColor = "#28a745";
-                } 
-                // 4. Error
-                else if (data.estatus.includes("ERROR")) {
-                    barraRelleno.style.width = "100%";
-                    barraRelleno.textContent = "Error";
-                    barraRelleno.style.backgroundColor = "#dc3545";
-                }
-            }
-        })
-        .catch(err => console.log("Consultando servidor...", err));
-}
 
-setInterval(consultarEstadoCarga, 3000);
-document.addEventListener("DOMContentLoaded", consultarEstadoCarga);
+                // Manejo visual de Errores y Finalización
+                if (estatus.includes("ERROR") && barra) {
+                    barra.style.backgroundColor = "#dc3545"; // Cambia barra a rojo si falla
+                    clearInterval(intervalo);
+                } else if (estatus.includes("COMPLETADO")) {
+                    if (barra) {
+                        barra.style.width = "100%";
+                        barra.textContent = "100%";
+                        barra.style.backgroundColor = "#28a745"; // Verde
+                    }
+                    clearInterval(intervalo);
+                }
+            })
+            .catch(err => console.error("Error consultando estado:", err));
+    }, 2000); // Consulta cada 2 segundos
+});
 </script>
 
 {% endblock %}
