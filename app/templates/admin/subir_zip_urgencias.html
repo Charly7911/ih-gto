@@ -175,12 +175,13 @@
 </div>
 
 <script>
-// 🔄 Función AJAX para consultar el avance del proceso en segundo plano
+// 🔄 Función AJAX para consultar el avance
 function consultarEstadoCarga() {
-    fetch("/estado_carga_urgencias")
+    // Flask genera dinámicamente la URL correcta respetando blueprints y prefijos
+    fetch("{{ url_for('admin.estado_carga_urgencias') }}")
         .then(response => {
             if (!response.ok) {
-                throw new Error("Respuesta no válida del servidor");
+                throw new Error("EstadoHTTP: " + response.status);
             }
             return response.json();
         })
@@ -210,11 +211,11 @@ function consultarEstadoCarga() {
             }
         })
         .catch(err => {
-            console.log("Consultando servidor...");
+            console.log("Esperando respuesta válida del servidor...", err);
         });
 }
 
-// Consultar cada 3 segundos (3000 ms)
+// Consultar cada 3 segundos
 setInterval(consultarEstadoCarga, 3000);
 
 // Ejecutar inmediatamente al cargar la página
