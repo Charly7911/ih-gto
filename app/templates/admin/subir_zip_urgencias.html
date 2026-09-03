@@ -177,14 +177,8 @@
 <script>
 // 🔄 Función AJAX para consultar el avance
 function consultarEstadoCarga() {
-    // Flask genera dinámicamente la URL correcta respetando blueprints y prefijos
     fetch("{{ url_for('admin.estado_carga_urgencias') }}")
-        .then(response => {
-            if (!response.ok) {
-                throw new Error("EstadoHTTP: " + response.status);
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
             const textoEstatus = document.getElementById("texto-estatus");
             const barraRelleno = document.getElementById("barra-relleno");
@@ -192,33 +186,39 @@ function consultarEstadoCarga() {
             if (data && data.estatus) {
                 textoEstatus.textContent = "Estado actual: " + data.estatus;
 
-                // Extraer el porcentaje entre paréntesis si existe (ej. 45%)
+                // 1. Buscar porcentaje entre paréntesis "(XX%)"
                 const coincidencia = data.estatus.match(/\((\d+)%\)/);
+
                 if (coincidencia) {
                     const porcentaje = coincidencia[1];
                     barraRelleno.style.width = porcentaje + "%";
                     barraRelleno.textContent = porcentaje + "%";
                     barraRelleno.style.backgroundColor = "#28a745";
-                } else if (data.estatus.includes("COMPLETADO")) {
+                } 
+                // 2. Si dice INICIANDO o PENDIENTE dar un avance visual inicial
+                else if (data.estatus.includes("PENDIENTE") || data.estatus.includes("INICIANDO")) {
+                    barraRelleno.style.width = "5%";
+                    barraRelleno.textContent = "5%";
+                    barraRelleno.style.backgroundColor = "#0d6efd";
+                }
+                // 3. Completado
+                else if (data.estatus.includes("COMPLETADO")) {
                     barraRelleno.style.width = "100%";
                     barraRelleno.textContent = "100%";
                     barraRelleno.style.backgroundColor = "#28a745";
-                } else if (data.estatus.includes("ERROR")) {
+                } 
+                // 4. Error
+                else if (data.estatus.includes("ERROR")) {
+                    barraRelleno.style.width = "100%";
+                    barraRelleno.textContent = "Error";
                     barraRelleno.style.backgroundColor = "#dc3545";
                 }
-            } else {
-                textoEstatus.textContent = "Sin procesos activos recientemente.";
             }
         })
-        .catch(err => {
-            console.log("Esperando respuesta válida del servidor...", err);
-        });
+        .catch(err => console.log("Consultando servidor...", err));
 }
 
-// Consultar cada 3 segundos
 setInterval(consultarEstadoCarga, 3000);
-
-// Ejecutar inmediatamente al cargar la página
 document.addEventListener("DOMContentLoaded", consultarEstadoCarga);
 </script>
 

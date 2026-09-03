@@ -169,13 +169,10 @@ def archivo_permitido(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-# *****************************************************************************************
-# ************************* SUBIR CARPETA Y ARCHIVO DE URGENCIAS ***************************
-# *****************************************************************************************
-# *****************************************************************************************
-# ************************* SUBIR CARPETA Y ARCHIVO DE URGENCIAS ***************************
-# *****************************************************************************************
 
+# *****************************************************************************************
+# ************************* SUBIR CARPETA Y ARCHIVO DE URGENCIAS ***************************
+# *****************************************************************************************
 
 # 💡 1. RUTA ENDPOINT PARA EL JAVASCRIPT
 @admin.route("/estado_carga_urgencias", methods=["GET"])
@@ -405,7 +402,11 @@ def procesar_txt_detallado_urgencias(
     columnas_sql = ", ".join(columnas_db)
     sql_insert = f"INSERT INTO urgencias_registros ({columnas_sql}) VALUES ({placeholders})"
 
-    # 📌 3. Procesar por fragmentos (Chunks) de 10,000 filas
+    # Estimación ultra-rápida de líneas por tamaño de archivo
+    tamano_bytes = os.path.getsize(path_urg)
+    # Promedio de ~250 bytes por registro en urgencias.txt
+    total_lineas_estimadas = max(int(tamano_bytes / 250), 1000)
+
     chunksize = 10000
     lineas_procesadas = 0
 
@@ -419,15 +420,11 @@ def procesar_txt_detallado_urgencias(
         on_bad_lines="skip",
     )
 
-    columnas_hora = ["HORASESTANCIA", "hora_ingreso", "hora_alta"]
-
     for chunk in reader:
-        # Filtrar por CLUES
+        # --- Tu lógica de filtrado por CLUES y limpieza ---
         if "CLUES" in chunk.columns:
             chunk["CLUES"] = chunk["CLUES"].str.upper().str.strip()
             chunk = chunk[chunk["CLUES"].isin(clues_validas)].copy()
-        else:
-            raise Exception("El archivo no contiene la columna 'CLUES'")
 
         if chunk.empty:
             lineas_procesadas += chunksize
@@ -436,43 +433,33 @@ def procesar_txt_detallado_urgencias(
         chunk["anio"] = anio_seleccionado
         chunk["carga_id"] = carga_id
 
-        # Asegurar columnas faltantes
         for col in columnas_db:
             if col not in chunk.columns:
                 chunk[col] = None
 
         chunk = chunk[columnas_db].copy()
 
-        # Limpieza de horas
         for col_h in columnas_hora:
             if col_h in chunk.columns:
                 chunk[col_h] = chunk[col_h].replace(
                     ["99:99", "9999", "99:9", " : "], None
                 )
 
-        # Convertir NaNs a None de Python (MySQL NULL)
         chunk = chunk.where(pd.notnull(chunk), None)
-
-        # Preparar tuplas para MySQL
         valores = [tuple(row) for row in chunk.to_numpy()]
 
-        # Insertar bloque
         cursor.executemany(sql_insert, valores)
-        conn.commit()
+        conn.commit()  # <-- LIBERA CADA CHUNK PARA QUE AJAX LEA EL AVANCE
 
-        # Actualizar progreso
         lineas_procesadas += len(chunk)
-        progreso = 5 + int((lineas_procesadas / total_lineas) * 80)
-        progreso = min(progreso, 85)  # Tope de 85% antes de agregados
+        progreso = 5 + int((lineas_procesadas / total_lineas_estimadas) * 80)
+        progreso = min(progreso, 85)
 
         cursor.execute(
             "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
-            (
-                f"CARGANDO REGISTROS ({progreso}%) [{lineas_procesadas:,}/{total_lineas:,}]",
-                carga_id,
-            ),
+            (f"CARGANDO REGISTROS ({progreso}%)", carga_id),
         )
-        conn.commit()
+        conn.commit()  # <-- CONFIRMA EL CAMBIO DE PORCENTAJE
 
 
 def actualizar_urgencias_agregado(conn, cursor, anio):
