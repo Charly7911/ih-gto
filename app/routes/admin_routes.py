@@ -382,7 +382,6 @@ def procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, an
 
     df_final = df_final.where(pd.notnull(df_final), None)
 
-    # 📌 Bloques aumentados a 5000 para acelerar la inserción cuando la información aumente a 12 meses
     bloque_size = 5000
     valores = [
         tuple(None if pd.isna(x) else x for x in row)
@@ -399,15 +398,16 @@ def procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, an
         cursor.executemany(sql, bloque)
         
         pct = 15 + int(((i + len(bloque)) / total) * 70) if total > 0 else 85
+        
+        # 🔑 CORRECCIÓN: Se utiliza %%%% para escapar el signo % ante PyMySQL
         cursor.execute(
             "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
-            (f"CARGANDO REGISTROS ({pct}%)", carga_id)
+            (f"CARGANDO REGISTROS ({pct}%%)", carga_id)
         )
         conn.commit()
 
 
 # 💡 AGREGADOS Y RESUMEN ANUAL
-# 💡 AGREGADOS Y RESUMEN ANUAL (CORREGIDO SIN %)
 def actualizar_urgencias_agregado(cursor, anio):
     cursor.execute("DELETE FROM urgencias_agregado WHERE anio = %s", (anio,))
 
