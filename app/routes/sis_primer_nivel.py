@@ -107,17 +107,23 @@ def dashboard_sis_primer_nivel():
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
+        # Cargar los registros agrupados de los últimos años (sin que LIMIT 2000 lo ahoque)
         query = """
             SELECT 
                 anio, mes, clues, nombre_unidad, jurisdiccion, municipio,
                 consultas, mental, bucal, embarazadas, planificacion_familiar, detecciones, tamiz,
                 detecciones_cardiometabolicas, orientacion_lac_des_obe, orientacion_eda_ira
             FROM sis_registros_agregados_primer_nivel
+            WHERE anio >= YEAR(CURDATE()) - 3  -- 👈 Carga los últimos 3 ó 4 años completos
             ORDER BY anio DESC, mes DESC, clues
-            LIMIT 2000
         """
         cursor.execute(query)
         resultados = cursor.fetchall() or []
+
+        # Asegurar que anio siempre sea int en Python antes de mandarlo a la plantilla
+        for r in resultados:
+            if r.get("anio") is not None:
+                r["anio"] = int(r["anio"])
 
         anios_disponibles = sorted({r["anio"] for r in resultados if r.get("anio")}, reverse=True)
         unidades_disponibles = sorted({r["nombre_unidad"] for r in resultados if r.get("nombre_unidad")})
@@ -200,8 +206,8 @@ def filtrar_datos_sis():
     unidades = data.get("unidades", []) or []
     jurisdicciones = data.get("jurisdicciones", []) or []
     municipios = data.get("municipios", []) or []
-    anios = data.get("anios", []) or []
-    meses = data.get("meses", []) or []
+    anios = [int(a) for a in data.get("anios", []) if str(a).isdigit()]
+    meses = [int(m) for m in data.get("meses", []) if str(m).isdigit()]
     variables_seleccionadas = data.get("variables", {}) or {}
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
