@@ -13,7 +13,7 @@
             <div class="col-md-6">
                 <div class="card h-100">
                     <div class="card-body text-center">
-                        <h6 class="text-muted mb-2">Total Atenciones por Año</h6>
+                        <h6 class="text-muted mb-2">Total Atenciones de Consultas por Año</h6>
                         <canvas id="graficaSisPorAnio"></canvas>
                     </div>
                 </div>
@@ -547,9 +547,7 @@
         const porAnio = {};
         for (let i = 0; i < data.length; i++) {
             const r = data[i];
-            const sumaFila = (Number(r.consultas) || 0) + (Number(r.embarazadas) || 0) + (Number(r.mental) || 0) +
-                (Number(r.bucal) || 0) + (Number(r.tamiz) || 0) + (Number(r.planificacion_familiar) || 0) +
-                (Number(r.detecciones) || 0);
+            const sumaFila = (Number(r.consultas) || 0);
             porAnio[r.anio] = (porAnio[r.anio] || 0) + sumaFila;
         }
 
