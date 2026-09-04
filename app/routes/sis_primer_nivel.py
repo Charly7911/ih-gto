@@ -59,7 +59,11 @@ VARIABLES_DEFAULT = {
         'DTE81','DTE82','DTE83','DTE84','DTE85','DTE86','DTE87','DTE88','DTE89',
         'DTE90','DTE91','DTE92','DTE93','DTE94','DTE95','DTE96','DTE97','DTE98','DTE99'
     ],
-    "tamiz": ['RNL06']
+    "detecciones_cardiometabolicas": ['DET01','DET02','DET03','DET04','DET25','DET26','DET27','DET28','DET50','DET51','DET52','DET53','DET58','DET59','DET60','DET61'],
+    "tamiz": ['RNL06'],
+
+    "orientacion_lac_des_obe": ['MAC07', 'MAC08', 'MAC09', 'MAC11', 'MAC12'],
+    "orientacion_eda_ira": ['MAC01', 'MAC02']
 }
 
 # --- FUNCIÓN AUXILIAR PARA SINTAXIS DINÁMICA SQL ---
@@ -83,14 +87,22 @@ def obtener_modulo_por_apartado(apartado_raw, variable_code=""):
         return "planificacion_familiar"
     elif apt in ["56"] or var.startswith(("DET", "DT0", "DT1", "DTE")):
         return "detecciones"
+    elif apt in ["56"] or var.startswith(("DET")):
+        return "detecciones_cardiometabolicas"
     elif apt in ["111"] or var.startswith(("RNL", "TAM")):
         return "tamiz"
+    elif apt in ["113"] and var in ['MAC']:
+        return "orientacion_lac_des_obe"
+    elif apt in ["113"] and var in ['MAC']:
+        return "orientacion_eda_ira"
     elif apt in ["2", "02"] and var in ['CPP06', 'CPP13', 'COD01', 'COD02']:
         return "bucal"
     elif apt in ["2", "02"] and var in ['CPP07', 'CPP14']:
         return "mental"
     else:
         return "consultas"
+
+    
 
 
 @sis_pn.route("/")
@@ -103,7 +115,8 @@ def dashboard_sis_primer_nivel():
         query = """
             SELECT 
                 anio, mes, clues, nombre_unidad, jurisdiccion, municipio,
-                consultas, mental, bucal, embarazadas, planificacion_familiar, detecciones, tamiz
+                consultas, mental, bucal, embarazadas, planificacion_familiar, detecciones, tamiz,
+                detecciones_cardiometabolicas, orientacion_lac_des_obe, orientacion_eda_ira
             FROM sis_registros_agregados_primer_nivel
             ORDER BY anio DESC, mes DESC, clues
             LIMIT 2000
@@ -211,7 +224,8 @@ def filtrar_datos_sis():
             query_base = """
                 SELECT 
                     anio, mes, clues, nombre_unidad, jurisdiccion, municipio,
-                    consultas, mental, bucal, embarazadas, planificacion_familiar, detecciones, tamiz
+                    consultas, mental, bucal, embarazadas, planificacion_familiar, detecciones, tamiz, 
+                    detecciones_cardiometabolicas, orientacion_lac_des_obe, orientacion_eda_ira 
                 FROM sis_registros_agregados_primer_nivel
                 WHERE 1=1
             """
@@ -240,7 +254,7 @@ def filtrar_datos_sis():
                     return VARIABLES_DEFAULT[mod_key]
                 return val if len(val) > 0 else ["__NONE__"]
 
-            modulos = ["consultas", "mental", "bucal", "embarazadas", "planificacion_familiar", "detecciones", "tamiz"]
+            modulos = ["consultas", "mental", "bucal", "embarazadas", "planificacion_familiar", "detecciones", "tamiz", "detecciones_cardiometabolicas", "orientacion_lac_des_obe", "orientacion_eda_ira"]
             vars_map = {m: resolver_vars(m) for m in modulos}
 
             # Construcción dinámica de columnas agregadas

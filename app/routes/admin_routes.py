@@ -2025,26 +2025,37 @@ def procesar_csv_detallado_sis(conn, cursor, carga_id, csv_path, anio):
 
 # 💡 4. CÁLCULO DE AGREGADOS
 def actualizar_sis_agregado_primer_nivel(cursor, anio):
+    # 1. Limpiar agregados anteriores del año procesado
     cursor.execute(
         "DELETE FROM sis_registros_agregados_primer_nivel WHERE anio = %s",
         (anio,),
     )
 
+    # 2. Re-calcular con las nuevas columnas incluidas
     sql = """
         INSERT INTO sis_registros_agregados_primer_nivel (
             anio, mes, clues, nombre_unidad, jurisdiccion, municipio,
             consultas, mental, bucal, embarazadas,
-            planificacion_familiar, detecciones, tamiz
+            planificacion_familiar, detecciones, tamiz,
+            detecciones_cardiometabolicas, orientacion_lac_des_obe, orientacion_eda_ira
         )
         SELECT
             sr.anio, sr.mes, sr.clues, cu.nombre_unidad, sr.jurisdiccion, sr.municipio,
+            
+            -- Consultas y Atenciones previas
             SUM(CASE WHEN sr.variable IN ('CON01','CON02','CON03','CON04','CON05','CON06','CON07','CON08','CON09','CON10','CON11','CON12','CON13','CON14','CON15','CON16','CON17','CON18','CON19','CON20','CON21','CON22','CON23','CON24','CON25','CON26','CON27','CON28','CON29','CON30','CON31','CON32','CON33','CON34','CON35','CON36','CON37','CON38','CON39','CON40','CON41','CON42','CON44','CON45','CON47','COD01','COD02') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
             SUM(CASE WHEN sr.variable IN ('CPP07','CPP14') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
             SUM(CASE WHEN sr.variable IN ('CPP06','CPP13','COD01','COD02') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
             SUM(CASE WHEN sr.variable IN ('EMB01','EMB02','EMB03','EMB04','EMB05','EMB06') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
             SUM(CASE WHEN sr.variable IN ('PFC01','PFC02','PFC03','PFC04','PFC05','PFC06','PFC07','PFC08','PFC10','PFC11','PFC12','PFC13','PFC14','PFC15','PFC16','PFC17','PFC19','PFC20','PFC21','PFC22','PFC23','PFC24','PFC25','PFC26','PFC27','PFC28','PFC29','PFC30','PFC31','PFC32') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
             SUM(CASE WHEN sr.variable IN ('DET01','DET02','DET03','DET04','DET05','DET06','DET07','DET08','DET09','DET11','DET12','DET16','DET17','DET18','DET19','DET21','DET22','DET25','DET26','DET27','DET28','DET29','DET30','DET31','DET33','DET34','DET35','DET36','DET39','DET40','DET42','DET43','DET44','DET45','DET47','DET50','DET51','DET52','DET53','DET54','DET57','DET58','DET59','DET60','DET61','DET62','DET63','DET64','DET73','DET74','DET85','DET86','DET87','DET88','DET89','DET90','DET91','DET92','DET93','DET94','DET95','DET96','DET97','DET98','DET99','DT001','DT002','DT003','DT004','DT005','DT006','DT007','DT008','DT009','DT010','DT011','DT012','DT013','DT014','DT015','DT016','DT017','DT018','DT019','DT020','DT021','DT022','DT023','DT024','DT025','DT026','DT027','DT028','DT030','DT031','DT032','DT033','DT034','DT035','DT036','DT037','DT038','DT039','DT040','DT041','DT042','DT043','DT044','DT045','DT046','DT047','DT048','DT049','DT050','DT051','DT053','DT054','DT055','DT056','DT059','DT060','DT061','DT062','DT063','DT064','DT065','DT066','DT067','DT068','DT069','DT070','DT071','DT072','DT073','DT074','DT075','DT076','DT077','DT078','DT079','DT080','DT081','DT082','DT083','DT084','DT085','DT086','DT087','DT088','DT089','DT090','DT091','DT092','DT093','DT094','DT095','DT096','DT097','DT098','DT099','DT100','DT101','DT102','DT103','DT104','DT105','DT106','DT107','DT108','DT109','DT110','DT111','DT112','DT113','DT114','DT115','DT116','DT117','DT118','DT119','DT120','DT121','DT122','DT123','DT124','DT125','DT126','DT127','DT128','DT129','DT130','DT131','DT132','DT133','DT134','DT135','DT136','DT137','DT138','DT139','DT140','DT141','DT142','DT143','DT144','DT145','DT146','DT147','DT148','DT149','DT150','DT151','DT152','DT153','DT154','DT155','DT156','DT157','DT158','DT159','DT160','DT161','DT162','DT163','DT165','DT166','DT167','DT168','DT169','DT170','DT171','DT172','DT173','DT174','DT175','DT176','DT177','DT178','DTE01','DTE02','DTE03','DTE04','DTE05','DTE06','DTE07','DTE08','DTE09','DTE10','DTE11','DTE12','DTE14','DTE15','DTE16','DTE17','DTE18','DTE19','DTE20','DTE21','DTE22','DTE23','DTE24','DTE25','DTE32','DTE33','DTE37','DTE38','DTE40','DTE41','DTE42','DTE43','DTE44','DTE45','DTE46','DTE47','DTE48','DTE49','DTE56','DTE57','DTE61','DTE62','DTE64','DTE65','DTE66','DTE67','DTE68','DTE69','DTE70','DTE71','DTE72','DTE73','DTE74','DTE75','DTE76','DTE77','DTE78','DTE79','DTE80','DTE81','DTE82','DTE83','DTE84','DTE85','DTE86','DTE87','DTE88','DTE89','DTE90','DTE91','DTE92','DTE93','DTE94','DTE95','DTE96','DTE97','DTE98','DTE99') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
-            SUM(CASE WHEN sr.variable = 'RNL06' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END)
+            SUM(CASE WHEN sr.variable = 'RNL06' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+            
+            -- 🆕 NUEVAS COLUMNAS: Ajusta las claves de 'IN (...)' según tus códigos de variable del SIS
+            SUM(CASE WHEN sr.variable IN ('DET01', 'DET02','DET03','DET04','DET25','DET26', 'DET27', 'DET28','DET50','DET51','DET52','DET53','DET58','DET59','DET60','DET61') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+            SUM(CASE WHEN sr.variable IN ('MAC07', 'MAC08','MAC09','MAC11','MAC12') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
+            SUM(CASE WHEN sr.variable IN ('MAC01', 'MAC02') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END)
+
         FROM sis_registros_primer_nivel sr
         LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
         WHERE sr.anio = %s

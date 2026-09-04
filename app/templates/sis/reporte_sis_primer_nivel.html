@@ -47,6 +47,9 @@
                                 <th class="text-center">Tamiz</th>
                                 <th class="text-center">Planificación Fam.</th>
                                 <th class="text-center">Detecciones</th>
+                                <th class="text-center">Detecciones Cardiometab.</th>
+                                <th class="text-center">Orientación Lactancia/Desnutrición/Obesidad</th>
+                                <th class="text-center">Orientación EDA/IRA</th>
                             </tr>
                         </thead>
                         <tbody id="tablaSIS"></tbody>
@@ -84,6 +87,10 @@
                                     <option value="tamiz">Tamiz</option>
                                     <option value="planificacion_familiar">Planificación Familiar</option>
                                     <option value="detecciones">Detecciones</option>
+                                    <option value="detecciones_cardiometabolicas">Detecciones Cardiometab.</option>
+                                    <option value="orientacion_lac_des_obe">Orientación Lactancia/Desnutrición/Obesidad
+                                    </option>
+                                    <option value="orientacion_eda_ira">Orientación EDA/IRA</option>
                                     <option value="todas">Todas</option>
                                 </select>
 
@@ -371,7 +378,7 @@
                     municipio: mun,
                     clues: (nivelAgrupacion === 'clues') ? clues : '-',
                     nombre_unidad: nombreEtiqueta,
-                    consultas: 0, embarazadas: 0, mental: 0, bucal: 0, tamiz: 0, planificacion_familiar: 0, detecciones: 0
+                    consultas: 0, embarazadas: 0, mental: 0, bucal: 0, tamiz: 0, planificacion_familiar: 0, detecciones: 0, detecciones_cardiometabolicas: 0, orientacion_lac_des_obe: 0, orientacion_eda_ira: 0
                 };
             }
 
@@ -382,6 +389,9 @@
             mapa[key].tamiz += Number(r.tamiz) || 0;
             mapa[key].planificacion_familiar += Number(r.planificacion_familiar) || 0;
             mapa[key].detecciones += Number(r.detecciones) || 0;
+            mapa[key].detecciones_cardiometabolicas += Number(r.detecciones_cardiometabolicas) || 0;
+            mapa[key].orientacion_lac_des_obe += Number(r.orientacion_lac_des_obe) || 0;
+            mapa[key].orientacion_eda_ira += Number(r.orientacion_eda_ira) || 0;
         }
 
         return Object.values(mapa);
@@ -517,6 +527,9 @@
                     <td class="text-center">${fmt(r.tamiz)}</td>
                     <td class="text-center">${fmt(r.planificacion_familiar)}</td>
                     <td class="text-center">${fmt(r.detecciones)}</td>
+                    <td class="text-center">${fmt(r.detecciones_cardiometabolicas)}</td>
+                    <td class="text-center">${fmt(r.orientacion_lac_des_obe)}</td>
+                    <td class="text-center">${fmt(r.orientacion_eda_ira)}</td>
                 </tr>`;
         }
         tbody.innerHTML = filasHTML;
@@ -593,7 +606,10 @@
             bucal: { label: 'Salud Bucal', color: '#76B7B2' },
             tamiz: { label: 'Tamiz', color: '#59A14F' },
             planificacion_familiar: { label: 'Planificación Fam.', color: '#EDC948' },
-            detecciones: { label: 'Detecciones', color: '#B07AA1' }
+            detecciones: { label: 'Detecciones', color: '#B07AA1' },
+            detecciones_cardiometabolicas: { label: 'Detecciones Cardiometabólicas', color: '#9C755F' },
+            orientacion_lac_des_obe: { label: 'Orientación Lactancia/Desnutrición/Obesidad', color: '#8C564B' },
+            orientacion_eda_ira: { label: 'Orientación EDA/IRA', color: '#C4A26A' }
         };
 
         const datasets = Object.keys(configVars).map(v => ({
@@ -644,7 +660,7 @@
         const sumarCategorias = (r) => {
             if (modulo === "todas") {
                 return (Number(r.consultas) || 0) + (Number(r.embarazadas) || 0) + (Number(r.mental) || 0) +
-                    (Number(r.bucal) || 0) + (Number(r.tamiz) || 0) + (Number(r.planificacion_familiar) || 0) + (Number(r.detecciones) || 0);
+                    (Number(r.bucal) || 0) + (Number(r.tamiz) || 0) + (Number(r.planificacion_familiar) || 0) + (Number(r.detecciones) || 0) + (Number(r.detecciones_cardiometabolicas) || 0) + (Number(r.orientacion_lac_des_obe) || 0) + (Number(r.orientacion_eda_ira) || 0);
             }
             return Number(r[modulo]) || 0;
         };
