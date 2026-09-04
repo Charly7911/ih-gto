@@ -164,8 +164,8 @@
         meta.textContent = registro ? ` | ${registro.estatus_inicio} · ${registro.estatus}` : "";
     }
 
-    /* 2. DIBUJAR APARTADOS Y CHECKBOXES DE VARIABLES */
-    /* 2. DIBUJAR APARTADOS Y CHECKBOXES (DESGLOSE COMPLETO COMPATIBLE) */
+
+    /* 2. ÁRBOL TIPO SUBMENÚ (TREEVIEW) CON DESGLOSE DESPLEGABLE */
     function renderSubvariables() {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const contenedor = document.getElementById("contenedorSubvariables");
@@ -173,99 +173,96 @@
 
         if (!contenedor) return;
 
-        let modulosAProcesar = [];
-        if (modulo === "todas") {
-            modulosAProcesar = Object.keys(DICCIONARIO_VARIABLES);
-        } else {
-            modulosAProcesar = [modulo];
-        }
-
-        let totalVariablesMostradas = 0;
+        let modulosAProcesar = modulo === "todas" ? Object.keys(DICCIONARIO_VARIABLES) : [modulo];
+        let totalVariables = 0;
         const fragment = document.createDocumentFragment();
+
+        // Estilos para simular la jerarquía visual de la imagen
+        const ulRaiz = document.createElement("ul");
+        ulRaiz.className = "list-unstyled ms-2 mb-0 font-monospace";
+        ulRaiz.style.fontSize = "0.85rem";
 
         modulosAProcesar.forEach((modKey) => {
             const estructuraModulo = DICCIONARIO_VARIABLES[modKey] || [];
             if (estructuraModulo.length === 0) return;
 
-            // Banner delimitador si elegimos "Todas"
-            if (modulo === "todas") {
-                const headerModulo = document.createElement("div");
-                headerModulo.className = "alert alert-secondary py-1 px-3 mb-2 mt-3 fw-bold text-uppercase border-0 shadow-sm";
-                headerModulo.style.fontSize = "0.85rem";
-                headerModulo.innerHTML = `📂 Módulo / Sección: <strong class="text-primary">${modKey.replace('_', ' ')}</strong>`;
-                fragment.appendChild(headerModulo);
-            }
-
             const seleccionadasModulo = variablesPersonalizadasEstado[modKey] || [];
 
-            estructuraModulo.forEach((grupo, idx) => {
-                totalVariablesMostradas += (grupo.variables || []).length;
-                const accordionId = `acc_${modKey}_${grupo.apartado}_${idx}`.replace(/[^a-zA-Z0-9_-]/g, "");
+            estructuraModulo.forEach((grupo) => {
+                const varsGrupo = grupo.variables || [];
+                totalVariables += varsGrupo.length;
 
-                const countSel = (grupo.variables || []).filter(v => seleccionadasModulo.includes(v.codigo)).length;
-                const totalGroup = (grupo.variables || []).length;
+                const liApartado = document.createElement("li");
+                liApartado.className = "my-1";
 
-                const cardGrupo = document.createElement("div");
-                cardGrupo.className = "card mb-2 border shadow-sm";
+                // Se calcula si todas las variables del apartado están marcadas
+                const codigosGrupo = varsGrupo.map(v => v.codigo);
+                const estanTodasMarcadas = codigosGrupo.every(c => seleccionadasModulo.includes(c));
 
-                // Se fuerza que SIEMPRE aparezca desplegado ('show') por defecto
-                let htmlGrupo = `
-                <div class="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center border-start border-4 border-primary">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="badge bg-primary">Apartado ${grupo.apartado}</span>
-                        <strong class="text-dark small">${grupo.descripcion_apartado || 'Sin descripción'}</strong>
-                    </div>
-                    <div>
-                        <span class="badge rounded-pill ${countSel > 0 ? 'bg-success' : 'bg-secondary'}">
-                            ${countSel}/${totalGroup} activas
+                liApartado.innerHTML = `
+                <details class="tree-item">
+                    <summary class="d-flex align-items-center gap-1 py-1 user-select-none" style="cursor: pointer;">
+                        <input type="checkbox" 
+                               class="form-check-input my-0 chk-padre" 
+                               data-modulo="${modKey}" 
+                               ${estanTodasMarcadas ? 'checked' : ''}>
+                        <span class="fw-bold text-dark">
+                            ${grupo.apartado} ${grupo.descripcion_apartado || ''}
                         </span>
-                    </div>
-                </div>
-                <div id="${accordionId}" class="card-body bg-white p-3">
-                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-2">`;
-
-                (grupo.variables || []).forEach(v => {
+                    </summary>
+                    <ul class="list-unstyled ms-4 ps-2 border-start border-secondary-subtle my-1">
+                        ${varsGrupo.map(v => {
                     const isChecked = seleccionadasModulo.includes(v.codigo);
+                    return `
+                                <li class="d-flex align-items-center gap-1 py-1">
+                                    <input type="checkbox" 
+                                           class="form-check-input my-0 chk-subvar" 
+                                           data-modulo="${modKey}" 
+                                           id="sub_${v.codigo}" 
+                                           value="${v.codigo}" 
+                                           ${isChecked ? 'checked' : ''}>
+                                    <label for="sub_${v.codigo}" class="mb-0 text-secondary" style="cursor: pointer;">
+                                        <strong>${v.codigo}</strong> ${v.nombre}
+                                    </label>
+                                </li>
+                            `;
+                }).join('')}
+                    </ul>
+                </details>
+            `;
 
-                    htmlGrupo += `
-                    <div class="col">
-                        <div class="form-check p-2 bg-light rounded border h-100 d-flex align-items-center">
-                            <input class="form-check-input chk-subvar me-2 mt-0" 
-                                   type="checkbox" 
-                                   data-modulo="${modKey}" 
-                                   id="sub_${v.codigo}" 
-                                   value="${v.codigo}" ${isChecked ? 'checked' : ''}>
-                            <label class="form-check-label small text-truncate" for="sub_${v.codigo}" title="${v.codigo}: ${v.nombre}">
-                                <strong class="text-primary">${v.codigo}</strong> <span class="text-secondary">— ${v.nombre}</span>
-                            </label>
-                        </div>
-                    </div>`;
-                });
-
-                htmlGrupo += `
-                    </div>
-                </div>`;
-
-                cardGrupo.innerHTML = htmlGrupo;
-                fragment.appendChild(cardGrupo);
+                ulRaiz.appendChild(liApartado);
             });
         });
 
         if (lbl) {
             const nombreVista = modulo === "todas" ? "Todas las Secciones" : modulo;
-            lbl.innerHTML = `📋 Desglose de Variables en <strong>${nombreVista.toUpperCase()}</strong> (${totalVariablesMostradas} variables en catálogo):`;
+            lbl.innerHTML = `📋 Árbol de Variables: <strong>${nombreVista.toUpperCase()}</strong> (${totalVariables} en catálogo):`;
         }
 
         contenedor.innerHTML = "";
-        contenedor.appendChild(fragment);
+        contenedor.appendChild(ulRaiz);
 
-        // Event Listener Delegado para los Checkboxes
+        // Gestor de eventos para marcar/desmarcar hijos y padres
         contenedor.onclick = null;
         contenedor.addEventListener('change', (e) => {
-            if (e.target && e.target.classList.contains('chk-subvar')) {
-                guardarEstadoVariablesActuales();
-                window.ejecutarFiltradoSis(400);
+            // Si se hace clic en el checkbox del apartado (Padre), marca/desmarca todos sus hijos
+            if (e.target.classList.contains('chk-padre')) {
+                const parentDetails = e.target.closest('details');
+                const hijos = parentDetails.querySelectorAll('.chk-subvar');
+                hijos.forEach(h => h.checked = e.target.checked);
             }
+
+            // Si se hace clic en un hijo, actualiza el estado del padre
+            if (e.target.classList.contains('chk-subvar')) {
+                const parentDetails = e.target.closest('details');
+                const chkPadre = parentDetails.querySelector('.chk-padre');
+                const hermanos = Array.from(parentDetails.querySelectorAll('.chk-subvar'));
+                if (chkPadre) chkPadre.checked = hermanos.every(h => h.checked);
+            }
+
+            guardarEstadoVariablesActuales();
+            window.ejecutarFiltradoSis(400);
         });
     }
 
