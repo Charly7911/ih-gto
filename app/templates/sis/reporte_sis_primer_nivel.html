@@ -355,25 +355,26 @@
 
         for (let i = 0; i < data.length; i++) {
             const r = data[i];
+            const numAnio = Number(r.anio); // 👈 Normalizado
             const jur = r.jurisdiccion ? String(r.jurisdiccion).trim() : 'Sin Especificar';
             const mun = r.municipio ? String(r.municipio).trim() : 'Sin Especificar';
             const clues = r.clues || 'Sin CLUES';
             const nombreUnidad = r.nombre_unidad || clues;
 
-            let key = `${r.anio}-${jur}-${mun}-${clues}`;
+            let key = `${numAnio}-${jur}-${mun}-${clues}`;
             let nombreEtiqueta = nombreUnidad;
 
             if (nivelAgrupacion === 'jurisdiccion') {
-                key = `${r.anio}-JUR-${jur}`;
+                key = `${numAnio}-JUR-${jur}`;
                 nombreEtiqueta = `Jurisdicción ${jur}`;
             } else if (nivelAgrupacion === 'municipio') {
-                key = `${r.anio}-MUN-${mun}`;
+                key = `${numAnio}-MUN-${mun}`;
                 nombreEtiqueta = mun;
             }
 
             if (!mapa[key]) {
                 mapa[key] = {
-                    anio: r.anio,
+                    anio: numAnio, // 👈 Normalizado
                     jurisdiccion: jur,
                     municipio: mun,
                     clues: (nivelAgrupacion === 'clues') ? clues : '-',
@@ -470,14 +471,18 @@
         const tabs = document.getElementById("tabsAnios");
         if (!tabs) return;
 
-        const anios = [...new Set(data.map(r => r.anio))].sort((a, b) => b - a);
+        // Normalizar a Number antes del sort
+        const anios = [...new Set(data.map(r => Number(r.anio)))].filter(a => !isNaN(a) && a > 0).sort((a, b) => b - a);
+
         if (anios.length === 0) { anioActivo = null; tabs.innerHTML = ""; return; }
 
-        if (!anioActivo || !anios.includes(anioActivo)) anioActivo = anios[0];
+        if (!anioActivo || !anios.includes(Number(anioActivo))) {
+            anioActivo = anios[0]; // Toma automáticamente el año más reciente (ej. 2026)
+        }
 
         let html = "";
         anios.forEach((anio) => {
-            const activeClass = (anio === anioActivo) ? 'active' : '';
+            const activeClass = (Number(anio) === Number(anioActivo)) ? 'active' : '';
             html += `<li class="nav-item"><button class="nav-link ${activeClass}" data-anio="${anio}">${anio}</button></li>`;
         });
         tabs.innerHTML = html;
@@ -491,7 +496,7 @@
                 paginaActual = 1;
 
                 renderTablaSis();
-                renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
+                renderGraficaPorUnidad(datosActuales.filter(r => Number(r.anio) === Number(anioActivo)));
             });
         });
     }
