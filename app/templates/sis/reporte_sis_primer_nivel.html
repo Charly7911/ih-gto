@@ -63,6 +63,7 @@
 
                 <!-- GRÁFICA TEMPORAL Y CATÁLOGO DE VARIABLES -->
                 <hr class="my-4">
+                <hr class="my-4">
                 <div class="card mb-2">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -83,7 +84,7 @@
                                     <option value="tamiz">Tamiz</option>
                                     <option value="planificacion_familiar">Planificación Familiar</option>
                                     <option value="detecciones">Detecciones</option>
-                                    <option value="todas">Todas las Secciones</option>
+                                    <option value="todas">Todas</option>
                                 </select>
 
                                 <button type="button" class="btn btn-outline-primary btn-sm"
@@ -93,7 +94,19 @@
                             </div>
                         </div>
 
+                        <!-- CONTENEDOR DE LA GRÁFICA CON LOADER -->
                         <div style="position: relative; height: 370px; width: 100%;">
+                            <!-- Superposición de carga (Spinner) AQUÍ SE AGREGA -->
+                            <div id="loaderGraficaTemporal"
+                                class="d-none position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex flex-column align-items-center justify-content-center"
+                                style="z-index: 10; border-radius: 6px;">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Cargando...</span>
+                                </div>
+                                <small class="text-muted fw-bold mt-2">Actualizando datos...</small>
+                            </div>
+
+                            <!-- Canvas de la gráfica -->
                             <canvas id="graficaSisMensual"></canvas>
                         </div>
 
@@ -374,10 +387,25 @@
         return Object.values(mapa);
     }
 
+    /* FUNCIONES PARA MOSTRAR Y OCULTAR EL LOADER DE LA GRÁFICA */
+    function mostrarCargandoGrafica() {
+        const loader = document.getElementById("loaderGraficaTemporal");
+        if (loader) loader.classList.remove("d-none");
+    }
+
+    function ocultarCargandoGrafica() {
+        const loader = document.getElementById("loaderGraficaTemporal");
+        if (loader) loader.classList.add("d-none");
+    }
+
+    /* REALIZAR CONSULTA AL BACKEND CON ESTADO DE CARGA */
     async function realizarConsultaBackend() {
+        mostrarCargandoGrafica(); // 1. Activar spinner de inmediato
+
         if (!hayVariablesSeleccionadas()) {
             datosFiltradosSis = [];
             actualizarVistas();
+            ocultarCargandoGrafica();
             return;
         }
 
@@ -397,15 +425,17 @@
                 body: JSON.stringify(payload)
             });
 
-            if (!resp.ok) return;
+            if (!resp.ok) throw new Error("Error en la respuesta de la API");
 
             const res = await resp.json();
             if (res.status === "success") {
                 datosFiltradosSis = res.data || [];
-                actualizarVistas();
+                actualizarVistas(); // 2. Dibujar la nueva gráfica con datos frescos
             }
         } catch (err) {
             console.error("Error al conectar con la API SIS:", err);
+        } finally {
+            ocultarCargandoGrafica(); // 3. Quitar spinner cuando todo termine
         }
     }
 
@@ -604,14 +634,14 @@
 
         if (!ctx) return;
 
-        // Si no hay datos, destruimos la instancia previa y limpiamos el lienzo limpiamente
-        if (!data || data.length === 0) {
-            if (graficaSisMensual) {
-                graficaSisMensual.destroy();
-                graficaSisMensual = null;
-            }
-            return;
+        // Si la gráfica existe, la destruimos completamente para vaciar el lienzo
+        if (graficaSisMensual) {
+            graficaSisMensual.destroy();
+            graficaSisMensual = null;
         }
+
+        // Si no hay datos, dejamos el lienzo limpio y salimos
+        if (!data || data.length === 0) return;
 
         const sumarCategorias = (r) => {
             if (modulo === "todas") {
@@ -664,28 +694,16 @@
 
         const tipoChartRequerido = tipoVista === 'anio' ? 'bar' : 'line';
 
-        // Destruir siempre la gráfica previa para evitar distorsiones de lienzo/ejes
-        if (graficaSisMensual) {
-            graficaSisMensual.destroy();
-            graficaSisMensual = null;
-        }
-
-        // Crear una nueva instancia limpia de Chart.js
+        // Creación limpia del gráfico
         graficaSisMensual = new Chart(ctx, {
             type: tipoChartRequerido,
             data: { labels, datasets },
             options: {
                 responsive: true,
-                maintainAspectRatio: false, // Asegura que tome el alto del contenedor padre
+                maintainAspectRatio: false,
                 animation: false,
-                scales: { 
-                    x: {
-                        grid: { display: true }
-                    },
-                    y: { 
-                        beginAtZero: true, 
-                        ticks: { callback: v => fmt(v) } 
-                    } 
+                scales: {
+                    y: { beginAtZero: true, ticks: { callback: v => fmt(v) } }
                 },
                 plugins: {
                     datalabels: {
@@ -707,6 +725,7 @@
 
         // AL CAMBIAR DE MÓDULO EN EL SELECT: RESTAURA SUS DEFAULTS Y VUELVE A FILTRAR
         document.getElementById("filtroSisDetalle")?.addEventListener("change", (e) => {
+            mostrarCargandoGrafica(); // Muestra el loader al instante de cambiar el valor
             const moduloSeleccionado = e.target.value;
             restaurarDefaultModulo(moduloSeleccionado);
             renderSubvariables();
