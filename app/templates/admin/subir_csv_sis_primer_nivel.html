@@ -58,37 +58,59 @@
         margin-top: 30px;
     }
 
-    .zona-formulario form input[type="submit"]:hover {
-        background-color: #0056b3;
+    .zona-formulario form input[type="submit"]:disabled {
+        background-color: #a0c4ff;
+        cursor: not-allowed;
     }
 
-    .zona-formulario ul {
-        max-width: 500px;
-        margin: 20px auto;
-        padding: 15px;
-        background-color: #e7f7e7;
-        border: 1px solid #b2ddb2;
-        border-radius: 8px;
-        list-style-type: none;
-        color: #2e7d32;
+    /* Estilos de la Barra de Progreso */
+    .progress-wrapper {
+        display: none;
+        margin-top: 25px;
     }
+
+    .progress-bar-container {
+        width: 100%;
+        background-color: #e0e0e0;
+        border-radius: 10px;
+        height: 22px;
+        overflow: hidden;
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+    }
+
+    .progress-bar-fill {
+        height: 100%;
+        width: 0%;
+        background-color: #007BFF;
+        transition: width 0.4s ease, background-color 0.3s ease;
+    }
+
+    .progress-text {
+        text-align: center;
+        font-size: 0.9rem;
+        color: #555;
+        margin-top: 8px;
+        font-weight: 600;
+    }
+
+    .alert-box {
+        display: none;
+        padding: 12px;
+        border-radius: 8px;
+        margin-top: 20px;
+        text-align: center;
+        font-weight: 500;
+    }
+    .alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .alert-danger { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
 </style>
 
 <div class="zona-formulario">
     <h1>Subir base CSV - Sistema SIS Primer Nivel</h1>
 
-    {% with messages = get_flashed_messages() %}
-    {% if messages %}
-    <ul>
-        {% for msg in messages %}
-        <li>{{ msg }}</li>
-        {% endfor %}
-    </ul>
-    {% endif %}
-    {% endwith %}
-
     <div class="form-container">
-        <form method="POST" enctype="multipart/form-data">
+        <!-- Envío estándar mediante el action del backend -->
+        <form id="uploadForm" action="{{ url_for('admin.subir_csv_sis_primer_nivel') }}" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <label for="file">Selecciona archivo CSV:</label>
@@ -119,9 +141,79 @@
                 <option value="CONSOLIDADO">Consolidado</option>
             </select>
 
-            <input type="submit" value="Subir y Procesar">
+            <input type="submit" id="btnSubmit" value="Subir y Procesar">
         </form>
+
+        <!-- Componente Visual de Avance -->
+        <div class="progress-wrapper" id="progressWrapper">
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="progressBar"></div>
+            </div>
+            <div class="progress-text" id="progressText">Iniciando procesamiento...</div>
+        </div>
+
+        <div id="alertBox" class="alert-box"></div>
     </div>
 </div>
+
+<script>
+document.getElementById('uploadForm').addEventListener('submit', function() {
+    const btnSubmit = document.getElementById('btnSubmit');
+    const progressWrapper = document.getElementById('progressWrapper');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const alertBox = document.getElementById('alertBox');
+
+    // Deshabilitar botón y activar la vista de carga
+    btnSubmit.disabled = true;
+    alertBox.style.display = 'none';
+    progressWrapper.style.display = 'block';
+    progressBar.style.width = '5%';
+    progressBar.style.backgroundColor = '#007BFF';
+    progressText.innerText = 'Enviando archivo al servidor...';
+
+    // Iniciar consulta periódica a la base de datos
+    const interval = setInterval(() => {
+        fetch("{{ url_for('admin.estado_carga_sis_primer_nivel') }}")
+            .then(res => res.json())
+            .then(data => {
+                const estatus = data.estatus || "Procesando...";
+                progressText.innerText = estatus;
+
+                // Extrae el porcentaje dentro del texto (Ej: "CARGANDO REGISTROS (45%)")
+                const match = estatus.match(/\((\d+)%\)/);
+                if (match) {
+                    const porcentaje = match[1];
+                    progressBar.style.width = `${porcentaje}%`;
+                }
+
+                // Carga completada
+                if (estatus.includes('COMPLETADO')) {
+                    clearInterval(interval);
+                    progressBar.style.width = '100%';
+                    progressBar.style.backgroundColor = '#28a745'; // Verde
+                    btnSubmit.disabled = false;
+                    
+                    alertBox.className = 'alert-box alert-success';
+                    alertBox.innerText = '¡El archivo se procesó e insertó con éxito!';
+                    alertBox.style.display = 'block';
+                } 
+                // Error reportado durante el proceso
+                else if (estatus.includes('ERROR')) {
+                    clearInterval(interval);
+                    progressBar.style.backgroundColor = '#dc3545'; // Rojo
+                    btnSubmit.disabled = false;
+
+                    alertBox.className = 'alert-box alert-danger';
+                    alertBox.innerText = estatus;
+                    alertBox.style.display = 'block';
+                }
+            })
+            .catch(err => {
+                console.error("Error consultando el progreso:", err);
+            });
+    }, 1200);
+});
+</script>
 
 {% endblock %}
