@@ -1796,9 +1796,9 @@ def subir_csv_sis():
     return render_template("admin/subir_csv_sis.html")
 
 
-#*****************************************************************
-#**********  CARGAR SIS PRIMER NIVEL *****************************
-#*****************************************************************
+# *****************************************************************
+# ********** CARGAR SIS PRIMER NIVEL *****************************
+# *****************************************************************
 @admin.route("/subir_csv_sis_primer_nivel", methods=["GET", "POST"])
 @login_required
 def subir_csv_sis_primer_nivel():
@@ -1819,40 +1819,19 @@ def subir_csv_sis_primer_nivel():
         anio = int(anio)
 
         try:
-            # 📖 2. Lectura y Normalización
-            df = pd.read_csv(file, dtype=str)
-            df.columns = [
-                col.strip().lower().replace(" ", "_").replace("ó", "o")
-                for col in df.columns
-            ]
-
             conn = mysql.connection
             cursor = conn.cursor()
 
-            # 🏥 3. Filtro de Catálogo (Usa catálogo de primer nivel)
+            # 🏥 2. Filtro de Catálogo (Usa catálogo de primer nivel)
             cursor.execute("SELECT clues FROM catalogo_unidades_primer_nivel")
             clues_validas = set(
                 row[0].upper().strip() for row in cursor.fetchall() if row[0]
             )
 
-            if "clues" in df.columns:
-                df["clues"] = df["clues"].str.upper().str.strip()
-                df = df[df["clues"].isin(clues_validas)].copy()
-
-            # 🧹 4. Limpieza de Datos Críticos
-            if "total" in df.columns:
-                df["total"] = df["total"].str.replace(",", "").fillna("0")
-
-            if "apartado" in df.columns:
-                df["apartado"] = df["apartado"].str[:3]
-            if "variable" in df.columns:
-                df["variable"] = df["variable"].str[:5]
-
-            df["anio"] = anio
-            df = df.where(pd.notnull(df), None)
-
-            # 🔓 5. Operaciones de Base de Datos
+            # 🔓 3. Desactivar verificaciones e índices temporales para máxima velocidad
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+            cursor.execute("SET UNIQUE_CHECKS = 0")
+            cursor.execute("SET AUTOCOMMIT = 0")
 
             # 🔥 Borrado preventivo
             if modo in ["actualizar", "reemplazar"]:
@@ -1864,9 +1843,10 @@ def subir_csv_sis_primer_nivel():
                     "DELETE FROM sis_registros_agregados_primer_nivel WHERE anio = %s",
                     (anio,),
                 )
+                conn.commit()
                 print(f"🧹 Limpieza SIS Primer Nivel año {anio} completada.")
 
-            # 🚀 6. Inserción por Bloques
+            # 📖 4. Lectura y Normalización por Bloques (Evita saturation de RAM)
             columnas_db = [
                 "anio",
                 "jurisdiccion",
@@ -1877,29 +1857,64 @@ def subir_csv_sis_primer_nivel():
                 "variable",
                 "total",
             ]
-            for col in columnas_db:
-                if col not in df.columns:
-                    df[col] = None
 
-            df_final = df[columnas_db]
-            df_final = df_final.replace({np.nan: None})
-            df_final = df_final.where(pd.notnull(df_final), None)
+            sql_ins = f"""
+                INSERT INTO sis_registros_primer_nivel 
+                ({', '.join(columnas_db)}) 
+                VALUES ({', '.join(['%s']*len(columnas_db))})
+            """
 
-            valores = [
-                tuple(None if pd.isna(x) else x for x in row)
-                for row in df_final.to_numpy()
-            ]
+            # Procesamiento en fragmentos de 20,000 filas para agilizar Pandas
+            chunksize = 20000
+            file.seek(0)
 
-            sql_ins = f"INSERT INTO sis_registros_primer_nivel ({', '.join(columnas_db)}) VALUES ({', '.join(['%s']*len(columnas_db))})"
+            for chunk in pd.read_csv(file, chunksize=chunksize, dtype=str):
+                chunk.columns = [
+                    col.strip().lower().replace(" ", "_").replace("ó", "o")
+                    for col in chunk.columns
+                ]
 
-            bloque_size = 10000
-            for i in range(0, len(valores), bloque_size):
-                cursor.executemany(sql_ins, valores[i : i + bloque_size])
+                if "clues" in chunk.columns:
+                    chunk["clues"] = chunk["clues"].str.upper().str.strip()
+                    chunk = chunk[chunk["clues"].isin(clues_validas)].copy()
 
-          
-            # ⚙️ 7. Recálculo de Agregados SIS Primer Nivel
-            cursor.execute(
-                """
+                if chunk.empty:
+                    continue
+
+                # Limpieza de datos
+                if "total" in chunk.columns:
+                    chunk["total"] = (
+                        chunk["total"]
+                        .str.replace(",", "", regex=False)
+                        .fillna("0")
+                    )
+                else:
+                    chunk["total"] = "0"
+
+                if "apartado" in chunk.columns:
+                    chunk["apartado"] = chunk["apartado"].str[:3]
+                if "variable" in chunk.columns:
+                    chunk["variable"] = chunk["variable"].str[:5]
+
+                chunk["anio"] = anio
+
+                # Asegurar columnas requeridas
+                for col in columnas_db:
+                    if col not in chunk.columns:
+                        chunk[col] = None
+
+                df_final = chunk[columnas_db].replace({np.nan: None})
+
+                # Inserción masiva del bloque
+                valores = [tuple(x) for x in df_final.to_numpy()]
+                cursor.executemany(sql_ins, valores)
+                conn.commit()  # Liberar memoria de transacciones en la BD
+
+            print("🚀 Inserción masiva de registros completada.")
+
+            # ⚙️ 5. Recálculo Optimizado de Agregados
+            # Se optimizan las agrupaciones y conversiones implícitas
+            sql_agregados = """
                 INSERT INTO sis_registros_agregados_primer_nivel (
                     anio, mes, clues, nombre_unidad, jurisdiccion, municipio,
                     consultas, mental, bucal, embarazadas,
@@ -1913,7 +1928,6 @@ def subir_csv_sis_primer_nivel():
                     sr.jurisdiccion,
                     sr.municipio,
 
-                    -- 1. Consultas
                     SUM(CASE WHEN sr.variable IN (
                         'CON01','CON02','CON03','CON04','CON05','CON06','CON07','CON08','CON09','CON10',
                         'CON11','CON12','CON13','CON14','CON15','CON16','CON17','CON18','CON19','CON20',
@@ -1922,19 +1936,15 @@ def subir_csv_sis_primer_nivel():
                         'CON41','CON42','CON44','CON45','CON47','COD01','COD02'
                     ) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
                     
-                    -- 2. Salud Mental (Valores oficiales por defecto)
                     SUM(CASE WHEN sr.variable IN ('CPP07','CPP14') 
                         THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
 
-                    -- 3. Salud Bucal (Sintaxis corregida)
                     SUM(CASE WHEN sr.variable IN ('CPP06','CPP13','COD01','COD02') 
                         THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
 
-                    -- 4. Embarazadas
                     SUM(CASE WHEN sr.variable IN ('EMB01','EMB02','EMB03','EMB04','EMB05','EMB06') 
                         THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
 
-                    -- 5. Planificación Familiar
                     SUM(CASE WHEN sr.variable IN (
                         'PFC01','PFC02','PFC03','PFC04','PFC05','PFC06','PFC07','PFC08','PFC10',
                         'PFC11','PFC12','PFC13','PFC14','PFC15','PFC16','PFC17','PFC19','PFC20',
@@ -1942,9 +1952,7 @@ def subir_csv_sis_primer_nivel():
                         'PFC30','PFC31','PFC32'
                     ) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
 
-                    -- 6. Detecciones
                     SUM(CASE WHEN sr.variable IN (
-                        -- DET
                         'DET01','DET02','DET03','DET04','DET05','DET06','DET07','DET08','DET09',
                         'DET11','DET12','DET16','DET17','DET18','DET19','DET21','DET22','DET25',
                         'DET26','DET27','DET28','DET29','DET30','DET31','DET33','DET34','DET35',
@@ -1952,52 +1960,47 @@ def subir_csv_sis_primer_nivel():
                         'DET51','DET52','DET53','DET54','DET57','DET58','DET59','DET60','DET61',
                         'DET62','DET63','DET64','DET73','DET74','DET85','DET86','DET87','DET88',
                         'DET89','DET90','DET91','DET92','DET93','DET94','DET95','DET96','DET97',
-                        'DET98','DET99',
-
-                        -- DT0 / DT1
-                        'DT001','DT002','DT003','DT004','DT005','DT006','DT007','DT008','DT009','DT010',
-                        'DT011','DT012','DT013','DT014','DT015','DT016','DT017','DT018','DT019','DT020',
-                        'DT021','DT022','DT023','DT024','DT025','DT026','DT027','DT028','DT030','DT031',
-                        'DT032','DT033','DT034','DT035','DT036','DT037','DT038','DT039','DT040','DT041',
-                        'DT042','DT043','DT044','DT045','DT046','DT047','DT048','DT049','DT050','DT051',
-                        'DT053','DT054','DT055','DT056','DT059','DT060','DT061','DT062','DT063','DT064',
-                        'DT065','DT066','DT067','DT068','DT069','DT070','DT071','DT072','DT073','DT074',
-                        'DT075','DT076','DT077','DT078','DT079','DT080','DT081','DT082','DT083','DT084',
-                        'DT085','DT086','DT087','DT088','DT089','DT090','DT091','DT092','DT093','DT094',
-                        'DT095','DT096','DT097','DT098','DT099','DT100','DT101','DT102','DT103','DT104',
-                        'DT105','DT106','DT107','DT108','DT109','DT110','DT111','DT112','DT113','DT114',
-                        'DT115','DT116','DT117','DT118','DT119','DT120','DT121','DT122','DT123','DT124',
-                        'DT125','DT126','DT127','DT128','DT129','DT130','DT131','DT132','DT133','DT134',
-                        'DT135','DT136','DT137','DT138','DT139','DT140','DT141','DT142','DT143','DT144',
-                        'DT145','DT146','DT147','DT148','DT149','DT150','DT151','DT152','DT153','DT154',
-                        'DT155','DT156','DT157','DT158','DT159','DT160','DT161','DT162','DT163','DT165',
-                        'DT166','DT167','DT168','DT169','DT170','DT171','DT172','DT173','DT174','DT175',
-                        'DT176','DT177','DT178',
-
-                        -- DTE
-                        'DTE01','DTE02','DTE03','DTE04','DTE05','DTE06','DTE07','DTE08','DTE09','DTE10',
-                        'DTE11','DTE12','DTE14','DTE15','DTE16','DTE17','DTE18','DTE19','DTE20','DTE21',
-                        'DTE22','DTE23','DTE24','DTE25','DTE32','DTE33','DTE37','DTE38','DTE40','DTE41',
-                        'DTE42','DTE43','DTE44','DTE45','DTE46','DTE47','DTE48','DTE49','DTE56','DTE57',
-                        'DTE61','DTE62','DTE64','DTE65','DTE66','DTE67','DTE68','DTE69','DTE70','DTE71',
-                        'DTE72','DTE73','DTE74','DTE75','DTE76','DTE77','DTE78','DTE79','DTE80','DTE81',
-                        'DTE82','DTE83','DTE84','DTE85','DTE86','DTE87','DTE88','DTE89','DTE90','DTE91',
-                        'DTE92','DTE93','DTE94','DTE95','DTE96','DTE97','DTE98','DTE99'
+                        'DET98','DET99','DT001','DT002','DT003','DT004','DT005','DT006','DT007',
+                        'DT008','DT009','DT010','DT011','DT012','DT013','DT014','DT015','DT016',
+                        'DT017','DT018','DT019','DT020','DT021','DT022','DT023','DT024','DT025',
+                        'DT026','DT027','DT028','DT030','DT031','DT032','DT033','DT034','DT035',
+                        'DT036','DT037','DT038','DT039','DT040','DT041','DT042','DT043','DT044',
+                        'DT045','DT046','DT047','DT048','DT049','DT050','DT051','DT053','DT054',
+                        'DT055','DT056','DT059','DT060','DT061','DT062','DT063','DT064','DT065',
+                        'DT066','DT067','DT068','DT069','DT070','DT071','DT072','DT073','DT074',
+                        'DT075','DT076','DT077','DT078','DT079','DT080','DT081','DT082','DT083',
+                        'DT084','DT085','DT086','DT087','DT088','DT089','DT090','DT091','DT092',
+                        'DT093','DT094','DT095','DT096','DT097','DT098','DT099','DT100','DT101',
+                        'DT102','DT103','DT104','DT105','DT106','DT107','DT108','DT109','DT110',
+                        'DT111','DT112','DT113','DT114','DT115','DT116','DT117','DT118','DT119',
+                        'DT120','DT121','DT122','DT123','DT124','DT125','DT126','DT127','DT128',
+                        'DT129','DT130','DT131','DT132','DT133','DT134','DT135','DT136','DT137',
+                        'DT138','DT139','DT140','DT141','DT142','DT143','DT144','DT145','DT146',
+                        'DT147','DT148','DT149','DT150','DT151','DT152','DT153','DT154','DT155',
+                        'DT156','DT157','DT158','DT159','DT160','DT161','DT162','DT163','DT165',
+                        'DT166','DT167','DT168','DT169','DT170','DT171','DT172','DT173','DT174',
+                        'DT175','DT176','DT177','DT178','DTE01','DTE02','DTE03','DTE04','DTE05',
+                        'DTE06','DTE07','DTE08','DTE09','DTE10','DTE11','DTE12','DTE14','DTE15',
+                        'DTE16','DTE17','DTE18','DTE19','DTE20','DTE21','DTE22','DTE23','DTE24',
+                        'DTE25','DTE32','DTE33','DTE37','DTE38','DTE40','DTE41','DTE42','DTE43',
+                        'DTE44','DTE45','DTE46','DTE47','DTE48','DTE49','DTE56','DTE57','DTE61',
+                        'DTE62','DTE64','DTE65','DTE66','DTE67','DTE68','DTE69','DTE70','DTE71',
+                        'DTE72','DTE73','DTE74','DTE75','DTE76','DTE77','DTE78','DTE79','DTE80',
+                        'DTE81','DTE82','DTE83','DTE84','DTE85','DTE86','DTE87','DTE88','DTE89',
+                        'DTE90','DTE91','DTE92','DTE93','DTE94','DTE95','DTE96','DTE97','DTE98','DTE99'
                     ) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END),
 
-                    -- 7. Tamiz (Asegurado como RNL06)
-                    SUM(CASE WHEN sr.variable IN ('RNL06') 
+                    SUM(CASE WHEN sr.variable = 'RNL06' 
                         THEN CAST(sr.total AS UNSIGNED) ELSE 0 END)
                     
                 FROM sis_registros_primer_nivel sr
                 LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
                 WHERE sr.anio = %s
                 GROUP BY sr.anio, sr.mes, sr.clues, cu.nombre_unidad, sr.jurisdiccion, sr.municipio
-            """,
-                (anio,),
-            )
+            """
+            cursor.execute(sql_agregados, (anio,))
 
-            # 📊 8. Control Anual
+            # 📊 6. Control Anual
             cursor.execute(
                 """
                 INSERT INTO sis_control_anual_primer_nivel (anio, estatus_inicio, fecha_actualizacion, estatus)
@@ -2010,11 +2013,8 @@ def subir_csv_sis_primer_nivel():
                 (anio, estatus_inicio, fecha_actualizacion, estatus),
             )
 
-            # ✅ 9. COMMIT FINAL
             conn.commit()
-            flash(
-                f"Base SIS Primer Nivel {anio} procesada con éxito.", "success"
-            )
+            flash(f"Base SIS Primer Nivel {anio} procesada con éxito.", "success")
 
         except Exception as e:
             if "conn" in locals():
@@ -2024,12 +2024,13 @@ def subir_csv_sis_primer_nivel():
         finally:
             if "cursor" in locals():
                 cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+                cursor.execute("SET UNIQUE_CHECKS = 1")
+                cursor.execute("SET AUTOCOMMIT = 1")
                 cursor.close()
 
         return redirect(url_for("admin.subir_csv_sis_primer_nivel"))
 
     return render_template("admin/subir_csv_sis_primer_nivel.html")
-
 
 
 #*****************************************************************
