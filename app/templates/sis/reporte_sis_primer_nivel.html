@@ -128,7 +128,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
-
 <script>
     if (typeof ChartDataLabels !== 'undefined') {
         Chart.register(ChartDataLabels);
@@ -164,9 +163,7 @@
         meta.textContent = registro ? ` | ${registro.estatus_inicio} · ${registro.estatus}` : "";
     }
 
-
     /* 2. ÁRBOL TIPO SUBMENÚ (TREEVIEW) CON DESGLOSE DESPLEGABLE */
-    /* 2. ÁRBOL TIPO SUBMENÚ (UNIFICADO, SIND DUPLICADOS Y ORDENADO) */
     function renderSubvariables() {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const contenedor = document.getElementById("contenedorSubvariables");
@@ -184,7 +181,6 @@
             const seleccionadasModulo = variablesPersonalizadasEstado[modKey] || [];
 
             estructuraModulo.forEach((grupo) => {
-                // Clave única basada en el número/código del apartado
                 const keyApartado = String(grupo.apartado).trim();
 
                 if (!mapaApartados[keyApartado]) {
@@ -196,7 +192,6 @@
                 }
 
                 (grupo.variables || []).forEach(v => {
-                    // Evitar duplicar la misma variable dentro del mismo apartado
                     if (!mapaApartados[keyApartado].variables.some(exist => exist.codigo === v.codigo)) {
                         mapaApartados[keyApartado].variables.push({
                             ...v,
@@ -216,7 +211,6 @@
         });
 
         let totalVariables = 0;
-        const fragment = document.createDocumentFragment();
         const ulRaiz = document.createElement("ul");
         ulRaiz.className = "list-unstyled ms-2 mb-0 font-monospace";
         ulRaiz.style.fontSize = "0.85rem";
@@ -228,7 +222,6 @@
             const liApartado = document.createElement("li");
             liApartado.className = "my-1";
 
-            // Verificar si TODAS las variables de este apartado están marcadas
             const estanTodasMarcadas = varsGrupo.length > 0 && varsGrupo.every(v => v.isChecked);
 
             liApartado.innerHTML = `
@@ -257,7 +250,7 @@
                     `).join('')}
                 </ul>
             </details>
-        `;
+            `;
 
             ulRaiz.appendChild(liApartado);
         });
@@ -271,16 +264,13 @@
         contenedor.appendChild(ulRaiz);
 
         // GESTOR DE EVENTOS PARA MARCAR / DESMARCAR PADRES E HIJOS
-        contenedor.onclick = null;
-        contenedor.addEventListener('change', (e) => {
-            // Al hacer clic en el checkbox del APARTADO (PADRE)
+        contenedor.onchange = (e) => {
             if (e.target.classList.contains('chk-padre')) {
                 const parentDetails = e.target.closest('details');
                 const hijos = parentDetails.querySelectorAll('.chk-subvar');
                 hijos.forEach(h => h.checked = e.target.checked);
             }
 
-            // Al hacer clic en una VARIABLE (HIJO)
             if (e.target.classList.contains('chk-subvar')) {
                 const parentDetails = e.target.closest('details');
                 const chkPadre = parentDetails.querySelector('.chk-padre');
@@ -290,7 +280,7 @@
 
             guardarEstadoVariablesActuales();
             window.ejecutarFiltradoSis(400);
-        });
+        };
     }
 
     /* GUARDAR ESTADO MODIFICADO PARA MÚLTIPLES MÓDULOS */
@@ -298,7 +288,6 @@
         const contenedor = document.getElementById("contenedorSubvariables");
         if (!contenedor) return;
 
-        // Recorrer los checkboxes y agrupar sus estados por módulo correspondiente
         contenedor.querySelectorAll('.chk-subvar').forEach(cb => {
             const mod = cb.getAttribute('data-modulo');
             if (mod) {
@@ -508,7 +497,7 @@
             data: { labels: anios, datasets: [{ label: 'Total Acumulado', data: anios.map(a => porAnio[a]), backgroundColor: colores }] },
             options: {
                 responsive: true,
-                animation: false, // Desactivar animación mejora el rendimiento
+                animation: false,
                 scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
                 plugins: {
                     legend: { display: false },
@@ -563,8 +552,6 @@
         }
     }
 
-
-    /* 5. GRÁFICA TEMPORAL (OPTIMIZADA) */
     function renderGraficaTemporal(data = datosFiltradosSis) {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
@@ -575,7 +562,6 @@
             return;
         }
 
-        // Si selecciona "Todas", sumar todas las categorías disponibles
         const sumarCategorias = (r) => {
             if (modulo === "todas") {
                 return (Number(r.consultas) || 0) + (Number(r.embarazadas) || 0) + (Number(r.mental) || 0) +
@@ -658,7 +644,6 @@
 
     /* 6. INICIALIZACIÓN Y EVENTOS */
     document.addEventListener("DOMContentLoaded", () => {
-        // Renderizar usando los datos inyectados de origen (Cero espera al servidor de inicio)
         renderSubvariables();
         actualizarVistas();
 
@@ -677,22 +662,23 @@
             renderGraficaTemporal(datosFiltradosSis);
         });
 
+        // BOTÓN SELECCIONAR TODAS: Selecciona tanto padres como hijos
         document.getElementById("btnSeleccionarTodasSub")?.addEventListener("click", () => {
-            const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
-            document.querySelectorAll("#contenedorSubvariables .chk-subvar").forEach(cb => cb.checked = true);
+            const contenedor = document.getElementById("contenedorSubvariables");
+            if (!contenedor) return;
 
-            const todas = Array.from(document.querySelectorAll("#contenedorSubvariables .chk-subvar")).map(cb => cb.value);
-            variablesPersonalizadasEstado[modulo] = todas;
-
+            contenedor.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = true);
+            guardarEstadoVariablesActuales();
             window.ejecutarFiltradoSis();
         });
 
+        // BOTÓN DESMARCAR TODAS: Desmarca tanto padres como hijos
         document.getElementById("btnDesmarcarTodasSub")?.addEventListener("click", () => {
-            const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
-            document.querySelectorAll("#contenedorSubvariables .chk-subvar").forEach(cb => cb.checked = false);
+            const contenedor = document.getElementById("contenedorSubvariables");
+            if (!contenedor) return;
 
-            variablesPersonalizadasEstado[modulo] = [];
-
+            contenedor.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = false);
+            guardarEstadoVariablesActuales();
             window.ejecutarFiltradoSis();
         });
     });
