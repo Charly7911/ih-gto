@@ -148,7 +148,8 @@
     let anioActivo = null;
 
     let mostrarValoresMensual = false;
-    // Estado independiente por módulo
+
+    // Clon profundo para preservar siempre el objeto VARIABLES_DEFAULT original intacto
     let variablesPersonalizadasEstado = JSON.parse(JSON.stringify(VARIABLES_DEFAULT));
 
     let graficaAnio = null;
@@ -165,6 +166,15 @@
         meta.textContent = registro ? ` | ${registro.estatus_inicio} · ${registro.estatus}` : "";
     }
 
+    /* RESTAURAR DEFAULT PARA UN MÓDULO ESPECÍFICO */
+    function restaurarDefaultModulo(modKey) {
+        if (modKey === "todas") {
+            variablesPersonalizadasEstado = JSON.parse(JSON.stringify(VARIABLES_DEFAULT));
+        } else if (VARIABLES_DEFAULT[modKey]) {
+            variablesPersonalizadasEstado[modKey] = [...VARIABLES_DEFAULT[modKey]];
+        }
+    }
+
     /* 2. ÁRBOL TIPO SUBMENÚ (TREEVIEW) CON DESGLOSE INDEPENDIENTE */
     function renderSubvariables() {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
@@ -178,7 +188,12 @@
 
         modulosAProcesar.forEach((modKey) => {
             const estructuraModulo = DICCIONARIO_VARIABLES[modKey] || [];
-            // Cargar solo las variables seleccionadas del módulo correspondiente
+            
+            // Si el módulo no tiene selección configurada en el estado actual, carga sus defaults
+            if (!variablesPersonalizadasEstado[modKey] && VARIABLES_DEFAULT[modKey]) {
+                variablesPersonalizadasEstado[modKey] = [...VARIABLES_DEFAULT[modKey]];
+            }
+
             const seleccionadasModulo = variablesPersonalizadasEstado[modKey] || [];
 
             estructuraModulo.forEach((grupo) => {
@@ -263,7 +278,7 @@
         contenedor.innerHTML = "";
         contenedor.appendChild(ulRaiz);
 
-        // LISTENERS DE CAMBIOS (PADRES E HIJOS)
+        // EVENTOS DE CAMBIO LOCAL EN CHECKBOXES
         contenedor.onchange = (e) => {
             if (e.target.classList.contains('chk-padre')) {
                 const parentDetails = e.target.closest('details');
@@ -283,28 +298,32 @@
         };
     }
 
-    /* GUARDAR ESTADO SIN AFECTAR OTROS MÓDULOS */
+    /* GUARDAR ESTADO DE CHECKBOXES VISIBLES SIN AFECTAR OTROS MÓDULOS */
     function guardarEstadoVariablesActuales() {
         const contenedor = document.getElementById("contenedorSubvariables");
         if (!contenedor) return;
 
-        contenedor.querySelectorAll('.chk-subvar').forEach(cb => {
+        const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
+        let modulosAProcesar = modulo === "todas" ? Object.keys(DICCIONARIO_VARIABLES) : [modulo];
+
+        // Limpiar el arreglo en el estado solo para las secciones visibles
+        modulosAProcesar.forEach(mod => {
+            variablesPersonalizadasEstado[mod] = [];
+        });
+
+        // Registrar solo los que están actualmente marcados en la interfaz
+        contenedor.querySelectorAll('.chk-subvar:checked').forEach(cb => {
             const mod = cb.getAttribute('data-modulo');
             if (mod) {
                 if (!variablesPersonalizadasEstado[mod]) variablesPersonalizadasEstado[mod] = [];
-
-                if (cb.checked) {
-                    if (!variablesPersonalizadasEstado[mod].includes(cb.value)) {
-                        variablesPersonalizadasEstado[mod].push(cb.value);
-                    }
-                } else {
-                    variablesPersonalizadasEstado[mod] = variablesPersonalizadasEstado[mod].filter(v => v !== cb.value);
+                if (!variablesPersonalizadasEstado[mod].includes(cb.value)) {
+                    variablesPersonalizadasEstado[mod].push(cb.value);
                 }
             }
         });
     }
 
-    /* COMPROBAR SI HAY AL MENOS UNA VARIABLE SELECCIONADA EN CUALQUIER MÓDULO */
+    /* VERIFICAR SI HAY AL MENOS UNA VARIABLE SELECCIONADA */
     function hayVariablesSeleccionadas() {
         return Object.values(variablesPersonalizadasEstado).some(arr => Array.isArray(arr) && arr.length > 0);
     }
@@ -356,7 +375,6 @@
     }
 
     async function realizarConsultaBackend() {
-        // DETECCIÓN: SI NO HAY NINGUNA VARIABLE MARCADA, VACIAR DATOS Y NO CONSULTAR BACKEND
         if (!hayVariablesSeleccionadas()) {
             datosFiltradosSis = [];
             actualizarVistas();
@@ -486,7 +504,7 @@
         renderTablaSis();
     };
 
-    /* 5. GRÁFICAS CORREGIDAS PARA DATOS VACÍOS */
+    /* 5. GRÁFICAS */
     function renderGraficaPorAnio(data = datosActuales) {
         const ctx = document.getElementById('graficaSisPorAnio');
         if (!ctx) return;
@@ -673,8 +691,10 @@
         renderSubvariables();
         actualizarVistas();
 
-        // AL CAMBIAR DE APARTADO O MÓDULO
-        document.getElementById("filtroSisDetalle")?.addEventListener("change", () => {
+        // AL CAMBIAR DE MÓDULO EN EL SELECT: RESTAURA SUS DEFAULTS Y VUELVE A FILTRAR
+        document.getElementById("filtroSisDetalle")?.addEventListener("change", (e) => {
+            const moduloSeleccionado = e.target.value;
+            restaurarDefaultModulo(moduloSeleccionado);
             renderSubvariables();
             window.ejecutarFiltradoSis(200);
         });
@@ -699,7 +719,7 @@
             window.ejecutarFiltradoSis();
         });
 
-        // BOTÓN DESMARCAR TODAS DEL APARTADO ACTUAL
+        // BOTÓN DESMARCAR TODAS (NINGUNA) DEL APARTADO ACTUAL
         document.getElementById("btnDesmarcarTodasSub")?.addEventListener("click", () => {
             const contenedor = document.getElementById("contenedorSubvariables");
             if (!contenedor) return;
