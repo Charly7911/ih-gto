@@ -61,25 +61,30 @@ VARIABLES_DEFAULT = {
     ],
     "detecciones_cardiometabolicas": ['DET01','DET02','DET03','DET04','DET25','DET26','DET27','DET28','DET50','DET51','DET52','DET53','DET58','DET59','DET60','DET61'],
     "tamiz": ['RNL06'],
-
     "orientacion_lac_des_obe": ['MAC07', 'MAC08', 'MAC09', 'MAC11', 'MAC12'],
     "orientacion_eda_ira": ['MAC01', 'MAC02']
 }
 
-# --- FUNCIÓN AUXILIAR PARA SINTAXIS DINÁMICA SQL ---
 def _construir_clausula_in(columna, lista):
-    """Genera fragmento 'AND columna IN (%s, %s)' y la lista de valores asociadas."""
     if not lista:
         return "", []
     placeholders = ','.join(['%s'] * len(lista))
     return f" AND {columna} IN ({placeholders})", list(lista)
 
-
 def obtener_modulo_por_apartado(apartado_raw, variable_code=""):
     apt = str(apartado_raw or "").strip()
-    var = str(variable_code or "").upper()
+    var = str(variable_code or "").upper().strip()
 
-    if apt in ["1", "01", "215"] or var.startswith("CON"):
+    # Evaluaciones específicas por código de variable (mayor prioridad)
+    if var in ['MAC07', 'MAC08', 'MAC09', 'MAC11', 'MAC12']:
+        return "orientacion_lac_des_obe"
+    elif var in ['MAC01', 'MAC02']:
+        return "orientacion_eda_ira"
+    elif var in ['DET01','DET02','DET03','DET04','DET25','DET26','DET27','DET28','DET50','DET51','DET52','DET53','DET58','DET59','DET60','DET61']:
+        return "detecciones_cardiometabolicas"
+
+    # Evaluaciones generales (menor prioridad)
+    elif apt in ["1", "01", "215"] or var.startswith("CON"):
         return "consultas"
     elif apt in ["24"] or var.startswith("EMB"):
         return "embarazadas"
@@ -87,14 +92,8 @@ def obtener_modulo_por_apartado(apartado_raw, variable_code=""):
         return "planificacion_familiar"
     elif apt in ["56"] or var.startswith(("DET", "DT0", "DT1", "DTE")):
         return "detecciones"
-    elif apt in ["56"] or var.startswith(("DET")):
-        return "detecciones_cardiometabolicas"
     elif apt in ["111"] or var.startswith(("RNL", "TAM")):
         return "tamiz"
-    elif apt in ["113"] and var in ['MAC']:
-        return "orientacion_lac_des_obe"
-    elif apt in ["113"] and var in ['MAC']:
-        return "orientacion_eda_ira"
     elif apt in ["2", "02"] and var in ['CPP06', 'CPP13', 'COD01', 'COD02']:
         return "bucal"
     elif apt in ["2", "02"] and var in ['CPP07', 'CPP14']:
@@ -102,16 +101,12 @@ def obtener_modulo_por_apartado(apartado_raw, variable_code=""):
     else:
         return "consultas"
 
-    
-
-
 @sis_pn.route("/")
 @login_required
 def dashboard_sis_primer_nivel():
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
-        # Limitamos o cargamos solo el resumen inicial para evitar colapsar la memoria del servidor Python
         query = """
             SELECT 
                 anio, mes, clues, nombre_unidad, jurisdiccion, municipio,
@@ -124,7 +119,6 @@ def dashboard_sis_primer_nivel():
         cursor.execute(query)
         resultados = cursor.fetchall() or []
 
-        # Listas de desplegables extraídas eficientemente
         anios_disponibles = sorted({r["anio"] for r in resultados if r.get("anio")}, reverse=True)
         unidades_disponibles = sorted({r["nombre_unidad"] for r in resultados if r.get("nombre_unidad")})
         jurisdicciones_disponibles = sorted({str(r["jurisdiccion"]) for r in resultados if r.get("jurisdiccion") is not None})
@@ -139,7 +133,6 @@ def dashboard_sis_primer_nivel():
             key=lambda x: x["nombre"]
         )
 
-        # Control Anual
         cursor.execute("""
             SELECT anio, estatus_inicio, fecha_actualizacion, estatus
             FROM sis_control_anual_primer_nivel
@@ -151,7 +144,6 @@ def dashboard_sis_primer_nivel():
             for row in rows_control
         ]
 
-        # Catálogo
         cursor.execute("""
             SELECT apartado, descripcion_apartado, variable, descripcion
             FROM catalogo_variables
@@ -199,7 +191,6 @@ def dashboard_sis_primer_nivel():
         title="Reporte SIS - Primer Nivel"
     )
 
-
 @sis_pn.route("/api/filtrar", methods=["POST"])
 @login_required
 @csrf.exempt
@@ -231,13 +222,11 @@ def filtrar_datos_sis():
             """
             params = []
 
-            # Filtro mixto para unidades (CLUES o Nombre)
             if unidades:
                 placeholders = ','.join(['%s'] * len(unidades))
                 query_base += f" AND (clues IN ({placeholders}) OR nombre_unidad IN ({placeholders}))"
                 params.extend(unidades + unidades)
 
-            # Filtros dinámicos limpios
             for col, lst in [('jurisdiccion', jurisdicciones), ('municipio', municipios), ('anio', anios), ('mes', meses)]:
                 clausula, vals = _construir_clausula_in(col, lst)
                 query_base += clausula
@@ -257,7 +246,6 @@ def filtrar_datos_sis():
             modulos = ["consultas", "mental", "bucal", "embarazadas", "planificacion_familiar", "detecciones", "tamiz", "detecciones_cardiometabolicas", "orientacion_lac_des_obe", "orientacion_eda_ira"]
             vars_map = {m: resolver_vars(m) for m in modulos}
 
-            # Construcción dinámica de columnas agregadas
             select_sums = []
             params = []
             for mod_key, v_list in vars_map.items():
@@ -299,8 +287,8 @@ def filtrar_datos_sis():
         return jsonify({"status": "success", "data": datos_filtrados})
 
     except Exception as e:
-        # Evitamos revelar errores crudos de MySQL/Python al cliente web por seguridad
-        return jsonify({"status": "error", "message": "Ocurrió un error al procesar los datos de la consulta."}), 400
+        print(f"❌ Error en API /api/filtrar: {str(e)}") # Depuración en consola del servidor
+        return jsonify({"status": "error", "message": f"Error al procesar la consulta: {str(e)}"}), 400
 
     finally:
         cursor.close()
