@@ -128,6 +128,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
 <script>
     if (typeof ChartDataLabels !== 'undefined') {
         Chart.register(ChartDataLabels);
@@ -147,6 +148,7 @@
     let anioActivo = null;
 
     let mostrarValoresMensual = false;
+    // Estado independiente por módulo
     let variablesPersonalizadasEstado = JSON.parse(JSON.stringify(VARIABLES_DEFAULT));
 
     let graficaAnio = null;
@@ -163,7 +165,7 @@
         meta.textContent = registro ? ` | ${registro.estatus_inicio} · ${registro.estatus}` : "";
     }
 
-    /* 2. ÁRBOL TIPO SUBMENÚ (TREEVIEW) CON DESGLOSE DESPLEGABLE */
+    /* 2. ÁRBOL TIPO SUBMENÚ (TREEVIEW) CON DESGLOSE INDEPENDIENTE */
     function renderSubvariables() {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const contenedor = document.getElementById("contenedorSubvariables");
@@ -172,12 +174,11 @@
         if (!contenedor) return;
 
         let modulosAProcesar = modulo === "todas" ? Object.keys(DICCIONARIO_VARIABLES) : [modulo];
-
-        // MAPA PARA UNIFICAR APARTADOS REPETIDOS Y FUSIONAR SUS VARIABLES
         const mapaApartados = {};
 
         modulosAProcesar.forEach((modKey) => {
             const estructuraModulo = DICCIONARIO_VARIABLES[modKey] || [];
+            // Cargar solo las variables seleccionadas del módulo correspondiente
             const seleccionadasModulo = variablesPersonalizadasEstado[modKey] || [];
 
             estructuraModulo.forEach((grupo) => {
@@ -203,7 +204,6 @@
             });
         });
 
-        // CONVERTIR EN ARREGLO Y ORDENAR NUMÉRICAMENTE POR EL NÚMERO DE APARTADO
         const listaApartados = Object.values(mapaApartados).sort((a, b) => {
             const numA = parseInt(a.apartado, 10) || 0;
             const numB = parseInt(b.apartado, 10) || 0;
@@ -263,7 +263,7 @@
         contenedor.innerHTML = "";
         contenedor.appendChild(ulRaiz);
 
-        // GESTOR DE EVENTOS PARA MARCAR / DESMARCAR PADRES E HIJOS
+        // LISTENERS DE CAMBIOS (PADRES E HIJOS)
         contenedor.onchange = (e) => {
             if (e.target.classList.contains('chk-padre')) {
                 const parentDetails = e.target.closest('details');
@@ -279,11 +279,11 @@
             }
 
             guardarEstadoVariablesActuales();
-            window.ejecutarFiltradoSis(400);
+            window.ejecutarFiltradoSis(300);
         };
     }
 
-    /* GUARDAR ESTADO MODIFICADO PARA MÚLTIPLES MÓDULOS */
+    /* GUARDAR ESTADO SIN AFECTAR OTROS MÓDULOS */
     function guardarEstadoVariablesActuales() {
         const contenedor = document.getElementById("contenedorSubvariables");
         if (!contenedor) return;
@@ -302,6 +302,11 @@
                 }
             }
         });
+    }
+
+    /* COMPROBAR SI HAY AL MENOS UNA VARIABLE SELECCIONADA EN CUALQUIER MÓDULO */
+    function hayVariablesSeleccionadas() {
+        return Object.values(variablesPersonalizadasEstado).some(arr => Array.isArray(arr) && arr.length > 0);
     }
 
     /* 3. PROCESAMIENTO Y FILTRADO */
@@ -351,6 +356,13 @@
     }
 
     async function realizarConsultaBackend() {
+        // DETECCIÓN: SI NO HAY NINGUNA VARIABLE MARCADA, VACIAR DATOS Y NO CONSULTAR BACKEND
+        if (!hayVariablesSeleccionadas()) {
+            datosFiltradosSis = [];
+            actualizarVistas();
+            return;
+        }
+
         const payload = {
             unidades: window.getUnidadesSeleccionadas ? window.getUnidadesSeleccionadas() : [],
             jurisdicciones: window.getJurisdiccionesSeleccionadas ? window.getJurisdiccionesSeleccionadas() : [],
@@ -474,8 +486,16 @@
         renderTablaSis();
     };
 
-    /* 5. GRÁFICAS */
+    /* 5. GRÁFICAS CORREGIDAS PARA DATOS VACÍOS */
     function renderGraficaPorAnio(data = datosActuales) {
+        const ctx = document.getElementById('graficaSisPorAnio');
+        if (!ctx) return;
+
+        if (!data || data.length === 0) {
+            if (graficaAnio) graficaAnio.destroy();
+            return;
+        }
+
         const porAnio = {};
         for (let i = 0; i < data.length; i++) {
             const r = data[i];
@@ -489,8 +509,6 @@
         const colores = ['#4E79A7', '#59A14F', '#F28E2B', '#E15759', '#76B7B2', '#EDC948', '#B07AA1'];
 
         if (graficaAnio) graficaAnio.destroy();
-        const ctx = document.getElementById('graficaSisPorAnio');
-        if (!ctx) return;
 
         graficaAnio = new Chart(ctx, {
             type: 'bar',
@@ -508,7 +526,18 @@
     }
 
     function renderGraficaPorUnidad(data = datosActuales.filter(r => r.anio === anioActivo)) {
-        let arrSafe = data.length > 0 ? data : datosActuales;
+        const ctx = document.getElementById('graficaSis');
+        const elTitulo = document.getElementById("tituloGraficaSis");
+
+        if (!ctx) return;
+
+        if (!data || data.length === 0) {
+            if (graficaUnidad) graficaUnidad.destroy();
+            if (elTitulo) elTitulo.innerHTML = `Indicadores — Sin variables seleccionadas`;
+            return;
+        }
+
+        let arrSafe = data;
         const labels = arrSafe.map(r => r.nombre_unidad || r.clues);
 
         const configVars = {
@@ -528,8 +557,6 @@
         }));
 
         if (graficaUnidad) graficaUnidad.destroy();
-        const ctx = document.getElementById('graficaSis');
-        if (!ctx) return;
 
         graficaUnidad = new Chart(ctx, {
             type: 'bar',
@@ -545,7 +572,6 @@
             }
         });
 
-        const elTitulo = document.getElementById("tituloGraficaSis");
         if (elTitulo) {
             let totalGeneral = datasets.reduce((acc, ds) => acc + ds.data.reduce((a, b) => a + b, 0), 0);
             elTitulo.innerHTML = `Indicadores <strong>${anioActivo || 'General'}</strong> — Total Seleccionado: <strong>${fmt(totalGeneral)}</strong>`;
@@ -647,9 +673,10 @@
         renderSubvariables();
         actualizarVistas();
 
+        // AL CAMBIAR DE APARTADO O MÓDULO
         document.getElementById("filtroSisDetalle")?.addEventListener("change", () => {
             renderSubvariables();
-            renderGraficaTemporal(datosFiltradosSis);
+            window.ejecutarFiltradoSis(200);
         });
 
         document.getElementById("selectTipoVistaTemporal")?.addEventListener("change", () => {
@@ -662,7 +689,7 @@
             renderGraficaTemporal(datosFiltradosSis);
         });
 
-        // BOTÓN SELECCIONAR TODAS: Selecciona tanto padres como hijos
+        // BOTÓN SELECCIONAR TODAS DEL APARTADO ACTUAL
         document.getElementById("btnSeleccionarTodasSub")?.addEventListener("click", () => {
             const contenedor = document.getElementById("contenedorSubvariables");
             if (!contenedor) return;
@@ -672,7 +699,7 @@
             window.ejecutarFiltradoSis();
         });
 
-        // BOTÓN DESMARCAR TODAS: Desmarca tanto padres como hijos
+        // BOTÓN DESMARCAR TODAS DEL APARTADO ACTUAL
         document.getElementById("btnDesmarcarTodasSub")?.addEventListener("click", () => {
             const contenedor = document.getElementById("contenedorSubvariables");
             if (!contenedor) return;
