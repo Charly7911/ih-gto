@@ -1877,22 +1877,25 @@ def ejecutar_procesamiento_sis_primer_nivel(
             cursor.execute("SET AUTOCOMMIT = 0")
 
             # Limpieza previa si es reemplazo
-            if modo_carga in ["actualizar", "reemplazar"]:
+            if modo_carga in ["actualizar", "reemplazar", "reemplazar_anio", "reemplazar año"]:
                 cursor.execute(
                     "UPDATE cargas_sis_primer_nivel SET estatus_proceso = 'LIMPIANDO DATOS PREVIOS (5%%%%)' WHERE id = %s",
                     (carga_id,),
                 )
                 conn.commit()
 
+                # Borrar registros de la tabla detallada
                 cursor.execute(
                     "DELETE FROM sis_registros_primer_nivel WHERE anio = %s",
                     (anio,),
                 )
+                # Borrar registros de la tabla agregada
                 cursor.execute(
                     "DELETE FROM sis_registros_agregados_primer_nivel WHERE anio = %s",
                     (anio,),
                 )
-                conn.commit()
+                conn.commit() # 👈 OBLIGATORIO: Asegura que el DELETE se aplique en MySQL inmediatamente
+                print(f"🗑️ Datos eliminados del año {anio} correctamente para modo: {modo_carga}")
 
             # Carga por fragmentos
             procesar_csv_detallado_sis(conn, cursor, carga_id, csv_path, anio)
@@ -2056,11 +2059,18 @@ def actualizar_sis_agregado_primer_nivel(cursor, anio):
 def subir_csv_sis_primer_nivel():
     if request.method == "POST":
         file = request.files.get("file") or request.files.get("archivo")
-        anio = int(request.form.get("anio"))
-
+        
         if not file or file.filename == "":
             flash("No se seleccionó ningún archivo CSV", "danger")
             return redirect(url_for("admin.subir_csv_sis_primer_nivel"))
+
+        # 🔑 1. EXTRAER TODOS LOS CAMPOS ANTES DE CREAR EL HILO
+        anio = int(request.form.get("anio"))
+        # Sanitizamos el modo_carga limpiando espacios y pasándolo a minúsculas
+        modo_carga = str(request.form.get("modo_carga", "")).strip().lower() 
+        fecha_actualizacion = request.form.get("fecha_actualizacion")
+        estatus = request.form.get("estatus")
+        estatus_inicio = request.form.get("estatus_inicio")
 
         carpeta_destino = os.path.join(
             current_app.root_path, "uploads", f"sis_primer_nivel_{anio}"
@@ -2078,16 +2088,16 @@ def subir_csv_sis_primer_nivel():
             else session.get("user_id")
         )
 
-        # 🔑 Ejecución en HILO SECUNDARIO para respuesta inmediata
+        # 🔑 2. PASAR LAS VARIABLES LOCALES YA EXTRAÍDAS
         thread = threading.Thread(
             target=ejecutar_procesamiento_sis_primer_nivel,
             args=(
                 app,
                 anio,
-                request.form.get("modo_carga"),
-                request.form.get("fecha_actualizacion"),
-                request.form.get("estatus"),
-                request.form.get("estatus_inicio"),
+                modo_carga,
+                fecha_actualizacion,
+                estatus,
+                estatus_inicio,
                 csv_path,
                 filename,
                 user_id,
