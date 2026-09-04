@@ -93,7 +93,7 @@
                             </div>
                         </div>
 
-                        <div style="height:350px">
+                        <div style="position: relative; height: 370px; width: 100%;">
                             <canvas id="graficaSisMensual"></canvas>
                         </div>
 
@@ -188,7 +188,7 @@
 
         modulosAProcesar.forEach((modKey) => {
             const estructuraModulo = DICCIONARIO_VARIABLES[modKey] || [];
-            
+
             // Si el módulo no tiene selección configurada en el estado actual, carga sus defaults
             if (!variablesPersonalizadasEstado[modKey] && VARIABLES_DEFAULT[modKey]) {
                 variablesPersonalizadasEstado[modKey] = [...VARIABLES_DEFAULT[modKey]];
@@ -596,13 +596,20 @@
         }
     }
 
+    /* 5. GRÁFICA TEMPORAL (CORREGIDA SIN OVERLAP NI GLITCHES DE TAMAÑO) */
     function renderGraficaTemporal(data = datosFiltradosSis) {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
         const ctx = document.getElementById("graficaSisMensual");
 
-        if (!data || data.length === 0 || !ctx) {
-            if (graficaSisMensual) graficaSisMensual.destroy();
+        if (!ctx) return;
+
+        // Si no hay datos, destruimos la instancia previa y limpiamos el lienzo limpiamente
+        if (!data || data.length === 0) {
+            if (graficaSisMensual) {
+                graficaSisMensual.destroy();
+                graficaSisMensual = null;
+            }
             return;
         }
 
@@ -657,33 +664,40 @@
 
         const tipoChartRequerido = tipoVista === 'anio' ? 'bar' : 'line';
 
-        if (graficaSisMensual && graficaSisMensual.config.type === tipoChartRequerido) {
-            graficaSisMensual.data.labels = labels;
-            graficaSisMensual.data.datasets = datasets;
-            graficaSisMensual.update('none');
-        } else {
-            if (graficaSisMensual) graficaSisMensual.destroy();
+        // Destruir siempre la gráfica previa para evitar distorsiones de lienzo/ejes
+        if (graficaSisMensual) {
+            graficaSisMensual.destroy();
+            graficaSisMensual = null;
+        }
 
-            graficaSisMensual = new Chart(ctx, {
-                type: tipoChartRequerido,
-                data: { labels, datasets },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: false,
-                    scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
-                    plugins: {
-                        datalabels: {
-                            display: () => mostrarValoresMensual || tipoVista === 'anio',
-                            align: 'top',
-                            anchor: 'end',
-                            formatter: (val) => val > 0 ? fmt(val) : '',
-                            font: { size: 10, weight: 'bold' }
-                        }
+        // Crear una nueva instancia limpia de Chart.js
+        graficaSisMensual = new Chart(ctx, {
+            type: tipoChartRequerido,
+            data: { labels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false, // Asegura que tome el alto del contenedor padre
+                animation: false,
+                scales: { 
+                    x: {
+                        grid: { display: true }
+                    },
+                    y: { 
+                        beginAtZero: true, 
+                        ticks: { callback: v => fmt(v) } 
+                    } 
+                },
+                plugins: {
+                    datalabels: {
+                        display: () => mostrarValoresMensual || tipoVista === 'anio',
+                        align: 'top',
+                        anchor: 'end',
+                        formatter: (val) => val > 0 ? fmt(val) : '',
+                        font: { size: 10, weight: 'bold' }
                     }
                 }
-            });
-        }
+            }
+        });
     }
 
     /* 6. INICIALIZACIÓN Y EVENTOS */
