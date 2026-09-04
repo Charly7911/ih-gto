@@ -166,6 +166,7 @@
 
 
     /* 2. ÁRBOL TIPO SUBMENÚ (TREEVIEW) CON DESGLOSE DESPLEGABLE */
+    /* 2. ÁRBOL TIPO SUBMENÚ (UNIFICADO, SIND DUPLICADOS Y ORDENADO) */
     function renderSubvariables() {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const contenedor = document.getElementById("contenedorSubvariables");
@@ -174,65 +175,91 @@
         if (!contenedor) return;
 
         let modulosAProcesar = modulo === "todas" ? Object.keys(DICCIONARIO_VARIABLES) : [modulo];
+
+        // MAPA PARA UNIFICAR APARTADOS REPETIDOS Y FUSIONAR SUS VARIABLES
+        const mapaApartados = {};
+
+        modulosAProcesar.forEach((modKey) => {
+            const estructuraModulo = DICCIONARIO_VARIABLES[modKey] || [];
+            const seleccionadasModulo = variablesPersonalizadasEstado[modKey] || [];
+
+            estructuraModulo.forEach((grupo) => {
+                // Clave única basada en el número/código del apartado
+                const keyApartado = String(grupo.apartado).trim();
+
+                if (!mapaApartados[keyApartado]) {
+                    mapaApartados[keyApartado] = {
+                        apartado: grupo.apartado,
+                        descripcion: grupo.descripcion_apartado || '',
+                        variables: []
+                    };
+                }
+
+                (grupo.variables || []).forEach(v => {
+                    // Evitar duplicar la misma variable dentro del mismo apartado
+                    if (!mapaApartados[keyApartado].variables.some(exist => exist.codigo === v.codigo)) {
+                        mapaApartados[keyApartado].variables.push({
+                            ...v,
+                            modKey: modKey,
+                            isChecked: seleccionadasModulo.includes(v.codigo)
+                        });
+                    }
+                });
+            });
+        });
+
+        // CONVERTIR EN ARREGLO Y ORDENAR NUMÉRICAMENTE POR EL NÚMERO DE APARTADO
+        const listaApartados = Object.values(mapaApartados).sort((a, b) => {
+            const numA = parseInt(a.apartado, 10) || 0;
+            const numB = parseInt(b.apartado, 10) || 0;
+            return numA - numB;
+        });
+
         let totalVariables = 0;
         const fragment = document.createDocumentFragment();
-
-        // Estilos para simular la jerarquía visual de la imagen
         const ulRaiz = document.createElement("ul");
         ulRaiz.className = "list-unstyled ms-2 mb-0 font-monospace";
         ulRaiz.style.fontSize = "0.85rem";
 
-        modulosAProcesar.forEach((modKey) => {
-            const estructuraModulo = DICCIONARIO_VARIABLES[modKey] || [];
-            if (estructuraModulo.length === 0) return;
+        listaApartados.forEach((grupo) => {
+            const varsGrupo = grupo.variables || [];
+            totalVariables += varsGrupo.length;
 
-            const seleccionadasModulo = variablesPersonalizadasEstado[modKey] || [];
+            const liApartado = document.createElement("li");
+            liApartado.className = "my-1";
 
-            estructuraModulo.forEach((grupo) => {
-                const varsGrupo = grupo.variables || [];
-                totalVariables += varsGrupo.length;
+            // Verificar si TODAS las variables de este apartado están marcadas
+            const estanTodasMarcadas = varsGrupo.length > 0 && varsGrupo.every(v => v.isChecked);
 
-                const liApartado = document.createElement("li");
-                liApartado.className = "my-1";
+            liApartado.innerHTML = `
+            <details class="tree-item">
+                <summary class="d-flex align-items-center gap-2 py-1 user-select-none" style="cursor: pointer;">
+                    <input type="checkbox" 
+                           class="form-check-input my-0 chk-padre" 
+                           ${estanTodasMarcadas ? 'checked' : ''}>
+                    <span class="fw-bold text-dark">
+                        ${grupo.apartado} ${grupo.descripcion}
+                    </span>
+                </summary>
+                <ul class="list-unstyled ms-4 ps-2 border-start border-secondary-subtle my-1">
+                    ${varsGrupo.map(v => `
+                        <li class="d-flex align-items-center gap-2 py-1">
+                            <input type="checkbox" 
+                                   class="form-check-input my-0 chk-subvar" 
+                                   data-modulo="${v.modKey}" 
+                                   id="sub_${v.codigo}" 
+                                   value="${v.codigo}" 
+                                   ${v.isChecked ? 'checked' : ''}>
+                            <label for="sub_${v.codigo}" class="mb-0 text-secondary" style="cursor: pointer;">
+                                <strong>${v.codigo}</strong> ${v.nombre}
+                            </label>
+                        </li>
+                    `).join('')}
+                </ul>
+            </details>
+        `;
 
-                // Se calcula si todas las variables del apartado están marcadas
-                const codigosGrupo = varsGrupo.map(v => v.codigo);
-                const estanTodasMarcadas = codigosGrupo.every(c => seleccionadasModulo.includes(c));
-
-                liApartado.innerHTML = `
-                <details class="tree-item">
-                    <summary class="d-flex align-items-center gap-1 py-1 user-select-none" style="cursor: pointer;">
-                        <input type="checkbox" 
-                               class="form-check-input my-0 chk-padre" 
-                               data-modulo="${modKey}" 
-                               ${estanTodasMarcadas ? 'checked' : ''}>
-                        <span class="fw-bold text-dark">
-                            ${grupo.apartado} ${grupo.descripcion_apartado || ''}
-                        </span>
-                    </summary>
-                    <ul class="list-unstyled ms-4 ps-2 border-start border-secondary-subtle my-1">
-                        ${varsGrupo.map(v => {
-                    const isChecked = seleccionadasModulo.includes(v.codigo);
-                    return `
-                                <li class="d-flex align-items-center gap-1 py-1">
-                                    <input type="checkbox" 
-                                           class="form-check-input my-0 chk-subvar" 
-                                           data-modulo="${modKey}" 
-                                           id="sub_${v.codigo}" 
-                                           value="${v.codigo}" 
-                                           ${isChecked ? 'checked' : ''}>
-                                    <label for="sub_${v.codigo}" class="mb-0 text-secondary" style="cursor: pointer;">
-                                        <strong>${v.codigo}</strong> ${v.nombre}
-                                    </label>
-                                </li>
-                            `;
-                }).join('')}
-                    </ul>
-                </details>
-            `;
-
-                ulRaiz.appendChild(liApartado);
-            });
+            ulRaiz.appendChild(liApartado);
         });
 
         if (lbl) {
@@ -243,17 +270,17 @@
         contenedor.innerHTML = "";
         contenedor.appendChild(ulRaiz);
 
-        // Gestor de eventos para marcar/desmarcar hijos y padres
+        // GESTOR DE EVENTOS PARA MARCAR / DESMARCAR PADRES E HIJOS
         contenedor.onclick = null;
         contenedor.addEventListener('change', (e) => {
-            // Si se hace clic en el checkbox del apartado (Padre), marca/desmarca todos sus hijos
+            // Al hacer clic en el checkbox del APARTADO (PADRE)
             if (e.target.classList.contains('chk-padre')) {
                 const parentDetails = e.target.closest('details');
                 const hijos = parentDetails.querySelectorAll('.chk-subvar');
                 hijos.forEach(h => h.checked = e.target.checked);
             }
 
-            // Si se hace clic en un hijo, actualiza el estado del padre
+            // Al hacer clic en una VARIABLE (HIJO)
             if (e.target.classList.contains('chk-subvar')) {
                 const parentDetails = e.target.closest('details');
                 const chkPadre = parentDetails.querySelector('.chk-padre');
