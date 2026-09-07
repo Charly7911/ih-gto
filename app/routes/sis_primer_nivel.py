@@ -75,15 +75,12 @@ def obtener_modulo_por_apartado(apartado_raw, variable_code=""):
     apt = str(apartado_raw or "").strip()
     var = str(variable_code or "").upper().strip()
 
-    # Evaluaciones específicas por código de variable (mayor prioridad)
     if var in ['MAC07', 'MAC08', 'MAC09', 'MAC11', 'MAC12']:
         return "orientacion_lac_des_obe"
     elif var in ['MAC01', 'MAC02']:
         return "orientacion_eda_ira"
     elif var in ['DET01','DET02','DET03','DET04','DET25','DET26','DET27','DET28','DET50','DET51','DET52','DET53','DET58','DET59','DET60','DET61']:
         return "detecciones_cardiometabolicas"
-
-    # Evaluaciones estrictas por apartado o prefijo
     elif apt in ["1", "01", "215"] or var.startswith("CON"):
         return "consultas"
     elif apt in ["24"] or var.startswith("EMB"):
@@ -99,7 +96,7 @@ def obtener_modulo_por_apartado(apartado_raw, variable_code=""):
     elif apt in ["2", "02"] and var in ['CPP07', 'CPP14']:
         return "mental"
     else:
-        return "otros" # <--- CORREGIDO: Retorna None si no pertenece a ningún módulo dashboard
+        return "otros"
 
 
 @sis_pn.route("/")
@@ -165,7 +162,6 @@ def dashboard_sis_primer_nivel():
 
             mod = obtener_modulo_por_apartado(apt, code)
 
-            # Si el elemento no pertenece a ningún módulo registrado, omitir
             if not mod:
                 continue
 
@@ -210,20 +206,46 @@ def filtrar_datos_sis():
     anios = [int(a) for a in data.get("anios", []) if str(a).isdigit()]
     meses = [int(m) for m in data.get("meses", []) if str(m).isdigit()]
     variables_seleccionadas = data.get("variables", {}) or {}
+    
+    # 🟢 1. CAPTURAR EL NIVEL DE AGRUPACIÓN DEL FRONTEND
+    nivel_agrupacion = data.get("nivel_agrupacion", "clues")
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
+        # 🟢 2. CONFIGURAR COLUMNAS DINÁMICAS SEGÚN AGRUPACIÓN ELEGIDA
+        if nivel_agrupacion == "jurisdiccion":
+            select_geo = "sr.anio, sr.mes, sr.jurisdiccion, 'N/A' AS municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
+            group_geo = "sr.anio, sr.mes, sr.jurisdiccion"
+            select_geo_agregados = "anio, mes, jurisdiccion, 'N/A' AS municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
+            group_geo_agregados = "anio, mes, jurisdiccion"
+        elif nivel_agrupacion == "municipio":
+            select_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
+            group_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio"
+            select_geo_agregados = "anio, mes, jurisdiccion, municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
+            group_geo_agregados = "anio, mes, jurisdiccion, municipio"
+        else:
+            # Opción 'clues' o por defecto
+            select_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, sr.clues, COALESCE(cu.nombre_unidad, sr.clues) AS nombre_unidad"
+            group_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, sr.clues, cu.nombre_unidad"
+            select_geo_agregados = "anio, mes, jurisdiccion, municipio, clues, nombre_unidad"
+            group_geo_agregados = "anio, mes, jurisdiccion, municipio, clues, nombre_unidad"
+
         tiene_variables_custom = isinstance(variables_seleccionadas, dict) and any(
             isinstance(v, list) and len(v) > 0 for v in variables_seleccionadas.values()
         )
 
+        # CASO A: TABLA PRE-AGREGADA (SIN VARIABLES PERSONALIZADAS)
         if not tiene_variables_custom:
-            query_base = """
+            query_base = f"""
                 SELECT 
-                    anio, mes, clues, nombre_unidad, jurisdiccion, municipio,
-                    consultas, mental, bucal, embarazadas, planificacion_familiar, detecciones, tamiz, 
-                    detecciones_cardiometabolicas, orientacion_lac_des_obe, orientacion_eda_ira 
+                    {select_geo_agregados},
+                    SUM(consultas) AS consultas, SUM(mental) AS mental, SUM(bucal) AS bucal, 
+                    SUM(embarazadas) AS embarazadas, SUM(planificacion_familiar) AS planificacion_familiar, 
+                    SUM(detecciones) AS detecciones, SUM(tamiz) AS tamiz, 
+                    SUM(detecciones_cardiometabolicas) AS detecciones_cardiometabolicas, 
+                    SUM(orientacion_lac_des_obe) AS orientacion_lac_des_obe, 
+                    SUM(orientacion_eda_ira) AS orientacion_eda_ira
                 FROM sis_registros_agregados_primer_nivel
                 WHERE 1=1
             """
@@ -239,18 +261,16 @@ def filtrar_datos_sis():
                 query_base += clausula
                 params.extend(vals)
 
-            query_base += " ORDER BY anio, mes, clues"
+            query_base += f" GROUP BY {group_geo_agregados} ORDER BY anio, mes, jurisdiccion"
             cursor.execute(query_base, params)
             datos_filtrados = cursor.fetchall() or []
 
+        # CASO B: TABLA DETALLADA (CON FILTRADO DE VARIABLES ESPECÍFICAS)
         else:
             select_sums = []
             params_select = []
-            
-            # Recopilador para la cláusula WHERE global
             todas_las_variables_activas = set()
 
-            # 1. CASO ESPECIAL: Si el usuario seleccionó variables desde la vista "todas"
             vars_todas = variables_seleccionadas.get("todas", [])
             if isinstance(vars_todas, list) and len(vars_todas) > 0:
                 placeholders = ','.join(['%s'] * len(vars_todas))
@@ -260,7 +280,6 @@ def filtrar_datos_sis():
                 params_select.extend(vars_todas)
                 todas_las_variables_activas.update(vars_todas)
 
-            # 2. CASO ESTÁNDAR: Procesamiento por módulos individuales (incluyendo 'otros')
             else:
                 def resolver_vars(mod_key):
                     val = variables_seleccionadas.get(mod_key)
@@ -287,15 +306,12 @@ def filtrar_datos_sis():
                     else:
                         select_sums.append(f"0 AS {mod_key}")
 
-            # Si no hay variables activas válidas para consultar
             if not todas_las_variables_activas:
                 return jsonify({"status": "success", "data": []})
 
-            # Construcción dinámica del WHERE
             where_conditions = ["1=1"]
             params_where = []
 
-            # 🟢 OPTIMIZACIÓN CLAVE: Filtrado directo en el WHERE por lista de variables seleccionadas
             placeholders_where = ','.join(['%s'] * len(todas_las_variables_activas))
             where_conditions.append(f"sr.variable IN ({placeholders_where})")
             params_where.extend(list(todas_las_variables_activas))
@@ -313,20 +329,16 @@ def filtrar_datos_sis():
 
             query_base = f"""
                 SELECT 
-                    sr.anio, sr.mes, sr.clues, 
-                    COALESCE(cu.nombre_unidad, sr.clues) AS nombre_unidad,
-                    sr.jurisdiccion, sr.municipio,
+                    {select_geo},
                     {', '.join(select_sums)}
                 FROM sis_registros_primer_nivel sr
                 LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
                 WHERE {" AND ".join(where_conditions)}
-                GROUP BY sr.anio, sr.mes, sr.clues, cu.nombre_unidad, sr.jurisdiccion, sr.municipio
-                ORDER BY sr.anio, sr.mes, sr.clues
+                GROUP BY {group_geo}
+                ORDER BY sr.anio, sr.mes, sr.jurisdiccion
             """
 
-            # Unimos los parámetros del SELECT + los del WHERE
             params_totales = params_select + params_where
-
             cursor.execute(query_base, params_totales)
             datos_filtrados = cursor.fetchall() or []
 
