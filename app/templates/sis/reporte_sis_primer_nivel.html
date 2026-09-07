@@ -330,14 +330,14 @@
         if (modulo === "todas") {
             return Array.isArray(variablesPersonalizadasEstado["todas"]) && variablesPersonalizadasEstado["todas"].length > 0;
         }
-        return Object.values(variablesPersonalizadasEstado).some(arr => Array.isArray(arr) && arr.length > 0);
+        return Array.isArray(variablesPersonalizadasEstado[modulo]) && variablesPersonalizadasEstado[modulo].length > 0;
     }
 
     /* 3. PROCESAMIENTO Y FILTRADO */
     function agruparDatos(data) {
         const mapa = {};
         const nivelAgrupacion = document.getElementById('selectNivelAgrupacion')?.value || 'clues';
-        const campos = ['consultas', 'embarazadas', 'mental', 'bucal', 'tamiz', 'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas', 'orientacion_lac_des_obe', 'orientacion_eda_ira','otros'];
+        const campos = ['consultas', 'embarazadas', 'mental', 'bucal', 'tamiz', 'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas', 'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'];
 
         for (let i = 0; i < data.length; i++) {
             const r = data[i];
@@ -387,10 +387,16 @@
             ocultarCargandoGrafica();
             return;
         }
+
         const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
-        const variablesAPasar = (moduloActual === "todas") 
-            ? { todas: variablesPersonalizadasEstado["todas"] || [] } 
-            : variablesPersonalizadasEstado;
+
+        // 🟢 FIX 1: Enviar SOLO las variables del módulo activo actual
+        let variablesAPasar = {};
+        if (moduloActual === "todas") {
+            variablesAPasar = { todas: variablesPersonalizadasEstado["todas"] || [] };
+        } else {
+            variablesAPasar = { [moduloActual]: variablesPersonalizadasEstado[moduloActual] || [] };
+        }
 
         const payload = {
             unidades: window.getUnidadesSeleccionadas?.() || [],
@@ -398,7 +404,7 @@
             municipios: window.getMunicipiosSeleccionados?.() || [],
             anios: window.getAniosSeleccionados?.() || [],
             meses: window.getMesesSeleccionados?.() || [],
-            variables: variablesAPasar 
+            variables: variablesAPasar
         };
 
         try {
@@ -619,23 +625,24 @@
         if (!ctx) return;
         if (graficaSisMensual) { graficaSisMensual.destroy(); graficaSisMensual = null; }
 
-        const varsEnTodas = variablesPersonalizadasEstado["todas"] || [];
-        if (modulo === "todas" && varsEnTodas.length === 0) {
+        if (!hayVariablesSeleccionadas()) {
             return;
         }
 
         if (!data || data.length === 0) return;
 
+        // 🟢 FIX 2: Cálculo dinámico con fallback seguro para la API backend
         const sumarCategorias = (r) => {
             if (modulo === "todas") {
                 let suma = 0;
-                const camposPosibles = ['consultas', 'embarazadas', 'mental', 'bucal', 'tamiz', 'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas', 'orientacion_lac_des_obe', 'orientacion_eda_ira'];
+                const camposPosibles = ['consultas', 'embarazadas', 'mental', 'bucal', 'tamiz', 'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas', 'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'];
                 camposPosibles.forEach(c => {
                     suma += Number(r[c]) || 0;
                 });
-                return suma;
+                return suma || Number(r.total || r.valor || 0);
             }
-            return Number(r[modulo]) || 0;
+            // Intenta leer el módulo específico; si el backend responde en 'total' o 'valor', toma ese dato como fallback
+            return Number(r[modulo]) || Number(r.total) || Number(r.valor) || 0;
         };
 
         let labels = [];
