@@ -1949,70 +1949,70 @@
         // ======================================================
 
         document.addEventListener("click", function (e) {
-            // CORREGIDO: Se cerró la comilla simple antes de la coma final
-            const selectorReset = '#btnResetAll, #btnResetSis, #btnReset' + (typeof sufijo !== 'undefined' ? sufijo : '') + ', .btn-reset, .btn-limpiar';
-
-            if (e.target.closest(selectorReset)) {
+            if (e.target.closest('#btnResetAll, #btnResetSis, #btnReset' + (typeof sufijo !== 'undefined' ? sufijo : '') + ', .btn-reset, .btn-limpiar')) {
                 e.preventDefault();
 
-                // 1. Desmarcar todos los checkboxes del menú de filtros y modales
-                document.querySelectorAll('.menu-filtros input[type="checkbox"], .popover-unidades input[type="checkbox"], .popover-content input[type="checkbox"], .modal input[type="checkbox"]').forEach(cb => cb.checked = false);
+                // ------------------------------------------------------
+                // A. RESETEAR ESTADO INTERNO DE VARIABLES SIS (NUEVO)
+                // ------------------------------------------------------
+                if (typeof VARIABLES_DEFAULT !== 'undefined') {
+                    variablesPersonalizadasEstado = structuredClone(VARIABLES_DEFAULT);
+                }
 
-                // 2. Restaurar select de agrupación y bloques de visibilidad si existen
+                const selectModulo = document.getElementById("filtroSisDetalle");
+                if (selectModulo) selectModulo.value = "consultas";
+
+                const selectVista = document.getElementById("selectTipoVistaTemporal");
+                if (selectVista) selectVista.value = "mes";
+
+                // Redibujar el árbol de subvariables con el estado original por defecto
+                if (typeof renderSubvariables === 'function') {
+                    renderSubvariables();
+                }
+
+                // ------------------------------------------------------
+                // B. DESMARCAR ELEMENTOS DEL MENÚ Y POPOVERS
+                // ------------------------------------------------------
+                document.querySelectorAll('.menu-filtros input[type="checkbox"], .popover-unidades input[type="checkbox"], .popover-content input[type="checkbox"]').forEach(cb => cb.checked = false);
+
+                // ------------------------------------------------------
+                // C. RESTAURAR SELECTS Y BLOQUES DE NIVELES
+                // ------------------------------------------------------
                 if (typeof selectNivel !== 'undefined' && selectNivel) selectNivel.value = 'clues';
                 if (typeof blockUnidades !== 'undefined' && blockUnidades) blockUnidades.style.display = 'block';
                 if (typeof blockJurisdicciones !== 'undefined' && blockJurisdicciones) blockJurisdicciones.style.display = 'none';
                 if (typeof blockMunicipios !== 'undefined' && blockMunicipios) blockMunicipios.style.display = 'none';
 
-                // 3. Limpiar inputs de búsqueda y forzar el evento para refrescar listas
+                // ------------------------------------------------------
+                // D. LIMPIAR BUSCADORES Y RESTAURAR TEXTOS
+                // ------------------------------------------------------
                 document.querySelectorAll('input[type="text"], input[type="search"]').forEach(inp => {
                     inp.value = "";
                     inp.dispatchEvent(new Event("input"));
                 });
 
-                // 4. Restaurar texto base de los botones selector
-                const btnUnidades = typeof obtenerBotonUnidades === 'function' ? obtenerBotonUnidades() : document.getElementById("btnUnidades");
+                const btnUnidades = typeof obtenerBotonUnidades === 'function' ? obtenerBotonUnidades() : null;
                 if (btnUnidades) btnUnidades.textContent = "🔍 Seleccionar unidades";
                 if (typeof btnJurisdicciones !== 'undefined' && btnJurisdicciones) btnJurisdicciones.textContent = "🔍 Seleccionar jurisdicciones";
                 if (typeof btnMunicipios !== 'undefined' && btnMunicipios) btnMunicipios.textContent = "🔍 Seleccionar municipios";
                 if (typeof btnServicio !== 'undefined' && btnServicio) btnServicio.textContent = "🔍 Seleccionar Egreso";
                 if (typeof btnAfecciones !== 'undefined' && btnAfecciones) btnAfecciones.textContent = "🔍 Seleccionar afecciones";
 
-                // 5. RESTAURAR ESTADO DE DATOS ORIGINALES
-                if (typeof sisResultadosIniciales !== 'undefined') {
-                    datosActuales = [...sisResultadosIniciales];
-                }
-
-                // 6. RESTABLECER PAGINACIÓN Y AÑO ACTIVO
-                paginaActual = 1;
-
-                if (typeof datosActuales !== 'undefined' && datosActuales.length > 0) {
-                    const anios = [...new Set(datosActuales.map(r => Number(r.anio)))]
-                        .filter(a => !isNaN(a) && a > 0)
-                        .sort((a, b) => b - a);
-
-                    anioActivo = anios.length > 0 ? anios[0] : null;
-                }
-
-                // 7. Actualizar la relación Municipio-Jurisdicción
+                // ------------------------------------------------------
+                // E. RECARGAR VISTAS Y DATOS
+                // ------------------------------------------------------
                 if (typeof actualizarRelacionJurisdiccionMunicipio === 'function') {
                     actualizarRelacionJurisdiccionMunicipio();
                 }
 
-                // 8. VOLVER A RENDERIZAR VISTAS Y GRÁFICAS INICIALES
-                if (typeof renderTabsAnios === 'function') {
-                    renderTabsAnios(datosActuales);
-                }
-                if (typeof renderTablaSis === 'function') {
-                    renderTablaSis();
-                }
-                if (typeof renderGraficaPorUnidad === 'function') {
-                    const datosAnoInicial = datosActuales.filter(r => Number(r.anio) === Number(anioActivo));
-                    renderGraficaPorUnidad(datosAnoInicial);
+                // Llamar a la consulta/renderizado SIS o general
+                if (typeof ejecutarFiltradoSis === 'function') {
+                    ejecutarFiltradoSis(0);
+                } else if (typeof ejecutarCargaGraficaYDatos === 'function') {
+                    ejecutarCargaGraficaYDatos();
                 }
             }
         });
 
     });
-
 </script>
