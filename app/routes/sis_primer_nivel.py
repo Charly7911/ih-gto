@@ -83,7 +83,7 @@ def obtener_modulo_por_apartado(apartado_raw, variable_code=""):
     elif var in ['DET01','DET02','DET03','DET04','DET25','DET26','DET27','DET28','DET50','DET51','DET52','DET53','DET58','DET59','DET60','DET61']:
         return "detecciones_cardiometabolicas"
 
-    # Evaluaciones generales (menor prioridad)
+    # Evaluaciones estrictas por apartado o prefijo
     elif apt in ["1", "01", "215"] or var.startswith("CON"):
         return "consultas"
     elif apt in ["24"] or var.startswith("EMB"):
@@ -99,7 +99,8 @@ def obtener_modulo_por_apartado(apartado_raw, variable_code=""):
     elif apt in ["2", "02"] and var in ['CPP07', 'CPP14']:
         return "mental"
     else:
-        return None
+        return None  # <--- CORREGIDO: Retorna None si no pertenece a ningún módulo dashboard
+
 
 @sis_pn.route("/")
 @login_required
@@ -107,20 +108,18 @@ def dashboard_sis_primer_nivel():
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
-        # Cargar los registros agrupados de los últimos años (sin que LIMIT 2000 lo ahoque)
         query = """
             SELECT 
                 anio, mes, clues, nombre_unidad, jurisdiccion, municipio,
                 consultas, mental, bucal, embarazadas, planificacion_familiar, detecciones, tamiz,
                 detecciones_cardiometabolicas, orientacion_lac_des_obe, orientacion_eda_ira
             FROM sis_registros_agregados_primer_nivel
-            WHERE anio >= YEAR(CURDATE()) - 3  -- 👈 Carga los últimos 3 ó 4 años completos
+            WHERE anio >= YEAR(CURDATE()) - 3
             ORDER BY anio DESC, mes DESC, clues
         """
         cursor.execute(query)
         resultados = cursor.fetchall() or []
 
-        # Asegurar que anio siempre sea int en Python antes de mandarlo a la plantilla
         for r in resultados:
             if r.get("anio") is not None:
                 r["anio"] = int(r["anio"])
@@ -160,13 +159,14 @@ def dashboard_sis_primer_nivel():
         catalogo_estructurado = {}
         for row in filas_catalogo:
             code = row.get("variable")
-            apt = str(row.get("apartado") or "00")
+            apt = str(row.get("apartado") or "00").strip()
             desc_apt = row.get("descripcion_apartado") or "Sin Descripción"
             nombre_var = row.get("descripcion") or code
 
             mod = obtener_modulo_por_apartado(apt, code)
 
-            if apt in ["2", "02"] and mod == "consultas":
+            # Si el elemento no pertenece a ningún módulo registrado, omitir
+            if not mod:
                 continue
 
             catalogo_estructurado.setdefault(mod, {}).setdefault(apt, {
@@ -293,7 +293,7 @@ def filtrar_datos_sis():
         return jsonify({"status": "success", "data": datos_filtrados})
 
     except Exception as e:
-        print(f"❌ Error en API /api/filtrar: {str(e)}") # Depuración en consola del servidor
+        print(f"❌ Error en API /api/filtrar: {str(e)}")
         return jsonify({"status": "error", "message": f"Error al procesar la consulta: {str(e)}"}), 400
 
     finally:
