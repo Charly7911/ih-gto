@@ -98,6 +98,12 @@
                                     id="btnToggleValoresMensual">
                                     Mostrar valores
                                 </button>
+
+                                <!-- 🟢 Botón de Exportar a Excel agregado -->
+                                <button type="button" class="btn btn-success btn-sm d-flex align-items-center gap-1"
+                                    id="btnExportarExcel" onclick="exportarFiltradoExcel()">
+                                    <i class="bi bi-file-earmark-excel-fill"></i> Excel
+                                </button>
                             </div>
                         </div>
 
@@ -148,6 +154,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 
 <script>
@@ -400,6 +407,72 @@
         }
 
         return Object.values(mapa);
+    }
+
+
+    function exportarFiltradoExcel() {
+        // 1. Validar si existen datos filtrados
+        if (!datosFiltradosSis || datosFiltradosSis.length === 0) {
+            alert("No hay datos disponibles en la consulta para exportar.");
+            return;
+        }
+
+        // 2. Notificación visual rápida en el botón
+        const btn = document.getElementById("btnExportarExcel");
+        const textoOriginal = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Generando Excel...';
+        btn.disabled = true;
+
+        try {
+            // 3. Formatear y aplanar los datos para las columnas del Excel
+            const datosParaExcel = datosFiltradosSis.map(r => {
+                return {
+                    "Año": r.anio || '',
+                    "Mes": r.mes || '',
+                    "Jurisdicción": r.jurisdiccion || '',
+                    "Municipio": r.municipio || 'Sin Especificar',
+                    "CLUES": r.clues || '-',
+                    "Nombre de Unidad": r.nombre_unidad || '',
+                    "Consultas": Number(r.consultas) || 0,
+                    "Embarazadas": Number(r.embarazadas) || 0,
+                    "Salud Mental": Number(r.mental) || 0,
+                    "Salud Bucal": Number(r.bucal) || 0,
+                    "Tamiz": Number(r.tamiz) || 0,
+                    "Planificación Familiar": Number(r.planificacion_familiar) || 0,
+                    "Detecciones": Number(r.detecciones) || 0,
+                    "Detecciones Cardiometabólicas": Number(r.detecciones_cardiometabolicas) || 0,
+                    "Orientación Lac/Des/Obe": Number(r.orientacion_lac_des_obe) || 0,
+                    "Orientación EDA/IRA": Number(r.orientacion_eda_ira) || 0,
+                    "Otros": Number(r.otros) || 0
+                };
+            });
+
+            // 4. Crear el libro de trabajo (Workbook) y la hoja (Worksheet)
+            const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS");
+
+            // 5. Auto-ajustar ancho de columnas para mejorar la presentación
+            const maxAnchos = Object.keys(datosParaExcel[0]).map(key => ({
+                wch: Math.max(key.length + 3, 12)
+            }));
+            worksheet['!cols'] = maxAnchos;
+
+            // 6. Generar nombre de archivo dinámico con fecha/hora actual
+            const fechaActual = new Date().toISOString().slice(0, 10);
+            const nombreArchivo = `Reporte_SIS_Filtrado_${fechaActual}.xlsx`;
+
+            // 7. Descargar el archivo
+            XLSX.writeFile(workbook, nombreArchivo);
+
+        } catch (error) {
+            console.error("Error al generar el archivo Excel:", error);
+            alert("Ocurrió un error al intentar exportar los datos.");
+        } finally {
+            // Restaurar estado del botón
+            btn.innerHTML = textoOriginal;
+            btn.disabled = false;
+        }
     }
 
     function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
