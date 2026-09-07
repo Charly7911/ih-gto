@@ -446,7 +446,7 @@
                     </div>
                 </div>
 
-              
+
                 <!-- Opción C: Municipios -->
                 <div class="filter-block" id="blockMunicipios" style="display: none;">
                     <label class="filter-label">Municipio</label>
@@ -1949,37 +1949,70 @@
         // ======================================================
 
         document.addEventListener("click", function (e) {
-            if (e.target.closest('#btnResetAll, #btnResetSis, #btnReset' + sufijo + ', .btn-reset, .btn-limpiar')) {
+            // CORREGIDO: Se cerró la comilla simple antes de la coma final
+            const selectorReset = '#btnResetAll, #btnResetSis, #btnReset' + (typeof sufijo !== 'undefined' ? sufijo : '') + ', .btn-reset, .btn-limpiar';
+
+            if (e.target.closest(selectorReset)) {
                 e.preventDefault();
 
-                // 1. Desmarcar todos los checkboxes del menú de filtros
-                document.querySelectorAll('.menu-filtros input[type="checkbox"], .popover-unidades input[type="checkbox"], .popover-content input[type="checkbox"]').forEach(cb => cb.checked = false);
+                // 1. Desmarcar todos los checkboxes del menú de filtros y modales
+                document.querySelectorAll('.menu-filtros input[type="checkbox"], .popover-unidades input[type="checkbox"], .popover-content input[type="checkbox"], .modal input[type="checkbox"]').forEach(cb => cb.checked = false);
 
-                // 2. Restaurar select de agrupación si existe
-                if (selectNivel) selectNivel.value = 'clues';
-                if (blockUnidades) blockUnidades.style.display = 'block';
-                if (blockJurisdicciones) blockJurisdicciones.style.display = 'none';
-                if (blockMunicipios) blockMunicipios.style.display = 'none';
+                // 2. Restaurar select de agrupación y bloques de visibilidad si existen
+                if (typeof selectNivel !== 'undefined' && selectNivel) selectNivel.value = 'clues';
+                if (typeof blockUnidades !== 'undefined' && blockUnidades) blockUnidades.style.display = 'block';
+                if (typeof blockJurisdicciones !== 'undefined' && blockJurisdicciones) blockJurisdicciones.style.display = 'none';
+                if (typeof blockMunicipios !== 'undefined' && blockMunicipios) blockMunicipios.style.display = 'none';
 
-                // 3. Limpiar inputs de búsqueda y forzar el evento para mostrar todos los ítems
+                // 3. Limpiar inputs de búsqueda y forzar el evento para refrescar listas
                 document.querySelectorAll('input[type="text"], input[type="search"]').forEach(inp => {
                     inp.value = "";
                     inp.dispatchEvent(new Event("input"));
                 });
 
-                // 4. Restaurar texto base de los botones
-                const btnUnidades = obtenerBotonUnidades();
+                // 4. Restaurar texto base de los botones selector
+                const btnUnidades = typeof obtenerBotonUnidades === 'function' ? obtenerBotonUnidades() : document.getElementById("btnUnidades");
                 if (btnUnidades) btnUnidades.textContent = "🔍 Seleccionar unidades";
-                if (btnJurisdicciones) btnJurisdicciones.textContent = "🔍 Seleccionar jurisdicciones";
-                if (btnMunicipios) btnMunicipios.textContent = "🔍 Seleccionar municipios";
-                if (btnServicio) btnServicio.textContent = "🔍 Seleccionar Egreso";
-                if (btnAfecciones) btnAfecciones.textContent = "🔍 Seleccionar afecciones";
+                if (typeof btnJurisdicciones !== 'undefined' && btnJurisdicciones) btnJurisdicciones.textContent = "🔍 Seleccionar jurisdicciones";
+                if (typeof btnMunicipios !== 'undefined' && btnMunicipios) btnMunicipios.textContent = "🔍 Seleccionar municipios";
+                if (typeof btnServicio !== 'undefined' && btnServicio) btnServicio.textContent = "🔍 Seleccionar Egreso";
+                if (typeof btnAfecciones !== 'undefined' && btnAfecciones) btnAfecciones.textContent = "🔍 Seleccionar afecciones";
 
-                // 5. Actualizar la relación Municipio-Jurisdicción y recargar la vista/gráficas
-                actualizarRelacionJurisdiccionMunicipio();
-                ejecutarCargaGraficaYDatos();
+                // 5. RESTAURAR ESTADO DE DATOS ORIGINALES
+                if (typeof sisResultadosIniciales !== 'undefined') {
+                    datosActuales = [...sisResultadosIniciales];
+                }
+
+                // 6. RESTABLECER PAGINACIÓN Y AÑO ACTIVO
+                paginaActual = 1;
+
+                if (typeof datosActuales !== 'undefined' && datosActuales.length > 0) {
+                    const anios = [...new Set(datosActuales.map(r => Number(r.anio)))]
+                        .filter(a => !isNaN(a) && a > 0)
+                        .sort((a, b) => b - a);
+
+                    anioActivo = anios.length > 0 ? anios[0] : null;
+                }
+
+                // 7. Actualizar la relación Municipio-Jurisdicción
+                if (typeof actualizarRelacionJurisdiccionMunicipio === 'function') {
+                    actualizarRelacionJurisdiccionMunicipio();
+                }
+
+                // 8. VOLVER A RENDERIZAR VISTAS Y GRÁFICAS INICIALES
+                if (typeof renderTabsAnios === 'function') {
+                    renderTabsAnios(datosActuales);
+                }
+                if (typeof renderTablaSis === 'function') {
+                    renderTablaSis();
+                }
+                if (typeof renderGraficaPorUnidad === 'function') {
+                    const datosAnoInicial = datosActuales.filter(r => Number(r.anio) === Number(anioActivo));
+                    renderGraficaPorUnidad(datosAnoInicial);
+                }
             }
         });
 
     });
+
 </script>
