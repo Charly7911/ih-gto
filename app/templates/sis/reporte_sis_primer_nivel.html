@@ -508,7 +508,13 @@
                 scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
                 plugins: {
                     legend: { display: false },
-                    datalabels: { anchor: 'end', align: 'top', formatter: (val) => val > 0 ? fmt(val) : '', font: { weight: 'bold', size: 11 }, color: '#333' }
+                    datalabels: {
+                        anchor: 'center', // <--- Cambiado de 'end' a 'center'
+                        align: 'center',  // <--- Cambiado de 'top' a 'center'
+                        color: '#ffffff', // <--- Texto en blanco para legibilidad sobre la barra
+                        font: { weight: 'bold', size: 11 },
+                        formatter: (val) => val > 0 ? fmt(val) : ''
+                    }
                 }
             }
         });
@@ -555,7 +561,13 @@
                 animation: false,
                 scales: { x: { stacked: true, ticks: { callback: v => fmt(v) } }, y: { stacked: true } },
                 plugins: {
-                    datalabels: { color: '#fff', font: { weight: 'bold', size: 10 }, formatter: (val) => val > 0 ? fmt(val) : '' }
+                    datalabels: {
+                        anchor: 'center', // <--- Centra respecto al segmento apilado
+                        align: 'center',  // <--- Ubica el texto exactamente al centro
+                        color: '#ffffff', // <--- Texto en blanco
+                        font: { weight: 'bold', size: 10 },
+                        formatter: (val) => val > 0 ? fmt(val) : ''
+                    }
                 }
             }
         });
@@ -588,14 +600,20 @@
         let labels = [];
         let datasets = [];
 
+        // Paleta de colores para las barras anuales
+        const paletaAnual = ['#4E79A7', '#59A14F', '#F28E2B', '#E15759', '#76B7B2', '#EDC948', '#B07AA1', '#9C755F'];
+
         if (tipoVista === 'anio') {
             const acumuladoAnual = {};
             data.forEach(r => { acumuladoAnual[r.anio] = (acumuladoAnual[r.anio] || 0) + sumarCategorias(r); });
+
             labels = Object.keys(acumuladoAnual).sort();
+
             datasets = [{
                 label: `Total ${modulo === 'todas' ? 'Todas las Secciones' : modulo.toUpperCase()}`,
                 data: labels.map(a => Math.round(acumuladoAnual[a])),
-                backgroundColor: '#4E79A7'
+                // Se pasa el arreglo de colores cortado al número exacto de años
+                backgroundColor: paletaAnual.slice(0, labels.length)
             }];
         } else {
             const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
@@ -609,9 +627,11 @@
                 resumen[key][Number(r.mes)] = (resumen[key][Number(r.mes)] || 0) + sumarCategorias(r);
             });
 
-            datasets = Object.keys(resumen).map(key => ({
+            datasets = Object.keys(resumen).map((key, index) => ({
                 label: key,
                 data: Array.from({ length: 12 }, (_, i) => Math.round(resumen[key][i + 1] || 0)),
+                borderColor: paletaAnual[index % paletaAnual.length], // Color de línea consistente por año
+                backgroundColor: paletaAnual[index % paletaAnual.length],
                 tension: 0.3,
                 pointRadius: 4,
                 fill: false
@@ -627,10 +647,13 @@
                 animation: false,
                 scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
                 plugins: {
+                    // Ocultar leyenda en vista por año ya que cada barra representa un año del eje X
+                    legend: { display: tipoVista !== 'anio' },
                     datalabels: {
                         display: () => mostrarValoresMensual || tipoVista === 'anio',
-                        align: 'top',
-                        anchor: 'end',
+                        anchor: tipoVista === 'anio' ? 'center' : 'end',
+                        align: tipoVista === 'anio' ? 'center' : 'top',
+                        color: tipoVista === 'anio' ? '#ffffff' : '#333333',
                         formatter: (val) => val > 0 ? fmt(val) : '',
                         font: { size: 10, weight: 'bold' }
                     }
