@@ -149,6 +149,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 
+
 <script>
     if (typeof ChartDataLabels !== 'undefined') {
         Chart.register(ChartDataLabels);
@@ -186,7 +187,7 @@
 
     function restaurarDefaultModulo(modKey) {
         if (modKey === "todas") {
-            variablesPersonalizadasEstado = structuredClone(VARIABLES_DEFAULT);
+            variablesPersonalizadasEstado["todas"] = [];
         } else if (VARIABLES_DEFAULT[modKey]) {
             variablesPersonalizadasEstado[modKey] = [...VARIABLES_DEFAULT[modKey]];
         }
@@ -203,14 +204,19 @@
         const modulosAProcesar = modulo === "todas" ? Object.keys(DICCIONARIO_VARIABLES) : [modulo];
         const mapaApartados = {};
 
+        // Si estamos en la opción "todas", leemos exclusivamente de variablesPersonalizadasEstado["todas"]
+        const seleccionadasTodas = modulo === "todas" ? (variablesPersonalizadasEstado["todas"] || []) : null;
+
         modulosAProcesar.forEach((modKey) => {
             const estructuraModulo = DICCIONARIO_VARIABLES[modKey] || [];
 
-            if (!variablesPersonalizadasEstado[modKey] && VARIABLES_DEFAULT[modKey]) {
+            if (modulo !== "todas" && !variablesPersonalizadasEstado[modKey] && VARIABLES_DEFAULT[modKey]) {
                 variablesPersonalizadasEstado[modKey] = [...VARIABLES_DEFAULT[modKey]];
             }
 
-            const seleccionadasModulo = variablesPersonalizadasEstado[modKey] || [];
+            const seleccionadasModulo = modulo === "todas"
+                ? seleccionadasTodas
+                : (variablesPersonalizadasEstado[modKey] || []);
 
             estructuraModulo.forEach((grupo) => {
                 const keyApartado = String(grupo.apartado).trim();
@@ -285,22 +291,35 @@
         if (!contenedor) return;
 
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
-        const modulosAProcesar = modulo === "todas" ? Object.keys(DICCIONARIO_VARIABLES) : [modulo];
 
-        modulosAProcesar.forEach(mod => { variablesPersonalizadasEstado[mod] = []; });
-
-        contenedor.querySelectorAll('.chk-subvar:checked').forEach(cb => {
-            const mod = cb.getAttribute('data-modulo');
-            if (mod) {
-                if (!variablesPersonalizadasEstado[mod]) variablesPersonalizadasEstado[mod] = [];
-                if (!variablesPersonalizadasEstado[mod].includes(cb.value)) {
-                    variablesPersonalizadasEstado[mod].push(cb.value);
+        if (modulo === "todas") {
+            variablesPersonalizadasEstado["todas"] = [];
+            contenedor.querySelectorAll('.chk-subvar:checked').forEach(cb => {
+                if (!variablesPersonalizadasEstado["todas"].includes(cb.value)) {
+                    variablesPersonalizadasEstado["todas"].push(cb.value);
                 }
-            }
-        });
+            });
+        } else {
+            const modulosAProcesar = [modulo];
+            modulosAProcesar.forEach(mod => { variablesPersonalizadasEstado[mod] = []; });
+
+            contenedor.querySelectorAll('.chk-subvar:checked').forEach(cb => {
+                const mod = cb.getAttribute('data-modulo');
+                if (mod) {
+                    if (!variablesPersonalizadasEstado[mod]) variablesPersonalizadasEstado[mod] = [];
+                    if (!variablesPersonalizadasEstado[mod].includes(cb.value)) {
+                        variablesPersonalizadasEstado[mod].push(cb.value);
+                    }
+                }
+            });
+        }
     }
 
     function hayVariablesSeleccionadas() {
+        const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
+        if (modulo === "todas") {
+            return Array.isArray(variablesPersonalizadasEstado["todas"]) && variablesPersonalizadasEstado["todas"].length > 0;
+        }
         return Object.values(variablesPersonalizadasEstado).some(arr => Array.isArray(arr) && arr.length > 0);
     }
 
@@ -509,9 +528,9 @@
                 plugins: {
                     legend: { display: false },
                     datalabels: {
-                        anchor: 'center', // <--- Cambiado de 'end' a 'center'
-                        align: 'center',  // <--- Cambiado de 'top' a 'center'
-                        color: '#ffffff', // <--- Texto en blanco para legibilidad sobre la barra
+                        anchor: 'center',
+                        align: 'center',
+                        color: '#ffffff',
                         font: { weight: 'bold', size: 11 },
                         formatter: (val) => val > 0 ? fmt(val) : ''
                     }
@@ -562,9 +581,9 @@
                 scales: { x: { stacked: true, ticks: { callback: v => fmt(v) } }, y: { stacked: true } },
                 plugins: {
                     datalabels: {
-                        anchor: 'center', // <--- Centra respecto al segmento apilado
-                        align: 'center',  // <--- Ubica el texto exactamente al centro
-                        color: '#ffffff', // <--- Texto en blanco
+                        anchor: 'center',
+                        align: 'center',
+                        color: '#ffffff',
                         font: { weight: 'bold', size: 10 },
                         formatter: (val) => val > 0 ? fmt(val) : ''
                     }
@@ -586,19 +605,15 @@
         if (!ctx) return;
         if (graficaSisMensual) { graficaSisMensual.destroy(); graficaSisMensual = null; }
 
-        // 1. REGLA: Si la opción es "todas" y no hay variables seleccionadas manualmente en el árbol, no graficar nada.
         const varsEnTodas = variablesPersonalizadasEstado["todas"] || [];
         if (modulo === "todas" && varsEnTodas.length === 0) {
             return;
         }
 
-        // 2. Si no hay datos devueltos por el backend, salir
         if (!data || data.length === 0) return;
 
-        // Función para obtener la suma estricta según la opción seleccionada
         const sumarCategorias = (r) => {
             if (modulo === "todas") {
-                // Suma únicamente si hay variables explícitamente activas
                 let suma = 0;
                 const camposPosibles = ['consultas', 'embarazadas', 'mental', 'bucal', 'tamiz', 'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas', 'orientacion_lac_des_obe', 'orientacion_eda_ira'];
                 camposPosibles.forEach(c => {
@@ -606,8 +621,6 @@
                 });
                 return suma;
             }
-
-            // Retorna estrictamente el valor del módulo activo (ej. 'consultas')
             return Number(r[modulo]) || 0;
         };
 
@@ -624,7 +637,6 @@
             labels = Object.keys(acumuladoAnual).sort();
             const valores = labels.map(a => Math.round(acumuladoAnual[a]));
 
-            // Si la suma de todos los valores da 0, no dibujamos barras vacías
             if (valores.reduce((a, b) => a + b, 0) === 0) return;
 
             datasets = [{
@@ -654,7 +666,6 @@
                 fill: false
             }));
 
-            // Si no hay ningún dato real mayor a 0 en las líneas, no graficar
             const tieneDatos = datasets.some(ds => ds.data.some(v => v > 0));
             if (!tieneDatos) return;
         }
@@ -682,14 +693,11 @@
         });
     }
 
-
-
-    /* 6. INICILIZACIÓN DE EVENTOS */
+    /* 6. INICIALIZACIÓN DE EVENTOS */
     document.addEventListener("DOMContentLoaded", () => {
         renderSubvariables();
         actualizarVistas();
 
-        // Delegación de eventos para el árbol contenedor
         document.getElementById("contenedorSubvariables")?.addEventListener("change", (e) => {
             if (e.target.classList.contains('chk-padre')) {
                 const parentDetails = e.target.closest('details');
@@ -710,7 +718,6 @@
             mostrarCargandoGrafica();
 
             if (moduloSeleccionado === "todas") {
-                // Vaciamos las variables de "todas" para obligar a que el usuario las seleccione
                 variablesPersonalizadasEstado["todas"] = [];
             } else {
                 restaurarDefaultModulo(moduloSeleccionado);
