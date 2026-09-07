@@ -337,7 +337,11 @@
     function agruparDatos(data) {
         const mapa = {};
         const nivelAgrupacion = document.getElementById('selectNivelAgrupacion')?.value || 'clues';
-        const campos = ['consultas', 'embarazadas', 'mental', 'bucal', 'tamiz', 'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas', 'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'];
+        const campos = [
+            'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
+            'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
+            'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
+        ];
 
         for (let i = 0; i < data.length; i++) {
             const r = data[i];
@@ -365,11 +369,25 @@
                     municipio: mun,
                     clues: (nivelAgrupacion === 'clues') ? clues : '-',
                     nombre_unidad: nombreEtiqueta,
-                    consultas: 0, embarazadas: 0, mental: 0, bucal: 0, tamiz: 0, planificacion_familiar: 0, detecciones: 0, detecciones_cardiometabolicas: 0, orientacion_lac_des_obe: 0, orientacion_eda_ira: 0
+                    consultas: 0, embarazadas: 0, mental: 0, bucal: 0, tamiz: 0,
+                    planificacion_familiar: 0, detecciones: 0, detecciones_cardiometabolicas: 0,
+                    orientacion_lac_des_obe: 0, orientacion_eda_ira: 0, otros: 0
                 };
             }
 
-            campos.forEach(c => { mapa[key][c] += Number(r[c]) || 0; });
+            // Suma explícita de campos estándar
+            campos.forEach(c => {
+                mapa[key][c] += Number(r[c]) || 0;
+            });
+
+            // 🟢 FIX: Si la API responde datos bajo propiedades genéricas ('total', 'valor', 'suma')
+            // y las propiedades estándar venían en 0, asigna ese valor al campo 'otros'
+            const sumaEstandar = campos.reduce((acc, c) => acc + (Number(r[c]) || 0), 0);
+            const valorGenerico = Number(r.total || r.valor || r.suma || 0);
+
+            if (sumaEstandar === 0 && valorGenerico > 0) {
+                mapa[key]['otros'] += valorGenerico;
+            }
         }
 
         return Object.values(mapa);
@@ -635,13 +653,16 @@
         const sumarCategorias = (r) => {
             if (modulo === "todas") {
                 let suma = 0;
-                const camposPosibles = ['consultas', 'embarazadas', 'mental', 'bucal', 'tamiz', 'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas', 'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'];
+                const camposPosibles = [
+                    'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
+                    'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
+                    'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
+                ];
                 camposPosibles.forEach(c => {
                     suma += Number(r[c]) || 0;
                 });
                 return suma || Number(r.total || r.valor || 0);
             }
-            // Intenta leer el módulo específico; si el backend responde en 'total' o 'valor', toma ese dato como fallback
             return Number(r[modulo]) || Number(r.total) || Number(r.valor) || 0;
         };
 
