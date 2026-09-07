@@ -585,34 +585,51 @@
 
         if (!ctx) return;
         if (graficaSisMensual) { graficaSisMensual.destroy(); graficaSisMensual = null; }
+
+        // 1. REGLA: Si la opción es "todas" y no hay variables seleccionadas manualmente en el árbol, no graficar nada.
+        const varsEnTodas = variablesPersonalizadasEstado["todas"] || [];
+        if (modulo === "todas" && varsEnTodas.length === 0) {
+            return;
+        }
+
+        // 2. Si no hay datos devueltos por el backend, salir
         if (!data || data.length === 0) return;
 
+        // Función para obtener la suma estricta según la opción seleccionada
         const sumarCategorias = (r) => {
             if (modulo === "todas") {
-                return (Number(r.consultas) || 0) + (Number(r.embarazadas) || 0) + (Number(r.mental) || 0) +
-                    (Number(r.bucal) || 0) + (Number(r.tamiz) || 0) + (Number(r.planificacion_familiar) || 0) +
-                    (Number(r.detecciones) || 0) + (Number(r.detecciones_cardiometabolicas) || 0) +
-                    (Number(r.orientacion_lac_des_obe) || 0) + (Number(r.orientacion_eda_ira) || 0);
+                // Suma únicamente si hay variables explícitamente activas
+                let suma = 0;
+                const camposPosibles = ['consultas', 'embarazadas', 'mental', 'bucal', 'tamiz', 'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas', 'orientacion_lac_des_obe', 'orientacion_eda_ira'];
+                camposPosibles.forEach(c => {
+                    suma += Number(r[c]) || 0;
+                });
+                return suma;
             }
+
+            // Retorna estrictamente el valor del módulo activo (ej. 'consultas')
             return Number(r[modulo]) || 0;
         };
 
         let labels = [];
         let datasets = [];
-
-        // Paleta de colores para las barras anuales
         const paletaAnual = ['#4E79A7', '#59A14F', '#F28E2B', '#E15759', '#76B7B2', '#EDC948', '#B07AA1', '#9C755F'];
 
         if (tipoVista === 'anio') {
             const acumuladoAnual = {};
-            data.forEach(r => { acumuladoAnual[r.anio] = (acumuladoAnual[r.anio] || 0) + sumarCategorias(r); });
+            data.forEach(r => {
+                acumuladoAnual[r.anio] = (acumuladoAnual[r.anio] || 0) + sumarCategorias(r);
+            });
 
             labels = Object.keys(acumuladoAnual).sort();
+            const valores = labels.map(a => Math.round(acumuladoAnual[a]));
+
+            // Si la suma de todos los valores da 0, no dibujamos barras vacías
+            if (valores.reduce((a, b) => a + b, 0) === 0) return;
 
             datasets = [{
-                label: `Total ${modulo === 'todas' ? 'Todas las Secciones' : modulo.toUpperCase()}`,
-                data: labels.map(a => Math.round(acumuladoAnual[a])),
-                // Se pasa el arreglo de colores cortado al número exacto de años
+                label: `Total ${modulo === 'todas' ? 'Secciones Seleccionadas' : modulo.toUpperCase()}`,
+                data: valores,
                 backgroundColor: paletaAnual.slice(0, labels.length)
             }];
         } else {
@@ -630,12 +647,16 @@
             datasets = Object.keys(resumen).map((key, index) => ({
                 label: key,
                 data: Array.from({ length: 12 }, (_, i) => Math.round(resumen[key][i + 1] || 0)),
-                borderColor: paletaAnual[index % paletaAnual.length], // Color de línea consistente por año
+                borderColor: paletaAnual[index % paletaAnual.length],
                 backgroundColor: paletaAnual[index % paletaAnual.length],
                 tension: 0.3,
                 pointRadius: 4,
                 fill: false
             }));
+
+            // Si no hay ningún dato real mayor a 0 en las líneas, no graficar
+            const tieneDatos = datasets.some(ds => ds.data.some(v => v > 0));
+            if (!tieneDatos) return;
         }
 
         graficaSisMensual = new Chart(ctx, {
@@ -647,7 +668,6 @@
                 animation: false,
                 scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
                 plugins: {
-                    // Ocultar leyenda en vista por año ya que cada barra representa un año del eje X
                     legend: { display: tipoVista !== 'anio' },
                     datalabels: {
                         display: () => mostrarValoresMensual || tipoVista === 'anio',
@@ -661,6 +681,8 @@
             }
         });
     }
+
+
 
     /* 6. INICILIZACIÓN DE EVENTOS */
     document.addEventListener("DOMContentLoaded", () => {
@@ -684,8 +706,16 @@
         });
 
         document.getElementById("filtroSisDetalle")?.addEventListener("change", (e) => {
+            const moduloSeleccionado = e.target.value;
             mostrarCargandoGrafica();
-            restaurarDefaultModulo(e.target.value);
+
+            if (moduloSeleccionado === "todas") {
+                // Vaciamos las variables de "todas" para obligar a que el usuario las seleccione
+                variablesPersonalizadasEstado["todas"] = [];
+            } else {
+                restaurarDefaultModulo(moduloSeleccionado);
+            }
+
             renderSubvariables();
             window.ejecutarFiltradoSis(200);
         });
