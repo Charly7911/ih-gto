@@ -99,7 +99,7 @@ def obtener_modulo_por_apartado(apartado_raw, variable_code=""):
     elif apt in ["2", "02"] and var in ['CPP07', 'CPP14']:
         return "mental"
     else:
-        return "consultas"
+        return None
 
 @sis_pn.route("/")
 @login_required
