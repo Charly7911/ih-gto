@@ -264,7 +264,10 @@
 
             const liApartado = document.createElement("li");
             liApartado.className = "my-1";
-            const estanTodasMarcadas = varsGrupo.length > 0 && varsGrupo.every(v => v.isChecked);
+
+            const marcadasCount = varsGrupo.filter(v => v.isChecked).length;
+            const estanTodasMarcadas = varsGrupo.length > 0 && marcadasCount === varsGrupo.length;
+            const hayAlgunasMarcadas = marcadasCount > 0 && !estanTodasMarcadas;
 
             liApartado.innerHTML = `
         <details class="tree-item">
@@ -283,6 +286,12 @@
                 `).join('')}
             </ul>
         </details>`;
+
+            // Asignar estado indeterminado si existen variables parcialmente seleccionadas
+            const chkPadreElement = liApartado.querySelector('.chk-padre');
+            if (chkPadreElement && hayAlgunasMarcadas) {
+                chkPadreElement.indeterminate = true;
+            }
 
             ulRaiz.appendChild(liApartado);
         });
@@ -741,16 +750,40 @@
         actualizarVistas();
 
         document.getElementById("contenedorSubvariables")?.addEventListener("change", (e) => {
+            // 1. Si se hace clic en el checkbox PADRE
             if (e.target.classList.contains('chk-padre')) {
                 const parentDetails = e.target.closest('details');
+                // Si el padre pasa a estar marcado/desmarcado, se limpian los estados indeterminados
+                e.target.indeterminate = false;
                 parentDetails.querySelectorAll('.chk-subvar').forEach(h => h.checked = e.target.checked);
             }
+
+            // 2. Si se hace clic en un checkbox HIJO (subvariable)
             if (e.target.classList.contains('chk-subvar')) {
                 const parentDetails = e.target.closest('details');
                 const chkPadre = parentDetails.querySelector('.chk-padre');
                 const hermanos = Array.from(parentDetails.querySelectorAll('.chk-subvar'));
-                if (chkPadre) chkPadre.checked = hermanos.every(h => h.checked);
+
+                if (chkPadre) {
+                    const cuantasMarcadas = hermanos.filter(h => h.checked).length;
+                    const totalHijos = hermanos.length;
+
+                    if (cuantasMarcadas === totalHijos) {
+                        // CASO A: Todas seleccionadas -> Palomita completa
+                        chkPadre.checked = true;
+                        chkPadre.indeterminate = false;
+                    } else if (cuantasMarcadas > 0) {
+                        // CASO B: Una o varias seleccionadas -> Cuadro azul sin palomita
+                        chkPadre.checked = false;
+                        chkPadre.indeterminate = true;
+                    } else {
+                        // CASO C: Ninguna seleccionada -> Vacío
+                        chkPadre.checked = false;
+                        chkPadre.indeterminate = false;
+                    }
+                }
             }
+
             guardarEstadoVariablesActuales();
             window.ejecutarFiltradoSis(300);
         });
