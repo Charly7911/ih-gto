@@ -411,63 +411,111 @@
 
 
     function exportarFiltradoExcel() {
-        // 1. Validar si existen datos filtrados
+        // 1. Verificar si existen datos cargados desde el backend
         if (!datosFiltradosSis || datosFiltradosSis.length === 0) {
-            alert("No hay datos disponibles en la consulta para exportar.");
+            alert("No hay datos disponibles para exportar con los filtros seleccionados.");
             return;
         }
 
-        // 2. Notificación visual rápida en el botón
+        // 2. Feedback visual en el botón
         const btn = document.getElementById("btnExportarExcel");
         const textoOriginal = btn.innerHTML;
-        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Generando Excel...';
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Generando...';
         btn.disabled = true;
 
         try {
-            // 3. Formatear y aplanar los datos para las columnas del Excel
-            const datosParaExcel = datosFiltradosSis.map(r => {
-                return {
-                    "Año": r.anio || '',
-                    "Mes": r.mes || '',
-                    "Jurisdicción": r.jurisdiccion || '',
+            // 3. Obtener el módulo activo seleccionado en el dropdown de la gráfica
+            const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
+
+            // Nombres legibles para las columnas según el módulo activo
+            const nombresModulos = {
+                "consultas": "Consultas",
+                "embarazadas": "Embarazadas",
+                "mental": "Salud Mental",
+                "bucal": "Salud Bucal",
+                "tamiz": "Tamiz",
+                "planificacion_familiar": "Planificación Familiar",
+                "detecciones": "Detecciones",
+                "detecciones_cardiometabolicas": "Detecciones Cardiometabólicas",
+                "orientacion_lac_des_obe": "Orientación Lac/Des/Obe",
+                "orientacion_eda_ira": "Orientación EDA/IRA",
+                "otros": "Otros"
+            };
+
+            // 4. Mapear y filtrar únicamente los datos que responden a los filtros activos
+            const datosParaExcel = [];
+
+            datosFiltradosSis.forEach(r => {
+                // Estructura base de ubicación y tiempo
+                const filaBase = {
+                    "Año": Number(r.anio) || '',
+                    "Mes": Number(r.mes) || '',
+                    "Jurisdicción": r.jurisdiccion || 'Sin Especificar',
                     "Municipio": r.municipio || 'Sin Especificar',
                     "CLUES": r.clues || '-',
-                    "Nombre de Unidad": r.nombre_unidad || '',
-                    "Consultas": Number(r.consultas) || 0,
-                    "Embarazadas": Number(r.embarazadas) || 0,
-                    "Salud Mental": Number(r.mental) || 0,
-                    "Salud Bucal": Number(r.bucal) || 0,
-                    "Tamiz": Number(r.tamiz) || 0,
-                    "Planificación Familiar": Number(r.planificacion_familiar) || 0,
-                    "Detecciones": Number(r.detecciones) || 0,
-                    "Detecciones Cardiometabólicas": Number(r.detecciones_cardiometabolicas) || 0,
-                    "Orientación Lac/Des/Obe": Number(r.orientacion_lac_des_obe) || 0,
-                    "Orientación EDA/IRA": Number(r.orientacion_eda_ira) || 0,
-                    "Otros": Number(r.otros) || 0
+                    "Nombre Unidad": r.nombre_unidad || ''
                 };
+
+                if (moduloActual === "todas") {
+                    // VISTA TODAS: Incluye únicamente columnas con valores mayor a cero
+                    let totalFila = 0;
+                    const camposModulo = [
+                        'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
+                        'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
+                        'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
+                    ];
+
+                    camposModulo.forEach(m => {
+                        const val = Number(r[m]) || 0;
+                        filaBase[nombresModulos[m] || m] = val;
+                        totalFila += val;
+                    });
+
+                    filaBase["Total"] = totalFila;
+
+                    // Solo agregar si la fila tiene datos filtrados mayores a 0
+                    if (totalFila > 0) {
+                        datosParaExcel.push(filaBase);
+                    }
+
+                } else {
+                    // VISTA POR MÓDULO INDIVIDUAL: Exporta sólo el valor de la variable/módulo seleccionado
+                    const valorModulo = Number(r[moduloActual]) || Number(r.total) || Number(r.valor) || 0;
+
+                    if (valorModulo > 0) {
+                        filaBase[nombresModulos[moduloActual] || "Total"] = valorModulo;
+                        datosParaExcel.push(filaBase);
+                    }
+                }
             });
 
-            // 4. Crear el libro de trabajo (Workbook) y la hoja (Worksheet)
+            // 5. Validar que tras el filtrado estricto existan registros
+            if (datosParaExcel.length === 0) {
+                alert("Los filtros aplicados no arrojaron registros con valores mayores a 0.");
+                return;
+            }
+
+            // 6. Crear el archivo Excel con SheetJS
             const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
             const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS");
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS Filtrado");
 
-            // 5. Auto-ajustar ancho de columnas para mejorar la presentación
+            // Auto-ajustar ancho de columnas según el contenido
             const maxAnchos = Object.keys(datosParaExcel[0]).map(key => ({
-                wch: Math.max(key.length + 3, 12)
+                wch: Math.max(key.length + 4, 12)
             }));
             worksheet['!cols'] = maxAnchos;
 
-            // 6. Generar nombre de archivo dinámico con fecha/hora actual
-            const fechaActual = new Date().toISOString().slice(0, 10);
-            const nombreArchivo = `Reporte_SIS_Filtrado_${fechaActual}.xlsx`;
+            // Nombre de archivo descriptivo
+            const fechaDescarga = new Date().toISOString().slice(0, 10);
+            const nombreArchivo = `SIS_Filtrado_${moduloActual}_${fechaDescarga}.xlsx`;
 
-            // 7. Descargar el archivo
+            // Descargar archivo
             XLSX.writeFile(workbook, nombreArchivo);
 
         } catch (error) {
-            console.error("Error al generar el archivo Excel:", error);
-            alert("Ocurrió un error al intentar exportar los datos.");
+            console.error("Error al exportar a Excel:", error);
+            alert("Ocurrió un error al intentar generar el archivo Excel.");
         } finally {
             // Restaurar estado del botón
             btn.innerHTML = textoOriginal;
