@@ -245,7 +245,10 @@ def filtrar_datos_sis():
 
         else:
             select_sums = []
-            params = []
+            params_select = []
+            
+            # Recopilador para la cláusula WHERE global
+            todas_las_variables_activas = set()
 
             # 1. CASO ESPECIAL: Si el usuario seleccionó variables desde la vista "todas"
             vars_todas = variables_seleccionadas.get("todas", [])
@@ -254,16 +257,16 @@ def filtrar_datos_sis():
                 select_sums.append(
                     f"SUM(CASE WHEN sr.variable IN ({placeholders}) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS consultas"
                 )
-                params.extend(vars_todas)
+                params_select.extend(vars_todas)
+                todas_las_variables_activas.update(vars_todas)
 
             # 2. CASO ESTÁNDAR: Procesamiento por módulos individuales (incluyendo 'otros')
             else:
                 def resolver_vars(mod_key):
                     val = variables_seleccionadas.get(mod_key)
                     if val is None:
-                        # Si no viene la clave pero existe un default, lo usamos
-                        return VARIABLES_DEFAULT.get(mod_key, ["__NONE__"])
-                    return val if len(val) > 0 else ["__NONE__"]
+                        return VARIABLES_DEFAULT.get(mod_key, [])
+                    return val if len(val) > 0 else []
 
                 modulos = [
                     "consultas", "mental", "bucal", "embarazadas", 
@@ -274,13 +277,40 @@ def filtrar_datos_sis():
                 vars_map = {m: resolver_vars(m) for m in modulos}
 
                 for mod_key, v_list in vars_map.items():
-                    placeholders = ','.join(['%s'] * len(v_list))
-                    select_sums.append(
-                        f"SUM(CASE WHEN sr.variable IN ({placeholders}) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS {mod_key}"
-                    )
-                    params.extend(v_list)
+                    if v_list:
+                        placeholders = ','.join(['%s'] * len(v_list))
+                        select_sums.append(
+                            f"SUM(CASE WHEN sr.variable IN ({placeholders}) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS {mod_key}"
+                        )
+                        params_select.extend(v_list)
+                        todas_las_variables_activas.update(v_list)
+                    else:
+                        select_sums.append(f"0 AS {mod_key}")
 
-            # Construcción final de la consulta dinámica SQL
+            # Si no hay variables activas válidas para consultar
+            if not todas_las_variables_activas:
+                return jsonify({"status": "success", "data": []})
+
+            # Construcción dinámica del WHERE
+            where_conditions = ["1=1"]
+            params_where = []
+
+            # 🟢 OPTIMIZACIÓN CLAVE: Filtrado directo en el WHERE por lista de variables seleccionadas
+            placeholders_where = ','.join(['%s'] * len(todas_las_variables_activas))
+            where_conditions.append(f"sr.variable IN ({placeholders_where})")
+            params_where.extend(list(todas_las_variables_activas))
+
+            if unidades:
+                placeholders_u = ','.join(['%s'] * len(unidades))
+                where_conditions.append(f"(sr.clues IN ({placeholders_u}) OR cu.nombre_unidad IN ({placeholders_u}))")
+                params_where.extend(unidades + unidades)
+
+            for col, lst in [('sr.jurisdiccion', jurisdicciones), ('sr.municipio', municipios), ('sr.anio', anios), ('sr.mes', meses)]:
+                if lst:
+                    placeholders_l = ','.join(['%s'] * len(lst))
+                    where_conditions.append(f"{col} IN ({placeholders_l})")
+                    params_where.extend(lst)
+
             query_base = f"""
                 SELECT 
                     sr.anio, sr.mes, sr.clues, 
@@ -289,25 +319,15 @@ def filtrar_datos_sis():
                     {', '.join(select_sums)}
                 FROM sis_registros_primer_nivel sr
                 LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
-                WHERE 1=1
-            """
-
-            if unidades:
-                placeholders = ','.join(['%s'] * len(unidades))
-                query_base += f" AND (sr.clues IN ({placeholders}) OR cu.nombre_unidad IN ({placeholders}))"
-                params.extend(unidades + unidades)
-
-            for col, lst in [('sr.jurisdiccion', jurisdicciones), ('sr.municipio', municipios), ('sr.anio', anios), ('sr.mes', meses)]:
-                clausula, vals = _construir_clausula_in(col, lst)
-                query_base += clausula
-                params.extend(vals)
-
-            query_base += """
+                WHERE {" AND ".join(where_conditions)}
                 GROUP BY sr.anio, sr.mes, sr.clues, cu.nombre_unidad, sr.jurisdiccion, sr.municipio
                 ORDER BY sr.anio, sr.mes, sr.clues
             """
 
-            cursor.execute(query_base, params)
+            # Unimos los parámetros del SELECT + los del WHERE
+            params_totales = params_select + params_where
+
+            cursor.execute(query_base, params_totales)
             datos_filtrados = cursor.fetchall() or []
 
         return jsonify({"status": "success", "data": datos_filtrados})
