@@ -99,7 +99,7 @@ def obtener_modulo_por_apartado(apartado_raw, variable_code=""):
     elif apt in ["2", "02"] and var in ['CPP07', 'CPP14']:
         return "mental"
     else:
-        return None  # <--- CORREGIDO: Retorna None si no pertenece a ningún módulo dashboard
+        return "otros" # <--- CORREGIDO: Retorna None si no pertenece a ningún módulo dashboard
 
 
 @sis_pn.route("/")
@@ -197,6 +197,7 @@ def dashboard_sis_primer_nivel():
         title="Reporte SIS - Primer Nivel"
     )
 
+
 @sis_pn.route("/api/filtrar", methods=["POST"])
 @login_required
 @csrf.exempt
@@ -243,24 +244,43 @@ def filtrar_datos_sis():
             datos_filtrados = cursor.fetchall() or []
 
         else:
-            def resolver_vars(mod_key):
-                val = variables_seleccionadas.get(mod_key)
-                if val is None:
-                    return VARIABLES_DEFAULT[mod_key]
-                return val if len(val) > 0 else ["__NONE__"]
-
-            modulos = ["consultas", "mental", "bucal", "embarazadas", "planificacion_familiar", "detecciones", "tamiz", "detecciones_cardiometabolicas", "orientacion_lac_des_obe", "orientacion_eda_ira"]
-            vars_map = {m: resolver_vars(m) for m in modulos}
-
             select_sums = []
             params = []
-            for mod_key, v_list in vars_map.items():
-                placeholders = ','.join(['%s'] * len(v_list))
-                select_sums.append(
-                    f"SUM(CASE WHEN sr.variable IN ({placeholders}) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS {mod_key}"
-                )
-                params.extend(v_list)
 
+            # 1. CASO ESPECIAL: Si el usuario seleccionó variables desde la vista "todas"
+            vars_todas = variables_seleccionadas.get("todas", [])
+            if isinstance(vars_todas, list) and len(vars_todas) > 0:
+                placeholders = ','.join(['%s'] * len(vars_todas))
+                select_sums.append(
+                    f"SUM(CASE WHEN sr.variable IN ({placeholders}) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS consultas"
+                )
+                params.extend(vars_todas)
+
+            # 2. CASO ESTÁNDAR: Procesamiento por módulos individuales (incluyendo 'otros')
+            else:
+                def resolver_vars(mod_key):
+                    val = variables_seleccionadas.get(mod_key)
+                    if val is None:
+                        # Si no viene la clave pero existe un default, lo usamos
+                        return VARIABLES_DEFAULT.get(mod_key, ["__NONE__"])
+                    return val if len(val) > 0 else ["__NONE__"]
+
+                modulos = [
+                    "consultas", "mental", "bucal", "embarazadas", 
+                    "planificacion_familiar", "detecciones", "tamiz", 
+                    "detecciones_cardiometabolicas", "orientacion_lac_des_obe", 
+                    "orientacion_eda_ira", "otros"
+                ]
+                vars_map = {m: resolver_vars(m) for m in modulos}
+
+                for mod_key, v_list in vars_map.items():
+                    placeholders = ','.join(['%s'] * len(v_list))
+                    select_sums.append(
+                        f"SUM(CASE WHEN sr.variable IN ({placeholders}) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS {mod_key}"
+                    )
+                    params.extend(v_list)
+
+            # Construcción final de la consulta dinámica SQL
             query_base = f"""
                 SELECT 
                     sr.anio, sr.mes, sr.clues, 

@@ -159,6 +159,11 @@
     const controlAnual = JSON.parse('{{ (control_anual | default([])) | tojson | safe }}');
     const sisResultadosIniciales = JSON.parse('{{ (resultados | default([])) | tojson | safe }}');
     const DICCIONARIO_VARIABLES = JSON.parse('{{ (catalogo_variables | default({})) | tojson | safe }}');
+
+    if (!DICCIONARIO_VARIABLES["otros"]) {
+        DICCIONARIO_VARIABLES["otros"] = [];
+    }
+
     const VARIABLES_DEFAULT = JSON.parse('{{ (variables_default | default({})) | tojson | safe }}');
 
     const FILAS_POR_PAGINA = 15;
@@ -194,6 +199,7 @@
     }
 
     /* 2. RENDERIZADO DEL ÁRBOL TIPO TREEVIEW */
+
     function renderSubvariables() {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const contenedor = document.getElementById("contenedorSubvariables");
@@ -204,9 +210,9 @@
         const modulosAProcesar = modulo === "todas" ? Object.keys(DICCIONARIO_VARIABLES) : [modulo];
         const mapaApartados = {};
 
-        // Si estamos en la opción "todas", leemos exclusivamente de variablesPersonalizadasEstado["todas"]
         const seleccionadasTodas = modulo === "todas" ? (variablesPersonalizadasEstado["todas"] || []) : null;
 
+        // 1. Recorrer la estructura del catálogo (DICCIONARIO_VARIABLES)
         modulosAProcesar.forEach((modKey) => {
             const estructuraModulo = DICCIONARIO_VARIABLES[modKey] || [];
 
@@ -219,11 +225,12 @@
                 : (variablesPersonalizadasEstado[modKey] || []);
 
             estructuraModulo.forEach((grupo) => {
+                // Limpieza de clave para evitar pérdida por espacios o formateos
                 const keyApartado = String(grupo.apartado).trim();
 
                 if (!mapaApartados[keyApartado]) {
                     mapaApartados[keyApartado] = {
-                        apartado: grupo.apartado,
+                        apartado: keyApartado,
                         descripcion: grupo.descripcion_apartado || '',
                         variables: []
                     };
@@ -241,7 +248,10 @@
             });
         });
 
-        const listaApartados = Object.values(mapaApartados).sort((a, b) => (parseInt(a.apartado, 10) || 0) - (parseInt(b.apartado, 10) || 0));
+        // 2. ORDENAMIENTO NATURAL (Mantiene el orden correcto para '02', '08', '144', etc.)
+        const listaApartados = Object.values(mapaApartados).sort((a, b) => {
+            return a.apartado.localeCompare(b.apartado, undefined, { numeric: true, sensitivity: 'base' });
+        });
 
         let totalVariables = 0;
         const ulRaiz = document.createElement("ul");
@@ -257,22 +267,22 @@
             const estanTodasMarcadas = varsGrupo.length > 0 && varsGrupo.every(v => v.isChecked);
 
             liApartado.innerHTML = `
-            <details class="tree-item">
-                <summary class="d-flex align-items-center gap-2 py-1 user-select-none" style="cursor: pointer;">
-                    <input type="checkbox" class="form-check-input my-0 chk-padre" ${estanTodasMarcadas ? 'checked' : ''}>
-                    <span class="fw-bold text-dark">${grupo.apartado} ${grupo.descripcion}</span>
-                </summary>
-                <ul class="list-unstyled ms-4 ps-2 border-start border-secondary-subtle my-1">
-                    ${varsGrupo.map(v => `
-                        <li class="d-flex align-items-center gap-2 py-1">
-                            <input type="checkbox" class="form-check-input my-0 chk-subvar" data-modulo="${v.modKey}" id="sub_${v.codigo}" value="${v.codigo}" ${v.isChecked ? 'checked' : ''}>
-                            <label for="sub_${v.codigo}" class="mb-0 text-secondary" style="cursor: pointer;">
-                                <strong>${v.codigo}</strong> ${v.nombre}
-                            </label>
-                        </li>
-                    `).join('')}
-                </ul>
-            </details>`;
+        <details class="tree-item">
+            <summary class="d-flex align-items-center gap-2 py-1 user-select-none" style="cursor: pointer;">
+                <input type="checkbox" class="form-check-input my-0 chk-padre" ${estanTodasMarcadas ? 'checked' : ''}>
+                <span class="fw-bold text-dark">Apartado ${grupo.apartado} ${grupo.descripcion ? '— ' + grupo.descripcion : ''}</span>
+            </summary>
+            <ul class="list-unstyled ms-4 ps-2 border-start border-secondary-subtle my-1">
+                ${varsGrupo.map(v => `
+                    <li class="d-flex align-items-center gap-2 py-1">
+                        <input type="checkbox" class="form-check-input my-0 chk-subvar" data-modulo="${v.modKey}" id="sub_${v.codigo}" value="${v.codigo}" ${v.isChecked ? 'checked' : ''}>
+                        <label for="sub_${v.codigo}" class="mb-0 text-secondary" style="cursor: pointer;">
+                            <strong>${v.codigo}</strong> ${v.nombre}
+                        </label>
+                    </li>
+                `).join('')}
+            </ul>
+        </details>`;
 
             ulRaiz.appendChild(liApartado);
         });
@@ -327,7 +337,7 @@
     function agruparDatos(data) {
         const mapa = {};
         const nivelAgrupacion = document.getElementById('selectNivelAgrupacion')?.value || 'clues';
-        const campos = ['consultas', 'embarazadas', 'mental', 'bucal', 'tamiz', 'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas', 'orientacion_lac_des_obe', 'orientacion_eda_ira'];
+        const campos = ['consultas', 'embarazadas', 'mental', 'bucal', 'tamiz', 'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas', 'orientacion_lac_des_obe', 'orientacion_eda_ira','otros'];
 
         for (let i = 0; i < data.length; i++) {
             const r = data[i];
@@ -377,6 +387,10 @@
             ocultarCargandoGrafica();
             return;
         }
+        const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
+        const variablesAPasar = (moduloActual === "todas") 
+            ? { todas: variablesPersonalizadasEstado["todas"] || [] } 
+            : variablesPersonalizadasEstado;
 
         const payload = {
             unidades: window.getUnidadesSeleccionadas?.() || [],
@@ -384,7 +398,7 @@
             municipios: window.getMunicipiosSeleccionados?.() || [],
             anios: window.getAniosSeleccionados?.() || [],
             meses: window.getMesesSeleccionados?.() || [],
-            variables: variablesPersonalizadasEstado
+            variables: variablesAPasar 
         };
 
         try {
