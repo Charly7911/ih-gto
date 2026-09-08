@@ -411,125 +411,54 @@
 
 
     async function exportarFiltradoExcel() {
-        // 1. Feedback visual en el botón
-        const btn = document.getElementById("btnExportarExcel");
-        const textoOriginal = btn ? btn.innerHTML : '';
-        if (btn) {
-            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Consultando datos...';
-            btn.disabled = true;
-        }
+        const payload = {
+            unidades: obtenerUnidadesSeleccionadas(),      // Array []
+            jurisdicciones: obtenerJurisdicciones(),        // Array []
+            municipios: obtenerMunicipios(),              // Array []
+            anios: obtenerAnios(),                        // Array []
+            meses: obtenerMeses(),                        // Array []
+            variables: obtenerVariablesSeleccionadas(),    // Objeto {} o Array []
+            nivel_agrupacion: obtenerNivelAgrupacion()     // String 'clues', 'municipio', 'jurisdiccion'
+        };
 
         try {
-            // 2. Obtener valores de los filtros del DOM
-            const nivelAgrupacion = document.getElementById("nivel_agrupacion")?.value || "clues";
-            const moduloActual = document.getElementById("filtroSisDetalle")?.value || "todas";
+            // Mostrar cargador o deshabilitar botón
+            mostrarSpinner(true);
 
-            // Obtener arrays con los valores seleccionados en los select/multiselect
-            const jurisdicciones = Array.from(document.querySelectorAll('#filtroJurisdiccion option:checked')).map(o => o.value).filter(Boolean);
-            const municipios = Array.from(document.querySelectorAll('#filtroMunicipio option:checked')).map(o => o.value).filter(Boolean);
-            const unidades = Array.from(document.querySelectorAll('#filtroUnidad option:checked')).map(o => o.value).filter(Boolean);
-            const anios = Array.from(document.querySelectorAll('#filtroAnio option:checked')).map(o => o.value).filter(Boolean);
-            const meses = Array.from(document.querySelectorAll('#filtroMes option:checked')).map(o => o.value).filter(Boolean);
-
-            // Obtención de variables seleccionadas desde el scope global o local
-            let varsParaEnviar = {};
-            if (typeof variablesSeleccionadas !== 'undefined' && variablesSeleccionadas) {
-                varsParaEnviar = variablesSeleccionadas;
-            } else if (window.variablesSeleccionadas) {
-                varsParaEnviar = window.variablesSeleccionadas;
-            }
-
-            // 3. Crear el objeto Payload
-            const payload = {
-                nivel_agrupacion: nivelAgrupacion,
-                modulo_activo: moduloActual,
-                jurisdicciones: jurisdicciones,
-                municipios: municipios,
-                unidades: unidades,
-                anios: anios,
-                meses: meses,
-                variables: varsParaEnviar
-            };
-
-            // 4. Hacer la petición al Endpoint detallado en Python
             const response = await fetch('/sis_primer_nivel/api/exportar_excel_detallado', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json'
+                },
                 body: JSON.stringify(payload)
             });
 
-            const res = await response.json();
-
-            // Si el backend devuelve un error explícito (estatus 400 o 500)
-            if (!response.ok || res.status !== "success") {
-                const msjError = res.message || "Error desconocido en el servidor.";
-                console.error("❌ Detalles del error del Servidor:", res);
-                alert(`No se pudo generar la exportación:\n${msjError}`);
-                return;
+            // 2. Si el servidor devuelve un error HTTP (ej: 400, 500)
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.message || `Error del servidor: ${response.status}`);
             }
 
-            // Validar si existen datos
-            if (!res.data || res.data.length === 0) {
-                alert("No se encontraron registros detallados para los filtros y variables seleccionadas.");
-                return;
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                if (result.data.length === 0) {
+                    alert("No se encontraron registros con los filtros seleccionados.");
+                    return;
+                }
+
+                // 3. Generar / Descargar el Excel con la librería XLSX o Blob
+                generarArchivoExcel(result.data);
+
+            } else {
+                alert(`Error: ${result.message}`);
             }
-
-            // 5. Mapear la respuesta para generar la estructura de Excel
-            const datosParaExcel = res.data.map(r => {
-                const fila = {
-                    "Año": Number(r.anio) || '',
-                    "Mes": Number(r.mes) || '',
-                    "Jurisdicción": r.jurisdiccion || 'Sin Especificar'
-                };
-
-                // Municipio (si aplica por agrupación)
-                if (nivelAgrupacion === "municipio" || nivelAgrupacion === "clues") {
-                    fila["Municipio"] = (r.municipio && r.municipio !== 'N/A') ? r.municipio : 'Sin Especificar';
-                }
-
-                // CLUES y Nombre Unidad (si aplica por agrupación)
-                if (nivelAgrupacion === "clues") {
-                    fila["CLUES"] = (r.clues && r.clues !== 'N/A') ? r.clues : '-';
-                    fila["Nombre Unidad"] = (r.nombre_unidad && r.nombre_unidad !== 'N/A') ? r.nombre_unidad : '';
-                }
-
-                // Columnas de variables y apartados
-                fila["Apartado"] = r.apartado || 'S/A';
-                fila["Descripción Apartado"] = r.descripcion_apartado || 'Sin Apartado';
-                fila["Variable"] = r.variable || '';
-                fila["Descripción Variable"] = r.descripcion_variable || '';
-                fila["Total"] = Number(r.total) || 0;
-
-                return fila;
-            });
-
-            // 6. Generar el libro Excel con SheetJS
-            const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Detalle SIS");
-
-            // Auto-ajustar ancho de columnas dinámicamente
-            const maxAnchos = Object.keys(datosParaExcel[0]).map(key => ({
-                wch: Math.max(key.length + 4, 12)
-            }));
-            worksheet['!cols'] = maxAnchos;
-
-            // Nombre de archivo dinámico
-            const fechaDescarga = new Date().toISOString().slice(0, 10);
-            const nombreArchivo = `SIS_Detallado_${nivelAgrupacion.toUpperCase()}_${moduloActual}_${fechaDescarga}.xlsx`;
-
-            // Descargar archivo
-            XLSX.writeFile(workbook, nombreArchivo);
 
         } catch (error) {
-            console.error("❌ Error al exportar a Excel:", error);
-            alert("Ocurrió un error al intentar procesar la exportación detallada.");
+            console.error("❌ Error en la exportación:", error);
+            alert(`Ocurrió un error al generar la exportación: ${error.message}`);
         } finally {
-            // Restaurar estado del botón
-            if (btn) {
-                btn.innerHTML = textoOriginal;
-                btn.disabled = false;
-            }
+            mostrarSpinner(false);
         }
     }
 

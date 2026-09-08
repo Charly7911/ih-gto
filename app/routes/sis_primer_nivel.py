@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required
 from flask_mysqldb import MySQLdb
+import traceback
 from app import mysql, csrf
 
 sis_pn = Blueprint('sis_pn', __name__, url_prefix='/sis_primer_nivel')
@@ -194,10 +195,8 @@ def dashboard_sis_primer_nivel():
     )
 
 
-
 @sis_pn.route("/api/filtrar", methods=["POST"])
 @login_required
-@csrf.exempt
 def filtrar_datos_sis():
     data = request.get_json(silent=True) or {}
 
@@ -207,14 +206,11 @@ def filtrar_datos_sis():
     anios = [int(a) for a in data.get("anios", []) if str(a).isdigit()]
     meses = [int(m) for m in data.get("meses", []) if str(m).isdigit()]
     variables_seleccionadas = data.get("variables", {}) or {}
-    
-    # 🟢 1. CAPTURAR EL NIVEL DE AGRUPACIÓN DEL FRONTEND
     nivel_agrupacion = data.get("nivel_agrupacion", "clues")
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
-        # 🟢 2. CONFIGURAR COLUMNAS DINÁMICAS SEGÚN AGRUPACIÓN ELEGIDA
         if nivel_agrupacion == "jurisdiccion":
             select_geo = "sr.anio, sr.mes, sr.jurisdiccion, 'N/A' AS municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
             group_geo = "sr.anio, sr.mes, sr.jurisdiccion"
@@ -226,7 +222,6 @@ def filtrar_datos_sis():
             select_geo_agregados = "anio, mes, jurisdiccion, municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
             group_geo_agregados = "anio, mes, jurisdiccion, municipio"
         else:
-            # Opción 'clues' o por defecto
             select_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, sr.clues, COALESCE(cu.nombre_unidad, sr.clues) AS nombre_unidad"
             group_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, sr.clues, cu.nombre_unidad"
             select_geo_agregados = "anio, mes, jurisdiccion, municipio, clues, nombre_unidad"
@@ -236,7 +231,6 @@ def filtrar_datos_sis():
             isinstance(v, list) and len(v) > 0 for v in variables_seleccionadas.values()
         )
 
-        # CASO A: TABLA PRE-AGREGADA (SIN VARIABLES PERSONALIZADAS)
         if not tiene_variables_custom:
             query_base = f"""
                 SELECT 
@@ -266,7 +260,6 @@ def filtrar_datos_sis():
             cursor.execute(query_base, params)
             datos_filtrados = cursor.fetchall() or []
 
-        # CASO B: TABLA DETALLADA (CON FILTRADO DE VARIABLES ESPECÍFICAS)
         else:
             select_sums = []
             params_select = []
@@ -347,20 +340,17 @@ def filtrar_datos_sis():
 
     except Exception as e:
         print(f"❌ Error en API /api/filtrar: {str(e)}")
-        return jsonify({"status": "error", "message": f"Error al procesar la consulta: {str(e)}"}), 400
+        return jsonify({"status": "error", "message": f"Error al procesar la consulta: {str(e)}"}), 500
 
     finally:
         cursor.close()
 
 
-
 @sis_pn.route("/api/exportar_excel_detallado", methods=["POST"])
 @login_required
-@csrf.exempt
 def exportar_excel_detallado():
     data = request.get_json(silent=True) or {}
 
-    # Convertir filtros a tipos de datos compatibles con la BD
     unidades = [str(u).strip() for u in data.get("unidades", []) if u]
     jurisdicciones = [int(j) for j in data.get("jurisdicciones", []) if str(j).isdigit()]
     municipios = [str(m).strip() for m in data.get("municipios", []) if m]
@@ -373,7 +363,6 @@ def exportar_excel_detallado():
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
-        # 1. Configuración dinámica según Nivel de Agrupación
         if nivel_agrupacion == "jurisdiccion":
             select_geo = "sr.jurisdiccion, 'N/A' AS municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
             group_geo = "sr.jurisdiccion"
@@ -384,11 +373,9 @@ def exportar_excel_detallado():
             select_geo = "sr.jurisdiccion, sr.municipio, sr.clues, COALESCE(cu.nombre_unidad, sr.clues) AS nombre_unidad"
             group_geo = "sr.jurisdiccion, sr.municipio, sr.clues, cu.nombre_unidad"
 
-        # 2. Construcción dinámica de condiciones WHERE
         where_conditions = ["1=1"]
         params = []
 
-        # Extraer variables seleccionadas del objeto
         todas_vars = set()
         if isinstance(variables_seleccionadas, dict):
             for m_key, v_list in variables_seleccionadas.items():
@@ -401,14 +388,12 @@ def exportar_excel_detallado():
             for v in variables_seleccionadas:
                 if v: todas_vars.add(str(v).strip())
 
-        # Aplicar filtro WHERE IN para variables
         if todas_vars:
             lista_vars = list(todas_vars)
             placeholders_v = ','.join(['%s'] * len(lista_vars))
             where_conditions.append(f"sr.variable IN ({placeholders_v})")
             params.extend(lista_vars)
 
-        # Aplicar filtros de localización y tiempo con cast adecuado
         if unidades:
             placeholders_u = ','.join(['%s'] * len(unidades))
             where_conditions.append(f"(sr.clues IN ({placeholders_u}) OR cu.nombre_unidad IN ({placeholders_u}))")
@@ -434,7 +419,7 @@ def exportar_excel_detallado():
             where_conditions.append(f"sr.mes IN ({placeholders_mes})")
             params.extend(meses)
 
-        # 3. Consulta SQL directa optimizada
+        # Consulta SQL corregida para evitar errores 400 por sintaxis/ambigüedad
         query = f"""
             SELECT 
                 sr.anio,
@@ -457,8 +442,8 @@ def exportar_excel_detallado():
                 COALESCE(cv.descripcion_apartado, 'Sin Apartado'), 
                 sr.variable, 
                 COALESCE(cv.descripcion, sr.variable)
-            HAVING total > 0
-            ORDER BY sr.anio, sr.mes, sr.jurisdiccion, apartado, sr.variable
+            HAVING SUM(sr.total) > 0
+            ORDER BY sr.anio, sr.mes, sr.jurisdiccion, sr.apartado, sr.variable
         """
 
         cursor.execute(query, params)
@@ -467,9 +452,15 @@ def exportar_excel_detallado():
         return jsonify({"status": "success", "data": resultados})
 
     except Exception as e:
-        import traceback
         error_detallado = traceback.format_exc()
         print(f"❌ Error al exportar Excel detallado:\n{error_detallado}")
         return jsonify({"status": "error", "message": str(e), "trace": error_detallado}), 500
     finally:
         cursor.close()
+
+# Eximir rutas de CSRF de forma compatible con Flask-WTF
+try:
+    csrf.exempt(filtrar_datos_sis)
+    csrf.exempt(exportar_excel_detallado)
+except Exception:
+    pass
