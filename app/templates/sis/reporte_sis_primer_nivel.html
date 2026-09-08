@@ -845,64 +845,65 @@
         let labels = [];
         let datasets = [];
 
-        // 🟢 EVALUAR SI SE DESGLOSA POR APARTADO
         // 🟢 MODO DESGLOSADO POR APARTADO
         if (modoDesglose === "por_apartado") {
             const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
-
-            // Helper para obtener el nombre real del apartado del objeto 'r'
-            const resolverNombreApartado = (r) => {
-                // Busca cualquier propiedad común donde venga la etiqueta del apartado
-                const textoBD = r.descripcion_apartado || r.apartado || r.nombre_apartado || r.seccion || r.modulo || r.concepto;
-                if (textoBD) return textoBD;
-
-                // Si no hay texto, busca en los campos numéricos de la estructura antigua
-                for (const c of camposApartados) {
-                    if (Number(r[c]) > 0) return etiquetasNombres[c] || c;
-                }
-                return "Otros / Sin Clasificar";
-            };
-
-            // Helper para extraer el valor numérico
-            const resolverValor = (r, claveCampo = null) => {
-                if (claveCampo && r[claveCampo] !== undefined) return Number(r[claveCampo]) || 0;
-                return Number(r.total || r.valor || r.suma || r.monto || r.cantidad || 0);
-            };
 
             if (tipoVista === 'anio') {
                 const apartadosAnual = {};
 
                 data.forEach(r => {
-                    const labelKey = resolverNombreApartado(r);
-                    const val = resolverValor(r);
-                    if (val > 0) {
-                        apartadosAnual[labelKey] = (apartadosAnual[labelKey] || 0) + val;
+                    // Estructura A: Propiedades por columna (consultas, mental, etc.)
+                    camposApartados.forEach(campo => {
+                        const val = Number(r[campo]) || 0;
+                        if (val > 0) {
+                            const label = etiquetasNombres[campo] || campo;
+                            apartadosAnual[label] = (apartadosAnual[label] || 0) + val;
+                        }
+                    });
+
+                    // Estructura B: Propiedades por fila/texto desde BD
+                    const nombreTexto = r.descripcion_apartado || r.apartado || r.nombre_apartado || r.seccion;
+                    const valTexto = Number(r.total || r.valor || r.suma || 0);
+                    if (nombreTexto && valTexto > 0) {
+                        apartadosAnual[nombreTexto] = (apartadosAnual[nombreTexto] || 0) + valTexto;
                     }
                 });
 
                 labels = Object.keys(apartadosAnual);
                 const valores = labels.map(k => Math.round(apartadosAnual[k]));
 
-                if (valores.length === 0) return;
-
-                datasets = [{
-                    label: 'Total por Apartado',
-                    data: valores,
-                    backgroundColor: paletaColores.slice(0, labels.length)
-                }];
+                if (valores.length > 0) {
+                    datasets = [{
+                        label: 'Total por Apartado',
+                        data: valores,
+                        backgroundColor: paletaColores.slice(0, labels.length)
+                    }];
+                }
             } else {
                 labels = Object.values(mesesNombres);
                 const apartadosMes = {};
 
                 data.forEach(r => {
-                    if (!r.mes) return;
-                    const mesNum = Number(r.mes);
-                    const labelKey = resolverNombreApartado(r);
-                    const val = resolverValor(r);
+                    const mesNum = Number(r.mes || r.id_mes || r.num_mes);
+                    if (!mesNum || mesNum < 1 || mesNum > 12) return;
 
-                    if (val > 0) {
-                        if (!apartadosMes[labelKey]) apartadosMes[labelKey] = {};
-                        apartadosMes[labelKey][mesNum] = (apartadosMes[labelKey][mesNum] || 0) + val;
+                    // Estructura A: Evaluación por columnas clave
+                    camposApartados.forEach(campo => {
+                        const val = Number(r[campo]) || 0;
+                        if (val > 0) {
+                            const label = etiquetasNombres[campo] || campo;
+                            if (!apartadosMes[label]) apartadosMes[label] = {};
+                            apartadosMes[label][mesNum] = (apartadosMes[label][mesNum] || 0) + val;
+                        }
+                    });
+
+                    // Estructura B: Evaluación por texto dinámico de BD
+                    const nombreTexto = r.descripcion_apartado || r.apartado || r.nombre_apartado || r.seccion;
+                    const valTexto = Number(r.total || r.valor || r.suma || 0);
+                    if (nombreTexto && valTexto > 0) {
+                        if (!apartadosMes[nombreTexto]) apartadosMes[nombreTexto] = {};
+                        apartadosMes[nombreTexto][mesNum] = (apartadosMes[nombreTexto][mesNum] || 0) + valTexto;
                     }
                 });
 
@@ -915,9 +916,10 @@
                     pointRadius: 4,
                     fill: false
                 }));
-
-                if (!datasets.some(ds => ds.data.some(v => v > 0))) return;
             }
+
+            // Si no hay valores mayor a 0 en ningún dataset, abortar renderizado sin romper la vista
+            if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
         }
         // 🟡 MODO ACUMULADO
         else {
