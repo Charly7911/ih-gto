@@ -358,14 +358,14 @@ def filtrar_datos_sis():
 def exportar_excel_detallado():
     data = request.get_json(silent=True) or {}
 
-    unidades = data.get("unidades", []) or []
-    jurisdicciones = data.get("jurisdicciones", []) or []
-    municipios = data.get("municipios", []) or []
+    unidades = [str(u) for u in data.get("unidades", []) if u]
+    jurisdicciones = [str(j) for j in data.get("jurisdicciones", []) if j]
+    municipios = [str(m) for m in data.get("municipios", []) if m]
     anios = [int(a) for a in data.get("anios", []) if str(a).isdigit()]
     meses = [int(m) for m in data.get("meses", []) if str(m).isdigit()]
     variables_seleccionadas = data.get("variables", {}) or {}
-    nivel_agrupacion = data.get("nivel_agrupacion", "clues")
-    modulo_activo = data.get("modulo_activo", "todas")
+    nivel_agrupacion = str(data.get("nivel_agrupacion", "clues")).lower()
+    modulo_activo = str(data.get("modulo_activo", "todas")).lower()
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
@@ -385,23 +385,31 @@ def exportar_excel_detallado():
         where_conditions = ["1=1"]
         params = []
 
-        # Determinar el conjunto de variables a filtrar
+        # Extraer dinámicamente las variables de los checklists
         todas_vars = set()
-
-        # 🟢 Si se seleccionó un módulo específico y no es "todas"
-        if modulo_activo and modulo_activo != "todas":
-            vars_del_modulo = variables_seleccionadas.get(modulo_activo, []) or VARIABLES_DEFAULT.get(modulo_activo, [])
-            if vars_del_modulo:
-                todas_vars.update(vars_del_modulo)
-        elif isinstance(variables_seleccionadas, dict):
+        if isinstance(variables_seleccionadas, dict):
             for m_key, v_list in variables_seleccionadas.items():
                 if isinstance(v_list, list):
-                    todas_vars.update(v_list)
+                    for v in v_list:
+                        if v: todas_vars.add(str(v).strip())
+                elif isinstance(v_list, bool) and v_list:
+                    todas_vars.add(str(m_key).strip())
+        elif isinstance(variables_seleccionadas, list):
+            for v in variables_seleccionadas:
+                if v: todas_vars.add(str(v).strip())
 
+        # Si el usuario eligió un módulo específico pero no hay checklist personalizado
+        if not todas_vars and modulo_activo != "todas":
+            vars_def = VARIABLES_DEFAULT.get(modulo_activo, [])
+            for v in vars_def:
+                todas_vars.add(str(v).strip())
+
+        # Aplicar filtro WHERE IN de variables solo si existen
         if todas_vars:
-            placeholders_v = ','.join(['%s'] * len(todas_vars))
+            lista_vars = list(todas_vars)
+            placeholders_v = ','.join(['%s'] * len(lista_vars))
             where_conditions.append(f"sr.variable IN ({placeholders_v})")
-            params.extend(list(todas_vars))
+            params.extend(lista_vars)
 
         if unidades:
             placeholders_u = ','.join(['%s'] * len(unidades))
@@ -414,7 +422,7 @@ def exportar_excel_detallado():
                 where_conditions.append(f"{col} IN ({placeholders_l})")
                 params.extend(lst)
 
-        # Consulta SQL con JOIN al catálogo de variables para traer apartado y descripciones
+        # Consulta SQL con JOIN al catálogo de variables
         query = f"""
             SELECT 
                 sr.anio,
@@ -440,7 +448,10 @@ def exportar_excel_detallado():
         return jsonify({"status": "success", "data": resultados})
 
     except Exception as e:
-        print(f"❌ Error al exportar Excel: {str(e)}")
+        print(f"❌ Error al exportar Excel detallado: {str(e)}")
+        # Imprimir traza completa en la consola de Flask para diagnóstico
+        import traceback
+        traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 400
     finally:
         cursor.close()
