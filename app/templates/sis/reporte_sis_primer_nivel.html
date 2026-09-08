@@ -807,55 +807,32 @@
 
         if (!data || data.length === 0) return;
 
-        const camposApartados = [
-            'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
-            'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
-            'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
+        // Paleta de colores variada para múltiples líneas/apartados
+        const paletaColores = [
+            '#2b5c8f', '#d9534f', '#20c997', '#f0ad4e', '#6f42c1',
+            '#e83e8c', '#17a2b8', '#fd7e14', '#6c757d', '#343a40'
         ];
-
-        const etiquetasNombres = {
-            consultas: 'Consultas',
-            embarazadas: 'Embarazadas',
-            mental: 'Salud Mental',
-            bucal: 'Salud Bucal',
-            tamiz: 'Tamiz',
-            planificacion_familiar: 'Planif. Familiar',
-            detecciones: 'Detecciones',
-            detecciones_cardiometabolicas: 'Detecciones Card.',
-            orientacion_lac_des_obe: 'Orient. Lac/Des/Obe',
-            orientacion_eda_ira: 'Orient. EDA/IRA',
-            otros: 'Otros'
-        };
-
-        const sumarCategorias = (r) => {
-            if (modulo === "todas") {
-                let suma = 0;
-                camposApartados.forEach(c => { suma += Number(r[c]) || 0; });
-                return suma || Number(r.total || r.valor || 0);
-            }
-            return Number(r[modulo]) || Number(r.total) || Number(r.valor) || 0;
-        };
 
         let labels = [];
         let datasets = [];
-        const paletaColores = ['#4E79A7', '#59A14F', '#F28E2B', '#E15759', '#76B7B2', '#EDC948', '#B07AA1', '#9C755F', '#FF9DA7', '#9D7660', '#BAB0AC'];
 
-        // 🟢 MODO DESGLOSADO POR APARTADO (SOLO EN "TODAS")
+        // 🟢 MODO DESGLOSADO REAL POR APARTADO (DINÁMICO SEGÚN TU BD)
         if (modulo === "todas" && modoDesglose === "por_apartado") {
             if (tipoVista === 'anio') {
                 const apartadosAnual = {};
+
                 data.forEach(r => {
-                    camposApartados.forEach(campo => {
-                        const val = Number(r[campo]) || 0;
-                        if (val > 0) {
-                            if (!apartadosAnual[campo]) apartadosAnual[campo] = 0;
-                            apartadosAnual[campo] += val;
-                        }
-                    });
+                    // Obtener el nombre del apartado proveniente del backend/BD
+                    const nombreApartado = r.descripcion_apartado || r.apartado || "Sin Apartado";
+                    const val = Number(r.total || r.valor || 0);
+
+                    if (val > 0) {
+                        apartadosAnual[nombreApartado] = (apartadosAnual[nombreApartado] || 0) + val;
+                    }
                 });
 
-                labels = Object.keys(apartadosAnual).map(k => etiquetasNombres[k] || k);
-                const valores = Object.keys(apartadosAnual).map(k => Math.round(apartadosAnual[k]));
+                labels = Object.keys(apartadosAnual);
+                const valores = labels.map(k => Math.round(apartadosAnual[k]));
 
                 if (valores.length === 0) return;
 
@@ -869,20 +846,25 @@
                 labels = Object.values(mesesNombres);
 
                 const apartadosMes = {};
+
                 data.forEach(r => {
                     if (!r.mes) return;
-                    camposApartados.forEach(campo => {
-                        const val = Number(r[campo]) || 0;
-                        if (val > 0) {
-                            if (!apartadosMes[campo]) apartadosMes[campo] = {};
-                            apartadosMes[campo][Number(r.mes)] = (apartadosMes[campo][Number(r.mes)] || 0) + val;
-                        }
-                    });
+                    // Obtener la clave real del apartado registrado
+                    const nombreApartado = r.descripcion_apartado || r.apartado || "Sin Apartado";
+                    const val = Number(r.total || r.valor || 0);
+
+                    if (!apartadosMes[nombreApartado]) {
+                        apartadosMes[nombreApartado] = {};
+                    }
+
+                    const mesNum = Number(r.mes);
+                    apartadosMes[nombreApartado][mesNum] = (apartadosMes[nombreApartado][mesNum] || 0) + val;
                 });
 
-                datasets = Object.keys(apartadosMes).map((campo, index) => ({
-                    label: etiquetasNombres[campo] || campo,
-                    data: Array.from({ length: 12 }, (_, i) => Math.round(apartadosMes[campo][i + 1] || 0)),
+                // Generar un Dataset (Línea) independiente por cada apartado encontrado
+                datasets = Object.keys(apartadosMes).map((apartadoKey, index) => ({
+                    label: apartadoKey,
+                    data: Array.from({ length: 12 }, (_, i) => Math.round(apartadosMes[apartadoKey][i + 1] || 0)),
                     borderColor: paletaColores[index % paletaColores.length],
                     backgroundColor: paletaColores[index % paletaColores.length],
                     tension: 0.3,
@@ -893,8 +875,10 @@
                 if (!datasets.some(ds => ds.data.some(v => v > 0))) return;
             }
         }
-        // 🟡 MODO TRADICIONAL (ACUMULADO POR AÑO / MÓDULO ÚNICO)
+        // 🟡 MODO ACUMULADO O POR AÑO
         else {
+            const sumarCategorias = (r) => Number(r.total || r.valor || 0);
+
             if (tipoVista === 'anio') {
                 const acumuladoAnual = {};
                 data.forEach(r => {
@@ -937,8 +921,9 @@
             }
         }
 
+        // Dibujar la gráfica
         graficaSisMensual = new Chart(ctx, {
-            type: (tipoVista === 'anio' || (modulo === "todas" && modoDesglose === "por_apartado" && tipoVista === 'anio')) ? 'bar' : 'line',
+            type: tipoVista === 'anio' ? 'bar' : 'line',
             data: { labels, datasets },
             options: {
                 responsive: true,
@@ -946,14 +931,14 @@
                 animation: false,
                 scales: { y: { beginAtZero: true, ticks: { callback: v => typeof fmt === "function" ? fmt(v) : v } } },
                 plugins: {
-                    legend: { display: true },
+                    legend: { display: true, position: 'top' },
                     datalabels: {
-                        display: () => (typeof mostrarValoresMensual !== 'undefined' ? mostrarValoresMensual : true) || tipoVista === 'anio',
-                        anchor: tipoVista === 'anio' ? 'center' : 'end',
-                        align: tipoVista === 'anio' ? 'center' : 'top',
-                        color: tipoVista === 'anio' ? '#ffffff' : '#333333',
+                        display: () => (typeof mostrarValoresMensual !== 'undefined' ? mostrarValoresMensual : true),
+                        anchor: 'end',
+                        align: 'top',
+                        color: '#333333',
                         formatter: (val) => (val > 0 && typeof fmt === "function") ? fmt(val) : (val > 0 ? val : ''),
-                        font: { size: 10, weight: 'bold' }
+                        font: { size: 9, weight: 'bold' }
                     }
                 }
             }
