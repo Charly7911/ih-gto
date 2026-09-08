@@ -350,4 +350,3 @@ def filtrar_datos_sis():
 
     finally:
         cursor.close()
-
