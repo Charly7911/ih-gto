@@ -833,7 +833,6 @@
             otros: 'Otros'
         };
 
-        // Helper universal para extraer la suma total de un registro
         const obtenerSumaFila = (r) => {
             if (modulo === "todas") {
                 let sumaCampos = 0;
@@ -846,27 +845,28 @@
         let labels = [];
         let datasets = [];
 
-        // 🟢 MODO DESGLOSADO POR APARTADO (AL ELEGIR "TODAS" + "POR APARTADO")
-        if (modulo === "todas" && modoDesglose === "por_apartado") {
+        // 🟢 EVALUAR SI SE DESGLOSA POR APARTADO
+        if (modoDesglose === "por_apartado") {
             const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
             if (tipoVista === 'anio') {
                 const apartadosAnual = {};
 
                 data.forEach(r => {
-                    // Opción A: Viene estructurado por columnas clave (consultas, mental...)
-                    camposApartados.forEach(campo => {
-                        const val = Number(r[campo]) || 0;
-                        if (val > 0) {
-                            const labelApartado = etiquetasNombres[campo] || campo;
-                            apartadosAnual[labelApartado] = (apartadosAnual[labelApartado] || 0) + val;
-                        }
-                    });
+                    if (modulo === "todas") {
+                        camposApartados.forEach(campo => {
+                            const val = Number(r[campo]) || 0;
+                            if (val > 0) {
+                                const labelApartado = etiquetasNombres[campo] || campo;
+                                apartadosAnual[labelApartado] = (apartadosAnual[labelApartado] || 0) + val;
+                            }
+                        });
+                    }
 
-                    // Opción B: Viene estructurado por texto en descripcion_apartado
-                    const nombreTexto = r.descripcion_apartado || r.apartado;
-                    if (nombreTexto && Number(r.total || r.valor)) {
-                        apartadosAnual[nombreTexto] = (apartadosAnual[nombreTexto] || 0) + Number(r.total || r.valor);
+                    const nombreTexto = r.descripcion_apartado || r.apartado || r.seccion;
+                    const valTotal = Number(r.total || r.valor || r.suma || 0);
+                    if (nombreTexto && valTotal > 0) {
+                        apartadosAnual[nombreTexto] = (apartadosAnual[nombreTexto] || 0) + valTotal;
                     }
                 });
 
@@ -888,19 +888,19 @@
                     if (!r.mes) return;
                     const mesNum = Number(r.mes);
 
-                    // Opción A: Extraer de propiedades tipo módulo (r.consultas, etc.)
-                    camposApartados.forEach(campo => {
-                        const val = Number(r[campo]) || 0;
-                        if (val > 0) {
-                            const labelKey = etiquetasNombres[campo] || campo;
-                            if (!apartadosMes[labelKey]) apartadosMes[labelKey] = {};
-                            apartadosMes[labelKey][mesNum] = (apartadosMes[labelKey][mesNum] || 0) + val;
-                        }
-                    });
+                    if (modulo === "todas") {
+                        camposApartados.forEach(campo => {
+                            const val = Number(r[campo]) || 0;
+                            if (val > 0) {
+                                const labelKey = etiquetasNombres[campo] || campo;
+                                if (!apartadosMes[labelKey]) apartadosMes[labelKey] = {};
+                                apartadosMes[labelKey][mesNum] = (apartadosMes[labelKey][mesNum] || 0) + val;
+                            }
+                        });
+                    }
 
-                    // Opción B: Extraer de texto de la BD (r.descripcion_apartado)
-                    const nombreTexto = r.descripcion_apartado || r.apartado;
-                    const valTotal = Number(r.total || r.valor || 0);
+                    const nombreTexto = r.descripcion_apartado || r.apartado || r.seccion;
+                    const valTotal = Number(r.total || r.valor || r.suma || 0);
                     if (nombreTexto && valTotal > 0) {
                         if (!apartadosMes[nombreTexto]) apartadosMes[nombreTexto] = {};
                         apartadosMes[nombreTexto][mesNum] = (apartadosMes[nombreTexto][mesNum] || 0) + valTotal;
@@ -920,7 +920,7 @@
                 if (!datasets.some(ds => ds.data.some(v => v > 0))) return;
             }
         }
-        // 🟡 MODO NORMAL / ACUMULADO POR AÑO (VISTA GENERAL ORIGINAL)
+        // 🟡 MODO ACUMULADO
         else {
             const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
