@@ -345,7 +345,6 @@ def filtrar_datos_sis():
     finally:
         cursor.close()
 
-
 @sis_pn.route("/api/exportar_excel_detallado", methods=["POST"])
 @login_required
 def exportar_excel_detallado():
@@ -363,6 +362,9 @@ def exportar_excel_detallado():
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
+        # 🟢 FIX CRÍTICO 1: Normalizar el collation de la sesión de MySQL
+        cursor.execute("SET NAMES utf8mb4 COLLATE utf8mb4_general_ci;")
+
         if nivel_agrupacion == "jurisdiccion":
             select_geo = "sr.jurisdiccion, 'N/A' AS municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
             group_geo = "sr.jurisdiccion"
@@ -391,12 +393,14 @@ def exportar_excel_detallado():
         if todas_vars:
             lista_vars = list(todas_vars)
             placeholders_v = ','.join(['%s'] * len(lista_vars))
-            where_conditions.append(f"sr.variable IN ({placeholders_v})")
+            # 🟢 FIX CRÍTICO 2: Forzar collation en comparaciones de variables
+            where_conditions.append(f"sr.variable COLLATE utf8mb4_general_ci IN ({placeholders_v})")
             params.extend(lista_vars)
 
         if unidades:
             placeholders_u = ','.join(['%s'] * len(unidades))
-            where_conditions.append(f"(sr.clues IN ({placeholders_u}) OR cu.nombre_unidad IN ({placeholders_u}))")
+            # 🟢 FIX CRÍTICO 3: Forzar collation en comparaciones de CLUES/Nombre
+            where_conditions.append(f"(sr.clues COLLATE utf8mb4_general_ci IN ({placeholders_u}) OR cu.nombre_unidad COLLATE utf8mb4_general_ci IN ({placeholders_u}))")
             params.extend(unidades + unidades)
 
         if jurisdicciones:
@@ -406,7 +410,7 @@ def exportar_excel_detallado():
 
         if municipios:
             placeholders_m = ','.join(['%s'] * len(municipios))
-            where_conditions.append(f"sr.municipio IN ({placeholders_m})")
+            where_conditions.append(f"sr.municipio COLLATE utf8mb4_general_ci IN ({placeholders_m})")
             params.extend(municipios)
 
         if anios:
@@ -419,7 +423,7 @@ def exportar_excel_detallado():
             where_conditions.append(f"sr.mes IN ({placeholders_mes})")
             params.extend(meses)
 
-        # Consulta SQL corregida para evitar errores 400 por sintaxis/ambigüedad
+        # 🟢 FIX CRÍTICO 4: Forzar collation explícito en las cláusulas LEFT JOIN
         query = f"""
             SELECT 
                 sr.anio,
@@ -431,8 +435,10 @@ def exportar_excel_detallado():
                 COALESCE(cv.descripcion, sr.variable) AS descripcion_variable,
                 SUM(sr.total) AS total
             FROM sis_registros_primer_nivel sr
-            LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
-            LEFT JOIN catalogo_variables cv ON sr.variable = cv.variable
+            LEFT JOIN catalogo_unidades_primer_nivel cu 
+                ON sr.clues COLLATE utf8mb4_general_ci = cu.clues COLLATE utf8mb4_general_ci
+            LEFT JOIN catalogo_variables cv 
+                ON sr.variable COLLATE utf8mb4_general_ci = cv.variable COLLATE utf8mb4_general_ci
             WHERE {" AND ".join(where_conditions)}
             GROUP BY 
                 sr.anio, 
@@ -457,10 +463,3 @@ def exportar_excel_detallado():
         return jsonify({"status": "error", "message": str(e), "trace": error_detallado}), 500
     finally:
         cursor.close()
-
-# Eximir rutas de CSRF de forma compatible con Flask-WTF
-try:
-    csrf.exempt(filtrar_datos_sis)
-    csrf.exempt(exportar_excel_detallado)
-except Exception:
-    pass
