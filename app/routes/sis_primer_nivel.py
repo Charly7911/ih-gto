@@ -1,7 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required
 from flask_mysqldb import MySQLdb
-import traceback
 from app import mysql, csrf
 
 sis_pn = Blueprint('sis_pn', __name__, url_prefix='/sis_primer_nivel')
@@ -197,6 +196,7 @@ def dashboard_sis_primer_nivel():
 
 @sis_pn.route("/api/filtrar", methods=["POST"])
 @login_required
+@csrf.exempt
 def filtrar_datos_sis():
     data = request.get_json(silent=True) or {}
 
@@ -206,11 +206,14 @@ def filtrar_datos_sis():
     anios = [int(a) for a in data.get("anios", []) if str(a).isdigit()]
     meses = [int(m) for m in data.get("meses", []) if str(m).isdigit()]
     variables_seleccionadas = data.get("variables", {}) or {}
+    
+    # 🟢 1. CAPTURAR EL NIVEL DE AGRUPACIÓN DEL FRONTEND
     nivel_agrupacion = data.get("nivel_agrupacion", "clues")
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
+        # 🟢 2. CONFIGURAR COLUMNAS DINÁMICAS SEGÚN AGRUPACIÓN ELEGIDA
         if nivel_agrupacion == "jurisdiccion":
             select_geo = "sr.anio, sr.mes, sr.jurisdiccion, 'N/A' AS municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
             group_geo = "sr.anio, sr.mes, sr.jurisdiccion"
@@ -222,6 +225,7 @@ def filtrar_datos_sis():
             select_geo_agregados = "anio, mes, jurisdiccion, municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
             group_geo_agregados = "anio, mes, jurisdiccion, municipio"
         else:
+            # Opción 'clues' o por defecto
             select_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, sr.clues, COALESCE(cu.nombre_unidad, sr.clues) AS nombre_unidad"
             group_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, sr.clues, cu.nombre_unidad"
             select_geo_agregados = "anio, mes, jurisdiccion, municipio, clues, nombre_unidad"
@@ -231,6 +235,7 @@ def filtrar_datos_sis():
             isinstance(v, list) and len(v) > 0 for v in variables_seleccionadas.values()
         )
 
+        # CASO A: TABLA PRE-AGREGADA (SIN VARIABLES PERSONALIZADAS)
         if not tiene_variables_custom:
             query_base = f"""
                 SELECT 
@@ -260,6 +265,7 @@ def filtrar_datos_sis():
             cursor.execute(query_base, params)
             datos_filtrados = cursor.fetchall() or []
 
+        # CASO B: TABLA DETALLADA (CON FILTRADO DE VARIABLES ESPECÍFICAS)
         else:
             select_sums = []
             params_select = []
@@ -340,126 +346,8 @@ def filtrar_datos_sis():
 
     except Exception as e:
         print(f"❌ Error en API /api/filtrar: {str(e)}")
-        return jsonify({"status": "error", "message": f"Error al procesar la consulta: {str(e)}"}), 500
+        return jsonify({"status": "error", "message": f"Error al procesar la consulta: {str(e)}"}), 400
 
     finally:
         cursor.close()
 
-@sis_pn.route("/api/exportar_excel_detallado", methods=["POST"])
-@login_required
-def exportar_excel_detallado():
-    data = request.get_json(silent=True) or {}
-
-    unidades = [str(u).strip() for u in data.get("unidades", []) if u]
-    jurisdicciones = [int(j) for j in data.get("jurisdicciones", []) if str(j).isdigit()]
-    municipios = [str(m).strip() for m in data.get("municipios", []) if m]
-    anios = [int(a) for a in data.get("anios", []) if str(a).isdigit()]
-    meses = [int(m) for m in data.get("meses", []) if str(m).isdigit()]
-    
-    variables_seleccionadas = data.get("variables", {}) or {}
-    nivel_agrupacion = str(data.get("nivel_agrupacion", "clues")).lower()
-
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-
-    try:
-        # 🟢 FIX CRÍTICO 1: Normalizar el collation de la sesión de MySQL
-        cursor.execute("SET NAMES utf8mb4 COLLATE utf8mb4_general_ci;")
-
-        if nivel_agrupacion == "jurisdiccion":
-            select_geo = "sr.jurisdiccion, 'N/A' AS municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
-            group_geo = "sr.jurisdiccion"
-        elif nivel_agrupacion == "municipio":
-            select_geo = "sr.jurisdiccion, sr.municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
-            group_geo = "sr.jurisdiccion, sr.municipio"
-        else:
-            select_geo = "sr.jurisdiccion, sr.municipio, sr.clues, COALESCE(cu.nombre_unidad, sr.clues) AS nombre_unidad"
-            group_geo = "sr.jurisdiccion, sr.municipio, sr.clues, cu.nombre_unidad"
-
-        where_conditions = ["1=1"]
-        params = []
-
-        todas_vars = set()
-        if isinstance(variables_seleccionadas, dict):
-            for m_key, v_list in variables_seleccionadas.items():
-                if isinstance(v_list, list):
-                    for v in v_list:
-                        if v: todas_vars.add(str(v).strip())
-                elif isinstance(v_list, bool) and v_list:
-                    todas_vars.add(str(m_key).strip())
-        elif isinstance(variables_seleccionadas, list):
-            for v in variables_seleccionadas:
-                if v: todas_vars.add(str(v).strip())
-
-        if todas_vars:
-            lista_vars = list(todas_vars)
-            placeholders_v = ','.join(['%s'] * len(lista_vars))
-            # 🟢 FIX CRÍTICO 2: Forzar collation en comparaciones de variables
-            where_conditions.append(f"sr.variable COLLATE utf8mb4_general_ci IN ({placeholders_v})")
-            params.extend(lista_vars)
-
-        if unidades:
-            placeholders_u = ','.join(['%s'] * len(unidades))
-            # 🟢 FIX CRÍTICO 3: Forzar collation en comparaciones de CLUES/Nombre
-            where_conditions.append(f"(sr.clues COLLATE utf8mb4_general_ci IN ({placeholders_u}) OR cu.nombre_unidad COLLATE utf8mb4_general_ci IN ({placeholders_u}))")
-            params.extend(unidades + unidades)
-
-        if jurisdicciones:
-            placeholders_j = ','.join(['%s'] * len(jurisdicciones))
-            where_conditions.append(f"sr.jurisdiccion IN ({placeholders_j})")
-            params.extend(jurisdicciones)
-
-        if municipios:
-            placeholders_m = ','.join(['%s'] * len(municipios))
-            where_conditions.append(f"sr.municipio COLLATE utf8mb4_general_ci IN ({placeholders_m})")
-            params.extend(municipios)
-
-        if anios:
-            placeholders_a = ','.join(['%s'] * len(anios))
-            where_conditions.append(f"sr.anio IN ({placeholders_a})")
-            params.extend(anios)
-
-        if meses:
-            placeholders_mes = ','.join(['%s'] * len(meses))
-            where_conditions.append(f"sr.mes IN ({placeholders_mes})")
-            params.extend(meses)
-
-        # 🟢 FIX CRÍTICO 4: Forzar collation explícito en las cláusulas LEFT JOIN
-        query = f"""
-            SELECT 
-                sr.anio,
-                sr.mes,
-                {select_geo},
-                COALESCE(cv.apartado, sr.apartado) AS apartado,
-                COALESCE(cv.descripcion_apartado, 'Sin Apartado') AS descripcion_apartado,
-                sr.variable,
-                COALESCE(cv.descripcion, sr.variable) AS descripcion_variable,
-                SUM(sr.total) AS total
-            FROM sis_registros_primer_nivel sr
-            LEFT JOIN catalogo_unidades_primer_nivel cu 
-                ON sr.clues COLLATE utf8mb4_general_ci = cu.clues COLLATE utf8mb4_general_ci
-            LEFT JOIN catalogo_variables cv 
-                ON sr.variable COLLATE utf8mb4_general_ci = cv.variable COLLATE utf8mb4_general_ci
-            WHERE {" AND ".join(where_conditions)}
-            GROUP BY 
-                sr.anio, 
-                sr.mes, 
-                {group_geo}, 
-                COALESCE(cv.apartado, sr.apartado), 
-                COALESCE(cv.descripcion_apartado, 'Sin Apartado'), 
-                sr.variable, 
-                COALESCE(cv.descripcion, sr.variable)
-            HAVING SUM(sr.total) > 0
-            ORDER BY sr.anio, sr.mes, sr.jurisdiccion, sr.apartado, sr.variable
-        """
-
-        cursor.execute(query, params)
-        resultados = cursor.fetchall() or []
-
-        return jsonify({"status": "success", "data": resultados})
-
-    except Exception as e:
-        error_detallado = traceback.format_exc()
-        print(f"❌ Error al exportar Excel detallado:\n{error_detallado}")
-        return jsonify({"status": "error", "message": str(e), "trace": error_detallado}), 500
-    finally:
-        cursor.close()

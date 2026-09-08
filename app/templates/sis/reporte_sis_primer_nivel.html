@@ -410,80 +410,127 @@
     }
 
 
-    async function exportarFiltradoExcel() {
-        // 1. Recopilar filtros del formulario y estado actual
-        const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
-        let variablesAPasar = {};
-        if (moduloActual === "todas") {
-            variablesAPasar = { todas: variablesPersonalizadasEstado["todas"] || [] };
-        } else {
-            variablesAPasar = { [moduloActual]: variablesPersonalizadasEstado[moduloActual] || [] };
+    function exportarFiltradoExcel() {
+        // 1. Verificar si existen datos cargados desde el backend
+        if (!datosFiltradosSis || datosFiltradosSis.length === 0) {
+            alert("No hay datos disponibles para exportar con los filtros seleccionados.");
+            return;
         }
 
-        const payload = {
-            unidades: typeof window.getUnidadesSeleccionadas === 'function' ? window.getUnidadesSeleccionadas() : [],
-            jurisdicciones: typeof window.getJurisdiccionesSeleccionadas === 'function' ? window.getJurisdiccionesSeleccionadas() : [],
-            municipios: typeof window.getMunicipiosSeleccionados === 'function' ? window.getMunicipiosSeleccionados() : [],
-            anios: typeof window.getAniosSeleccionados === 'function' ? window.getAniosSeleccionados() : [],
-            meses: typeof window.getMesesSeleccionados === 'function' ? window.getMesesSeleccionados() : [],
-            servicios: typeof window.getServiciosSeleccionados === 'function' ? window.getServiciosSeleccionados() : [],
-            afecciones: typeof window.getAfeccionesSeleccionadas === 'function' ? window.getAfeccionesSeleccionadas() : [],
-            variables: variablesAPasar,
-            nivel_agrupacion: document.getElementById('selectNivelAgrupacion')?.value || 'clues'
-        };
+        // 2. Feedback visual en el botón
+        const btn = document.getElementById("btnExportarExcel");
+        const textoOriginal = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Generando...';
+        btn.disabled = true;
 
         try {
-            // Indicador visual opcional (puedes mostrar un spinner si lo deseas)
-            mostrarCargandoGrafica();
+            // 3. Obtener el nivel de agrupación activo del DOM
+            const nivelAgrupacion = document.getElementById("nivel_agrupacion")?.value || "clues";
 
-            const response = await fetch('/sis_primer_nivel/api/exportar_excel_detallado', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
+            // Obtener el módulo activo seleccionado en el dropdown
+            const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
+
+            // Nombres legibles para las columnas según el módulo activo
+            const nombresModulos = {
+                "consultas": "Consultas",
+                "embarazadas": "Embarazadas",
+                "mental": "Salud Mental",
+                "bucal": "Salud Bucal",
+                "tamiz": "Tamiz",
+                "planificacion_familiar": "Planificación Familiar",
+                "detecciones": "Detecciones",
+                "detecciones_cardiometabolicas": "Detecciones Cardiometabólicas",
+                "orientacion_lac_des_obe": "Orientación Lac/Des/Obe",
+                "orientacion_eda_ira": "Orientación EDA/IRA",
+                "otros": "Otros"
+            };
+
+            // 4. Mapear los datos según el Nivel de Agrupación elegido
+            const datosParaExcel = [];
+
+            datosFiltradosSis.forEach(r => {
+                // 🟢 CONSTRUCCIÓN DINÁMICA DE LA CABECERA SEGÚN NIVEL DE AGRUPACIÓN
+                const filaBase = {
+                    "Año": Number(r.anio) || '',
+                    "Mes": Number(r.mes) || '',
+                    "Jurisdicción": r.jurisdiccion || 'Sin Especificar'
+                };
+
+                // Solo agregamos Municipio si la agrupación es por Municipio o CLUES
+                if (nivelAgrupacion === "municipio" || nivelAgrupacion === "clues") {
+                    filaBase["Municipio"] = (r.municipio && r.municipio !== 'N/A') ? r.municipio : 'Sin Especificar';
+                }
+
+                // Solo agregamos CLUES y Unidad si la agrupación es por CLUES
+                if (nivelAgrupacion === "clues") {
+                    filaBase["CLUES"] = (r.clues && r.clues !== 'N/A') ? r.clues : '-';
+                    filaBase["Nombre Unidad"] = (r.nombre_unidad && r.nombre_unidad !== 'N/A') ? r.nombre_unidad : '';
+                }
+
+                // 🟢 INCLUSIÓN DE MÓDULOS / VARIABLES
+                if (moduloActual === "todas") {
+                    let totalFila = 0;
+                    const camposModulo = [
+                        'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
+                        'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
+                        'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
+                    ];
+
+                    camposModulo.forEach(m => {
+                        const val = Number(r[m]) || 0;
+                        filaBase[nombresModulos[m] || m] = val;
+                        totalFila += val;
+                    });
+
+                    filaBase["Total"] = totalFila;
+
+                    if (totalFila > 0) {
+                        datosParaExcel.push(filaBase);
+                    }
+
+                } else {
+                    const valorModulo = Number(r[moduloActual]) || Number(r.total) || Number(r.valor) || 0;
+
+                    if (valorModulo > 0) {
+                        filaBase[nombresModulos[moduloActual] || "Total"] = valorModulo;
+                        datosParaExcel.push(filaBase);
+                    }
+                }
             });
 
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.message || `Error del servidor: ${response.status}`);
+            // 5. Validar si existen registros tras procesar
+            if (datosParaExcel.length === 0) {
+                alert("Los filtros aplicados no arrojaron registros con valores mayores a 0.");
+                return;
             }
 
-            const result = await response.json();
+            // 6. Generar el libro Excel con SheetJS
+            const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS Filtrado");
 
-            if (result.status === 'success') {
-                if (!result.data || result.data.length === 0) {
-                    alert("No se encontraron registros con los filtros seleccionados.");
-                    return;
-                }
+            // Auto-ajustar ancho de columnas dinámicamente
+            const maxAnchos = Object.keys(datosParaExcel[0]).map(key => ({
+                wch: Math.max(key.length + 4, 12)
+            }));
+            worksheet['!cols'] = maxAnchos;
 
-                // 2. Verificar que SheetJS esté disponible en el navegador
-                if (typeof XLSX === 'undefined') {
-                    alert("La librería SheetJS (XLSX) no está cargada en la página.");
-                    return;
-                }
+            // Nombre de archivo dinámico reflejando el agrupamiento
+            const fechaDescarga = new Date().toISOString().slice(0, 10);
+            const nombreArchivo = `SIS_${nivelAgrupacion.toUpperCase()}_${moduloActual}_${fechaDescarga}.xlsx`;
 
-                // 3. Generar la hoja y libro de trabajo Excel con SheetJS
-                const worksheet = XLSX.utils.json_to_sheet(result.data);
-                const workbook = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS");
-
-                // 4. Disparar la descarga automática en el navegador
-                const fechaActual = new Date().toISOString().slice(0, 10);
-                XLSX.writeFile(workbook, `Reporte_SIS_Primer_Nivel_${fechaActual}.xlsx`);
-
-            } else {
-                alert(`Error: ${result.message}`);
-            }
+            // Descargar archivo
+            XLSX.writeFile(workbook, nombreArchivo);
 
         } catch (error) {
-            console.error("❌ Error al exportar Excel:", error);
-            alert(`Ocurrió un error al generar la exportación: ${error.message}`);
+            console.error("Error al exportar a Excel:", error);
+            alert("Ocurrió un error al intentar generar el archivo Excel.");
         } finally {
-            ocultarCargandoGrafica();
+            // Restaurar botón
+            btn.innerHTML = textoOriginal;
+            btn.disabled = false;
         }
     }
-
 
     function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
     function ocultarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.add("d-none"); }
