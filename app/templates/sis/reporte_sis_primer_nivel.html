@@ -66,7 +66,6 @@
 
                 <!-- GRÁFICA TEMPORAL Y CATÁLOGO DE VARIABLES -->
                 <hr class="my-4">
-                <hr class="my-4">
                 <div class="card mb-2">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -79,7 +78,8 @@
                                     <option value="anio">Vista Anual (Acumulado)</option>
                                 </select>
 
-                                <select id="filtroSisDetalle" class="form-select form-select-sm w-auto fw-bold">
+                                <select id="filtroSisDetalle" class="form-select form-select-sm w-auto fw-bold"
+                                    onchange="toggleModoDesglose(); renderGraficaTemporal();">
                                     <option value="consultas" selected>Consultas</option>
                                     <option value="embarazadas">Embarazadas</option>
                                     <option value="mental">Salud Mental</option>
@@ -94,12 +94,19 @@
                                     <option value="todas">Todas</option>
                                 </select>
 
+                                <!-- 🟢 NUEVO CONTROL: Aparece dinámicamente solo si eligen "Todas" -->
+                                <select id="selectModoDesglose"
+                                    class="form-select form-select-sm w-auto fw-bold border-info text-info d-none"
+                                    onchange="renderGraficaTemporal();">
+                                    <option value="acumulado" selected>📊 Acumulado</option>
+                                    <option value="por_apartado">🔀 Por Apartado</option>
+                                </select>
+
                                 <button type="button" class="btn btn-outline-primary btn-sm"
                                     id="btnToggleValoresMensual">
                                     Mostrar valores
                                 </button>
 
-                                <!-- 🟢 Botón de Exportar a Excel agregado -->
                                 <button type="button" class="btn btn-success btn-sm d-flex align-items-center gap-1"
                                     id="btnExportarExcel" onclick="exportarFiltradoExcel()">
                                     <i class="bi bi-file-earmark-excel-fill"></i> Excel
@@ -107,9 +114,7 @@
                             </div>
                         </div>
 
-                        <!-- CONTENEDOR DE LA GRÁFICA CON LOADER -->
                         <div style="position: relative; height: 370px; width: 100%;">
-                            <!-- Superposición de carga (Spinner) AQUÍ SE AGREGA -->
                             <div id="loaderGraficaTemporal"
                                 class="d-none position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex flex-column align-items-center justify-content-center"
                                 style="z-index: 10; border-radius: 6px;">
@@ -119,11 +124,9 @@
                                 <small class="text-muted fw-bold mt-2">Actualizando datos...</small>
                             </div>
 
-                            <!-- Canvas de la gráfica -->
                             <canvas id="graficaSisMensual"></canvas>
                         </div>
 
-                        <!-- DESGLOSE DINÁMICO DESDE CATÁLOGO DE BD -->
                         <div class="mt-3 pt-3 border-top bg-light p-3 rounded">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <label class="form-label font-weight-bold mb-0 text-secondary"
@@ -139,7 +142,6 @@
                             </div>
 
                             <div id="contenedorSubvariables" style="max-height: 250px; overflow-y: auto;">
-                                <!-- Renderizado dinámico desde el catálogo -->
                             </div>
                         </div>
 
@@ -774,32 +776,61 @@
         }
     }
 
+
+
+    // Función helper para visibilidad del botón de desglose
+    function toggleModoDesglose() {
+        const modulo = document.getElementById("filtroSisDetalle")?.value;
+        const selectDesglose = document.getElementById("selectModoDesglose");
+        if (!selectDesglose) return;
+
+        if (modulo === "todas") {
+            selectDesglose.classList.remove("d-none");
+        } else {
+            selectDesglose.classList.add("d-none");
+            selectDesglose.value = "acumulado";
+        }
+    }
+
     function renderGraficaTemporal(data = datosFiltradosSis) {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
+        const modoDesglose = document.getElementById("selectModoDesglose")?.value || "acumulado";
         const ctx = document.getElementById("graficaSisMensual");
 
         if (!ctx) return;
         if (graficaSisMensual) { graficaSisMensual.destroy(); graficaSisMensual = null; }
 
-        if (!hayVariablesSeleccionadas()) {
+        if (typeof hayVariablesSeleccionadas === "function" && !hayVariablesSeleccionadas()) {
             return;
         }
 
         if (!data || data.length === 0) return;
 
-        // 🟢 FIX 2: Cálculo dinámico con fallback seguro para la API backend
+        const camposApartados = [
+            'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
+            'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
+            'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
+        ];
+
+        const etiquetasNombres = {
+            consultas: 'Consultas',
+            embarazadas: 'Embarazadas',
+            mental: 'Salud Mental',
+            bucal: 'Salud Bucal',
+            tamiz: 'Tamiz',
+            planificacion_familiar: 'Planif. Familiar',
+            detecciones: 'Detecciones',
+            detecciones_cardiometabolicas: 'Detecciones Card.',
+            orientacion_lac_des_obe: 'Orient. Lac/Des/Obe',
+            orientacion_eda_ira: 'Orient. EDA/IRA',
+            otros: 'Otros'
+        };
+
         const sumarCategorias = (r) => {
             if (modulo === "todas") {
                 let suma = 0;
-                const camposPosibles = [
-                    'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
-                    'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
-                    'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
-                ];
-                camposPosibles.forEach(c => {
-                    suma += Number(r[c]) || 0;
-                });
+                camposApartados.forEach(c => { suma += Number(r[c]) || 0; });
                 return suma || Number(r.total || r.valor || 0);
             }
             return Number(r[modulo]) || Number(r.total) || Number(r.valor) || 0;
@@ -807,66 +838,121 @@
 
         let labels = [];
         let datasets = [];
-        const paletaAnual = ['#4E79A7', '#59A14F', '#F28E2B', '#E15759', '#76B7B2', '#EDC948', '#B07AA1', '#9C755F'];
+        const paletaColores = ['#4E79A7', '#59A14F', '#F28E2B', '#E15759', '#76B7B2', '#EDC948', '#B07AA1', '#9C755F', '#FF9DA7', '#9D7660', '#BAB0AC'];
 
-        if (tipoVista === 'anio') {
-            const acumuladoAnual = {};
-            data.forEach(r => {
-                acumuladoAnual[r.anio] = (acumuladoAnual[r.anio] || 0) + sumarCategorias(r);
-            });
+        // 🟢 MODO DESGLOSADO POR APARTADO (SOLO EN "TODAS")
+        if (modulo === "todas" && modoDesglose === "por_apartado") {
+            if (tipoVista === 'anio') {
+                const apartadosAnual = {};
+                data.forEach(r => {
+                    camposApartados.forEach(campo => {
+                        const val = Number(r[campo]) || 0;
+                        if (val > 0) {
+                            if (!apartadosAnual[campo]) apartadosAnual[campo] = 0;
+                            apartadosAnual[campo] += val;
+                        }
+                    });
+                });
 
-            labels = Object.keys(acumuladoAnual).sort();
-            const valores = labels.map(a => Math.round(acumuladoAnual[a]));
+                labels = Object.keys(apartadosAnual).map(k => etiquetasNombres[k] || k);
+                const valores = Object.keys(apartadosAnual).map(k => Math.round(apartadosAnual[k]));
 
-            if (valores.reduce((a, b) => a + b, 0) === 0) return;
+                if (valores.length === 0) return;
 
-            datasets = [{
-                label: `Total ${modulo === 'todas' ? 'Secciones Seleccionadas' : modulo.toUpperCase()}`,
-                data: valores,
-                backgroundColor: paletaAnual.slice(0, labels.length)
-            }];
-        } else {
-            const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
-            labels = Object.values(mesesNombres);
-            const resumen = {};
+                datasets = [{
+                    label: 'Total por Apartado',
+                    data: valores,
+                    backgroundColor: paletaColores.slice(0, labels.length)
+                }];
+            } else {
+                const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
+                labels = Object.values(mesesNombres);
 
-            data.forEach(r => {
-                if (!r.mes) return;
-                const key = `Año ${r.anio}`;
-                if (!resumen[key]) resumen[key] = {};
-                resumen[key][Number(r.mes)] = (resumen[key][Number(r.mes)] || 0) + sumarCategorias(r);
-            });
+                const apartadosMes = {};
+                data.forEach(r => {
+                    if (!r.mes) return;
+                    camposApartados.forEach(campo => {
+                        const val = Number(r[campo]) || 0;
+                        if (val > 0) {
+                            if (!apartadosMes[campo]) apartadosMes[campo] = {};
+                            apartadosMes[campo][Number(r.mes)] = (apartadosMes[campo][Number(r.mes)] || 0) + val;
+                        }
+                    });
+                });
 
-            datasets = Object.keys(resumen).map((key, index) => ({
-                label: key,
-                data: Array.from({ length: 12 }, (_, i) => Math.round(resumen[key][i + 1] || 0)),
-                borderColor: paletaAnual[index % paletaAnual.length],
-                backgroundColor: paletaAnual[index % paletaAnual.length],
-                tension: 0.3,
-                pointRadius: 4,
-                fill: false
-            }));
+                datasets = Object.keys(apartadosMes).map((campo, index) => ({
+                    label: etiquetasNombres[campo] || campo,
+                    data: Array.from({ length: 12 }, (_, i) => Math.round(apartadosMes[campo][i + 1] || 0)),
+                    borderColor: paletaColores[index % paletaColores.length],
+                    backgroundColor: paletaColores[index % paletaColores.length],
+                    tension: 0.3,
+                    pointRadius: 4,
+                    fill: false
+                }));
 
-            const tieneDatos = datasets.some(ds => ds.data.some(v => v > 0));
-            if (!tieneDatos) return;
+                if (!datasets.some(ds => ds.data.some(v => v > 0))) return;
+            }
+        }
+        // 🟡 MODO TRADICIONAL (ACUMULADO POR AÑO / MÓDULO ÚNICO)
+        else {
+            if (tipoVista === 'anio') {
+                const acumuladoAnual = {};
+                data.forEach(r => {
+                    acumuladoAnual[r.anio] = (acumuladoAnual[r.anio] || 0) + sumarCategorias(r);
+                });
+
+                labels = Object.keys(acumuladoAnual).sort();
+                const valores = labels.map(a => Math.round(acumuladoAnual[a]));
+
+                if (valores.reduce((a, b) => a + b, 0) === 0) return;
+
+                datasets = [{
+                    label: `Total ${modulo === 'todas' ? 'Secciones Seleccionadas' : modulo.toUpperCase()}`,
+                    data: valores,
+                    backgroundColor: paletaColores.slice(0, labels.length)
+                }];
+            } else {
+                const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
+                labels = Object.values(mesesNombres);
+                const resumen = {};
+
+                data.forEach(r => {
+                    if (!r.mes) return;
+                    const key = `Año ${r.anio}`;
+                    if (!resumen[key]) resumen[key] = {};
+                    resumen[key][Number(r.mes)] = (resumen[key][Number(r.mes)] || 0) + sumarCategorias(r);
+                });
+
+                datasets = Object.keys(resumen).map((key, index) => ({
+                    label: key,
+                    data: Array.from({ length: 12 }, (_, i) => Math.round(resumen[key][i + 1] || 0)),
+                    borderColor: paletaColores[index % paletaColores.length],
+                    backgroundColor: paletaColores[index % paletaColores.length],
+                    tension: 0.3,
+                    pointRadius: 4,
+                    fill: false
+                }));
+
+                if (!datasets.some(ds => ds.data.some(v => v > 0))) return;
+            }
         }
 
         graficaSisMensual = new Chart(ctx, {
-            type: tipoVista === 'anio' ? 'bar' : 'line',
+            type: (tipoVista === 'anio' || (modulo === "todas" && modoDesglose === "por_apartado" && tipoVista === 'anio')) ? 'bar' : 'line',
             data: { labels, datasets },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: false,
-                scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
+                scales: { y: { beginAtZero: true, ticks: { callback: v => typeof fmt === "function" ? fmt(v) : v } } },
                 plugins: {
-                    legend: { display: tipoVista !== 'anio' },
+                    legend: { display: true },
                     datalabels: {
-                        display: () => mostrarValoresMensual || tipoVista === 'anio',
+                        display: () => (typeof mostrarValoresMensual !== 'undefined' ? mostrarValoresMensual : true) || tipoVista === 'anio',
                         anchor: tipoVista === 'anio' ? 'center' : 'end',
                         align: tipoVista === 'anio' ? 'center' : 'top',
                         color: tipoVista === 'anio' ? '#ffffff' : '#333333',
-                        formatter: (val) => val > 0 ? fmt(val) : '',
+                        formatter: (val) => (val > 0 && typeof fmt === "function") ? fmt(val) : (val > 0 ? val : ''),
                         font: { size: 10, weight: 'bold' }
                     }
                 }
