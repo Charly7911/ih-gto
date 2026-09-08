@@ -807,7 +807,6 @@
 
         if (!data || data.length === 0) return;
 
-        // Paleta de colores variada para múltiples líneas/apartados
         const paletaColores = [
             '#2b5c8f', '#d9534f', '#20c997', '#f0ad4e', '#6f42c1',
             '#e83e8c', '#17a2b8', '#fd7e14', '#6c757d', '#343a40'
@@ -816,16 +815,22 @@
         let labels = [];
         let datasets = [];
 
-        // 🟢 MODO DESGLOSADO REAL POR APARTADO (DINÁMICO SEGÚN TU BD)
+        // Helper para detectar de forma flexible el nombre del apartado en cada objeto
+        const obtenerNombreApartado = (r) => {
+            return r.descripcion_apartado || r.apartado || r.seccion || r.modulo || r.nombre_apartado || null;
+        };
+
+        // Helper para obtener el valor numérico
+        const obtenerValor = (r) => Number(r.total || r.valor || r.suma || 0);
+
+        // 🟢 MODO DESGLOSADO POR APARTADO (CUANDO SELECCIONAN "TODAS" Y "POR APARTADO")
         if (modulo === "todas" && modoDesglose === "por_apartado") {
             if (tipoVista === 'anio') {
                 const apartadosAnual = {};
 
                 data.forEach(r => {
-                    // Obtener el nombre del apartado proveniente del backend/BD
-                    const nombreApartado = r.descripcion_apartado || r.apartado || "Sin Apartado";
-                    const val = Number(r.total || r.valor || 0);
-
+                    const nombreApartado = obtenerNombreApartado(r) || "General";
+                    const val = obtenerValor(r);
                     if (val > 0) {
                         apartadosAnual[nombreApartado] = (apartadosAnual[nombreApartado] || 0) + val;
                     }
@@ -834,7 +839,7 @@
                 labels = Object.keys(apartadosAnual);
                 const valores = labels.map(k => Math.round(apartadosAnual[k]));
 
-                if (valores.length === 0) return;
+                if (valores.length === 0 || valores.reduce((a, b) => a + b, 0) === 0) return;
 
                 datasets = [{
                     label: 'Total por Apartado',
@@ -849,9 +854,8 @@
 
                 data.forEach(r => {
                     if (!r.mes) return;
-                    // Obtener la clave real del apartado registrado
-                    const nombreApartado = r.descripcion_apartado || r.apartado || "Sin Apartado";
-                    const val = Number(r.total || r.valor || 0);
+                    const nombreApartado = obtenerNombreApartado(r) || "General";
+                    const val = obtenerValor(r);
 
                     if (!apartadosMes[nombreApartado]) {
                         apartadosMes[nombreApartado] = {};
@@ -861,7 +865,6 @@
                     apartadosMes[nombreApartado][mesNum] = (apartadosMes[nombreApartado][mesNum] || 0) + val;
                 });
 
-                // Generar un Dataset (Línea) independiente por cada apartado encontrado
                 datasets = Object.keys(apartadosMes).map((apartadoKey, index) => ({
                     label: apartadoKey,
                     data: Array.from({ length: 12 }, (_, i) => Math.round(apartadosMes[apartadoKey][i + 1] || 0)),
@@ -875,14 +878,13 @@
                 if (!datasets.some(ds => ds.data.some(v => v > 0))) return;
             }
         }
-        // 🟡 MODO ACUMULADO O POR AÑO
+        // 🟡 MODO ACUMULADO / NORMAL
         else {
-            const sumarCategorias = (r) => Number(r.total || r.valor || 0);
-
             if (tipoVista === 'anio') {
                 const acumuladoAnual = {};
                 data.forEach(r => {
-                    acumuladoAnual[r.anio] = (acumuladoAnual[r.anio] || 0) + sumarCategorias(r);
+                    const anio = r.anio || r.año || "N/A";
+                    acumuladoAnual[anio] = (acumuladoAnual[anio] || 0) + obtenerValor(r);
                 });
 
                 labels = Object.keys(acumuladoAnual).sort();
@@ -902,9 +904,9 @@
 
                 data.forEach(r => {
                     if (!r.mes) return;
-                    const key = `Año ${r.anio}`;
+                    const key = `Año ${r.anio || r.año}`;
                     if (!resumen[key]) resumen[key] = {};
-                    resumen[key][Number(r.mes)] = (resumen[key][Number(r.mes)] || 0) + sumarCategorias(r);
+                    resumen[key][Number(r.mes)] = (resumen[key][Number(r.mes)] || 0) + obtenerValor(r);
                 });
 
                 datasets = Object.keys(resumen).map((key, index) => ({
@@ -921,9 +923,9 @@
             }
         }
 
-        // Dibujar la gráfica
+        // Renderizar gráfico
         graficaSisMensual = new Chart(ctx, {
-            type: tipoVista === 'anio' ? 'bar' : 'line',
+            type: (tipoVista === 'anio') ? 'bar' : 'line',
             data: { labels, datasets },
             options: {
                 responsive: true,
@@ -944,7 +946,6 @@
             }
         });
     }
-
     /* 6. INICIALIZACIÓN DE EVENTOS */
     document.addEventListener("DOMContentLoaded", () => {
         renderSubvariables();
