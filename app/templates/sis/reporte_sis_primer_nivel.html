@@ -846,27 +846,37 @@
         let datasets = [];
 
         // 🟢 EVALUAR SI SE DESGLOSA POR APARTADO
+        // 🟢 MODO DESGLOSADO POR APARTADO
         if (modoDesglose === "por_apartado") {
             const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
+
+            // Helper para obtener el nombre real del apartado del objeto 'r'
+            const resolverNombreApartado = (r) => {
+                // Busca cualquier propiedad común donde venga la etiqueta del apartado
+                const textoBD = r.descripcion_apartado || r.apartado || r.nombre_apartado || r.seccion || r.modulo || r.concepto;
+                if (textoBD) return textoBD;
+
+                // Si no hay texto, busca en los campos numéricos de la estructura antigua
+                for (const c of camposApartados) {
+                    if (Number(r[c]) > 0) return etiquetasNombres[c] || c;
+                }
+                return "Otros / Sin Clasificar";
+            };
+
+            // Helper para extraer el valor numérico
+            const resolverValor = (r, claveCampo = null) => {
+                if (claveCampo && r[claveCampo] !== undefined) return Number(r[claveCampo]) || 0;
+                return Number(r.total || r.valor || r.suma || r.monto || r.cantidad || 0);
+            };
 
             if (tipoVista === 'anio') {
                 const apartadosAnual = {};
 
                 data.forEach(r => {
-                    if (modulo === "todas") {
-                        camposApartados.forEach(campo => {
-                            const val = Number(r[campo]) || 0;
-                            if (val > 0) {
-                                const labelApartado = etiquetasNombres[campo] || campo;
-                                apartadosAnual[labelApartado] = (apartadosAnual[labelApartado] || 0) + val;
-                            }
-                        });
-                    }
-
-                    const nombreTexto = r.descripcion_apartado || r.apartado || r.seccion;
-                    const valTotal = Number(r.total || r.valor || r.suma || 0);
-                    if (nombreTexto && valTotal > 0) {
-                        apartadosAnual[nombreTexto] = (apartadosAnual[nombreTexto] || 0) + valTotal;
+                    const labelKey = resolverNombreApartado(r);
+                    const val = resolverValor(r);
+                    if (val > 0) {
+                        apartadosAnual[labelKey] = (apartadosAnual[labelKey] || 0) + val;
                     }
                 });
 
@@ -887,23 +897,12 @@
                 data.forEach(r => {
                     if (!r.mes) return;
                     const mesNum = Number(r.mes);
+                    const labelKey = resolverNombreApartado(r);
+                    const val = resolverValor(r);
 
-                    if (modulo === "todas") {
-                        camposApartados.forEach(campo => {
-                            const val = Number(r[campo]) || 0;
-                            if (val > 0) {
-                                const labelKey = etiquetasNombres[campo] || campo;
-                                if (!apartadosMes[labelKey]) apartadosMes[labelKey] = {};
-                                apartadosMes[labelKey][mesNum] = (apartadosMes[labelKey][mesNum] || 0) + val;
-                            }
-                        });
-                    }
-
-                    const nombreTexto = r.descripcion_apartado || r.apartado || r.seccion;
-                    const valTotal = Number(r.total || r.valor || r.suma || 0);
-                    if (nombreTexto && valTotal > 0) {
-                        if (!apartadosMes[nombreTexto]) apartadosMes[nombreTexto] = {};
-                        apartadosMes[nombreTexto][mesNum] = (apartadosMes[nombreTexto][mesNum] || 0) + valTotal;
+                    if (val > 0) {
+                        if (!apartadosMes[labelKey]) apartadosMes[labelKey] = {};
+                        apartadosMes[labelKey][mesNum] = (apartadosMes[labelKey][mesNum] || 0) + val;
                     }
                 });
 
