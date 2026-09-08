@@ -350,3 +350,97 @@ def filtrar_datos_sis():
 
     finally:
         cursor.close()
+
+
+@sis_pn.route("/api/exportar_excel_detallado", methods=["POST"])
+@login_required
+@csrf.exempt
+def exportar_excel_detallado():
+    data = request.get_json(silent=True) or {}
+
+    unidades = data.get("unidades", []) or []
+    jurisdicciones = data.get("jurisdicciones", []) or []
+    municipios = data.get("municipios", []) or []
+    anios = [int(a) for a in data.get("anios", []) if str(a).isdigit()]
+    meses = [int(m) for m in data.get("meses", []) if str(m).isdigit()]
+    variables_seleccionadas = data.get("variables", {}) or {}
+    nivel_agrupacion = data.get("nivel_agrupacion", "clues")
+    modulo_activo = data.get("modulo_activo", "todas")
+
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    try:
+        # Define dinámica de ubicación según nivel de agrupación
+        if nivel_agrupacion == "jurisdiccion":
+            select_geo = "sr.jurisdiccion, 'N/A' AS municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
+            group_geo = "sr.jurisdiccion"
+        elif nivel_agrupacion == "municipio":
+            select_geo = "sr.jurisdiccion, sr.municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
+            group_geo = "sr.jurisdiccion, sr.municipio"
+        else:
+            select_geo = "sr.jurisdiccion, sr.municipio, sr.clues, COALESCE(cu.nombre_unidad, sr.clues) AS nombre_unidad"
+            group_geo = "sr.jurisdiccion, sr.municipio, sr.clues, cu.nombre_unidad"
+
+        # Filtros base
+        where_conditions = ["1=1"]
+        params = []
+
+        # Determinar el conjunto de variables a filtrar
+        todas_vars = set()
+
+        # 🟢 Si se seleccionó un módulo específico y no es "todas"
+        if modulo_activo and modulo_activo != "todas":
+            vars_del_modulo = variables_seleccionadas.get(modulo_activo, []) or VARIABLES_DEFAULT.get(modulo_activo, [])
+            if vars_del_modulo:
+                todas_vars.update(vars_del_modulo)
+        elif isinstance(variables_seleccionadas, dict):
+            for m_key, v_list in variables_seleccionadas.items():
+                if isinstance(v_list, list):
+                    todas_vars.update(v_list)
+
+        if todas_vars:
+            placeholders_v = ','.join(['%s'] * len(todas_vars))
+            where_conditions.append(f"sr.variable IN ({placeholders_v})")
+            params.extend(list(todas_vars))
+
+        if unidades:
+            placeholders_u = ','.join(['%s'] * len(unidades))
+            where_conditions.append(f"(sr.clues IN ({placeholders_u}) OR cu.nombre_unidad IN ({placeholders_u}))")
+            params.extend(unidades + unidades)
+
+        for col, lst in [('sr.jurisdiccion', jurisdicciones), ('sr.municipio', municipios), ('sr.anio', anios), ('sr.mes', meses)]:
+            if lst:
+                placeholders_l = ','.join(['%s'] * len(lst))
+                where_conditions.append(f"{col} IN ({placeholders_l})")
+                params.extend(lst)
+
+        # Consulta SQL con JOIN al catálogo de variables para traer apartado y descripciones
+        query = f"""
+            SELECT 
+                sr.anio,
+                sr.mes,
+                {select_geo},
+                COALESCE(cv.apartado, 'S/A') AS apartado,
+                COALESCE(cv.descripcion_apartado, 'Sin Apartado') AS descripcion_apartado,
+                sr.variable,
+                COALESCE(cv.descripcion, sr.variable) AS descripcion_variable,
+                SUM(CAST(sr.total AS UNSIGNED)) AS total
+            FROM sis_registros_primer_nivel sr
+            LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
+            LEFT JOIN catalogo_variables cv ON sr.variable = cv.variable
+            WHERE {" AND ".join(where_conditions)}
+            GROUP BY sr.anio, sr.mes, {group_geo}, cv.apartado, cv.descripcion_apartado, sr.variable, cv.descripcion
+            HAVING total > 0
+            ORDER BY sr.anio, sr.mes, sr.jurisdiccion, cv.apartado, sr.variable
+        """
+
+        cursor.execute(query, params)
+        resultados = cursor.fetchall() or []
+
+        return jsonify({"status": "success", "data": resultados})
+
+    except Exception as e:
+        print(f"❌ Error al exportar Excel: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 400
+    finally:
+        cursor.close()

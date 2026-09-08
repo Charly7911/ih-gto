@@ -410,47 +410,55 @@
     }
 
 
-    function exportarFiltradoExcel() {
-        // 1. Verificar si existen datos cargados desde el backend
-        if (!datosFiltradosSis || datosFiltradosSis.length === 0) {
-            alert("No hay datos disponibles para exportar con los filtros seleccionados.");
-            return;
-        }
-
-        // 2. Feedback visual en el botón
+    async function exportarFiltradoExcel() {
+        // 1. Feedback visual en el botón
         const btn = document.getElementById("btnExportarExcel");
         const textoOriginal = btn.innerHTML;
-        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Generando...';
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Consultando datos...';
         btn.disabled = true;
 
         try {
-            // 3. Obtener el nivel de agrupación activo del DOM
+            // 2. Obtener valores de los filtros del DOM
             const nivelAgrupacion = document.getElementById("nivel_agrupacion")?.value || "clues";
+            const moduloActual = document.getElementById("filtroSisDetalle")?.value || "todas";
 
-            // Obtener el módulo activo seleccionado en el dropdown
-            const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
+            // Obtener arrays con los valores seleccionados en los select/multiselect
+            const jurisdicciones = Array.from(document.querySelectorAll('#filtroJurisdiccion option:checked')).map(o => o.value);
+            const municipios = Array.from(document.querySelectorAll('#filtroMunicipio option:checked')).map(o => o.value);
+            const unidades = Array.from(document.querySelectorAll('#filtroUnidad option:checked')).map(o => o.value);
+            const anios = Array.from(document.querySelectorAll('#filtroAnio option:checked')).map(o => o.value);
+            const meses = Array.from(document.querySelectorAll('#filtroMes option:checked')).map(o => o.value);
 
-            // Nombres legibles para las columnas según el módulo activo
-            const nombresModulos = {
-                "consultas": "Consultas",
-                "embarazadas": "Embarazadas",
-                "mental": "Salud Mental",
-                "bucal": "Salud Bucal",
-                "tamiz": "Tamiz",
-                "planificacion_familiar": "Planificación Familiar",
-                "detecciones": "Detecciones",
-                "detecciones_cardiometabolicas": "Detecciones Cardiometabólicas",
-                "orientacion_lac_des_obe": "Orientación Lac/Des/Obe",
-                "orientacion_eda_ira": "Orientación EDA/IRA",
-                "otros": "Otros"
+            // 3. Crear el objeto con los datos a enviar al Backend
+            // 'variablesSeleccionadas' contiene únicamente los checklists marcados en tu modal/catálogo
+            const payload = {
+                nivel_agrupacion: nivelAgrupacion,
+                modulo_activo: moduloActual,
+                jurisdicciones: jurisdicciones,
+                municipios: municipios,
+                unidades: unidades,
+                anios: anios,
+                meses: meses,
+                variables: typeof variablesSeleccionadas !== 'undefined' ? variablesSeleccionadas : {}
             };
 
-            // 4. Mapear los datos según el Nivel de Agrupación elegido
-            const datosParaExcel = [];
+            // 4. Hacer la petición al Endpoint detallado en Python
+            const response = await fetch('/sis_primer_nivel/api/exportar_excel_detallado', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-            datosFiltradosSis.forEach(r => {
-                // 🟢 CONSTRUCCIÓN DINÁMICA DE LA CABECERA SEGÚN NIVEL DE AGRUPACIÓN
-                const filaBase = {
+            const res = await response.json();
+
+            if (res.status !== "success" || !res.data || res.data.length === 0) {
+                alert("No se encontraron registros detallados para los filtros y variables seleccionadas.");
+                return;
+            }
+
+            // 5. Mapear la respuesta para generar la estructura solicitada en Excel
+            const datosParaExcel = res.data.map(r => {
+                const fila = {
                     "Año": Number(r.anio) || '',
                     "Mes": Number(r.mes) || '',
                     "Jurisdicción": r.jurisdiccion || 'Sin Especificar'
@@ -458,56 +466,29 @@
 
                 // Solo agregamos Municipio si la agrupación es por Municipio o CLUES
                 if (nivelAgrupacion === "municipio" || nivelAgrupacion === "clues") {
-                    filaBase["Municipio"] = (r.municipio && r.municipio !== 'N/A') ? r.municipio : 'Sin Especificar';
+                    fila["Municipio"] = (r.municipio && r.municipio !== 'N/A') ? r.municipio : 'Sin Especificar';
                 }
 
-                // Solo agregamos CLUES y Unidad si la agrupación es por CLUES
+                // Solo agregamos CLUES y Nombre Unidad si la agrupación es por CLUES
                 if (nivelAgrupacion === "clues") {
-                    filaBase["CLUES"] = (r.clues && r.clues !== 'N/A') ? r.clues : '-';
-                    filaBase["Nombre Unidad"] = (r.nombre_unidad && r.nombre_unidad !== 'N/A') ? r.nombre_unidad : '';
+                    fila["CLUES"] = (r.clues && r.clues !== 'N/A') ? r.clues : '-';
+                    fila["Nombre Unidad"] = (r.nombre_unidad && r.nombre_unidad !== 'N/A') ? r.nombre_unidad : '';
                 }
 
-                // 🟢 INCLUSIÓN DE MÓDULOS / VARIABLES
-                if (moduloActual === "todas") {
-                    let totalFila = 0;
-                    const camposModulo = [
-                        'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
-                        'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
-                        'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
-                    ];
+                // Columnas detalladas por Apartado y Variable solicitadas:
+                fila["Apartado"] = r.apartado;
+                fila["Descripción Apartado"] = r.descripcion_apartado;
+                fila["Variable"] = r.variable;
+                fila["Descripción Variable"] = r.descripcion_variable;
+                fila["Total"] = Number(r.total) || 0;
 
-                    camposModulo.forEach(m => {
-                        const val = Number(r[m]) || 0;
-                        filaBase[nombresModulos[m] || m] = val;
-                        totalFila += val;
-                    });
-
-                    filaBase["Total"] = totalFila;
-
-                    if (totalFila > 0) {
-                        datosParaExcel.push(filaBase);
-                    }
-
-                } else {
-                    const valorModulo = Number(r[moduloActual]) || Number(r.total) || Number(r.valor) || 0;
-
-                    if (valorModulo > 0) {
-                        filaBase[nombresModulos[moduloActual] || "Total"] = valorModulo;
-                        datosParaExcel.push(filaBase);
-                    }
-                }
+                return fila;
             });
-
-            // 5. Validar si existen registros tras procesar
-            if (datosParaExcel.length === 0) {
-                alert("Los filtros aplicados no arrojaron registros con valores mayores a 0.");
-                return;
-            }
 
             // 6. Generar el libro Excel con SheetJS
             const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
             const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS Filtrado");
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Detalle SIS");
 
             // Auto-ajustar ancho de columnas dinámicamente
             const maxAnchos = Object.keys(datosParaExcel[0]).map(key => ({
@@ -515,18 +496,18 @@
             }));
             worksheet['!cols'] = maxAnchos;
 
-            // Nombre de archivo dinámico reflejando el agrupamiento
+            // Nombre de archivo dinámico
             const fechaDescarga = new Date().toISOString().slice(0, 10);
-            const nombreArchivo = `SIS_${nivelAgrupacion.toUpperCase()}_${moduloActual}_${fechaDescarga}.xlsx`;
+            const nombreArchivo = `SIS_Detallado_${nivelAgrupacion.toUpperCase()}_${moduloActual}_${fechaDescarga}.xlsx`;
 
             // Descargar archivo
             XLSX.writeFile(workbook, nombreArchivo);
 
         } catch (error) {
             console.error("Error al exportar a Excel:", error);
-            alert("Ocurrió un error al intentar generar el archivo Excel.");
+            alert("Ocurrió un error al intentar generar la exportación detallada.");
         } finally {
-            // Restaurar botón
+            // Restaurar estado del botón
             btn.innerHTML = textoOriginal;
             btn.disabled = false;
         }
