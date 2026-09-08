@@ -194,6 +194,7 @@ def dashboard_sis_primer_nivel():
     )
 
 
+
 @sis_pn.route("/api/filtrar", methods=["POST"])
 @login_required
 @csrf.exempt
@@ -352,25 +353,27 @@ def filtrar_datos_sis():
         cursor.close()
 
 
+
 @sis_pn.route("/api/exportar_excel_detallado", methods=["POST"])
 @login_required
 @csrf.exempt
 def exportar_excel_detallado():
     data = request.get_json(silent=True) or {}
 
-    unidades = [str(u) for u in data.get("unidades", []) if u]
-    jurisdicciones = [str(j) for j in data.get("jurisdicciones", []) if j]
-    municipios = [str(m) for m in data.get("municipios", []) if m]
+    # Convertir filtros a tipos de datos compatibles con la BD
+    unidades = [str(u).strip() for u in data.get("unidades", []) if u]
+    jurisdicciones = [int(j) for j in data.get("jurisdicciones", []) if str(j).isdigit()]
+    municipios = [str(m).strip() for m in data.get("municipios", []) if m]
     anios = [int(a) for a in data.get("anios", []) if str(a).isdigit()]
     meses = [int(m) for m in data.get("meses", []) if str(m).isdigit()]
+    
     variables_seleccionadas = data.get("variables", {}) or {}
     nivel_agrupacion = str(data.get("nivel_agrupacion", "clues")).lower()
-    modulo_activo = str(data.get("modulo_activo", "todas")).lower()
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
-        # Define dinámica de ubicación según nivel de agrupación
+        # 1. Configuración dinámica según Nivel de Agrupación
         if nivel_agrupacion == "jurisdiccion":
             select_geo = "sr.jurisdiccion, 'N/A' AS municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
             group_geo = "sr.jurisdiccion"
@@ -381,11 +384,11 @@ def exportar_excel_detallado():
             select_geo = "sr.jurisdiccion, sr.municipio, sr.clues, COALESCE(cu.nombre_unidad, sr.clues) AS nombre_unidad"
             group_geo = "sr.jurisdiccion, sr.municipio, sr.clues, cu.nombre_unidad"
 
-        # Filtros base
+        # 2. Construcción dinámica de condiciones WHERE
         where_conditions = ["1=1"]
         params = []
 
-        # Extraer dinámicamente las variables de los checklists
+        # Extraer variables seleccionadas del objeto
         todas_vars = set()
         if isinstance(variables_seleccionadas, dict):
             for m_key, v_list in variables_seleccionadas.items():
@@ -398,48 +401,64 @@ def exportar_excel_detallado():
             for v in variables_seleccionadas:
                 if v: todas_vars.add(str(v).strip())
 
-        # Si el usuario eligió un módulo específico pero no hay checklist personalizado
-        if not todas_vars and modulo_activo != "todas":
-            vars_def = VARIABLES_DEFAULT.get(modulo_activo, [])
-            for v in vars_def:
-                todas_vars.add(str(v).strip())
-
-        # Aplicar filtro WHERE IN de variables solo si existen
+        # Aplicar filtro WHERE IN para variables
         if todas_vars:
             lista_vars = list(todas_vars)
             placeholders_v = ','.join(['%s'] * len(lista_vars))
             where_conditions.append(f"sr.variable IN ({placeholders_v})")
             params.extend(lista_vars)
 
+        # Aplicar filtros de localización y tiempo con cast adecuado
         if unidades:
             placeholders_u = ','.join(['%s'] * len(unidades))
             where_conditions.append(f"(sr.clues IN ({placeholders_u}) OR cu.nombre_unidad IN ({placeholders_u}))")
             params.extend(unidades + unidades)
 
-        for col, lst in [('sr.jurisdiccion', jurisdicciones), ('sr.municipio', municipios), ('sr.anio', anios), ('sr.mes', meses)]:
-            if lst:
-                placeholders_l = ','.join(['%s'] * len(lst))
-                where_conditions.append(f"{col} IN ({placeholders_l})")
-                params.extend(lst)
+        if jurisdicciones:
+            placeholders_j = ','.join(['%s'] * len(jurisdicciones))
+            where_conditions.append(f"sr.jurisdiccion IN ({placeholders_j})")
+            params.extend(jurisdicciones)
 
-        # Consulta SQL con JOIN al catálogo de variables
+        if municipios:
+            placeholders_m = ','.join(['%s'] * len(municipios))
+            where_conditions.append(f"sr.municipio IN ({placeholders_m})")
+            params.extend(municipios)
+
+        if anios:
+            placeholders_a = ','.join(['%s'] * len(anios))
+            where_conditions.append(f"sr.anio IN ({placeholders_a})")
+            params.extend(anios)
+
+        if meses:
+            placeholders_mes = ','.join(['%s'] * len(meses))
+            where_conditions.append(f"sr.mes IN ({placeholders_mes})")
+            params.extend(meses)
+
+        # 3. Consulta SQL directa optimizada
         query = f"""
             SELECT 
                 sr.anio,
                 sr.mes,
                 {select_geo},
-                COALESCE(cv.apartado, 'S/A') AS apartado,
+                COALESCE(cv.apartado, sr.apartado) AS apartado,
                 COALESCE(cv.descripcion_apartado, 'Sin Apartado') AS descripcion_apartado,
                 sr.variable,
                 COALESCE(cv.descripcion, sr.variable) AS descripcion_variable,
-                SUM(CAST(sr.total AS UNSIGNED)) AS total
+                SUM(sr.total) AS total
             FROM sis_registros_primer_nivel sr
             LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
             LEFT JOIN catalogo_variables cv ON sr.variable = cv.variable
             WHERE {" AND ".join(where_conditions)}
-            GROUP BY sr.anio, sr.mes, {group_geo}, cv.apartado, cv.descripcion_apartado, sr.variable, cv.descripcion
+            GROUP BY 
+                sr.anio, 
+                sr.mes, 
+                {group_geo}, 
+                COALESCE(cv.apartado, sr.apartado), 
+                COALESCE(cv.descripcion_apartado, 'Sin Apartado'), 
+                sr.variable, 
+                COALESCE(cv.descripcion, sr.variable)
             HAVING total > 0
-            ORDER BY sr.anio, sr.mes, sr.jurisdiccion, cv.apartado, sr.variable
+            ORDER BY sr.anio, sr.mes, sr.jurisdiccion, apartado, sr.variable
         """
 
         cursor.execute(query, params)
@@ -448,10 +467,9 @@ def exportar_excel_detallado():
         return jsonify({"status": "success", "data": resultados})
 
     except Exception as e:
-        print(f"❌ Error al exportar Excel detallado: {str(e)}")
-        # Imprimir traza completa en la consola de Flask para diagnóstico
         import traceback
-        traceback.print_exc()
-        return jsonify({"status": "error", "message": str(e)}), 400
+        error_detallado = traceback.format_exc()
+        print(f"❌ Error al exportar Excel detallado:\n{error_detallado}")
+        return jsonify({"status": "error", "message": str(e), "trace": error_detallado}), 500
     finally:
         cursor.close()

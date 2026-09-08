@@ -413,9 +413,11 @@
     async function exportarFiltradoExcel() {
         // 1. Feedback visual en el botón
         const btn = document.getElementById("btnExportarExcel");
-        const textoOriginal = btn.innerHTML;
-        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Consultando datos...';
-        btn.disabled = true;
+        const textoOriginal = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Consultando datos...';
+            btn.disabled = true;
+        }
 
         try {
             // 2. Obtener valores de los filtros del DOM
@@ -423,14 +425,21 @@
             const moduloActual = document.getElementById("filtroSisDetalle")?.value || "todas";
 
             // Obtener arrays con los valores seleccionados en los select/multiselect
-            const jurisdicciones = Array.from(document.querySelectorAll('#filtroJurisdiccion option:checked')).map(o => o.value);
-            const municipios = Array.from(document.querySelectorAll('#filtroMunicipio option:checked')).map(o => o.value);
-            const unidades = Array.from(document.querySelectorAll('#filtroUnidad option:checked')).map(o => o.value);
-            const anios = Array.from(document.querySelectorAll('#filtroAnio option:checked')).map(o => o.value);
-            const meses = Array.from(document.querySelectorAll('#filtroMes option:checked')).map(o => o.value);
+            const jurisdicciones = Array.from(document.querySelectorAll('#filtroJurisdiccion option:checked')).map(o => o.value).filter(Boolean);
+            const municipios = Array.from(document.querySelectorAll('#filtroMunicipio option:checked')).map(o => o.value).filter(Boolean);
+            const unidades = Array.from(document.querySelectorAll('#filtroUnidad option:checked')).map(o => o.value).filter(Boolean);
+            const anios = Array.from(document.querySelectorAll('#filtroAnio option:checked')).map(o => o.value).filter(Boolean);
+            const meses = Array.from(document.querySelectorAll('#filtroMes option:checked')).map(o => o.value).filter(Boolean);
 
-            // 3. Crear el objeto con los datos a enviar al Backend
-            // 'variablesSeleccionadas' contiene únicamente los checklists marcados en tu modal/catálogo
+            // Obtención de variables seleccionadas desde el scope global o local
+            let varsParaEnviar = {};
+            if (typeof variablesSeleccionadas !== 'undefined' && variablesSeleccionadas) {
+                varsParaEnviar = variablesSeleccionadas;
+            } else if (window.variablesSeleccionadas) {
+                varsParaEnviar = window.variablesSeleccionadas;
+            }
+
+            // 3. Crear el objeto Payload
             const payload = {
                 nivel_agrupacion: nivelAgrupacion,
                 modulo_activo: moduloActual,
@@ -439,7 +448,7 @@
                 unidades: unidades,
                 anios: anios,
                 meses: meses,
-                variables: typeof variablesSeleccionadas !== 'undefined' ? variablesSeleccionadas : {}
+                variables: varsParaEnviar
             };
 
             // 4. Hacer la petición al Endpoint detallado en Python
@@ -451,12 +460,21 @@
 
             const res = await response.json();
 
-            if (res.status !== "success" || !res.data || res.data.length === 0) {
+            // Si el backend devuelve un error explícito (estatus 400 o 500)
+            if (!response.ok || res.status !== "success") {
+                const msjError = res.message || "Error desconocido en el servidor.";
+                console.error("❌ Detalles del error del Servidor:", res);
+                alert(`No se pudo generar la exportación:\n${msjError}`);
+                return;
+            }
+
+            // Validar si existen datos
+            if (!res.data || res.data.length === 0) {
                 alert("No se encontraron registros detallados para los filtros y variables seleccionadas.");
                 return;
             }
 
-            // 5. Mapear la respuesta para generar la estructura solicitada en Excel
+            // 5. Mapear la respuesta para generar la estructura de Excel
             const datosParaExcel = res.data.map(r => {
                 const fila = {
                     "Año": Number(r.anio) || '',
@@ -464,22 +482,22 @@
                     "Jurisdicción": r.jurisdiccion || 'Sin Especificar'
                 };
 
-                // Solo agregamos Municipio si la agrupación es por Municipio o CLUES
+                // Municipio (si aplica por agrupación)
                 if (nivelAgrupacion === "municipio" || nivelAgrupacion === "clues") {
                     fila["Municipio"] = (r.municipio && r.municipio !== 'N/A') ? r.municipio : 'Sin Especificar';
                 }
 
-                // Solo agregamos CLUES y Nombre Unidad si la agrupación es por CLUES
+                // CLUES y Nombre Unidad (si aplica por agrupación)
                 if (nivelAgrupacion === "clues") {
                     fila["CLUES"] = (r.clues && r.clues !== 'N/A') ? r.clues : '-';
                     fila["Nombre Unidad"] = (r.nombre_unidad && r.nombre_unidad !== 'N/A') ? r.nombre_unidad : '';
                 }
 
-                // Columnas detalladas por Apartado y Variable solicitadas:
-                fila["Apartado"] = r.apartado;
-                fila["Descripción Apartado"] = r.descripcion_apartado;
-                fila["Variable"] = r.variable;
-                fila["Descripción Variable"] = r.descripcion_variable;
+                // Columnas de variables y apartados
+                fila["Apartado"] = r.apartado || 'S/A';
+                fila["Descripción Apartado"] = r.descripcion_apartado || 'Sin Apartado';
+                fila["Variable"] = r.variable || '';
+                fila["Descripción Variable"] = r.descripcion_variable || '';
                 fila["Total"] = Number(r.total) || 0;
 
                 return fila;
@@ -504,15 +522,17 @@
             XLSX.writeFile(workbook, nombreArchivo);
 
         } catch (error) {
-            console.error("Error al exportar a Excel:", error);
-            alert("Ocurrió un error al intentar generar la exportación detallada.");
+            console.error("❌ Error al exportar a Excel:", error);
+            alert("Ocurrió un error al intentar procesar la exportación detallada.");
         } finally {
             // Restaurar estado del botón
-            btn.innerHTML = textoOriginal;
-            btn.disabled = false;
+            if (btn) {
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+            }
         }
     }
-    
+
 
     function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
     function ocultarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.add("d-none"); }
