@@ -411,19 +411,30 @@
 
 
     async function exportarFiltradoExcel() {
+        // 1. Recopilar filtros del formulario y estado actual
+        const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
+        let variablesAPasar = {};
+        if (moduloActual === "todas") {
+            variablesAPasar = { todas: variablesPersonalizadasEstado["todas"] || [] };
+        } else {
+            variablesAPasar = { [moduloActual]: variablesPersonalizadasEstado[moduloActual] || [] };
+        }
+
         const payload = {
-            unidades: obtenerUnidadesSeleccionadas(),      // Array []
-            jurisdicciones: obtenerJurisdicciones(),        // Array []
-            municipios: obtenerMunicipios(),              // Array []
-            anios: obtenerAnios(),                        // Array []
-            meses: obtenerMeses(),                        // Array []
-            variables: obtenerVariablesSeleccionadas(),    // Objeto {} o Array []
-            nivel_agrupacion: obtenerNivelAgrupacion()     // String 'clues', 'municipio', 'jurisdiccion'
+            unidades: typeof window.getUnidadesSeleccionadas === 'function' ? window.getUnidadesSeleccionadas() : [],
+            jurisdicciones: typeof window.getJurisdiccionesSeleccionadas === 'function' ? window.getJurisdiccionesSeleccionadas() : [],
+            municipios: typeof window.getMunicipiosSeleccionados === 'function' ? window.getMunicipiosSeleccionados() : [],
+            anios: typeof window.getAniosSeleccionados === 'function' ? window.getAniosSeleccionados() : [],
+            meses: typeof window.getMesesSeleccionados === 'function' ? window.getMesesSeleccionados() : [],
+            servicios: typeof window.getServiciosSeleccionados === 'function' ? window.getServiciosSeleccionados() : [],
+            afecciones: typeof window.getAfeccionesSeleccionadas === 'function' ? window.getAfeccionesSeleccionadas() : [],
+            variables: variablesAPasar,
+            nivel_agrupacion: document.getElementById('selectNivelAgrupacion')?.value || 'clues'
         };
 
         try {
-            // Mostrar cargador o deshabilitar botón
-            mostrarSpinner(true);
+            // Indicador visual opcional (puedes mostrar un spinner si lo deseas)
+            mostrarCargandoGrafica();
 
             const response = await fetch('/sis_primer_nivel/api/exportar_excel_detallado', {
                 method: 'POST',
@@ -433,32 +444,43 @@
                 body: JSON.stringify(payload)
             });
 
-            // 2. Si el servidor devuelve un error HTTP (ej: 400, 500)
             if (!response.ok) {
-                const errData = await response.json();
+                const errData = await response.json().catch(() => ({}));
                 throw new Error(errData.message || `Error del servidor: ${response.status}`);
             }
 
             const result = await response.json();
 
             if (result.status === 'success') {
-                if (result.data.length === 0) {
+                if (!result.data || result.data.length === 0) {
                     alert("No se encontraron registros con los filtros seleccionados.");
                     return;
                 }
 
-                // 3. Generar / Descargar el Excel con la librería XLSX o Blob
-                generarArchivoExcel(result.data);
+                // 2. Verificar que SheetJS esté disponible en el navegador
+                if (typeof XLSX === 'undefined') {
+                    alert("La librería SheetJS (XLSX) no está cargada en la página.");
+                    return;
+                }
+
+                // 3. Generar la hoja y libro de trabajo Excel con SheetJS
+                const worksheet = XLSX.utils.json_to_sheet(result.data);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS");
+
+                // 4. Disparar la descarga automática en el navegador
+                const fechaActual = new Date().toISOString().slice(0, 10);
+                XLSX.writeFile(workbook, `Reporte_SIS_Primer_Nivel_${fechaActual}.xlsx`);
 
             } else {
                 alert(`Error: ${result.message}`);
             }
 
         } catch (error) {
-            console.error("❌ Error en la exportación:", error);
+            console.error("❌ Error al exportar Excel:", error);
             alert(`Ocurrió un error al generar la exportación: ${error.message}`);
         } finally {
-            mostrarSpinner(false);
+            ocultarCargandoGrafica();
         }
     }
 
