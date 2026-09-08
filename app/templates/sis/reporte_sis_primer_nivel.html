@@ -73,7 +73,8 @@
 
                             <div class="d-flex gap-2 align-items-center flex-wrap">
                                 <select id="selectTipoVistaTemporal"
-                                    class="form-select form-select-sm w-auto fw-bold text-primary border-primary">
+                                    class="form-select form-select-sm w-auto fw-bold text-primary border-primary"
+                                    onchange="renderGraficaTemporal();">
                                     <option value="mes" selected>Vista Mensual</option>
                                     <option value="anio">Vista Anual (Acumulado)</option>
                                 </select>
@@ -94,7 +95,7 @@
                                     <option value="todas">Todas</option>
                                 </select>
 
-                                <!-- 🟢 NUEVO CONTROL: Aparece dinámicamente solo si eligen "Todas" -->
+                                <!-- 🟢 NUEVO CONTROL CON ONCHANGE -->
                                 <select id="selectModoDesglose"
                                     class="form-select form-select-sm w-auto fw-bold border-info text-info d-none"
                                     onchange="renderGraficaTemporal();">
@@ -809,37 +810,70 @@
 
         const paletaColores = [
             '#2b5c8f', '#d9534f', '#20c997', '#f0ad4e', '#6f42c1',
-            '#e83e8c', '#17a2b8', '#fd7e14', '#6c757d', '#343a40'
+            '#e83e8c', '#17a2b8', '#fd7e14', '#6c757d', '#343a40', '#4E79A7'
         ];
+
+        const camposApartados = [
+            'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
+            'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
+            'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
+        ];
+
+        const etiquetasNombres = {
+            consultas: 'Consultas',
+            embarazadas: 'Embarazadas',
+            mental: 'Salud Mental',
+            bucal: 'Salud Bucal',
+            tamiz: 'Tamiz',
+            planificacion_familiar: 'Planif. Familiar',
+            detecciones: 'Detecciones',
+            detecciones_cardiometabolicas: 'Detecciones Card.',
+            orientacion_lac_des_obe: 'Orient. Lac/Des/Obe',
+            orientacion_eda_ira: 'Orient. EDA/IRA',
+            otros: 'Otros'
+        };
+
+        // Helper universal para extraer la suma total de un registro
+        const obtenerSumaFila = (r) => {
+            if (modulo === "todas") {
+                let sumaCampos = 0;
+                camposApartados.forEach(c => { sumaCampos += Number(r[c]) || 0; });
+                return sumaCampos > 0 ? sumaCampos : Number(r.total || r.valor || r.suma || 0);
+            }
+            return Number(r[modulo]) || Number(r.total) || Number(r.valor) || 0;
+        };
 
         let labels = [];
         let datasets = [];
 
-        // Helper para detectar de forma flexible el nombre del apartado en cada objeto
-        const obtenerNombreApartado = (r) => {
-            return r.descripcion_apartado || r.apartado || r.seccion || r.modulo || r.nombre_apartado || null;
-        };
-
-        // Helper para obtener el valor numérico
-        const obtenerValor = (r) => Number(r.total || r.valor || r.suma || 0);
-
-        // 🟢 MODO DESGLOSADO POR APARTADO (CUANDO SELECCIONAN "TODAS" Y "POR APARTADO")
+        // 🟢 MODO DESGLOSADO POR APARTADO (AL ELEGIR "TODAS" + "POR APARTADO")
         if (modulo === "todas" && modoDesglose === "por_apartado") {
+            const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
+
             if (tipoVista === 'anio') {
                 const apartadosAnual = {};
 
                 data.forEach(r => {
-                    const nombreApartado = obtenerNombreApartado(r) || "General";
-                    const val = obtenerValor(r);
-                    if (val > 0) {
-                        apartadosAnual[nombreApartado] = (apartadosAnual[nombreApartado] || 0) + val;
+                    // Opción A: Viene estructurado por columnas clave (consultas, mental...)
+                    camposApartados.forEach(campo => {
+                        const val = Number(r[campo]) || 0;
+                        if (val > 0) {
+                            const labelApartado = etiquetasNombres[campo] || campo;
+                            apartadosAnual[labelApartado] = (apartadosAnual[labelApartado] || 0) + val;
+                        }
+                    });
+
+                    // Opción B: Viene estructurado por texto en descripcion_apartado
+                    const nombreTexto = r.descripcion_apartado || r.apartado;
+                    if (nombreTexto && Number(r.total || r.valor)) {
+                        apartadosAnual[nombreTexto] = (apartadosAnual[nombreTexto] || 0) + Number(r.total || r.valor);
                     }
                 });
 
                 labels = Object.keys(apartadosAnual);
                 const valores = labels.map(k => Math.round(apartadosAnual[k]));
 
-                if (valores.length === 0 || valores.reduce((a, b) => a + b, 0) === 0) return;
+                if (valores.length === 0) return;
 
                 datasets = [{
                     label: 'Total por Apartado',
@@ -847,27 +881,35 @@
                     backgroundColor: paletaColores.slice(0, labels.length)
                 }];
             } else {
-                const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
                 labels = Object.values(mesesNombres);
-
                 const apartadosMes = {};
 
                 data.forEach(r => {
                     if (!r.mes) return;
-                    const nombreApartado = obtenerNombreApartado(r) || "General";
-                    const val = obtenerValor(r);
-
-                    if (!apartadosMes[nombreApartado]) {
-                        apartadosMes[nombreApartado] = {};
-                    }
-
                     const mesNum = Number(r.mes);
-                    apartadosMes[nombreApartado][mesNum] = (apartadosMes[nombreApartado][mesNum] || 0) + val;
+
+                    // Opción A: Extraer de propiedades tipo módulo (r.consultas, etc.)
+                    camposApartados.forEach(campo => {
+                        const val = Number(r[campo]) || 0;
+                        if (val > 0) {
+                            const labelKey = etiquetasNombres[campo] || campo;
+                            if (!apartadosMes[labelKey]) apartadosMes[labelKey] = {};
+                            apartadosMes[labelKey][mesNum] = (apartadosMes[labelKey][mesNum] || 0) + val;
+                        }
+                    });
+
+                    // Opción B: Extraer de texto de la BD (r.descripcion_apartado)
+                    const nombreTexto = r.descripcion_apartado || r.apartado;
+                    const valTotal = Number(r.total || r.valor || 0);
+                    if (nombreTexto && valTotal > 0) {
+                        if (!apartadosMes[nombreTexto]) apartadosMes[nombreTexto] = {};
+                        apartadosMes[nombreTexto][mesNum] = (apartadosMes[nombreTexto][mesNum] || 0) + valTotal;
+                    }
                 });
 
-                datasets = Object.keys(apartadosMes).map((apartadoKey, index) => ({
-                    label: apartadoKey,
-                    data: Array.from({ length: 12 }, (_, i) => Math.round(apartadosMes[apartadoKey][i + 1] || 0)),
+                datasets = Object.keys(apartadosMes).map((key, index) => ({
+                    label: key,
+                    data: Array.from({ length: 12 }, (_, i) => Math.round(apartadosMes[key][i + 1] || 0)),
                     borderColor: paletaColores[index % paletaColores.length],
                     backgroundColor: paletaColores[index % paletaColores.length],
                     tension: 0.3,
@@ -878,13 +920,15 @@
                 if (!datasets.some(ds => ds.data.some(v => v > 0))) return;
             }
         }
-        // 🟡 MODO ACUMULADO / NORMAL
+        // 🟡 MODO NORMAL / ACUMULADO POR AÑO (VISTA GENERAL ORIGINAL)
         else {
+            const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
+
             if (tipoVista === 'anio') {
                 const acumuladoAnual = {};
                 data.forEach(r => {
-                    const anio = r.anio || r.año || "N/A";
-                    acumuladoAnual[anio] = (acumuladoAnual[anio] || 0) + obtenerValor(r);
+                    const anioKey = r.anio || r.año || "Año";
+                    acumuladoAnual[anioKey] = (acumuladoAnual[anioKey] || 0) + obtenerSumaFila(r);
                 });
 
                 labels = Object.keys(acumuladoAnual).sort();
@@ -898,7 +942,6 @@
                     backgroundColor: paletaColores.slice(0, labels.length)
                 }];
             } else {
-                const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
                 labels = Object.values(mesesNombres);
                 const resumen = {};
 
@@ -906,7 +949,7 @@
                     if (!r.mes) return;
                     const key = `Año ${r.anio || r.año}`;
                     if (!resumen[key]) resumen[key] = {};
-                    resumen[key][Number(r.mes)] = (resumen[key][Number(r.mes)] || 0) + obtenerValor(r);
+                    resumen[key][Number(r.mes)] = (resumen[key][Number(r.mes)] || 0) + obtenerSumaFila(r);
                 });
 
                 datasets = Object.keys(resumen).map((key, index) => ({
@@ -923,9 +966,9 @@
             }
         }
 
-        // Renderizar gráfico
+        // Dibujar la gráfica
         graficaSisMensual = new Chart(ctx, {
-            type: (tipoVista === 'anio') ? 'bar' : 'line',
+            type: tipoVista === 'anio' ? 'bar' : 'line',
             data: { labels, datasets },
             options: {
                 responsive: true,
@@ -946,6 +989,8 @@
             }
         });
     }
+
+
     /* 6. INICIALIZACIÓN DE EVENTOS */
     document.addEventListener("DOMContentLoaded", () => {
         renderSubvariables();
