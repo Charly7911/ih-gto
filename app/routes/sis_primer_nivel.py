@@ -65,12 +65,6 @@ VARIABLES_DEFAULT = {
     "orientacion_eda_ira": ['MAC01', 'MAC02']
 }
 
-def _construir_clausula_in(columna, lista):
-    if not lista:
-        return "", []
-    placeholders = ','.join(['%s'] * len(lista))
-    return f" AND {columna} IN ({placeholders})", list(lista)
-
 def obtener_modulo_por_apartado(apartado_raw, variable_code=""):
     apt = str(apartado_raw or "").strip()
     var = str(variable_code or "").upper().strip()
@@ -121,12 +115,13 @@ def dashboard_sis_primer_nivel():
             if r.get("anio") is not None:
                 r["anio"] = int(r["anio"])
 
-        anios_disponibles = sorted({r["anio"] for r in resultados if r.get("anio")}, reverse=True)
-        unidades_disponibles = sorted({r["nombre_unidad"] for r in resultados if r.get("nombre_unidad")})
+        # ORDENAMIENTO SEGURO CONTRA VALORES None
+        anios_disponibles = sorted({r["anio"] for r in resultados if r.get("anio") is not None}, reverse=True)
+        unidades_disponibles = sorted({str(r["nombre_unidad"]) for r in resultados if r.get("nombre_unidad")})
         jurisdicciones_disponibles = sorted({str(r["jurisdiccion"]) for r in resultados if r.get("jurisdiccion") is not None})
 
         municipios_set = {
-            (r["municipio"], str(r["jurisdiccion"])) 
+            (str(r["municipio"]), str(r["jurisdiccion"])) 
             for r in resultados 
             if r.get("municipio") and r.get("jurisdiccion") is not None
         }
@@ -194,7 +189,6 @@ def dashboard_sis_primer_nivel():
     )
 
 
-
 @sis_pn.route("/api/filtrar", methods=["POST"])
 @login_required
 @csrf.exempt
@@ -214,7 +208,7 @@ def filtrar_datos_sis():
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
-        # 🟢 1. CONFIGURACIÓN GEOGRÁFICA
+        # CONFIGURACIÓN GEOGRÁFICA
         if nivel_agrupacion == "jurisdiccion":
             select_geo = "sr.anio, sr.mes, sr.jurisdiccion, 'N/A' AS municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
             group_geo = "sr.anio, sr.mes, sr.jurisdiccion"
@@ -231,14 +225,13 @@ def filtrar_datos_sis():
             select_geo_agregados = "anio, mes, jurisdiccion, municipio, clues, nombre_unidad"
             group_geo_agregados = "anio, mes, jurisdiccion, municipio, clues, nombre_unidad"
 
-        # Evaluar si vienen variables específicas seleccionadas
         tiene_variables_custom = isinstance(variables_seleccionadas, dict) and any(
             isinstance(v, list) and len(v) > 0 for v in variables_seleccionadas.values()
         )
 
         datos_filtrados = []
 
-        # 🟢 2. CASO A: VISTA PRE-AGREGADA (Sin selección de variables avanzadas)
+        # CASO A: VISTA PRE-AGREGADA
         if not tiene_variables_custom:
             params_agregados = []
             where_agregados = ["1=1"]
@@ -257,7 +250,6 @@ def filtrar_datos_sis():
             str_where = " AND ".join(where_agregados)
 
             if modo_desglose == "por_apartado":
-                # Consulta dividida por apartados con parámetros seguros
                 query_base = f"""
                     SELECT {select_geo_agregados}, '01' AS apartado, 'Consultas' AS descripcion_apartado, SUM(consultas) AS total FROM sis_registros_agregados_primer_nivel WHERE {str_where} GROUP BY {group_geo_agregados}
                     UNION ALL
@@ -267,7 +259,6 @@ def filtrar_datos_sis():
                     UNION ALL
                     SELECT {select_geo_agregados}, '56' AS apartado, 'Detecciones' AS descripcion_apartado, SUM(detecciones) AS total FROM sis_registros_agregados_primer_nivel WHERE {str_where} GROUP BY {group_geo_agregados}
                 """
-                # Al repetirse 4 veces en UNION ALL, replicamos los parámetros 4 veces
                 cursor.execute(query_base, params_agregados * 4)
             else:
                 query_base = f"""
@@ -288,7 +279,7 @@ def filtrar_datos_sis():
 
             datos_filtrados = cursor.fetchall() or []
 
-        # 🟢 3. CASO B: TABLA DETALLADA (Variables personalizadas/múltiples apartados)
+        # CASO B: TABLA DETALLADA (Variables personalizadas)
         else:
             todas_las_variables_activas = set()
 
@@ -331,13 +322,16 @@ def filtrar_datos_sis():
                 select_extra = ", SUM(CAST(sr.total AS UNSIGNED)) AS total"
                 group_extra = group_geo
 
+            # FORZANDO LA INTERCALACIÓN (COLLATE) EN LOS JOINS PARA PREVENIR ERROR 1267
             query_base = f"""
                 SELECT 
                     {select_geo}
                     {select_extra}
                 FROM sis_registros_primer_nivel sr
-                LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
-                LEFT JOIN catalogo_variables cv ON sr.variable = cv.variable
+                LEFT JOIN catalogo_unidades_primer_nivel cu 
+                    ON sr.clues COLLATE utf8mb4_general_ci = cu.clues COLLATE utf8mb4_general_ci
+                LEFT JOIN catalogo_variables cv 
+                    ON sr.variable COLLATE utf8mb4_general_ci = cv.variable COLLATE utf8mb4_general_ci
                 WHERE {" AND ".join(where_conditions)}
                 GROUP BY {group_extra}
                 ORDER BY sr.anio, sr.mes, sr.jurisdiccion
