@@ -238,33 +238,52 @@ def filtrar_datos_sis():
 
         # CASO A: VISTA PRE-AGREGADA (SIN VARIABLES ESPECÍFICAS SELECCIONADAS)
         if not tiene_variables_custom:
-            query_base = f"""
-                SELECT 
-                    {select_geo_agregados},
-                    SUM(consultas) AS consultas, SUM(mental) AS mental, SUM(bucal) AS bucal, 
-                    SUM(embarazadas) AS embarazadas, SUM(planificacion_familiar) AS planificacion_familiar, 
-                    SUM(detecciones) AS detecciones, SUM(tamiz) AS tamiz, 
-                    SUM(detecciones_cardiometabolicas) AS detecciones_cardiometabolicas, 
-                    SUM(orientacion_lac_des_obe) AS orientacion_lac_des_obe, 
-                    SUM(orientacion_eda_ira) AS orientacion_eda_ira
-                FROM sis_registros_agregados_primer_nivel
-                WHERE 1=1
-            """
-            params = []
+            if modo_desglose == "por_apartado":
+                query_base = f"""
+                    SELECT 
+                        {select_geo_agregados},
+                        '01' AS apartado, 'Consultas' AS descripcion_apartado, SUM(consultas) AS total FROM sis_registros_agregados_primer_nivel WHERE 1=1 {clausulas_where} GROUP BY {group_geo_agregados}
+                    UNION ALL
+                    SELECT 
+                        {select_geo_agregados},
+                        '02' AS apartado, 'Salud Mental' AS descripcion_apartado, SUM(mental) AS total FROM sis_registros_agregados_primer_nivel WHERE 1=1 {clausulas_where} GROUP BY {group_geo_agregados}
+                    UNION ALL
+                    SELECT 
+                        {select_geo_agregados},
+                        '24' AS apartado, 'Embarazadas' AS descripcion_apartado, SUM(embarazadas) AS total FROM sis_registros_agregados_primer_nivel WHERE 1=1 {clausulas_where} GROUP BY {group_geo_agregados}
+                    UNION ALL
+                    SELECT 
+                        {select_geo_agregados},
+                        '56' AS apartado, 'Detecciones' AS descripcion_apartado, SUM(detecciones) AS total FROM sis_registros_agregados_primer_nivel WHERE 1=1 {clausulas_where} GROUP BY {group_geo_agregados}
+                """
+            else:
+                query_base = f"""
+                    SELECT 
+                        {select_geo_agregados},
+                        SUM(consultas) AS consultas, SUM(mental) AS mental, SUM(bucal) AS bucal, 
+                        SUM(embarazadas) AS embarazadas, SUM(planificacion_familiar) AS planificacion_familiar, 
+                        SUM(detecciones) AS detecciones, SUM(tamiz) AS tamiz, 
+                        SUM(detecciones_cardiometabolicas) AS detecciones_cardiometabolicas, 
+                        SUM(orientacion_lac_des_obe) AS orientacion_lac_des_obe, 
+                        SUM(orientacion_eda_ira) AS orientacion_eda_ira
+                    FROM sis_registros_agregados_primer_nivel
+                    WHERE 1=1
+                """
+                params = []
 
-            if unidades:
-                placeholders = ','.join(['%s'] * len(unidades))
-                query_base += f" AND (clues IN ({placeholders}) OR nombre_unidad IN ({placeholders}))"
-                params.extend(unidades + unidades)
+                if unidades:
+                    placeholders = ','.join(['%s'] * len(unidades))
+                    query_base += f" AND (clues IN ({placeholders}) OR nombre_unidad IN ({placeholders}))"
+                    params.extend(unidades + unidades)
 
-            for col, lst in [('jurisdiccion', jurisdicciones), ('municipio', municipios), ('anio', anios), ('mes', meses)]:
-                clausula, vals = _construir_clausula_in(col, lst)
-                query_base += clausula
-                params.extend(vals)
+                for col, lst in [('jurisdiccion', jurisdicciones), ('municipio', municipios), ('anio', anios), ('mes', meses)]:
+                    clausula, vals = _construir_clausula_in(col, lst)
+                    query_base += clausula
+                    params.extend(vals)
 
-            query_base += f" GROUP BY {group_geo_agregados} ORDER BY anio, mes, jurisdiccion"
-            cursor.execute(query_base, params)
-            datos_filtrados = cursor.fetchall() or []
+                query_base += f" GROUP BY {group_geo_agregados} ORDER BY anio, mes, jurisdiccion"
+                cursor.execute(query_base, params)
+                datos_filtrados = cursor.fetchall() or []
 
         # CASO B: TABLA DETALLADA CON SELECCIÓN DE VARIABLES
         else:
