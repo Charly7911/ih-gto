@@ -826,80 +826,128 @@
             '#e83e8c', '#17a2b8', '#fd7e14', '#6c757d', '#343a40', '#4E79A7'
         ];
 
-        const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
+        const camposApartados = [
+            'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
+            'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
+            'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
+        ];
+
+        const etiquetasNombres = {
+            consultas: 'Consultas',
+            embarazadas: 'Embarazadas',
+            mental: 'Salud Mental',
+            bucal: 'Salud Bucal',
+            tamiz: 'Tamiz',
+            planificacion_familiar: 'Planif. Familiar',
+            detecciones: 'Detecciones',
+            detecciones_cardiometabolicas: 'Detecciones Card.',
+            orientacion_lac_des_obe: 'Orient. Lac/Des/Obe',
+            orientacion_eda_ira: 'Orient. EDA/IRA',
+            otros: 'Otros'
+        };
 
         const obtenerSumaFila = (r) => {
-            return Number(r.total || r.valor || r.suma || 0);
+            if (modulo === "todas") {
+                let sumaCampos = 0;
+                camposApartados.forEach(c => { sumaCampos += Number(r[c]) || 0; });
+                return sumaCampos > 0 ? sumaCampos : Number(r.total || r.valor || r.suma || 0);
+            }
+            return Number(r[modulo]) || Number(r.total) || Number(r.valor) || 0;
         };
 
         let labels = [];
         let datasets = [];
 
-        // 🟢 1. MODO DESGLOSADO POR APARTADO O POR VARIABLE
-        if (modoDesglose === "por_apartado" || modoDesglose === "por_variable") {
 
-            // Determinar qué propiedad usaremos para la etiqueta de cada línea/barra
-            const obtenerEtiqueta = (r) => {
-                if (modoDesglose === "por_apartado") {
-                    const cod = r.apartado || "S/A";
-                    const desc = r.descripcion_apartado || "";
-                    return desc ? `Apt ${cod} - ${desc}` : `Apartado ${cod}`;
-                } else {
-                    const cod = r.variable || "S/V";
-                    const desc = r.descripcion_variable || "";
-                    return desc ? `Var ${cod} - ${desc}` : `Variable ${cod}`;
+        // 🟢 MODO DESGLOSADO POR APARTADO
+        if (modoDesglose === "por_apartado") {
+            const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
+
+            // 1. Obtener la lista de apartados únicos activos desde el catálogo dinámico o el formulario
+            // Supongamos que tienes acceso al catalogo_variables cargado desde el backend o las selecciones del usuario
+            const apartadosDetectados = {};
+
+            // Si tu Backend envía variables_seleccionadas o tienes la estructura del catálogo:
+            // Mapeamos los campos a sus apartados correspondientes
+            data.forEach(r => {
+                // Estructura cuando viene desagregado con el nombre o código del apartado
+                const aptCodigo = r.apartado || r.id_apartado || r.num_apartado;
+                const aptNombre = r.descripcion_apartado || `Apartado ${aptCodigo}`;
+
+                // Si la respuesta trae campos con prefijo o nombre directo
+                if (aptCodigo) {
+                    const label = `${aptCodigo} - ${aptNombre}`;
+                    if (!apartadosDetectados[label]) apartadosDetectados[label] = aptCodigo;
                 }
+            });
+
+            // En caso de que la respuesta venga agrupada por módulos (Consultas, Detecciones, etc.):
+            const mapModulosAApartados = {
+                consultas: "01 - Consultas",
+                mental: "02 - Salud Mental",
+                bucal: "02 - Salud Bucal",
+                embarazadas: "24 - Embarazadas",
+                planificacion_familiar: "36 - Planificación Familiar",
+                detecciones: "56 - Detecciones",
+                tamiz: "111 - Tamiz Neonatal",
+                detecciones_cardiometabolicas: "Detecciones Cardiometabólicas",
+                orientacion_lac_des_obe: "Orientación Lactancia/Obesidad",
+                orientacion_eda_ira: "Orientación EDA / IRA"
             };
 
             if (tipoVista === 'anio') {
-                // VISTA ANUAL: Categorías en el eje X = Apartados/Variables, Barras = Total acumulado
-                const agregadosMap = {};
+                // Vista por Año (Muestra la suma total por Apartado como Barras o Categorías)
+                const apartadosAnual = {};
 
                 data.forEach(r => {
-                    const key = obtenerEtiqueta(r);
-                    const val = obtenerSumaFila(r);
-                    if (val > 0) {
-                        agregadosMap[key] = (agregadosMap[key] || 0) + val;
-                    }
+                    Object.keys(mapModulosAApartados).forEach(col => {
+                        const val = Number(r[col]) || 0;
+                        if (val > 0) {
+                            const labelApartado = mapModulosAApartados[col];
+                            apartadosAnual[labelApartado] = (apartadosAnual[labelApartado] || 0) + val;
+                        }
+                    });
                 });
 
-                labels = Object.keys(agregadosMap);
-                const valores = labels.map(k => Math.round(agregadosMap[k]));
+                labels = Object.keys(apartadosAnual);
+                const valores = labels.map(k => Math.round(apartadosAnual[k]));
 
                 if (valores.length > 0) {
                     datasets = [{
-                        label: modoDesglose === "por_apartado" ? "Total por Apartado" : "Total por Variable",
+                        label: 'Total por Apartado',
                         data: valores,
                         backgroundColor: paletaColores.slice(0, labels.length)
                     }];
                 }
-
             } else {
-                // VISTA MENSUAL: Eje X = 12 Meses, 1 Línea por CADA Apartado / Variable
+                // Vista Mensual (Graficar 12 meses, creando 1 línea por CADA APARTADO)
                 labels = Object.values(mesesNombres);
-                const seriesMap = {};
+                const apartadosMes = {};
 
-                // Agrupamos por Apartado/Variable y por su correspondiente Mes
                 data.forEach(r => {
                     const mesNum = Number(r.mes);
                     if (!mesNum || mesNum < 1 || mesNum > 12) return;
 
-                    const keyLabel = obtenerEtiqueta(r);
-                    const val = obtenerSumaFila(r);
+                    // Recorremos los módulos/apartados mapeados para separar en objetos independientes por mes
+                    Object.keys(mapModulosAApartados).forEach(col => {
+                        const val = Number(r[col]) || 0;
+                        if (val > 0) {
+                            const labelApartado = mapModulosAApartados[col];
+                            if (!apartadosMes[labelApartado]) apartadosMes[labelApartado] = {};
 
-                    if (val > 0) {
-                        if (!seriesMap[keyLabel]) seriesMap[keyLabel] = {};
-                        seriesMap[keyLabel][mesNum] = (seriesMap[keyLabel][mesNum] || 0) + val;
-                    }
+                            // Sumamos solo dentro de su mes respectivo (evitando encadenar años)
+                            apartadosMes[labelApartado][mesNum] = (apartadosMes[labelApartado][mesNum] || 0) + val;
+                        }
+                    });
                 });
 
-                // Generar 1 Dataset (Línea) por cada Apartado/Variable presente
-                datasets = Object.keys(seriesMap).map((keyLabel, index) => ({
-                    label: keyLabel,
-                    data: Array.from({ length: 12 }, (_, i) => Math.round(seriesMap[keyLabel][i + 1] || 0)),
+                // Crear una línea (Dataset) separada por cada apartado encontrado
+                datasets = Object.keys(apartadosMes).map((labelApartado, index) => ({
+                    label: labelApartado,
+                    data: Array.from({ length: 12 }, (_, i) => Math.round(apartadosMes[labelApartado][i + 1] || 0)),
                     borderColor: paletaColores[index % paletaColores.length],
                     backgroundColor: paletaColores[index % paletaColores.length],
-                    tension: 0.2,
+                    tension: 0.3,
                     pointRadius: 4,
                     fill: false
                 }));
@@ -907,9 +955,10 @@
 
             if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
         }
-
-        // 🟡 2. MODO ACUMULADO (Comportamiento Estándar)
+        // 🟡 MODO ACUMULADO
         else {
+            const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
+
             if (tipoVista === 'anio') {
                 const acumuladoAnual = {};
                 data.forEach(r => {
@@ -952,7 +1001,7 @@
             }
         }
 
-        // 🟢 3. RENDERIZADO DE LA GRÁFICA (Chart.js)
+        // Dibujar la gráfica
         graficaSisMensual = new Chart(ctx, {
             type: tipoVista === 'anio' ? 'bar' : 'line',
             data: { labels, datasets },
