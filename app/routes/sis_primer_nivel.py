@@ -208,14 +208,13 @@ def filtrar_datos_sis():
     meses = [int(m) for m in data.get("meses", []) if str(m).isdigit()]
     variables_seleccionadas = data.get("variables", {}) or {}
     
-    # 🟢 CAPTURAR NIVEL DE AGRUPACIÓN Y MODO DE DESGLOSE
     nivel_agrupacion = data.get("nivel_agrupacion", "clues")
-    modo_desglose = data.get("modo_desglose", "acumulado")  # 'acumulado', 'por_apartado', 'por_variable'
+    modo_desglose = data.get("modo_desglose", "acumulado")
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
-        # 🟢 CONFIGURAR GEOGRAFÍA DE LA CONSULTA
+        # 🟢 1. CONFIGURACIÓN GEOGRÁFICA
         if nivel_agrupacion == "jurisdiccion":
             select_geo = "sr.anio, sr.mes, sr.jurisdiccion, 'N/A' AS municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
             group_geo = "sr.anio, sr.mes, sr.jurisdiccion"
@@ -232,30 +231,44 @@ def filtrar_datos_sis():
             select_geo_agregados = "anio, mes, jurisdiccion, municipio, clues, nombre_unidad"
             group_geo_agregados = "anio, mes, jurisdiccion, municipio, clues, nombre_unidad"
 
+        # Evaluar si vienen variables específicas seleccionadas
         tiene_variables_custom = isinstance(variables_seleccionadas, dict) and any(
             isinstance(v, list) and len(v) > 0 for v in variables_seleccionadas.values()
         )
 
-        # CASO A: VISTA PRE-AGREGADA (SIN VARIABLES ESPECÍFICAS SELECCIONADAS)
+        datos_filtrados = []
+
+        # 🟢 2. CASO A: VISTA PRE-AGREGADA (Sin selección de variables avanzadas)
         if not tiene_variables_custom:
+            params_agregados = []
+            where_agregados = ["1=1"]
+
+            if unidades:
+                placeholders = ','.join(['%s'] * len(unidades))
+                where_agregados.append(f"(clues IN ({placeholders}) OR nombre_unidad IN ({placeholders}))")
+                params_agregados.extend(unidades + unidades)
+
+            for col, lst in [('jurisdiccion', jurisdicciones), ('municipio', municipios), ('anio', anios), ('mes', meses)]:
+                if lst:
+                    placeholders = ','.join(['%s'] * len(lst))
+                    where_agregados.append(f"{col} IN ({placeholders})")
+                    params_agregados.extend(lst)
+
+            str_where = " AND ".join(where_agregados)
+
             if modo_desglose == "por_apartado":
+                # Consulta dividida por apartados con parámetros seguros
                 query_base = f"""
-                    SELECT 
-                        {select_geo_agregados},
-                        '01' AS apartado, 'Consultas' AS descripcion_apartado, SUM(consultas) AS total FROM sis_registros_agregados_primer_nivel WHERE 1=1 {clausulas_where} GROUP BY {group_geo_agregados}
+                    SELECT {select_geo_agregados}, '01' AS apartado, 'Consultas' AS descripcion_apartado, SUM(consultas) AS total FROM sis_registros_agregados_primer_nivel WHERE {str_where} GROUP BY {group_geo_agregados}
                     UNION ALL
-                    SELECT 
-                        {select_geo_agregados},
-                        '02' AS apartado, 'Salud Mental' AS descripcion_apartado, SUM(mental) AS total FROM sis_registros_agregados_primer_nivel WHERE 1=1 {clausulas_where} GROUP BY {group_geo_agregados}
+                    SELECT {select_geo_agregados}, '02' AS apartado, 'Salud Mental' AS descripcion_apartado, SUM(mental) AS total FROM sis_registros_agregados_primer_nivel WHERE {str_where} GROUP BY {group_geo_agregados}
                     UNION ALL
-                    SELECT 
-                        {select_geo_agregados},
-                        '24' AS apartado, 'Embarazadas' AS descripcion_apartado, SUM(embarazadas) AS total FROM sis_registros_agregados_primer_nivel WHERE 1=1 {clausulas_where} GROUP BY {group_geo_agregados}
+                    SELECT {select_geo_agregados}, '24' AS apartado, 'Embarazadas' AS descripcion_apartado, SUM(embarazadas) AS total FROM sis_registros_agregados_primer_nivel WHERE {str_where} GROUP BY {group_geo_agregados}
                     UNION ALL
-                    SELECT 
-                        {select_geo_agregados},
-                        '56' AS apartado, 'Detecciones' AS descripcion_apartado, SUM(detecciones) AS total FROM sis_registros_agregados_primer_nivel WHERE 1=1 {clausulas_where} GROUP BY {group_geo_agregados}
+                    SELECT {select_geo_agregados}, '56' AS apartado, 'Detecciones' AS descripcion_apartado, SUM(detecciones) AS total FROM sis_registros_agregados_primer_nivel WHERE {str_where} GROUP BY {group_geo_agregados}
                 """
+                # Al repetirse 4 veces en UNION ALL, replicamos los parámetros 4 veces
+                cursor.execute(query_base, params_agregados * 4)
             else:
                 query_base = f"""
                     SELECT 
@@ -267,47 +280,32 @@ def filtrar_datos_sis():
                         SUM(orientacion_lac_des_obe) AS orientacion_lac_des_obe, 
                         SUM(orientacion_eda_ira) AS orientacion_eda_ira
                     FROM sis_registros_agregados_primer_nivel
-                    WHERE 1=1
+                    WHERE {str_where}
+                    GROUP BY {group_geo_agregados}
+                    ORDER BY anio, mes, jurisdiccion
                 """
-                params = []
+                cursor.execute(query_base, params_agregados)
 
-                if unidades:
-                    placeholders = ','.join(['%s'] * len(unidades))
-                    query_base += f" AND (clues IN ({placeholders}) OR nombre_unidad IN ({placeholders}))"
-                    params.extend(unidades + unidades)
+            datos_filtrados = cursor.fetchall() or []
 
-                for col, lst in [('jurisdiccion', jurisdicciones), ('municipio', municipios), ('anio', anios), ('mes', meses)]:
-                    clausula, vals = _construir_clausula_in(col, lst)
-                    query_base += clausula
-                    params.extend(vals)
-
-                query_base += f" GROUP BY {group_geo_agregados} ORDER BY anio, mes, jurisdiccion"
-                cursor.execute(query_base, params)
-                datos_filtrados = cursor.fetchall() or []
-
-        # CASO B: TABLA DETALLADA CON SELECCIÓN DE VARIABLES
-        # CASO B: TABLA DETALLADA CON SELECCIÓN DE VARIABLES
+        # 🟢 3. CASO B: TABLA DETALLADA (Variables personalizadas/múltiples apartados)
         else:
             todas_las_variables_activas = set()
 
-            # 🟢 Extraer de forma segura todas las variables de la estructura recibida
             vars_todas = variables_seleccionadas.get("todas", [])
             if isinstance(vars_todas, list) and len(vars_todas) > 0:
                 todas_las_variables_activas.update(vars_todas)
-            else:
-                # Si 'todas' viene en un módulo específico o en el diccionario general
-                for mod_key, v_list in variables_seleccionadas.items():
-                    if isinstance(v_list, list) and len(v_list) > 0:
-                        todas_las_variables_activas.update(v_list)
 
-            # 🛑 VALIDACIÓN ANTI-ERROR 400: Si no hay variables válidas, responde arreglo vacío sin fallar
+            for mod_key, v_list in variables_seleccionadas.items():
+                if mod_key != "todas" and isinstance(v_list, list) and len(v_list) > 0:
+                    todas_las_variables_activas.update(v_list)
+
             if not todas_las_variables_activas:
                 return jsonify({"status": "success", "data": []})
 
             where_conditions = ["1=1"]
             params_where = []
 
-            # Construir placeholders de forma segura
             placeholders_where = ','.join(['%s'] * len(todas_las_variables_activas))
             where_conditions.append(f"sr.variable IN ({placeholders_where})")
             params_where.extend(list(todas_las_variables_activas))
@@ -323,7 +321,6 @@ def filtrar_datos_sis():
                     where_conditions.append(f"{col} IN ({placeholders_l})")
                     params_where.extend(lst)
 
-            # 🟢 DEFINIR CAMPOS DE SALIDA SEGÚN MODO DE DESGLOSE
             if modo_desglose == "por_apartado":
                 select_extra = ", cv.apartado, cv.descripcion_apartado, SUM(CAST(sr.total AS UNSIGNED)) AS total"
                 group_extra = f"{group_geo}, cv.apartado, cv.descripcion_apartado"
@@ -331,7 +328,6 @@ def filtrar_datos_sis():
                 select_extra = ", sr.variable, cv.descripcion AS descripcion_variable, SUM(CAST(sr.total AS UNSIGNED)) AS total"
                 group_extra = f"{group_geo}, sr.variable, cv.descripcion"
             else:
-                # Acumulado estándar
                 select_extra = ", SUM(CAST(sr.total AS UNSIGNED)) AS total"
                 group_extra = group_geo
 
