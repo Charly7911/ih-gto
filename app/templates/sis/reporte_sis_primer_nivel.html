@@ -362,6 +362,22 @@
             'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
         ];
 
+        // Clasificador inteligente si la API regresa por "descripcion_apartado"
+        const normalizarApartado = (desc) => {
+            const text = (desc || '').toLowerCase();
+            if (text.includes('consulta')) return 'consultas';
+            if (text.includes('embaraz') || text.includes('matern')) return 'embarazadas';
+            if (text.includes('mental')) return 'mental';
+            if (text.includes('bucal')) return 'bucal';
+            if (text.includes('tamiz')) return 'tamiz';
+            if (text.includes('planific')) return 'planificacion_familiar';
+            if (text.includes('cardiometab')) return 'detecciones_cardiometabolicas';
+            if (text.includes('detec')) return 'detecciones';
+            if (text.includes('lactan') || text.includes('nutri') || text.includes('obes')) return 'orientacion_lac_des_obe';
+            if (text.includes('eda') || text.includes('ira')) return 'orientacion_eda_ira';
+            return 'otros';
+        };
+
         for (let i = 0; i < data.length; i++) {
             const r = data[i];
             const numAnio = Number(r.anio);
@@ -394,18 +410,22 @@
                 };
             }
 
-            // Suma explícita de campos estándar
+            // 1. Si la fila trae columnas estáticas
+            let sumoEstandar = false;
             campos.forEach(c => {
-                mapa[key][c] += Number(r[c]) || 0;
+                if (r[c] !== undefined && r[c] !== null) {
+                    mapa[key][c] += Number(r[c]) || 0;
+                    sumoEstandar = true;
+                }
             });
 
-            // 🟢 FIX: Si la API responde datos bajo propiedades genéricas ('total', 'valor', 'suma')
-            // y las propiedades estándar venían en 0, asigna ese valor al campo 'otros'
-            const sumaEstandar = campos.reduce((acc, c) => acc + (Number(r[c]) || 0), 0);
-            const valorGenerico = Number(r.total || r.valor || r.suma || 0);
-
-            if (sumaEstandar === 0 && valorGenerico > 0) {
-                mapa[key]['otros'] += valorGenerico;
+            // 2. Si la fila viene desglosada por apartado desde el SQL
+            if (!sumoEstandar || r.descripcion_apartado || r.apartado) {
+                const totalGenerico = Number(r.total || r.valor || r.suma || 0);
+                if (totalGenerico > 0) {
+                    const destino = normalizarApartado(r.descripcion_apartado);
+                    mapa[key][destino] += totalGenerico;
+                }
             }
         }
 
@@ -414,26 +434,20 @@
 
 
     function exportarFiltradoExcel() {
-        // 1. Verificar si existen datos cargados desde el backend
         if (!datosFiltradosSis || datosFiltradosSis.length === 0) {
             alert("No hay datos disponibles para exportar con los filtros seleccionados.");
             return;
         }
 
-        // 2. Feedback visual en el botón
         const btn = document.getElementById("btnExportarExcel");
         const textoOriginal = btn.innerHTML;
         btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Generando...';
         btn.disabled = true;
 
         try {
-            // 3. Obtener el nivel de agrupación activo del DOM
             const nivelAgrupacion = document.getElementById("nivel_agrupacion")?.value || "clues";
-
-            // Obtener el módulo activo seleccionado en el dropdown
             const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
 
-            // Nombres legibles para las columnas según el módulo activo
             const nombresModulos = {
                 "consultas": "Consultas",
                 "embarazadas": "Embarazadas",
@@ -448,52 +462,39 @@
                 "otros": "Otros"
             };
 
-            // 4. Mapear los datos según el Nivel de Agrupación elegido
             const datosParaExcel = [];
 
             datosFiltradosSis.forEach(r => {
-                // 🟢 CONSTRUCCIÓN DINÁMICA DE LA CABECERA SEGÚN NIVEL DE AGRUPACIÓN
                 const filaBase = {
                     "Año": Number(r.anio) || '',
                     "Mes": Number(r.mes) || '',
                     "Jurisdicción": r.jurisdiccion || 'Sin Especificar'
                 };
 
-                // Solo agregamos Municipio si la agrupación es por Municipio o CLUES
                 if (nivelAgrupacion === "municipio" || nivelAgrupacion === "clues") {
                     filaBase["Municipio"] = (r.municipio && r.municipio !== 'N/A') ? r.municipio : 'Sin Especificar';
                 }
 
-                // Solo agregamos CLUES y Unidad si la agrupación es por CLUES
                 if (nivelAgrupacion === "clues") {
                     filaBase["CLUES"] = (r.clues && r.clues !== 'N/A') ? r.clues : '-';
                     filaBase["Nombre Unidad"] = (r.nombre_unidad && r.nombre_unidad !== 'N/A') ? r.nombre_unidad : '';
                 }
 
-                // 🟢 INCLUSIÓN DE MÓDULOS / VARIABLES
-                if (moduloActual === "todas") {
+                if (r.descripcion_apartado) {
+                    filaBase["Apartado"] = r.descripcion_apartado;
+                    filaBase["Total"] = Number(r.total || r.valor || 0);
+                    datosParaExcel.push(filaBase);
+                } else if (moduloActual === "todas") {
                     let totalFila = 0;
-                    const camposModulo = [
-                        'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
-                        'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
-                        'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
-                    ];
-
-                    camposModulo.forEach(m => {
+                    Object.keys(nombresModulos).forEach(m => {
                         const val = Number(r[m]) || 0;
-                        filaBase[nombresModulos[m] || m] = val;
+                        filaBase[nombresModulos[m]] = val;
                         totalFila += val;
                     });
-
                     filaBase["Total"] = totalFila;
-
-                    if (totalFila > 0) {
-                        datosParaExcel.push(filaBase);
-                    }
-
+                    if (totalFila > 0) datosParaExcel.push(filaBase);
                 } else {
-                    const valorModulo = Number(r[moduloActual]) || Number(r.total) || Number(r.valor) || 0;
-
+                    const valorModulo = Number(r[moduloActual]) || Number(r.total) || 0;
                     if (valorModulo > 0) {
                         filaBase[nombresModulos[moduloActual] || "Total"] = valorModulo;
                         datosParaExcel.push(filaBase);
@@ -501,35 +502,29 @@
                 }
             });
 
-            // 5. Validar si existen registros tras procesar
             if (datosParaExcel.length === 0) {
                 alert("Los filtros aplicados no arrojaron registros con valores mayores a 0.");
                 return;
             }
 
-            // 6. Generar el libro Excel con SheetJS
             const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS Filtrado");
 
-            // Auto-ajustar ancho de columnas dinámicamente
             const maxAnchos = Object.keys(datosParaExcel[0]).map(key => ({
                 wch: Math.max(key.length + 4, 12)
             }));
             worksheet['!cols'] = maxAnchos;
 
-            // Nombre de archivo dinámico reflejando el agrupamiento
             const fechaDescarga = new Date().toISOString().slice(0, 10);
             const nombreArchivo = `SIS_${nivelAgrupacion.toUpperCase()}_${moduloActual}_${fechaDescarga}.xlsx`;
 
-            // Descargar archivo
             XLSX.writeFile(workbook, nombreArchivo);
 
         } catch (error) {
             console.error("Error al exportar a Excel:", error);
             alert("Ocurrió un error al intentar generar el archivo Excel.");
         } finally {
-            // Restaurar botón
             btn.innerHTML = textoOriginal;
             btn.disabled = false;
         }
@@ -813,64 +808,21 @@
             '#e83e8c', '#17a2b8', '#fd7e14', '#6c757d', '#343a40', '#4E79A7'
         ];
 
-        const camposApartados = [
-            'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
-            'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
-            'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
-        ];
-
-        const obtenerSumaFila = (r) => {
-            if (modulo === "todas") {
-                let sumaCampos = 0;
-                camposApartados.forEach(c => { sumaCampos += Number(r[c]) || 0; });
-                return sumaCampos > 0 ? sumaCampos : Number(r.total || r.valor || r.suma || 0);
-            }
-            return Number(r[modulo]) || Number(r.total) || Number(r.valor) || 0;
-        };
-
         let labels = [];
         let datasets = [];
 
-        // 🟢 MODO DESGLOSADO POR APARTADO
+        // MODO DESGLOSADO POR APARTADO
         if (modoDesglose === "por_apartado") {
             const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
-
-            const mapNombresApartados = {
-                consultas: "Consultas",
-                mental: "Salud Mental",
-                bucal: "Salud Bucal",
-                embarazadas: "Embarazadas / Maternidad",
-                planificacion_familiar: "Planificación Familiar",
-                detecciones: "Detecciones Generales",
-                tamiz: "Tamiz Neonatal",
-                detecciones_cardiometabolicas: "Detecciones Cardiometabólicas",
-                orientacion_lac_des_obe: "Orientación Lactancia/Desnutrición/Obesidad",
-                orientacion_eda_ira: "Orientación EDA / IRA",
-                otros: "Otros / Sin Clasificar"
-            };
-
-            const columnasModulo = Object.keys(mapNombresApartados);
 
             if (tipoVista === 'anio') {
                 const apartadosAnual = {};
 
                 data.forEach(r => {
-                    // Intentar leer por propiedad dinámica de apartado o por columna estática
-                    const nombreApDinamico = r.descripcion_apartado || (r.apartado ? `Apartado ${r.apartado}` : null);
-
-                    if (nombreApDinamico) {
-                        const val = Number(r.total || r.valor || r.suma || 0);
-                        if (val > 0) {
-                            apartadosAnual[nombreApDinamico] = (apartadosAnual[nombreApDinamico] || 0) + val;
-                        }
-                    } else {
-                        columnasModulo.forEach(col => {
-                            const val = Number(r[col]) || 0;
-                            if (val > 0) {
-                                const label = mapNombresApartados[col];
-                                apartadosAnual[label] = (apartadosAnual[label] || 0) + val;
-                            }
-                        });
+                    const nombreAp = r.descripcion_apartado || (r.apartado ? `Apartado ${r.apartado}` : 'Sin Clasificar');
+                    const val = Number(r.total || r.valor || 0);
+                    if (val > 0) {
+                        apartadosAnual[nombreAp] = (apartadosAnual[nombreAp] || 0) + val;
                     }
                 });
 
@@ -885,7 +837,7 @@
                     }];
                 }
             } else {
-                // Vista Mensual (12 meses)
+                // Vista Mensual
                 labels = Object.values(mesesNombres);
                 const apartadosMes = {};
 
@@ -893,105 +845,57 @@
                     const mesNum = Number(r.mes);
                     if (!mesNum || mesNum < 1 || mesNum > 12) return;
 
-                    // 1. Verificar si el registro ya contiene información del apartado directamente
-                    const nombreApDinamico = r.descripcion_apartado || (r.apartado ? `Apartado ${r.apartado}` : null);
+                    const nombreAp = r.descripcion_apartado || (r.apartado ? `Apartado ${r.apartado}` : 'Sin Clasificar');
+                    const val = Number(r.total || r.valor || 0);
 
-                    if (nombreApDinamico) {
-                        const val = Number(r.total || r.valor || r.suma || 0);
-                        if (val > 0) {
-                            if (!apartadosMes[nombreApDinamico]) apartadosMes[nombreApDinamico] = {};
-                            apartadosMes[nombreApDinamico][mesNum] = (apartadosMes[nombreApDinamico][mesNum] || 0) + val;
-                        }
-                    } else {
-                        // 2. Si no tiene apartado dinámico, evalúa las columnas predefinidas
-                        columnasModulo.forEach(col => {
-                            const val = Number(r[col]) || 0;
-                            if (val > 0) {
-                                const label = mapNombresApartados[col];
-                                if (!apartadosMes[label]) apartadosMes[label] = {};
-                                apartadosMes[label][mesNum] = (apartadosMes[label][mesNum] || 0) + val;
-                            }
-                        });
+                    if (val > 0) {
+                        if (!apartadosMes[nombreAp]) apartadosMes[nombreAp] = Array(12).fill(0);
+                        apartadosMes[nombreAp][mesNum - 1] += val;
                     }
                 });
 
-                datasets = Object.keys(apartadosMes).map((label, index) => ({
-                    label: label,
-                    data: Array.from({ length: 12 }, (_, i) => Math.round(apartadosMes[label][i + 1] || 0)),
-                    borderColor: paletaColores[index % paletaColores.length],
-                    backgroundColor: paletaColores[index % paletaColores.length],
-                    tension: 0.3,
-                    pointRadius: 4,
-                    fill: false
+                let idx = 0;
+                datasets = Object.keys(apartadosMes).map(apName => ({
+                    label: apName,
+                    data: apartadosMes[apName],
+                    backgroundColor: paletaColores[idx++ % paletaColores.length]
                 }));
             }
+        } else {
+            // MODO ACUMULADO GLOBAL
+            const mesesNombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+            labels = mesesNombres;
 
-            if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
-        }
-        // 🟡 MODO ACUMULADO
-        else {
-            const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
+            const acumuladoMes = Array(12).fill(0);
+            data.forEach(r => {
+                const mesNum = Number(r.mes);
+                if (mesNum >= 1 && mesNum <= 12) {
+                    const val = Number(r.total || r.valor || r.consultas || 0);
+                    acumuladoMes[mesNum - 1] += val;
+                }
+            });
 
-            if (tipoVista === 'anio') {
-                const acumuladoAnual = {};
-                data.forEach(r => {
-                    const anioKey = r.anio || r.año || "Año";
-                    acumuladoAnual[anioKey] = (acumuladoAnual[anioKey] || 0) + obtenerSumaFila(r);
-                });
-
-                labels = Object.keys(acumuladoAnual).sort();
-                const valores = labels.map(a => Math.round(acumuladoAnual[a]));
-
-                if (valores.reduce((a, b) => a + b, 0) === 0) return;
-
-                datasets = [{
-                    label: `Total ${modulo === 'todas' ? 'Secciones Seleccionadas' : modulo.toUpperCase()}`,
-                    data: valores,
-                    backgroundColor: paletaColores.slice(0, labels.length)
-                }];
-            } else {
-                labels = Object.values(mesesNombres);
-                const resumen = {};
-
-                data.forEach(r => {
-                    if (!r.mes) return;
-                    const key = `Año ${r.anio || r.año}`;
-                    if (!resumen[key]) resumen[key] = {};
-                    resumen[key][Number(r.mes)] = (resumen[key][Number(r.mes)] || 0) + obtenerSumaFila(r);
-                });
-
-                datasets = Object.keys(resumen).map((key, index) => ({
-                    label: key,
-                    data: Array.from({ length: 12 }, (_, i) => Math.round(resumen[key][i + 1] || 0)),
-                    borderColor: paletaColores[index % paletaColores.length],
-                    backgroundColor: paletaColores[index % paletaColores.length],
-                    tension: 0.3,
-                    pointRadius: 4,
-                    fill: false
-                }));
-
-                if (!datasets.some(ds => ds.data.some(v => v > 0))) return;
-            }
+            datasets = [{
+                label: 'Total Acumulado',
+                data: acumuladoMes,
+                backgroundColor: '#2b5c8f'
+            }];
         }
 
-        // Dibujar la gráfica
         graficaSisMensual = new Chart(ctx, {
-            type: tipoVista === 'anio' ? 'bar' : 'line',
+            type: 'bar',
             data: { labels, datasets },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
                 animation: false,
-                scales: { y: { beginAtZero: true, ticks: { callback: v => typeof fmt === "function" ? fmt(v) : v } } },
+                scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
                 plugins: {
-                    legend: { display: true, position: 'top' },
                     datalabels: {
-                        display: () => (typeof mostrarValoresMensual !== 'undefined' ? mostrarValoresMensual : true),
-                        anchor: 'end',
-                        align: 'top',
-                        color: '#333333',
-                        formatter: (val) => (val > 0 && typeof fmt === "function") ? fmt(val) : (val > 0 ? val : ''),
-                        font: { size: 9, weight: 'bold' }
+                        anchor: 'center',
+                        align: 'center',
+                        color: '#ffffff',
+                        font: { weight: 'bold', size: 10 },
+                        formatter: (val) => val > 0 ? fmt(val) : ''
                     }
                 }
             }
