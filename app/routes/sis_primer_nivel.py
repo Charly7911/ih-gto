@@ -286,34 +286,28 @@ def filtrar_datos_sis():
                 datos_filtrados = cursor.fetchall() or []
 
         # CASO B: TABLA DETALLADA CON SELECCIÓN DE VARIABLES
+        # CASO B: TABLA DETALLADA CON SELECCIÓN DE VARIABLES
         else:
             todas_las_variables_activas = set()
 
+            # 🟢 Extraer de forma segura todas las variables de la estructura recibida
             vars_todas = variables_seleccionadas.get("todas", [])
             if isinstance(vars_todas, list) and len(vars_todas) > 0:
                 todas_las_variables_activas.update(vars_todas)
             else:
-                def resolver_vars(mod_key):
-                    val = variables_seleccionadas.get(mod_key)
-                    if val is None:
-                        return VARIABLES_DEFAULT.get(mod_key, [])
-                    return val if len(val) > 0 else []
+                # Si 'todas' viene en un módulo específico o en el diccionario general
+                for mod_key, v_list in variables_seleccionadas.items():
+                    if isinstance(v_list, list) and len(v_list) > 0:
+                        todas_las_variables_activas.update(v_list)
 
-                modulos = [
-                    "consultas", "mental", "bucal", "embarazadas", 
-                    "planificacion_familiar", "detecciones", "tamiz", 
-                    "detecciones_cardiometabolicas", "orientacion_lac_des_obe", 
-                    "orientacion_eda_ira", "otros"
-                ]
-                for m in modulos:
-                    todas_las_variables_activas.update(resolver_vars(m))
-
+            # 🛑 VALIDACIÓN ANTI-ERROR 400: Si no hay variables válidas, responde arreglo vacío sin fallar
             if not todas_las_variables_activas:
                 return jsonify({"status": "success", "data": []})
 
             where_conditions = ["1=1"]
             params_where = []
 
+            # Construir placeholders de forma segura
             placeholders_where = ','.join(['%s'] * len(todas_las_variables_activas))
             where_conditions.append(f"sr.variable IN ({placeholders_where})")
             params_where.extend(list(todas_las_variables_activas))
@@ -329,7 +323,7 @@ def filtrar_datos_sis():
                     where_conditions.append(f"{col} IN ({placeholders_l})")
                     params_where.extend(lst)
 
-            # 🟢 DINAMISMO DE DESGLOSE SEGÚN LO SOLICITADO
+            # 🟢 DEFINIR CAMPOS DE SALIDA SEGÚN MODO DE DESGLOSE
             if modo_desglose == "por_apartado":
                 select_extra = ", cv.apartado, cv.descripcion_apartado, SUM(CAST(sr.total AS UNSIGNED)) AS total"
                 group_extra = f"{group_geo}, cv.apartado, cv.descripcion_apartado"
@@ -337,7 +331,7 @@ def filtrar_datos_sis():
                 select_extra = ", sr.variable, cv.descripcion AS descripcion_variable, SUM(CAST(sr.total AS UNSIGNED)) AS total"
                 group_extra = f"{group_geo}, sr.variable, cv.descripcion"
             else:
-                # Acumulado
+                # Acumulado estándar
                 select_extra = ", SUM(CAST(sr.total AS UNSIGNED)) AS total"
                 group_extra = group_geo
 

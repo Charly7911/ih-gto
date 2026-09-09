@@ -563,7 +563,20 @@
         // Enviar SOLO las variables del módulo activo actual
         let variablesAPasar = {};
         if (moduloActual === "todas") {
-            variablesAPasar = { todas: variablesPersonalizadasEstado["todas"] || [] };
+            let arrayTodas = [];
+
+            // Si existe una lista global en variablesPersonalizadasEstado["todas"], la usamos
+            if (Array.isArray(variablesPersonalizadasEstado["todas"]) && variablesPersonalizadasEstado["todas"].length > 0) {
+                arrayTodas = variablesPersonalizadasEstado["todas"];
+            } else {
+                // De lo contrario, unimos todas las variables de todos los apartados activos
+                Object.keys(variablesPersonalizadasEstado).forEach(key => {
+                    if (Array.isArray(variablesPersonalizadasEstado[key])) {
+                        arrayTodas = arrayTodas.concat(variablesPersonalizadasEstado[key]);
+                    }
+                });
+            }
+            variablesAPasar = { todas: [...new Set(arrayTodas)] };
         } else {
             variablesAPasar = { [moduloActual]: variablesPersonalizadasEstado[moduloActual] || [] };
         }
