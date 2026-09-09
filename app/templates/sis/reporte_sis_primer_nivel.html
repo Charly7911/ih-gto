@@ -575,35 +575,45 @@
         }
 
         const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
-        // 🟢 1. Obtener el modo de desglose seleccionado ("acumulado", "por_apartado", "por_variable")
-        // (Asegúrate de ajustar 'filtroModoDesglose' al ID real de tu select de desglose si se llama diferente)
-        const modoDesglose = document.getElementById("selectModoDesglose")?.value || "acumulado";
+        const modoDesglose = document.getElementById("selectModoDesglose")?.value || "por_apartado";
 
-        // 🟢 2. Estructurar las variables a pasar
+        // 🟢 RECOLECCIÓN EXACTA: Lee directamente del DOM los checkboxes de subvariables marcados
         let variablesAPasar = {};
-        if (moduloActual === "todas") {
-            // Si eligió "todas", copiamos el objeto completo de variables por apartado
-            // (evitamos enviar { todas: [...] } para que el backend reconozca los apartados)
-            const copiaEstado = { ...variablesPersonalizadasEstado };
-            delete copiaEstado["todas"]; // Eliminamos la clave "todas" si existe
-            variablesAPasar = copiaEstado;
 
-            // Si después de limpiar no quedaron variables por clave, mandamos todas las que existan
-            if (Object.keys(variablesAPasar).length === 0 && variablesPersonalizadasEstado["todas"]) {
-                variablesAPasar = { seleccionadas: variablesPersonalizadasEstado["todas"] };
-            }
+        if (moduloActual === "todas") {
+            // Seleccionamos solo las subvariables que están CHECKED en la interfaz
+            const subvarsChecked = document.querySelectorAll('.chk-subvar:checked');
+
+            subvarsChecked.forEach(chk => {
+                const modKey = chk.dataset.modulo || "otros";
+                const codVariable = chk.value;
+
+                if (!variablesAPasar[modKey]) {
+                    variablesAPasar[modKey] = [];
+                }
+                variablesAPasar[modKey].push(codVariable);
+            });
         } else {
-            variablesAPasar = { [moduloActual]: variablesPersonalizadasEstado[moduloActual] || [] };
+            // Si hay un módulo específico, filtramos solo los checkboxes checked de ese módulo
+            const subvarsModulo = document.querySelectorAll(`.chk-subvar[data-modulo="${moduloActual}"]:checked`);
+            variablesAPasar[moduloActual] = Array.from(subvarsModulo).map(chk => chk.value);
         }
 
-        // 🟢 3. Payload listo con modo_desglose
+        // Si no quedó ninguna variable marcada, cancelamos y limpiamos
+        if (Object.keys(variablesAPasar).length === 0 || !Object.values(variablesAPasar).some(arr => arr.length > 0)) {
+            datosFiltradosSis = [];
+            actualizarVistas();
+            ocultarCargandoGrafica();
+            return;
+        }
+
         const payload = {
             unidades: window.getUnidadesSeleccionadas?.() || [],
             jurisdicciones: window.getJurisdiccionesSeleccionadas?.() || [],
             municipios: window.getMunicipiosSeleccionados?.() || [],
             anios: window.getAniosSeleccionados?.() || [],
             meses: window.getMesesSeleccionados?.() || [],
-            modo_desglose: modoDesglose, // 👈 CLAVE: Envía "por_apartado" al backend
+            modo_desglose: modoDesglose,
             variables: variablesAPasar
         };
 
