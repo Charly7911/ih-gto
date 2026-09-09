@@ -159,7 +159,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-
 <script>
     if (typeof ChartDataLabels !== 'undefined') {
         Chart.register(ChartDataLabels);
@@ -175,7 +174,6 @@
     }
 
     const VARIABLES_DEFAULT = JSON.parse('{{ (variables_default | default({})) | tojson | safe }}');
-
     const FILAS_POR_PAGINA = 15;
 
     let datosActuales = [];
@@ -209,7 +207,6 @@
     }
 
     /* 2. RENDERIZADO DEL ÁRBOL TIPO TREEVIEW */
-
     function renderSubvariables() {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const contenedor = document.getElementById("contenedorSubvariables");
@@ -219,10 +216,8 @@
 
         const modulosAProcesar = modulo === "todas" ? Object.keys(DICCIONARIO_VARIABLES) : [modulo];
         const mapaApartados = {};
-
         const seleccionadasTodas = modulo === "todas" ? (variablesPersonalizadasEstado["todas"] || []) : null;
 
-        // 1. Recorrer la estructura del catálogo (DICCIONARIO_VARIABLES)
         modulosAProcesar.forEach((modKey) => {
             const estructuraModulo = DICCIONARIO_VARIABLES[modKey] || [];
 
@@ -235,7 +230,6 @@
                 : (variablesPersonalizadasEstado[modKey] || []);
 
             estructuraModulo.forEach((grupo) => {
-                // Limpieza de clave para evitar pérdida por espacios o formateos
                 const keyApartado = String(grupo.apartado).trim();
 
                 if (!mapaApartados[keyApartado]) {
@@ -258,7 +252,6 @@
             });
         });
 
-        // 2. ORDENAMIENTO NATURAL (Mantiene el orden correcto para '02', '08', '144', etc.)
         const listaApartados = Object.values(mapaApartados).sort((a, b) => {
             return a.apartado.localeCompare(b.apartado, undefined, { numeric: true, sensitivity: 'base' });
         });
@@ -297,7 +290,6 @@
             </ul>
         </details>`;
 
-            // Asignar estado indeterminado si existen variables parcialmente seleccionadas
             const chkPadreElement = liApartado.querySelector('.chk-padre');
             if (chkPadreElement && hayAlgunasMarcadas) {
                 chkPadreElement.indeterminate = true;
@@ -394,13 +386,10 @@
                 };
             }
 
-            // Suma explícita de campos estándar
             campos.forEach(c => {
                 mapa[key][c] += Number(r[c]) || 0;
             });
 
-            // 🟢 FIX: Si la API responde datos bajo propiedades genéricas ('total', 'valor', 'suma')
-            // y las propiedades estándar venían en 0, asigna ese valor al campo 'otros'
             const sumaEstandar = campos.reduce((acc, c) => acc + (Number(r[c]) || 0), 0);
             const valorGenerico = Number(r.total || r.valor || r.suma || 0);
 
@@ -412,65 +401,47 @@
         return Object.values(mapa);
     }
 
-
     function exportarFiltradoExcel() {
-        // 1. Verificar si existen datos cargados desde el backend
         if (!datosFiltradosSis || datosFiltradosSis.length === 0) {
             alert("No hay datos disponibles para exportar con los filtros seleccionados.");
             return;
         }
 
-        // 2. Feedback visual en el botón
         const btn = document.getElementById("btnExportarExcel");
         const textoOriginal = btn.innerHTML;
         btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Generando...';
         btn.disabled = true;
 
         try {
-            // 3. Obtener el nivel de agrupación activo del DOM
             const nivelAgrupacion = document.getElementById("nivel_agrupacion")?.value || "clues";
-
-            // Obtener el módulo activo seleccionado en el dropdown
             const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
 
-            // Nombres legibles para las columnas según el módulo activo
             const nombresModulos = {
-                "consultas": "Consultas",
-                "embarazadas": "Embarazadas",
-                "mental": "Salud Mental",
-                "bucal": "Salud Bucal",
-                "tamiz": "Tamiz",
-                "planificacion_familiar": "Planificación Familiar",
-                "detecciones": "Detecciones",
-                "detecciones_cardiometabolicas": "Detecciones Cardiometabólicas",
-                "orientacion_lac_des_obe": "Orientación Lac/Des/Obe",
-                "orientacion_eda_ira": "Orientación EDA/IRA",
+                "consultas": "Consultas", "embarazadas": "Embarazadas", "mental": "Salud Mental",
+                "bucal": "Salud Bucal", "tamiz": "Tamiz", "planificacion_familiar": "Planificación Familiar",
+                "detecciones": "Detecciones", "detecciones_cardiometabolicas": "Detecciones Cardiometabólicas",
+                "orientacion_lac_des_obe": "Orientación Lac/Des/Obe", "orientacion_eda_ira": "Orientación EDA/IRA",
                 "otros": "Otros"
             };
 
-            // 4. Mapear los datos según el Nivel de Agrupación elegido
             const datosParaExcel = [];
 
             datosFiltradosSis.forEach(r => {
-                // 🟢 CONSTRUCCIÓN DINÁMICA DE LA CABECERA SEGÚN NIVEL DE AGRUPACIÓN
                 const filaBase = {
                     "Año": Number(r.anio) || '',
                     "Mes": Number(r.mes) || '',
                     "Jurisdicción": r.jurisdiccion || 'Sin Especificar'
                 };
 
-                // Solo agregamos Municipio si la agrupación es por Municipio o CLUES
                 if (nivelAgrupacion === "municipio" || nivelAgrupacion === "clues") {
                     filaBase["Municipio"] = (r.municipio && r.municipio !== 'N/A') ? r.municipio : 'Sin Especificar';
                 }
 
-                // Solo agregamos CLUES y Unidad si la agrupación es por CLUES
                 if (nivelAgrupacion === "clues") {
                     filaBase["CLUES"] = (r.clues && r.clues !== 'N/A') ? r.clues : '-';
                     filaBase["Nombre Unidad"] = (r.nombre_unidad && r.nombre_unidad !== 'N/A') ? r.nombre_unidad : '';
                 }
 
-                // 🟢 INCLUSIÓN DE MÓDULOS / VARIABLES
                 if (moduloActual === "todas") {
                     let totalFila = 0;
                     const camposModulo = [
@@ -485,15 +456,11 @@
                         totalFila += val;
                     });
 
-                    filaBase["Total"] = totalFila;
+                    filaBase["Total"] = totalFila > 0 ? totalFila : Number(r.total || 0);
 
-                    if (totalFila > 0) {
-                        datosParaExcel.push(filaBase);
-                    }
-
+                    if (filaBase["Total"] > 0) datosParaExcel.push(filaBase);
                 } else {
                     const valorModulo = Number(r[moduloActual]) || Number(r.total) || Number(r.valor) || 0;
-
                     if (valorModulo > 0) {
                         filaBase[nombresModulos[moduloActual] || "Total"] = valorModulo;
                         datosParaExcel.push(filaBase);
@@ -501,35 +468,29 @@
                 }
             });
 
-            // 5. Validar si existen registros tras procesar
             if (datosParaExcel.length === 0) {
                 alert("Los filtros aplicados no arrojaron registros con valores mayores a 0.");
                 return;
             }
 
-            // 6. Generar el libro Excel con SheetJS
             const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS Filtrado");
 
-            // Auto-ajustar ancho de columnas dinámicamente
             const maxAnchos = Object.keys(datosParaExcel[0]).map(key => ({
                 wch: Math.max(key.length + 4, 12)
             }));
             worksheet['!cols'] = maxAnchos;
 
-            // Nombre de archivo dinámico reflejando el agrupamiento
             const fechaDescarga = new Date().toISOString().slice(0, 10);
             const nombreArchivo = `SIS_${nivelAgrupacion.toUpperCase()}_${moduloActual}_${fechaDescarga}.xlsx`;
 
-            // Descargar archivo
             XLSX.writeFile(workbook, nombreArchivo);
 
         } catch (error) {
             console.error("Error al exportar a Excel:", error);
             alert("Ocurrió un error al intentar generar el archivo Excel.");
         } finally {
-            // Restaurar botón
             btn.innerHTML = textoOriginal;
             btn.disabled = false;
         }
@@ -537,7 +498,6 @@
 
     function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
     function ocultarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.add("d-none"); }
-
 
     async function realizarConsultaBackend() {
         mostrarCargandoGrafica();
@@ -550,26 +510,17 @@
         }
 
         const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
-
-        // 🟢 1. Capturar el modo de desglose del selector (acumulado, por_apartado, por_variable)
-        // Ajusta el ID "filtroDesglose" al ID real que tenga tu <select> de la interfaz
-        const selectDesglose = document.getElementById("filtroDesglose") || document.getElementById("selectModoDesglose");
+        const selectDesglose = document.getElementById("selectModoDesglose") || document.getElementById("filtroDesglose");
         const modoDesglose = selectDesglose?.value || "acumulado";
-
-        // 🟢 2. Capturar el nivel de agrupación geográfica si existe
-        const selectAgrupacion = document.getElementById("filtroAgrupacionGeo");
+        const selectAgrupacion = document.getElementById("selectNivelAgrupacion") || document.getElementById("filtroAgrupacionGeo");
         const nivelAgrupacion = selectAgrupacion?.value || "clues";
 
-        // Enviar SOLO las variables del módulo activo actual
         let variablesAPasar = {};
         if (moduloActual === "todas") {
             let arrayTodas = [];
-
-            // Si existe una lista global en variablesPersonalizadasEstado["todas"], la usamos
             if (Array.isArray(variablesPersonalizadasEstado["todas"]) && variablesPersonalizadasEstado["todas"].length > 0) {
                 arrayTodas = variablesPersonalizadasEstado["todas"];
             } else {
-                // De lo contrario, unimos todas las variables de todos los apartados activos
                 Object.keys(variablesPersonalizadasEstado).forEach(key => {
                     if (Array.isArray(variablesPersonalizadasEstado[key])) {
                         arrayTodas = arrayTodas.concat(variablesPersonalizadasEstado[key]);
@@ -581,7 +532,6 @@
             variablesAPasar = { [moduloActual]: variablesPersonalizadasEstado[moduloActual] || [] };
         }
 
-        // 🟢 3. Payload actualizado con los parámetros requeridos por el Backend
         const payload = {
             unidades: window.getUnidadesSeleccionadas?.() || [],
             jurisdicciones: window.getJurisdiccionesSeleccionadas?.() || [],
@@ -589,12 +539,12 @@
             anios: window.getAniosSeleccionados?.() || [],
             meses: window.getMesesSeleccionados?.() || [],
             variables: variablesAPasar,
-            modo_desglose: modoDesglose,     // 👈 Indispensable para activar la agrupación por apartado en SQL
+            modo_desglose: modoDesglose,
             nivel_agrupacion: nivelAgrupacion
         };
 
         try {
-            const resp = await fetch("/sis_primer_nivel/api/filtrar", {
+            const resp = await fetch("/api/filtrar", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
@@ -803,9 +753,6 @@
         }
     }
 
-
-
-    // Función helper para visibilidad del botón de desglose
     function toggleModoDesglose() {
         const modulo = document.getElementById("filtroSisDetalle")?.value;
         const selectDesglose = document.getElementById("selectModoDesglose");
@@ -819,19 +766,18 @@
         }
     }
 
+    /* 6. RENDER GRÁFICA TEMPORAL COMPLETADA */
     function renderGraficaTemporal(data = datosFiltradosSis) {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
-        const modoDesglose = document.getElementById("selectModoDesglose")?.value || "acumulado";
+        const selectDesglose = document.getElementById("selectModoDesglose") || document.getElementById("filtroDesglose");
+        const modoDesglose = selectDesglose?.value || "acumulado";
         const ctx = document.getElementById("graficaSisMensual");
 
         if (!ctx) return;
         if (graficaSisMensual) { graficaSisMensual.destroy(); graficaSisMensual = null; }
 
-        if (typeof hayVariablesSeleccionadas === "function" && !hayVariablesSeleccionadas()) {
-            return;
-        }
-
+        if (typeof hayVariablesSeleccionadas === "function" && !hayVariablesSeleccionadas()) return;
         if (!data || data.length === 0) return;
 
         const paletaColores = [
@@ -841,45 +787,27 @@
 
         const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
-        // 🟢 Función de lectura tolerante a ambas estructuras de la API
         const obtenerSumaFila = (r) => {
-            // 1. Si la API devolvió la respuesta formateada con la columna 'total'
-            if (r.total !== undefined && r.total !== null) {
-                return Number(r.total) || 0;
-            }
-
-            // 2. Si la API devolvió la estructura clásica por columnas
+            if (r.total !== undefined && r.total !== null) return Number(r.total) || 0;
             if (r.consultas !== undefined || r.mental !== undefined || r.embarazadas !== undefined) {
                 if (modulo === "todas") {
-                    const campos = [
-                        'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
-                        'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
-                        'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
-                    ];
+                    const campos = ['consultas', 'embarazadas', 'mental', 'bucal', 'tamiz', 'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas', 'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'];
                     return campos.reduce((acc, c) => acc + (Number(r[c]) || 0), 0);
                 }
                 return Number(r[modulo]) || 0;
             }
-
             return Number(r.valor || r.suma || 0);
         };
 
         let labels = [];
         let datasets = [];
 
-        // 🟢 1. MODO DESGLOSADO POR APARTADO O POR VARIABLE
         if (modoDesglose === "por_apartado" || modoDesglose === "por_variable") {
-
-            // Determinar qué propiedad usaremos para la etiqueta de cada línea/barra
             const obtenerEtiqueta = (r) => {
                 if (modoDesglose === "por_apartado") {
-                    if (r.descripcion_apartado || r.apartado) {
-                        const cod = r.apartado || "";
-                        const desc = r.descripcion_apartado || "";
-                        return desc ? `Apt ${cod} - ${desc}` : `Apartado ${cod}`;
-                    }
-                    // Fallback en caso de venir por columnas
-                    return "Apartado General";
+                    const cod = r.apartado || "";
+                    const desc = r.descripcion_apartado || "";
+                    return desc ? `Apt ${cod} - ${desc}` : `Apartado ${cod || 'General'}`;
                 } else {
                     const cod = r.variable || "S/V";
                     const desc = r.descripcion_variable || "";
@@ -887,215 +815,69 @@
                 }
             };
 
-            if (tipoVista === 'anio') {
-                // VISTA ANUAL: Categorías en el eje X = Apartados/Variables, Barras = Total acumulado
-                const agregadosMap = {};
+            const grupos = {};
+            data.forEach(r => {
+                const grp = obtenerEtiqueta(r);
+                if (!grupos[grp]) grupos[grp] = {};
 
-                data.forEach(r => {
-                    const key = obtenerEtiqueta(r);
-                    const val = obtenerSumaFila(r);
-                    if (val > 0) {
-                        agregadosMap[key] = (agregadosMap[key] || 0) + val;
-                    }
+                const claveTiempo = tipoVista === 'anio' ? String(r.anio) : `${mesesNombres[r.mes] || r.mes} ${r.anio}`;
+                grupos[grp][claveTiempo] = (grupos[grp][claveTiempo] || 0) + obtenerSumaFila(r);
+            });
+
+            // Recolectar todas las etiquetas del eje X únicas
+            const setTiempo = new Set();
+            data.forEach(r => {
+                setTiempo.add(tipoVista === 'anio' ? String(r.anio) : `${mesesNombres[r.mes] || r.mes} ${r.anio}`);
+            });
+            labels = Array.from(setTiempo);
+
+            let idxColor = 0;
+            for (const [nombreGrupo, mapaTiempo] of Object.entries(grupos)) {
+                datasets.push({
+                    label: nombreGrupo,
+                    data: labels.map(lbl => mapaTiempo[lbl] || 0),
+                    borderColor: paletaColores[idxColor % paletaColores.length],
+                    backgroundColor: paletaColores[idxColor % paletaColores.length],
+                    fill: false,
+                    tension: 0.2
                 });
-
-                labels = Object.keys(agregadosMap);
-                const valores = labels.map(k => Math.round(agregadosMap[k]));
-
-                if (valores.length > 0) {
-                    datasets = [{
-                        label: modoDesglose === "por_apartado" ? "Total por Apartado" : "Total por Variable",
-                        data: valores,
-                        backgroundColor: paletaColores.slice(0, labels.length)
-                    }];
-                }
-
-            } else {
-                // VISTA MENSUAL: Eje X = 12 Meses, 1 Línea por CADA Apartado / Variable
-                labels = Object.values(mesesNombres);
-                const seriesMap = {};
-
-                // Agrupamos por Apartado/Variable y por su correspondiente Mes
-                data.forEach(r => {
-                    const mesNum = Number(r.mes);
-                    if (!mesNum || mesNum < 1 || mesNum > 12) return;
-
-                    const keyLabel = obtenerEtiqueta(r);
-                    const val = obtenerSumaFila(r);
-
-                    if (val > 0) {
-                        if (!seriesMap[keyLabel]) seriesMap[keyLabel] = {};
-                        seriesMap[keyLabel][mesNum] = (seriesMap[keyLabel][mesNum] || 0) + val;
-                    }
-                });
-
-                // Generar 1 Dataset (Línea) por cada Apartado/Variable presente
-                datasets = Object.keys(seriesMap).map((keyLabel, index) => ({
-                    label: keyLabel,
-                    data: Array.from({ length: 12 }, (_, i) => Math.round(seriesMap[keyLabel][i + 1] || 0)),
-                    borderColor: paletaColores[index % paletaColores.length],
-                    backgroundColor: paletaColores[index % paletaColores.length],
-                    tension: 0.2,
-                    pointRadius: 4,
-                    fill: false
-                }));
+                idxColor++;
             }
+        } else {
+            // MODO ACUMULADO GLOBAL
+            const acumulado = {};
+            data.forEach(r => {
+                const claveTiempo = tipoVista === 'anio' ? String(r.anio) : `${mesesNombres[r.mes] || r.mes} ${r.anio}`;
+                acumulado[claveTiempo] = (acumulado[claveTiempo] || 0) + obtenerSumaFila(r);
+            });
 
-            if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
+            labels = Object.keys(acumulado);
+            datasets.push({
+                label: "Total Registros",
+                data: Object.values(acumulado),
+                borderColor: '#2b5c8f',
+                backgroundColor: 'rgba(43, 92, 143, 0.2)',
+                fill: true,
+                tension: 0.2
+            });
         }
 
-        // 🟡 2. MODO ACUMULADO (Comportamiento Estándar)
-        else {
-            if (tipoVista === 'anio') {
-                const acumuladoAnual = {};
-                data.forEach(r => {
-                    const anioKey = r.anio || r.año || "Año";
-                    acumuladoAnual[anioKey] = (acumuladoAnual[anioKey] || 0) + obtenerSumaFila(r);
-                });
-
-                labels = Object.keys(acumuladoAnual).sort();
-                const valores = labels.map(a => Math.round(acumuladoAnual[a]));
-
-                if (valores.reduce((a, b) => a + b, 0) === 0) return;
-
-                datasets = [{
-                    label: `Total ${modulo === 'todas' ? 'Secciones Seleccionadas' : modulo.toUpperCase()}`,
-                    data: valores,
-                    backgroundColor: paletaColores.slice(0, labels.length)
-                }];
-            } else {
-                labels = Object.values(mesesNombres);
-                const resumen = {};
-
-                data.forEach(r => {
-                    if (!r.mes) return;
-                    const key = `Año ${r.anio || r.año}`;
-                    if (!resumen[key]) resumen[key] = {};
-                    resumen[key][Number(r.mes)] = (resumen[key][Number(r.mes)] || 0) + obtenerSumaFila(r);
-                });
-
-                datasets = Object.keys(resumen).map((key, index) => ({
-                    label: key,
-                    data: Array.from({ length: 12 }, (_, i) => Math.round(resumen[key][i + 1] || 0)),
-                    borderColor: paletaColores[index % paletaColores.length],
-                    backgroundColor: paletaColores[index % paletaColores.length],
-                    tension: 0.3,
-                    pointRadius: 4,
-                    fill: false
-                }));
-
-                if (!datasets.some(ds => ds.data.some(v => v > 0))) return;
-            }
-        }
-
-        // 🟢 3. RENDERIZADO DE LA GRÁFICA (Chart.js)
         graficaSisMensual = new Chart(ctx, {
-            type: tipoVista === 'anio' ? 'bar' : 'line',
+            type: 'line',
             data: { labels, datasets },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
                 animation: false,
-                scales: { y: { beginAtZero: true, ticks: { callback: v => typeof fmt === "function" ? fmt(v) : v } } },
+                scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
                 plugins: {
-                    legend: { display: true, position: 'top' },
                     datalabels: {
-                        display: () => (typeof mostrarValoresMensual !== 'undefined' ? mostrarValoresMensual : true),
                         anchor: 'end',
                         align: 'top',
-                        color: '#333333',
-                        formatter: (val) => (val > 0 && typeof fmt === "function") ? fmt(val) : (val > 0 ? val : ''),
-                        font: { size: 9, weight: 'bold' }
+                        formatter: (val) => val > 0 ? fmt(val) : ''
                     }
                 }
             }
         });
     }
-
-
-    /* 6. INICIALIZACIÓN DE EVENTOS */
-    document.addEventListener("DOMContentLoaded", () => {
-        renderSubvariables();
-        actualizarVistas();
-
-        document.getElementById("contenedorSubvariables")?.addEventListener("change", (e) => {
-            // 1. Si se hace clic en el checkbox PADRE
-            if (e.target.classList.contains('chk-padre')) {
-                const parentDetails = e.target.closest('details');
-                // Si el padre pasa a estar marcado/desmarcado, se limpian los estados indeterminados
-                e.target.indeterminate = false;
-                parentDetails.querySelectorAll('.chk-subvar').forEach(h => h.checked = e.target.checked);
-            }
-
-            // 2. Si se hace clic en un checkbox HIJO (subvariable)
-            if (e.target.classList.contains('chk-subvar')) {
-                const parentDetails = e.target.closest('details');
-                const chkPadre = parentDetails.querySelector('.chk-padre');
-                const hermanos = Array.from(parentDetails.querySelectorAll('.chk-subvar'));
-
-                if (chkPadre) {
-                    const cuantasMarcadas = hermanos.filter(h => h.checked).length;
-                    const totalHijos = hermanos.length;
-
-                    if (cuantasMarcadas === totalHijos) {
-                        // CASO A: Todas seleccionadas -> Palomita completa
-                        chkPadre.checked = true;
-                        chkPadre.indeterminate = false;
-                    } else if (cuantasMarcadas > 0) {
-                        // CASO B: Una o varias seleccionadas -> Cuadro azul sin palomita
-                        chkPadre.checked = false;
-                        chkPadre.indeterminate = true;
-                    } else {
-                        // CASO C: Ninguna seleccionada -> Vacío
-                        chkPadre.checked = false;
-                        chkPadre.indeterminate = false;
-                    }
-                }
-            }
-
-            guardarEstadoVariablesActuales();
-            window.ejecutarFiltradoSis(300);
-        });
-
-        document.getElementById("filtroSisDetalle")?.addEventListener("change", (e) => {
-            const moduloSeleccionado = e.target.value;
-            mostrarCargandoGrafica();
-
-            if (moduloSeleccionado === "todas") {
-                variablesPersonalizadasEstado["todas"] = [];
-            } else {
-                restaurarDefaultModulo(moduloSeleccionado);
-            }
-
-            renderSubvariables();
-            window.ejecutarFiltradoSis(200);
-        });
-
-        document.getElementById("selectTipoVistaTemporal")?.addEventListener("change", () => {
-            renderGraficaTemporal(datosFiltradosSis);
-        });
-
-        document.getElementById("btnToggleValoresMensual")?.addEventListener("click", (e) => {
-            mostrarValoresMensual = !mostrarValoresMensual;
-            e.target.textContent = mostrarValoresMensual ? "Ocultar valores" : "Mostrar valores";
-            renderGraficaTemporal(datosFiltradosSis);
-        });
-
-        document.getElementById("btnSeleccionarTodasSub")?.addEventListener("click", () => {
-            const contenedor = document.getElementById("contenedorSubvariables");
-            if (!contenedor) return;
-            contenedor.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = true);
-            guardarEstadoVariablesActuales();
-            window.ejecutarFiltradoSis();
-        });
-
-        document.getElementById("btnDesmarcarTodasSub")?.addEventListener("click", () => {
-            const contenedor = document.getElementById("contenedorSubvariables");
-            if (!contenedor) return;
-            contenedor.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = false);
-            guardarEstadoVariablesActuales();
-            window.ejecutarFiltradoSis();
-        });
-    });
 </script>
 {% endblock %}
