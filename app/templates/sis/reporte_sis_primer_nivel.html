@@ -407,6 +407,7 @@
     function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
     function ocultarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.add("d-none"); }
 
+
     async function realizarConsultaBackend() {
         mostrarCargandoGrafica();
 
@@ -440,7 +441,7 @@
         };
 
         try {
-            const resp = await fetch("/api/filtrar", {
+            const resp = await fetch("/sis_primer_nivel/api/filtrar", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
