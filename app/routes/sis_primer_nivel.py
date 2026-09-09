@@ -193,6 +193,7 @@ def dashboard_sis_primer_nivel():
         title="Reporte SIS - Primer Nivel"
     )
 
+
 @sis_pn.route("/api/filtrar", methods=["POST"])
 @login_required
 @csrf.exempt

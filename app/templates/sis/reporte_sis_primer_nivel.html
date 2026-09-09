@@ -98,7 +98,7 @@
                                 <!-- 🟢 NUEVO CONTROL CON ONCHANGE -->
                                 <select id="selectModoDesglose"
                                     class="form-select form-select-sm w-auto fw-bold border-info text-info d-none"
-                                    onchange="renderGraficaTemporal();">
+                                    onchange="realizarConsultaBackend();">
                                     <option value="acumulado" selected>📊 Acumulado</option>
                                     <option value="por_apartado">🔀 Por Apartado</option>
                                 </select>
@@ -575,21 +575,35 @@
         }
 
         const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
+        // 🟢 1. Obtener el modo de desglose seleccionado ("acumulado", "por_apartado", "por_variable")
+        // (Asegúrate de ajustar 'filtroModoDesglose' al ID real de tu select de desglose si se llama diferente)
+        const modoDesglose = document.getElementById("selectModoDesglose")?.value || "acumulado";
 
-        // 🟢 FIX 1: Enviar SOLO las variables del módulo activo actual
+        // 🟢 2. Estructurar las variables a pasar
         let variablesAPasar = {};
         if (moduloActual === "todas") {
-            variablesAPasar = { todas: variablesPersonalizadasEstado["todas"] || [] };
+            // Si eligió "todas", copiamos el objeto completo de variables por apartado
+            // (evitamos enviar { todas: [...] } para que el backend reconozca los apartados)
+            const copiaEstado = { ...variablesPersonalizadasEstado };
+            delete copiaEstado["todas"]; // Eliminamos la clave "todas" si existe
+            variablesAPasar = copiaEstado;
+
+            // Si después de limpiar no quedaron variables por clave, mandamos todas las que existan
+            if (Object.keys(variablesAPasar).length === 0 && variablesPersonalizadasEstado["todas"]) {
+                variablesAPasar = { seleccionadas: variablesPersonalizadasEstado["todas"] };
+            }
         } else {
             variablesAPasar = { [moduloActual]: variablesPersonalizadasEstado[moduloActual] || [] };
         }
 
+        // 🟢 3. Payload listo con modo_desglose
         const payload = {
             unidades: window.getUnidadesSeleccionadas?.() || [],
             jurisdicciones: window.getJurisdiccionesSeleccionadas?.() || [],
             municipios: window.getMunicipiosSeleccionados?.() || [],
             anios: window.getAniosSeleccionados?.() || [],
             meses: window.getMesesSeleccionados?.() || [],
+            modo_desglose: modoDesglose, // 👈 CLAVE: Envía "por_apartado" al backend
             variables: variablesAPasar
         };
 
@@ -613,6 +627,7 @@
             ocultarCargandoGrafica();
         }
     }
+
 
     function actualizarVistas() {
         datosActuales = agruparDatos(datosFiltradosSis);
@@ -823,7 +838,7 @@
     function renderGraficaTemporal(data = datosFiltradosSis) {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
-        const modoDesglose = document.getElementById("selectModoDesglose")?.value || "acumulado";
+        const modoDesglose = document.getElementById("selectModoDesglose")?.value || "por_apartado";
         const ctx = document.getElementById("graficaSisMensual");
 
         if (!ctx) return;
