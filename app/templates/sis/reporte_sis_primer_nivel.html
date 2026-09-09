@@ -206,9 +206,31 @@
         }
     }
 
+    /* Helper para obtener el valor actual del selector de Módulo */
+    function getModuloActual() {
+        return document.getElementById("selectModuloSis")?.value 
+            || document.getElementById("filtroSisDetalle")?.value 
+            || "consultas";
+    }
+
+    /* Helper para obtener el valor del selector de Agrupación */
+    function getNivelAgrupacionActual() {
+        return document.getElementById("selectNivelAgrupacion")?.value 
+            || document.getElementById("filtroAgrupacionGeo")?.value 
+            || document.getElementById("nivel_agrupacion")?.value 
+            || "clues";
+    }
+
+    /* Helper para obtener el valor del selector de Desglose */
+    function getModoDesgloseActual() {
+        return document.getElementById("selectModoDesglose")?.value 
+            || document.getElementById("filtroDesglose")?.value 
+            || "acumulado";
+    }
+
     /* 2. RENDERIZADO DEL ÁRBOL TIPO TREEVIEW */
     function renderSubvariables() {
-        const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
+        const modulo = getModuloActual();
         const contenedor = document.getElementById("contenedorSubvariables");
         const lbl = document.getElementById("lblSubvariablesModulo");
 
@@ -311,7 +333,7 @@
         const contenedor = document.getElementById("contenedorSubvariables");
         if (!contenedor) return;
 
-        const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
+        const modulo = getModuloActual();
 
         if (modulo === "todas") {
             variablesPersonalizadasEstado["todas"] = [];
@@ -337,7 +359,7 @@
     }
 
     function hayVariablesSeleccionadas() {
-        const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
+        const modulo = getModuloActual();
         if (modulo === "todas") {
             return Array.isArray(variablesPersonalizadasEstado["todas"]) && variablesPersonalizadasEstado["todas"].length > 0;
         }
@@ -347,7 +369,7 @@
     /* 3. PROCESAMIENTO Y FILTRADO */
     function agruparDatos(data) {
         const mapa = {};
-        const nivelAgrupacion = document.getElementById('selectNivelAgrupacion')?.value || 'clues';
+        const nivelAgrupacion = getNivelAgrupacionActual();
         const campos = [
             'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
             'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
@@ -408,13 +430,15 @@
         }
 
         const btn = document.getElementById("btnExportarExcel");
-        const textoOriginal = btn.innerHTML;
-        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Generando...';
-        btn.disabled = true;
+        const textoOriginal = btn ? btn.innerHTML : "";
+        if (btn) {
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Generando...';
+            btn.disabled = true;
+        }
 
         try {
-            const nivelAgrupacion = document.getElementById("nivel_agrupacion")?.value || "clues";
-            const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
+            const nivelAgrupacion = getNivelAgrupacionActual();
+            const moduloActual = getModuloActual();
 
             const nombresModulos = {
                 "consultas": "Consultas", "embarazadas": "Embarazadas", "mental": "Salud Mental",
@@ -491,8 +515,10 @@
             console.error("Error al exportar a Excel:", error);
             alert("Ocurrió un error al intentar generar el archivo Excel.");
         } finally {
-            btn.innerHTML = textoOriginal;
-            btn.disabled = false;
+            if (btn) {
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+            }
         }
     }
 
@@ -509,11 +535,9 @@
             return;
         }
 
-        const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
-        const selectDesglose = document.getElementById("selectModoDesglose") || document.getElementById("filtroDesglose");
-        const modoDesglose = selectDesglose?.value || "acumulado";
-        const selectAgrupacion = document.getElementById("selectNivelAgrupacion") || document.getElementById("filtroAgrupacionGeo");
-        const nivelAgrupacion = selectAgrupacion?.value || "clues";
+        const moduloActual = getModuloActual();
+        const modoDesglose = getModoDesgloseActual();
+        const nivelAgrupacion = getNivelAgrupacionActual();
 
         let variablesAPasar = {};
         if (moduloActual === "todas") {
@@ -539,6 +563,7 @@
             anios: window.getAniosSeleccionados?.() || [],
             meses: window.getMesesSeleccionados?.() || [],
             variables: variablesAPasar,
+            modulo: moduloActual,
             modo_desglose: modoDesglose,
             nivel_agrupacion: nivelAgrupacion
         };
@@ -754,8 +779,8 @@
     }
 
     function toggleModoDesglose() {
-        const modulo = document.getElementById("filtroSisDetalle")?.value;
-        const selectDesglose = document.getElementById("selectModoDesglose");
+        const modulo = getModuloActual();
+        const selectDesglose = document.getElementById("selectModoDesglose") || document.getElementById("filtroDesglose");
         if (!selectDesglose) return;
 
         if (modulo === "todas") {
@@ -768,10 +793,9 @@
 
     /* 6. RENDER GRÁFICA TEMPORAL COMPLETADA */
     function renderGraficaTemporal(data = datosFiltradosSis) {
-        const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
+        const modulo = getModuloActual();
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
-        const selectDesglose = document.getElementById("selectModoDesglose") || document.getElementById("filtroDesglose");
-        const modoDesglose = selectDesglose?.value || "acumulado";
+        const modoDesglose = getModoDesgloseActual();
         const ctx = document.getElementById("graficaSisMensual");
 
         if (!ctx) return;
@@ -824,7 +848,6 @@
                 grupos[grp][claveTiempo] = (grupos[grp][claveTiempo] || 0) + obtenerSumaFila(r);
             });
 
-            // Recolectar todas las etiquetas del eje X únicas
             const setTiempo = new Set();
             data.forEach(r => {
                 setTiempo.add(tipoVista === 'anio' ? String(r.anio) : `${mesesNombres[r.mes] || r.mes} ${r.anio}`);
@@ -844,7 +867,6 @@
                 idxColor++;
             }
         } else {
-            // MODO ACUMULADO GLOBAL
             const acumulado = {};
             data.forEach(r => {
                 const claveTiempo = tipoVista === 'anio' ? String(r.anio) : `${mesesNombres[r.mes] || r.mes} ${r.anio}`;
