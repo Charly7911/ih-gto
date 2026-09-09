@@ -819,20 +819,6 @@
             'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
         ];
 
-        const etiquetasNombres = {
-            consultas: 'Consultas',
-            embarazadas: 'Embarazadas',
-            mental: 'Salud Mental',
-            bucal: 'Salud Bucal',
-            tamiz: 'Tamiz',
-            planificacion_familiar: 'Planif. Familiar',
-            detecciones: 'Detecciones',
-            detecciones_cardiometabolicas: 'Detecciones Card.',
-            orientacion_lac_des_obe: 'Orient. Lac/Des/Obe',
-            orientacion_eda_ira: 'Orient. EDA/IRA',
-            otros: 'Otros'
-        };
-
         const obtenerSumaFila = (r) => {
             if (modulo === "todas") {
                 let sumaCampos = 0;
@@ -846,11 +832,9 @@
         let datasets = [];
 
         // 🟢 MODO DESGLOSADO POR APARTADO
-        // 🟢 MODO DESGLOSADO POR APARTADO
         if (modoDesglose === "por_apartado") {
             const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
-            // Mapeo de las columnas enviadas por el Backend hacia sus nombres descriptivos
             const mapNombresApartados = {
                 consultas: "Consultas",
                 mental: "Salud Mental",
@@ -871,13 +855,23 @@
                 const apartadosAnual = {};
 
                 data.forEach(r => {
-                    columnasModulo.forEach(col => {
-                        const val = Number(r[col]) || 0;
+                    // Intentar leer por propiedad dinámica de apartado o por columna estática
+                    const nombreApDinamico = r.descripcion_apartado || (r.apartado ? `Apartado ${r.apartado}` : null);
+
+                    if (nombreApDinamico) {
+                        const val = Number(r.total || r.valor || r.suma || 0);
                         if (val > 0) {
-                            const label = mapNombresApartados[col];
-                            apartadosAnual[label] = (apartadosAnual[label] || 0) + val;
+                            apartadosAnual[nombreApDinamico] = (apartadosAnual[nombreApDinamico] || 0) + val;
                         }
-                    });
+                    } else {
+                        columnasModulo.forEach(col => {
+                            const val = Number(r[col]) || 0;
+                            if (val > 0) {
+                                const label = mapNombresApartados[col];
+                                apartadosAnual[label] = (apartadosAnual[label] || 0) + val;
+                            }
+                        });
+                    }
                 });
 
                 labels = Object.keys(apartadosAnual);
@@ -899,14 +893,26 @@
                     const mesNum = Number(r.mes);
                     if (!mesNum || mesNum < 1 || mesNum > 12) return;
 
-                    columnasModulo.forEach(col => {
-                        const val = Number(r[col]) || 0;
+                    // 1. Verificar si el registro ya contiene información del apartado directamente
+                    const nombreApDinamico = r.descripcion_apartado || (r.apartado ? `Apartado ${r.apartado}` : null);
+
+                    if (nombreApDinamico) {
+                        const val = Number(r.total || r.valor || r.suma || 0);
                         if (val > 0) {
-                            const label = mapNombresApartados[col];
-                            if (!apartadosMes[label]) apartadosMes[label] = {};
-                            apartadosMes[label][mesNum] = (apartadosMes[label][mesNum] || 0) + val;
+                            if (!apartadosMes[nombreApDinamico]) apartadosMes[nombreApDinamico] = {};
+                            apartadosMes[nombreApDinamico][mesNum] = (apartadosMes[nombreApDinamico][mesNum] || 0) + val;
                         }
-                    });
+                    } else {
+                        // 2. Si no tiene apartado dinámico, evalúa las columnas predefinidas
+                        columnasModulo.forEach(col => {
+                            const val = Number(r[col]) || 0;
+                            if (val > 0) {
+                                const label = mapNombresApartados[col];
+                                if (!apartadosMes[label]) apartadosMes[label] = {};
+                                apartadosMes[label][mesNum] = (apartadosMes[label][mesNum] || 0) + val;
+                            }
+                        });
+                    }
                 });
 
                 datasets = Object.keys(apartadosMes).map((label, index) => ({
