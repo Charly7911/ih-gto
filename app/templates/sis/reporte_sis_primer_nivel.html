@@ -159,7 +159,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-
 <script>
     if (typeof ChartDataLabels !== 'undefined') {
         Chart.register(ChartDataLabels);
@@ -188,6 +187,7 @@
     let graficaUnidad = null;
     let graficaSisMensual = null;
     let debounceTimer = null;
+    let mostrarValoresMensual = true;
 
     const fmt = (n) => Number(n || 0).toLocaleString("es-MX");
 
@@ -406,7 +406,6 @@
 
     function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
     function ocultarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.add("d-none"); }
-
 
     async function realizarConsultaBackend() {
         mostrarCargandoGrafica();
@@ -651,6 +650,7 @@
         }
     }
 
+    /* FUNCION DE GRÁFICA TEMPORAL CORREGIDA (LÍNEAS POR APARTADO) */
     function renderGraficaTemporal(data = datosFiltradosSis) {
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
         const modoDesglose = document.getElementById("selectModoDesglose")?.value || "acumulado";
@@ -672,31 +672,43 @@
 
         let labels = [];
         let datasets = [];
+        let tipoGrafico = 'line'; // Tipo por defecto en líneas para desglose
 
         if (modoDesglose === "por_apartado") {
             const columnasModulo = Object.keys(mapNombresApartados);
 
             if (tipoVista === 'anio') {
-                const apartadosAnual = {};
+                // EJE X: AÑOS | LINEAS: CADA APARTADO
+                labels = [...new Set(data.map(r => Number(r.anio)))].filter(a => !isNaN(a) && a > 0).sort((a, b) => a - b);
+                const apartadosData = {};
+
                 data.forEach(r => {
+                    const anioStr = r.anio;
                     columnasModulo.forEach(col => {
                         const val = Number(r[col]) || 0;
                         if (val > 0) {
                             const label = mapNombresApartados[col];
-                            apartadosAnual[label] = (apartadosAnual[label] || 0) + val;
+                            if (!apartadosData[label]) apartadosData[label] = {};
+                            apartadosData[label][anioStr] = (apartadosData[label][anioStr] || 0) + val;
                         }
                     });
                 });
 
-                labels = Object.keys(apartadosAnual);
-                if (labels.length > 0) {
-                    datasets = [{
-                        label: 'Total por Apartado',
-                        data: labels.map(k => Math.round(apartadosAnual[k])),
-                        backgroundColor: paletaColores.slice(0, labels.length)
-                    }];
-                }
+                let colorIdx = 0;
+                datasets = Object.keys(apartadosData).map(label => {
+                    const color = paletaColores[colorIdx++ % paletaColores.length];
+                    return {
+                        label: label,
+                        data: labels.map(a => apartadosData[label][a] || 0),
+                        borderColor: color,
+                        backgroundColor: color,
+                        fill: false,
+                        tension: 0.2,
+                        pointRadius: 4
+                    };
+                });
             } else {
+                // EJE X: MESES | LINEAS: CADA APARTADO
                 labels = Object.values(mesesNombres);
                 const apartadosMes = {};
 
@@ -715,14 +727,22 @@
                 });
 
                 let colorIdx = 0;
-                datasets = Object.keys(apartadosMes).map(label => ({
-                    label: label,
-                    data: apartadosMes[label],
-                    backgroundColor: paletaColores[colorIdx++ % paletaColores.length]
-                }));
+                datasets = Object.keys(apartadosMes).map(label => {
+                    const color = paletaColores[colorIdx++ % paletaColores.length];
+                    return {
+                        label: label,
+                        data: apartadosMes[label],
+                        borderColor: color,
+                        backgroundColor: color,
+                        fill: false,
+                        tension: 0.2,
+                        pointRadius: 4
+                    };
+                });
             }
         } else {
-            // MODO ACUMULADO
+            // MODO ACUMULADO GENERAL (BARRAS)
+            tipoGrafico = 'bar';
             if (tipoVista === 'anio') {
                 const acAnual = {};
                 data.forEach(r => {
@@ -730,7 +750,7 @@
                     const total = Number(r.total || r.consultas || 0);
                     acAnual[anio] = (acAnual[anio] || 0) + total;
                 });
-                labels = Object.keys(acAnual).sort();
+                labels = Object.keys(acAnual).sort((a, b) => a - b);
                 datasets = [{
                     label: 'Total Acumulado',
                     data: labels.map(a => acAnual[a]),
@@ -756,17 +776,27 @@
         }
 
         graficaSisMensual = new Chart(ctx, {
-            type: 'bar',
+            type: tipoGrafico,
             data: { labels, datasets },
             options: {
                 responsive: true,
                 animation: false,
-                scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
+                scales: { 
+                    y: { 
+                        beginAtZero: true, 
+                        ticks: { callback: v => fmt(v) } 
+                    } 
+                },
                 plugins: {
+                    legend: {
+                        display: datasets.length > 1,
+                        position: 'top'
+                    },
                     datalabels: {
-                        anchor: 'center',
-                        align: 'center',
-                        color: '#ffffff',
+                        display: mostrarValoresMensual,
+                        anchor: tipoGrafico === 'line' ? 'end' : 'center',
+                        align: tipoGrafico === 'line' ? 'top' : 'center',
+                        color: tipoGrafico === 'line' ? '#333333' : '#ffffff',
                         font: { weight: 'bold', size: 10 },
                         formatter: (val) => val > 0 ? fmt(val) : ''
                     }
@@ -775,22 +805,18 @@
         });
     }
 
-
     /* 6. INICIALIZACIÓN DE EVENTOS */
     document.addEventListener("DOMContentLoaded", () => {
         renderSubvariables();
         actualizarVistas();
 
         document.getElementById("contenedorSubvariables")?.addEventListener("change", (e) => {
-            // 1. Si se hace clic en el checkbox PADRE
             if (e.target.classList.contains('chk-padre')) {
                 const parentDetails = e.target.closest('details');
-                // Si el padre pasa a estar marcado/desmarcado, se limpian los estados indeterminados
                 e.target.indeterminate = false;
                 parentDetails.querySelectorAll('.chk-subvar').forEach(h => h.checked = e.target.checked);
             }
 
-            // 2. Si se hace clic en un checkbox HIJO (subvariable)
             if (e.target.classList.contains('chk-subvar')) {
                 const parentDetails = e.target.closest('details');
                 const chkPadre = parentDetails.querySelector('.chk-padre');
@@ -801,15 +827,12 @@
                     const totalHijos = hermanos.length;
 
                     if (cuantasMarcadas === totalHijos) {
-                        // CASO A: Todas seleccionadas -> Palomita completa
                         chkPadre.checked = true;
                         chkPadre.indeterminate = false;
                     } else if (cuantasMarcadas > 0) {
-                        // CASO B: Una o varias seleccionadas -> Cuadro azul sin palomita
                         chkPadre.checked = false;
                         chkPadre.indeterminate = true;
                     } else {
-                        // CASO C: Ninguna seleccionada -> Vacío
                         chkPadre.checked = false;
                         chkPadre.indeterminate = false;
                     }
@@ -827,11 +850,17 @@
             if (moduloSeleccionado === "todas") {
                 variablesPersonalizadasEstado["todas"] = [];
             } else {
-                restaurarDefaultModulo(moduloSeleccionado);
+                if (typeof restaurarDefaultModulo === "function") {
+                    restaurarDefaultModulo(moduloSeleccionado);
+                }
             }
 
             renderSubvariables();
             window.ejecutarFiltradoSis(200);
+        });
+
+        document.getElementById("selectModoDesglose")?.addEventListener("change", () => {
+            renderGraficaTemporal(datosFiltradosSis);
         });
 
         document.getElementById("selectTipoVistaTemporal")?.addEventListener("change", () => {
