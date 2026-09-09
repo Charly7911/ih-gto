@@ -862,42 +862,16 @@
         if (modoDesglose === "por_apartado") {
             const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
-            const mapNombresApartados = {
-                consultas: "Consultas",
-                mental: "Salud Mental",
-                bucal: "Salud Bucal",
-                embarazadas: "Embarazadas / Maternidad",
-                planificacion_familiar: "Planificación Familiar",
-                detecciones: "Detecciones Generales",
-                tamiz: "Tamiz Neonatal",
-                detecciones_cardiometabolicas: "Detecciones Cardiometabólicas",
-                orientacion_lac_des_obe: "Orientación Lactancia/Desnutrición/Obesidad",
-                orientacion_eda_ira: "Orientación EDA / IRA",
-                otros: "Otros / Sin Clasificar"
-            };
-
-            const columnasModulo = Object.keys(mapNombresApartados);
-
             if (tipoVista === 'anio') {
                 const apartadosAnual = {};
 
                 data.forEach(r => {
-                    // Intentar leer por propiedad dinámica de apartado o por columna estática
-                    const nombreApDinamico = r.descripcion_apartado || (r.apartado ? `Apartado ${r.apartado}` : null);
+                    const numAp = r.id_apartado || r.apartado || r.num_apartado;
+                    const labelApartado = r.descripcion_apartado || (numAp ? `Apartado ${numAp}` : 'Sin Clasificar');
+                    const val = Number(r.total || r.valor || r.suma || 0);
 
-                    if (nombreApDinamico) {
-                        const val = Number(r.total || r.valor || r.suma || 0);
-                        if (val > 0) {
-                            apartadosAnual[nombreApDinamico] = (apartadosAnual[nombreApDinamico] || 0) + val;
-                        }
-                    } else {
-                        columnasModulo.forEach(col => {
-                            const val = Number(r[col]) || 0;
-                            if (val > 0) {
-                                const label = mapNombresApartados[col];
-                                apartadosAnual[label] = (apartadosAnual[label] || 0) + val;
-                            }
-                        });
+                    if (val > 0) {
+                        apartadosAnual[labelApartado] = (apartadosAnual[labelApartado] || 0) + val;
                     }
                 });
 
@@ -912,45 +886,48 @@
                     }];
                 }
             } else {
-                // Vista Mensual (12 meses)
+                // Vista Mensual (Crea 1 dataset por cada combinación de Apartado y Año)
                 labels = Object.values(mesesNombres);
-                const apartadosMes = {};
+                const seriesMap = {};
 
                 data.forEach(r => {
                     const mesNum = Number(r.mes);
                     if (!mesNum || mesNum < 1 || mesNum > 12) return;
 
-                    // 1. Verificar si el registro ya contiene información del apartado directamente
-                    const nombreApDinamico = r.descripcion_apartado || (r.apartado ? `Apartado ${r.apartado}` : null);
+                    // 1. Obtener identificadores del apartado
+                    const numAp = r.id_apartado || r.apartado || r.num_apartado;
+                    const descAp = r.descripcion_apartado || (numAp ? `Apartado ${numAp}` : 'Otros');
 
-                    if (nombreApDinamico) {
-                        const val = Number(r.total || r.valor || r.suma || 0);
-                        if (val > 0) {
-                            if (!apartadosMes[nombreApDinamico]) apartadosMes[nombreApDinamico] = {};
-                            apartadosMes[nombreApDinamico][mesNum] = (apartadosMes[nombreApDinamico][mesNum] || 0) + val;
+                    // 2. Obtener el año del registro
+                    const anio = r.anio || r.año || '';
+
+                    // 3. Crear una clave ÚNICA por Apartado + Año (Ejemplo: "Apartado 1 - CONSULTA (2024)")
+                    const serieKey = anio ? `${descAp} (${anio})` : descAp;
+
+                    const val = Number(r.total || r.valor || r.suma || 0);
+
+                    if (val > 0) {
+                        if (!seriesMap[serieKey]) {
+                            seriesMap[serieKey] = Array(12).fill(0);
                         }
-                    } else {
-                        // 2. Si no tiene apartado dinámico, evalúa las columnas predefinidas
-                        columnasModulo.forEach(col => {
-                            const val = Number(r[col]) || 0;
-                            if (val > 0) {
-                                const label = mapNombresApartados[col];
-                                if (!apartadosMes[label]) apartadosMes[label] = {};
-                                apartadosMes[label][mesNum] = (apartadosMes[label][mesNum] || 0) + val;
-                            }
-                        });
+                        seriesMap[serieKey][mesNum - 1] += val;
                     }
                 });
 
-                datasets = Object.keys(apartadosMes).map((label, index) => ({
-                    label: label,
-                    data: Array.from({ length: 12 }, (_, i) => Math.round(apartadosMes[label][i + 1] || 0)),
-                    borderColor: paletaColores[index % paletaColores.length],
-                    backgroundColor: paletaColores[index % paletaColores.length],
-                    tension: 0.3,
-                    pointRadius: 4,
-                    fill: false
-                }));
+                let colorIdx = 0;
+                datasets = Object.keys(seriesMap).map(serieKey => {
+                    const color = paletaColores[colorIdx % paletaColores.length];
+                    colorIdx++;
+                    return {
+                        label: serieKey,
+                        data: seriesMap[serieKey].map(v => Math.round(v)),
+                        borderColor: color,
+                        backgroundColor: color,
+                        tension: 0.3,
+                        pointRadius: 4,
+                        fill: false
+                    };
+                });
             }
 
             if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
