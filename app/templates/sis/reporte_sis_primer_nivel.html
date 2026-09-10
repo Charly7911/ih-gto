@@ -454,9 +454,9 @@
                 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
             };
 
-            // Extraer municipios seleccionados en el checklist por si r.municipio viene vacío
+            // 🟢 Capturar municipios marcados en el popover (ej. CORTAZAR)
             const municipiosChecklist = Array.from(document.querySelectorAll('.sis-filtro-municipio:checked'))
-                .map(cb => cb.value);
+                .map(cb => cb.value.trim());
 
             const mapaMatriz = {};
             const mesesConDatos = new Set();
@@ -468,23 +468,19 @@
                 const nombreMes = nombresMeses[numMes] || `Mes ${numMes}`;
                 const anioRegistro = r.anio || 'Sin Año';
 
-                // 1. Obtención robusta del Municipio
+                // 1. Detección prioritaria del Municipio
                 let nombreMunicipio = r.municipio || r.nombre_municipio || r.nombre;
                 if (!nombreMunicipio || nombreMunicipio === 'N/A' || nombreMunicipio === 'Sin Especificar') {
-                    if (municipiosChecklist.length === 1) {
-                        nombreMunicipio = municipiosChecklist[0];
-                    } else if (municipiosChecklist.length > 1) {
+                    if (municipiosChecklist.length > 0) {
                         nombreMunicipio = municipiosChecklist.join(', ');
                     } else {
                         nombreMunicipio = 'Sin Especificar';
                     }
                 }
 
-                // 2. Obtención de Unidad y Jurisdicción
                 let nombreUnidad = r.nombre_unidad || r.clues || 'Sin Especificar';
                 let nombreJurisdiccion = r.jurisdiccion ? `Jurisdicción ${r.jurisdiccion}` : 'Sin Especificar';
 
-                // Key principal de la fila según selección
                 let nombreEntidad = nombreUnidad;
                 if (nivelAgrupacion === "jurisdiccion") {
                     nombreEntidad = nombreJurisdiccion;
@@ -496,7 +492,6 @@
                     nombreEntidad += ` - ${r.descripcion_apartado}`;
                 }
 
-                // Clave única
                 const claveUnicaMatriz = `${nombreEntidad}_${anioRegistro}`;
 
                 if (!mapaMatriz[claveUnicaMatriz]) {
@@ -505,8 +500,7 @@
                         "Jurisdicción": nombreJurisdiccion,
                         "Municipio": nombreMunicipio,
                         "Unidad": nombreUnidad,
-                        "Año": Number(anioRegistro) || anioRegistro,
-                        "_claveFila": nombreEntidad
+                        "Año": Number(anioRegistro) || anioRegistro
                     };
                 }
 
@@ -514,30 +508,30 @@
                 mapaMatriz[claveUnicaMatriz][nombreMes] = (mapaMatriz[claveUnicaMatriz][nombreMes] || 0) + valorMonto;
             });
 
-            // Ordenar meses cronológicamente
             const mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
 
-            // 3. Estructurar columnas finales según el nivel seleccionado
+            // 2. Construcción de filas (fuerza la columna Municipio si hay filtro activo)
             const datosParaExcel = [];
             const totalesMes = {};
             mesesOrdenados.forEach(m => totalesMes[m] = 0);
             let granTotalGeneral = 0;
 
+            // Evaluar si debemos mostrar obligatoriamente la columna Municipio
+            const mostrarColumnaMunicipio = nivelAgrupacion === "municipio" || municipiosChecklist.length > 0;
+
             Object.keys(mapaMatriz).forEach(clave => {
                 const item = mapaMatriz[clave];
 
-                // Construir el objeto base según la vista
                 const fila = {
                     "Entidad": item["Entidad"],
                     "Jurisdicción": item["Jurisdicción"]
                 };
 
-                // Incluir Municipio si la vista es Municipio o Unidad
-                if (nivelAgrupacion === "municipio" || nivelAgrupacion === "clues") {
+                // 🟢 Incluir 'Municipio' siempre que se haya agrupado o filtrado por municipio
+                if (mostrarColumnaMunicipio) {
                     fila["Municipio"] = item["Municipio"];
                 }
 
-                // Incluir Unidad solo si la vista es Unidad
                 if (nivelAgrupacion === "clues") {
                     fila["Unidad"] = item["Unidad"];
                 }
@@ -568,17 +562,17 @@
             // Ordenar datos
             datosParaExcel.sort((a, b) => {
                 if (a["Año"] !== b["Año"]) return a["Año"] - b["Año"];
-                const colRef = nivelAgrupacion === "municipio" ? "Municipio" : (nivelAgrupacion === "jurisdiccion" ? "Jurisdicción" : "Unidad");
+                const colRef = mostrarColumnaMunicipio ? "Municipio" : (nivelAgrupacion === "jurisdiccion" ? "Jurisdicción" : "Unidad");
                 return String(a[colRef] || '').localeCompare(String(b[colRef] || ''));
             });
 
-            // 4. Fila final de Totales
+            // 3. Fila de Total General
             const filaTotal = {
                 "Entidad": "Total General",
                 "Jurisdicción": "-"
             };
 
-            if (nivelAgrupacion === "municipio" || nivelAgrupacion === "clues") {
+            if (mostrarColumnaMunicipio) {
                 filaTotal["Municipio"] = "-";
             }
             if (nivelAgrupacion === "clues") {
@@ -594,12 +588,11 @@
 
             datosParaExcel.push(filaTotal);
 
-            // 5. Generar archivo Excel
+            // 4. Generación y descarga
             const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS");
 
-            // Ajustar anchos automáticamente
             const maxAnchos = Object.keys(datosParaExcel[0]).map(key => ({
                 wch: Math.max(key.length + 4, 14)
             }));
