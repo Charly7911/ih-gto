@@ -992,12 +992,14 @@
         });
     }
 
-    function renderGraficaPorUnidad(data = datosActuales.filter(r => r.anio === anioActivo)) {
+
+    
+    function renderGraficaPorUnidad(data = datosActuales.filter(r => Number(r.anio) === Number(anioActivo))) {
         const ctx = document.getElementById('graficaSis');
         const elTitulo = document.getElementById("tituloGraficaSis");
         if (!ctx) return;
 
-        // 🟢 1. Obtener el nombre legible de la sección seleccionada
+        // 1. Obtener el nombre del módulo seleccionado
         const selectModulo = document.getElementById("filtroSisDetalle");
         let nombreModulo = "Indicadores";
 
@@ -1008,18 +1010,38 @@
                 : (optionSelected ? optionSelected.text.trim() : selectModulo.value);
         }
 
+        // 2. Obtener los nombres de los Apartados marcados en el catálogo (Treeview)
+        const apartadosMarcados = [];
+        document.querySelectorAll('.chk-apartado:checked, .chk-subvar:checked').forEach(chk => {
+            // Busca el texto del apartado padre o etiqueta activa
+            const textoApartado = chk.closest('li')?.querySelector('.nombre-apartado')?.textContent ||
+                chk.parentElement?.textContent?.trim();
+            if (textoApartado && !apartadosMarcados.includes(textoApartado)) {
+                apartadosMarcados.push(textoApartado);
+            }
+        });
+
+        let textoApartadosSubtitulo = apartadosMarcados.length > 0
+            ? apartadosMarcados.slice(0, 3).join(', ') + (apartadosMarcados.length > 3 ? '...' : '')
+            : 'Todos los apartados del módulo';
+
         if (graficaUnidad) graficaUnidad.destroy();
 
-        // 🟢 2. Caso sin datos: usa la variable dinámica
+        // Sin datos
         if (!data || data.length === 0) {
-            if (elTitulo) elTitulo.innerHTML = `${nombreModulo} — Sin variables seleccionadas`;
+            if (elTitulo) {
+                elTitulo.innerHTML = `
+                <div class="fw-bold">${nombreModulo} — Sin variables seleccionadas</div>
+                <small class="text-muted d-block mt-1">${textoApartadosSubtitulo}</small>
+            `;
+            }
             return;
         }
 
-        const labels = data.map(r => r.nombre_unidad || r.clues);
+        const labels = data.map(r => r.nombre_unidad || r.clues || r.jurisdiccion);
         const configVars = {
             consultas: { label: 'Consultas', color: '#4E79A7' },
-            embarazadas: { label: 'Embarazadas', color: '#F28E2B' },
+            embarazadas: { label: 'Embarazadas', color: '#4E79A7' },
             mental: { label: 'Salud Mental', color: '#E15759' },
             bucal: { label: 'Salud Bucal', color: '#76B7B2' },
             tamiz: { label: 'Tamiz', color: '#59A14F' },
@@ -1030,11 +1052,22 @@
             orientacion_eda_ira: { label: 'Orientación EDA/IRA', color: '#C4A26A' }
         };
 
-        const datasets = Object.keys(configVars).map(v => ({
-            label: configVars[v].label,
-            data: data.map(r => Number(r[v]) || 0),
-            backgroundColor: configVars[v].color
-        }));
+        const moduloClave = selectModulo?.value || 'consultas';
+        const colorGrafica = configVars[moduloClave]?.color || '#4E79A7';
+
+        // Generar datasets
+        const datasets = [{
+            label: nombreModulo,
+            data: data.map(r => {
+                if (moduloClave === 'todas') {
+                    return (Number(r.consultas) || 0) + (Number(r.embarazadas) || 0) + (Number(r.mental) || 0) +
+                        (Number(r.bucal) || 0) + (Number(r.tamiz) || 0) + (Number(r.planificacion_familiar) || 0) +
+                        (Number(r.detecciones) || 0) + (Number(r.detecciones_cardiometabolicas) || 0);
+                }
+                return Number(r[moduloClave]) || Number(r.total) || 0;
+            }),
+            backgroundColor: colorGrafica
+        }];
 
         graficaUnidad = new Chart(ctx, {
             type: 'bar',
@@ -1043,8 +1076,15 @@
                 indexAxis: 'y',
                 responsive: true,
                 animation: false,
-                scales: { x: { stacked: true, ticks: { callback: v => fmt(v) } }, y: { stacked: true } },
+                scales: {
+                    x: { stacked: true, ticks: { callback: v => fmt(v) } },
+                    y: { stacked: true }
+                },
                 plugins: {
+                    // 🟢 OCULTA LA LEYENDA DE COLORES INNECESARIA
+                    legend: {
+                        display: false
+                    },
                     datalabels: {
                         anchor: 'center',
                         align: 'center',
@@ -1056,10 +1096,17 @@
             }
         });
 
-        // 🟢 3. Actualizar el título HTML usando nombreModulo en lugar de "Indicadores"
+        // 🟢 3. ACTUALIZAR TÍTULO Y DESCRIPCIÓN DE APARTADOS
         if (elTitulo) {
-            const totalGeneral = datasets.reduce((acc, ds) => acc + ds.data.reduce((a, b) => a + b, 0), 0);
-            elTitulo.innerHTML = `${nombreModulo} <strong>${anioActivo || 'General'}</strong> — Total Seleccionado: <strong>${fmt(totalGeneral)}</strong>`;
+            const totalGeneral = datasets[0].data.reduce((a, b) => a + b, 0);
+            elTitulo.innerHTML = `
+            <div class="fs-6 fw-bold text-dark">
+                ${nombreModulo} <span class="text-primary">${anioActivo || ''}</span> — Total Seleccionado: <strong>${fmt(totalGeneral)}</strong>
+            </div>
+            <div class="small text-muted fw-normal mt-1" style="font-size: 0.85rem;">
+                📌 <strong>Apartados:</strong> ${textoApartadosSubtitulo}
+            </div>
+        `;
         }
     }
 
