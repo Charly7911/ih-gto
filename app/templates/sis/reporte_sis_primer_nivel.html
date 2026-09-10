@@ -108,10 +108,40 @@
                                     Mostrar valores
                                 </button>
 
-                                <button type="button" class="btn btn-success btn-sm d-flex align-items-center gap-1"
-                                    id="btnExportarExcel" onclick="exportarFiltradoExcel()">
-                                    <i class="bi bi-file-earmark-excel-fill"></i> Excel
-                                </button>
+                                <div class="btn-group">
+                                    <button type="button"
+                                        class="btn btn-success btn-sm dropdown-toggle d-flex align-items-center gap-1"
+                                        id="btnExportarExcel" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="bi bi-file-earmark-excel-fill"></i> Excel
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                        <li>
+                                            <a class="dropdown-item d-flex align-items-center gap-2" href="#"
+                                                onclick="exportarExcelConModo('acumulado'); return false;">
+                                                <i class="bi bi-file-earmark-text text-success"></i>
+                                                <div>
+                                                    <strong>Reporte Acumulado</strong>
+                                                    <div class="text-muted small" style="font-size: 0.75rem;">Resumen
+                                                        general por Municipio/Unidad</div>
+                                                </div>
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <hr class="dropdown-divider">
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item d-flex align-items-center gap-2" href="#"
+                                                onclick="exportarExcelConModo('desagregado'); return false;">
+                                                <i class="bi bi-list-nested text-primary"></i>
+                                                <div>
+                                                    <strong>Reporte Desagregado</strong>
+                                                    <div class="text-muted small" style="font-size: 0.75rem;">Incluye
+                                                        Apartado, Variable y Subtotales</div>
+                                                </div>
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
 
@@ -431,6 +461,20 @@
     }
 
 
+    // Función puente para pasar el modo elegido desde el botón Excel
+    function exportarExcelConModo(modo) {
+        // Si existe el select en tu vista, actualizamos su valor; si no, lo manejamos dinámicamente
+        const selectModo = document.getElementById("selectModoDesglose");
+        if (selectModo) {
+            selectModo.value = modo;
+        } else {
+            window.modoExportacionTemporal = modo;
+        }
+
+        // Ejecutar la exportación
+        exportarFiltradoExcel();
+    }
+
     function exportarFiltradoExcel() {
         if (!datosFiltradosSis || datosFiltradosSis.length === 0) {
             alert("No hay datos disponibles para exportar con los filtros seleccionados.");
@@ -446,7 +490,13 @@
 
         try {
             const nivelAgrupacion = document.getElementById("selectNivelAgrupacion")?.value || "clues";
-            const modoDesglose = document.getElementById("selectModoDesglose")?.value || "acumulado";
+            const modoDesglose = window.modoExportacionTemporal
+                || document.getElementById("selectModoDesglose")?.value
+                || "acumulado";
+
+            // Limpiar la variable temporal
+            window.modoExportacionTemporal = null;
+            // 🟢 'desagregado' o 'por_apartado' / 'acumulado'
 
             const nombresMeses = {
                 1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
@@ -454,8 +504,7 @@
                 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
             };
 
-            // Capturar municipios marcados en el popover
-            const municipiosChecklist = Array.from(document.querySelectorAll('.sis-filtro-municipio:checked'))
+            const municipiosSeleccionados = Array.from(document.querySelectorAll('.sis-filtro-municipio:checked'))
                 .map(cb => cb.value.trim());
 
             const mapaMatriz = {};
@@ -467,138 +516,166 @@
 
                 const nombreMes = nombresMeses[numMes] || `Mes ${numMes}`;
                 const anioRegistro = r.anio || 'Sin Año';
-
-                // 1. Extraer EL MUNICIPIO PROPIO de este registro individual
-                let nombreMunicipio = r.municipio || r.nombre_municipio || r.nombre || 'Sin Especificar';
-                let nombreUnidad = r.nombre_unidad || r.clues || 'Sin Especificar';
-                let nombreJurisdiccion = r.jurisdiccion ? `Jurisdicción ${r.jurisdiccion}` : 'Sin Especificar';
-
-                // Determinar bajo qué criterio se agruparán las filas del Excel
-                let nombreEntidad = nombreUnidad;
-                if (nivelAgrupacion === "jurisdiccion") {
-                    nombreEntidad = nombreJurisdiccion;
-                } else if (nivelAgrupacion === "municipio" || municipiosChecklist.length > 0) {
-                    // 🟢 Agrupar de forma independiente por el municipio del registro
-                    nombreEntidad = nombreMunicipio;
-                }
-
-                if (modoDesglose === "por_apartado" && r.descripcion_apartado) {
-                    nombreEntidad += ` - ${r.descripcion_apartado}`;
-                }
-
-                // 🔴 CLAVE ÚNICA INDIVIDUAL: Garantiza que cada municipio tenga su propia fila por año
-                const claveUnicaMatriz = `${nombreEntidad}_${nombreJurisdiccion}_${anioRegistro}`;
-
-                if (!mapaMatriz[claveUnicaMatriz]) {
-                    mapaMatriz[claveUnicaMatriz] = {
-                        "Entidad": "GUANAJUATO",
-                        "Jurisdicción": nombreJurisdiccion,
-                        "Municipio": nombreMunicipio,
-                        "Unidad": nombreUnidad,
-                        "Año": Number(anioRegistro) || anioRegistro
-                    };
-                }
-
+                const nombreJurisdiccion = r.jurisdiccion ? `Jurisdicción ${r.jurisdiccion}` : 'Sin Especificar';
                 const valorMonto = Number(r.total || r.consultas || r.suma || 0);
-                mapaMatriz[claveUnicaMatriz][nombreMes] = (mapaMatriz[claveUnicaMatriz][nombreMes] || 0) + valorMonto;
+
+                // Determinar Municipios
+                let municipiosAProcesar = [];
+                if (r.municipio && r.municipio !== 'N/A' && r.municipio !== 'Sin Especificar') {
+                    municipiosAProcesar.push(r.municipio);
+                } else if (municipiosSeleccionados.length > 0) {
+                    municipiosAProcesar = municipiosSeleccionados;
+                } else {
+                    municipiosAProcesar.push('Sin Especificar');
+                }
+
+                municipiosAProcesar.forEach(mun => {
+                    // Capturar Apartado y Variable (con valores por defecto)
+                    const apartado = r.descripcion_apartado || r.apartado || 'SIN APARTADO';
+                    const variable = r.descripcion_variable || r.variable || r.concepto || 'SIN VARIABLE';
+
+                    // 🟢 Clave única adaptada si el modo es 'desagregado'
+                    let claveUnicaMatriz = "";
+                    if (modoDesglose === "desagregado") {
+                        claveUnicaMatriz = `${nombreJurisdiccion}_${mun}_${r.nombre_unidad || ''}_${apartado}_${variable}_${anioRegistro}`;
+                    } else {
+                        claveUnicaMatriz = `${mun}_${nombreJurisdiccion}_${anioRegistro}`;
+                    }
+
+                    if (!mapaMatriz[claveUnicaMatriz]) {
+                        mapaMatriz[claveUnicaMatriz] = {
+                            "Entidad": "GUANAJUATO",
+                            "Jurisdicción": nombreJurisdiccion,
+                            "Municipio": mun,
+                            "Unidad": r.nombre_unidad || r.clues || '-',
+                            "Apartado": apartado,
+                            "Variable": variable,
+                            "Año": Number(anioRegistro) || anioRegistro
+                        };
+                    }
+
+                    const montoAplica = (municipiosAProcesar.length > 1 && !r.municipio)
+                        ? (valorMonto / municipiosAProcesar.length)
+                        : valorMonto;
+
+                    mapaMatriz[claveUnicaMatriz][nombreMes] = (mapaMatriz[claveUnicaMatriz][nombreMes] || 0) + montoAplica;
+                });
             });
 
             const mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
+            const incluirColumnaMunicipio = nivelAgrupacion === "municipio" || municipiosSeleccionados.length > 0;
+            const esDesagregado = modoDesglose === "desagregado";
 
-            // 2. Construir matriz de filas independientes para el Excel
             const datosParaExcel = [];
             const totalesMes = {};
             mesesOrdenados.forEach(m => totalesMes[m] = 0);
             let granTotalGeneral = 0;
 
-            const mostrarColumnaMunicipio = nivelAgrupacion === "municipio" || municipiosChecklist.length > 0;
+            // Auxiliares para cálculo de Subtotales por Apartado/Jurisdicción
+            let subtotalApartado = {};
+            let apartadoActual = null;
 
-            Object.keys(mapaMatriz).forEach(clave => {
-                const item = mapaMatriz[clave];
+            const resetSubtotal = () => {
+                const sub = { "Entidad": "", "Jurisdicción": "", "Año": "Total" };
+                if (incluirColumnaMunicipio) sub["Municipio"] = "";
+                if (nivelAgrupacion === "clues") sub["Unidad"] = "";
+                sub["Apartado"] = "";
+                sub["Variable"] = "";
+                mesesOrdenados.forEach(m => sub[m] = 0);
+                sub["Grand Total"] = 0;
+                return sub;
+            };
+
+            subtotalApartado = resetSubtotal();
+
+            // Convertir y ordenar lista de registros
+            let listaRegistros = Object.values(mapaMatriz);
+
+            if (esDesagregado) {
+                listaRegistros.sort((a, b) => {
+                    if (a["Jurisdicción"] !== b["Jurisdicción"]) return a["Jurisdicción"].localeCompare(b["Jurisdicción"]);
+                    if (a["Apartado"] !== b["Apartado"]) return a["Apartado"].localeCompare(b["Apartado"]);
+                    return a["Variable"].localeCompare(b["Variable"]);
+                });
+            }
+
+            listaRegistros.forEach((item, index) => {
+                // Generar fila de Subtotal si cambia el Apartado en modo desagregado
+                if (esDesagregado && apartadoActual && apartadoActual !== item["Apartado"]) {
+                    datosParaExcel.push(subtotalApartado);
+                    subtotalApartado = resetSubtotal();
+                }
+
+                apartadoActual = item["Apartado"];
 
                 const fila = {
                     "Entidad": item["Entidad"],
                     "Jurisdicción": item["Jurisdicción"]
                 };
 
-                if (mostrarColumnaMunicipio) {
-                    fila["Municipio"] = item["Municipio"];
-                }
+                if (incluirColumnaMunicipio) fila["Municipio"] = item["Municipio"];
+                if (nivelAgrupacion === "clues") fila["Unidad"] = item["Unidad"];
 
-                if (nivelAgrupacion === "clues") {
-                    fila["Unidad"] = item["Unidad"];
+                // 🟢 Incluir columnas Apartado y Variable si está en modo desagregado
+                if (esDesagregado) {
+                    fila["Apartado"] = item["Apartado"];
+                    fila["Variable"] = item["Variable"];
                 }
 
                 fila["Año"] = item["Año"];
 
                 let totalFila = 0;
                 mesesOrdenados.forEach(m => {
-                    const val = item[m] || 0;
+                    const val = Math.round(item[m] || 0);
                     fila[m] = val;
                     totalFila += val;
+
+                    // Acumuladores
                     totalesMes[m] += val;
+                    if (esDesagregado) subtotalApartado[m] += val;
                 });
 
                 fila["Grand Total"] = totalFila;
                 granTotalGeneral += totalFila;
+                if (esDesagregado) subtotalApartado["Grand Total"] += totalFila;
 
-                if (totalFila > 0 || Object.keys(mapaMatriz).length === 1) {
-                    datosParaExcel.push(fila);
+                datosParaExcel.push(fila);
+
+                // Insertar último subtotal
+                if (esDesagregado && index === listaRegistros.length - 1) {
+                    datosParaExcel.push(subtotalApartado);
                 }
             });
 
-            if (datosParaExcel.length === 0) {
-                alert("No hay registros para exportar con los filtros seleccionados.");
-                return;
+            // 🟢 Fila de Total General al final
+            const filaTotal = { "Entidad": "Grand Total", "Jurisdicción": "" };
+            if (incluirColumnaMunicipio) filaTotal["Municipio"] = "";
+            if (nivelAgrupacion === "clues") filaTotal["Unidad"] = "";
+            if (esDesagregado) {
+                filaTotal["Apartado"] = "";
+                filaTotal["Variable"] = "";
             }
+            filaTotal["Año"] = "";
 
-            // Ordenar por Año y luego por el Nombre del Municipio
-            datosParaExcel.sort((a, b) => {
-                if (a["Año"] !== b["Año"]) return a["Año"] - b["Año"];
-                const colRef = mostrarColumnaMunicipio ? "Municipio" : (nivelAgrupacion === "jurisdiccion" ? "Jurisdicción" : "Unidad");
-                return String(a[colRef] || '').localeCompare(String(b[colRef] || ''));
-            });
-
-            // 3. Fila de Total General que suma todos los municipios listados
-            const filaTotal = {
-                "Entidad": "Total General",
-                "Jurisdicción": "-"
-            };
-
-            if (mostrarColumnaMunicipio) {
-                filaTotal["Municipio"] = "-";
-            }
-            if (nivelAgrupacion === "clues") {
-                filaTotal["Unidad"] = "-";
-            }
-
-            filaTotal["Año"] = "-";
-
-            mesesOrdenados.forEach(m => {
-                filaTotal[m] = totalesMes[m];
-            });
+            mesesOrdenados.forEach(m => filaTotal[m] = totalesMes[m]);
             filaTotal["Grand Total"] = granTotalGeneral;
-
             datosParaExcel.push(filaTotal);
 
-            // 4. Generación y descarga del archivo Excel
+            // Exportación a Excel
             const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS");
 
-            const maxAnchos = Object.keys(datosParaExcel[0]).map(key => ({
-                wch: Math.max(key.length + 4, 14)
+            worksheet['!cols'] = Object.keys(datosParaExcel[0]).map(key => ({
+                wch: Math.max(key.length + 4, 15)
             }));
-            worksheet['!cols'] = maxAnchos;
 
             const fechaDescarga = new Date().toISOString().slice(0, 10);
-            const nombreArchivo = `SIS_${nivelAgrupacion.toUpperCase()}_${fechaDescarga}.xlsx`;
-
-            XLSX.writeFile(workbook, nombreArchivo);
+            XLSX.writeFile(workbook, `SIS_${modoDesglose.toUpperCase()}_${fechaDescarga}.xlsx`);
 
         } catch (error) {
-            console.error("Error al exportar a Excel:", error);
-            alert("Ocurrió un error al generar la tabla dinámicamente.");
+            console.error("Error al exportar:", error);
+            alert("Ocurrió un error al generar el desglose.");
         } finally {
             if (btn) {
                 btn.innerHTML = textoOriginal;
