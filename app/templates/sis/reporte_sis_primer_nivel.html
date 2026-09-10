@@ -997,10 +997,22 @@
         const elTitulo = document.getElementById("tituloGraficaSis");
         if (!ctx) return;
 
+        // 🟢 1. Obtener el nombre legible de la sección seleccionada
+        const selectModulo = document.getElementById("filtroSisDetalle");
+        let nombreModulo = "Indicadores";
+
+        if (selectModulo) {
+            const optionSelected = selectModulo.options[selectModulo.selectedIndex];
+            nombreModulo = selectModulo.value === "todas"
+                ? "Todas las Secciones"
+                : (optionSelected ? optionSelected.text.trim() : selectModulo.value);
+        }
+
         if (graficaUnidad) graficaUnidad.destroy();
 
+        // 🟢 2. Caso sin datos: usa la variable dinámica
         if (!data || data.length === 0) {
-            if (elTitulo) elTitulo.innerHTML = `Indicadores — Sin variables seleccionadas`;
+            if (elTitulo) elTitulo.innerHTML = `${nombreModulo} — Sin variables seleccionadas`;
             return;
         }
 
@@ -1044,9 +1056,10 @@
             }
         });
 
+        // 🟢 3. Actualizar el título HTML usando nombreModulo en lugar de "Indicadores"
         if (elTitulo) {
             const totalGeneral = datasets.reduce((acc, ds) => acc + ds.data.reduce((a, b) => a + b, 0), 0);
-            elTitulo.innerHTML = `Indicadores <strong>${anioActivo || 'General'}</strong> — Total Seleccionado: <strong>${fmt(totalGeneral)}</strong>`;
+            elTitulo.innerHTML = `${nombreModulo} <strong>${anioActivo || 'General'}</strong> — Total Seleccionado: <strong>${fmt(totalGeneral)}</strong>`;
         }
     }
 
