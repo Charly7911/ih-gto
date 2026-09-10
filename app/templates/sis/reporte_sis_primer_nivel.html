@@ -999,16 +999,18 @@
         const elTitulo = document.getElementById("tituloGraficaSis");
         if (!ctx) return;
 
-        // 🟢 1. OBTENER AÑOS ACTIVOS
+        // 1. OBTENER AÑOS ACTIVOS (Normalizados a Números)
         let aniosSeleccionados = [];
         if (Array.isArray(window.aniosActivos) && window.aniosActivos.length > 0) {
-            aniosSeleccionados = window.aniosActivos.map(a => String(a));
+            aniosSeleccionados = window.aniosActivos.map(a => Number(a));
         } else if (window.anioActivo) {
-            aniosSeleccionados = [String(window.anioActivo)];
+            aniosSeleccionados = [Number(window.anioActivo)];
+        } else {
+            aniosSeleccionados = [2026]; // Respaldo por defecto
         }
-        aniosSeleccionados.sort();
+        aniosSeleccionados.sort((a, b) => a - b);
 
-        // 🟢 2. OBTENER NOMBRE DEL MÓDULO
+        // 2. OBTENER NOMBRE DEL MÓDULO SELECCIONADO
         const selectModulo = document.getElementById("filtroSisDetalle");
         let nombreModulo = "Indicadores";
         if (selectModulo) {
@@ -1018,9 +1020,9 @@
                 : (optionSelected ? optionSelected.text.trim() : selectModulo.value);
         }
 
-        // 🟢 3. OBTENER APARTADOS SELECCIONADOS (Badges)
+        // 3. OBTENER APARTADOS SELECCIONADOS (Badges)
         const apartadosElementos = [];
-        document.querySelectorAll('#contenedorSubvariables input[type="checkbox"]:checked').forEach(chk => {
+        document.querySelectorAll('#contenedorSubvariables input[type="checkbox"]:checked, .chk-apartado:checked, .chk-subvar:checked').forEach(chk => {
             const valId = chk.value || chk.id;
             const labelText = chk.nextElementSibling?.textContent?.trim() || chk.parentElement?.textContent?.trim() || valId;
             if (labelText && !apartadosElementos.some(a => a.id === valId)) {
@@ -1028,75 +1030,73 @@
             }
         });
 
-        // 🟢 4. ESTRUCTURAR DATOS SEPARADOS POR AÑO Y JURISDICCIÓN
+        // 4. FILTRAR DATOS ASEGURANDO CONVERSIÓN CORRECTA
         const moduloClave = selectModulo?.value || 'consultas';
-        const datosPorAnioYUnidad = {};
-        const listaJurisdicciones = new Set();
+        const datosFiltrados = (data || []).filter(r => aniosSeleccionados.includes(Number(r.anio)));
 
-        // Filtrar solo los datos de los años activos
-        const datosFiltrados = data.filter(r => aniosSeleccionados.includes(String(r.anio)));
+        // Obtener lista única de Jurisdicciones/Unidades
+        const listaJurisdicciones = Array.from(new Set(
+            datosFiltrados.map(r => r.jurisdiccion || r.nombre_unidad || r.clues || r.unidad || "Sin Especificar")
+        )).filter(Boolean);
 
-        datosFiltrados.forEach(r => {
-            const anio = String(r.anio);
-            const unidad = r.jurisdiccion || r.nombre_unidad || r.clues || "Sin Especificar";
-            listaJurisdicciones.add(unidad);
-
-            if (!datosPorAnioYUnidad[anio]) datosPorAnioYUnidad[anio] = {};
-            if (!datosPorAnioYUnidad[anio][unidad]) datosPorAnioYUnidad[anio][unidad] = 0;
-
-            let valor = 0;
-            if (moduloClave === 'todas') {
-                valor = (Number(r.consultas) || 0) + (Number(r.embarazadas) || 0) + (Number(r.mental) || 0) +
-                    (Number(r.bucal) || 0) + (Number(r.tamiz) || 0) + (Number(r.planificacion_familiar) || 0) +
-                    (Number(r.detecciones) || 0) + (Number(r.detecciones_cardiometabolicas) || 0);
-            } else {
-                valor = Number(r[moduloClave]) || Number(r.total) || 0;
-            }
-
-            datosPorAnioYUnidad[anio][unidad] += valor;
-        });
-
-        const labels = Array.from(listaJurisdicciones);
-
+        // Si la gráfica anterior existe, la destruimos
         if (graficaUnidad) graficaUnidad.destroy();
 
-        if (labels.length === 0) {
-            if (elTitulo) elTitulo.innerHTML = `<div class="fw-bold">${nombreModulo} — Sin información para los años seleccionados</div>`;
+        // Validar si no hay registros tras el filtro
+        if (datosFiltrados.length === 0 || listaJurisdicciones.length === 0) {
+            if (elTitulo) {
+                elTitulo.innerHTML = `<div class="fw-bold text-danger">${nombreModulo} — Sin datos registrados para los años seleccionados (${aniosSeleccionados.join(', ')})</div>`;
+            }
             return;
         }
 
-        // 🟢 5. CREAR UN DATASET INDEPENDIENTE POR CADA AÑO (Barras Agrupadas)
+        // 5. CONSTRUIR ESTRUCTURA DE DATOS PARA BARRAS AGRUPADAS
         const paletaColores = ['#4E79A7', '#F28E2B', '#E15759', '#76B7B2', '#59A14F'];
         let totalGeneral = 0;
 
         const datasets = aniosSeleccionados.map((anio, index) => {
-            const dataAnio = labels.map(unid => {
-                const val = datosPorAnioYUnidad[anio]?.[unid] || 0;
-                totalGeneral += val;
-                return val;
+            const dataPorJurisdiccion = listaJurisdicciones.map(unid => {
+                // Filtrar registros correspondientes al año y jurisdicción actual
+                const registrosUnidad = datosFiltrados.filter(r =>
+                    Number(r.anio) === anio &&
+                    (r.jurisdiccion === unid || r.nombre_unidad === unid || r.clues === unid || r.unidad === unid)
+                );
+
+                // Sumar los valores según el módulo seleccionado
+                const suma = registrosUnidad.reduce((acc, r) => {
+                    if (moduloClave === 'todas') {
+                        return acc + (Number(r.consultas) || 0) + (Number(r.embarazadas) || 0) +
+                            (Number(r.mental) || 0) + (Number(r.bucal) || 0) +
+                            (Number(r.tamiz) || 0) + (Number(r.planificacion_familiar) || 0) +
+                            (Number(r.detecciones) || 0) + (Number(r.detecciones_cardiometabolicas) || 0);
+                    }
+                    return acc + (Number(r[moduloClave]) || Number(r.total) || Number(r.cantidad) || Number(r.valor) || 0);
+                }, 0);
+
+                totalGeneral += suma;
+                return suma;
             });
 
             return {
                 label: `Año ${anio}`,
-                data: dataAnio,
+                data: dataPorJurisdiccion,
                 backgroundColor: paletaColores[index % paletaColores.length]
             };
         });
 
-        // 🟢 6. CONFIGURAR CHART.JS (stacked: false permite ver las barras lado a lado)
+        // 6. RENDERIZAR GRÁFICA CON CHART.JS
         graficaUnidad = new Chart(ctx, {
             type: 'bar',
-            data: { labels, datasets },
+            data: { labels: listaJurisdicciones, datasets },
             options: {
                 indexAxis: 'y',
                 responsive: true,
                 animation: false,
                 scales: {
-                    x: { stacked: false, ticks: { callback: v => fmt(v) } },
+                    x: { stacked: false, ticks: { callback: v => typeof fmt === 'function' ? fmt(v) : v } },
                     y: { stacked: false }
                 },
                 plugins: {
-                    // Leyenda visible si hay más de 1 año para distinguir los colores
                     legend: {
                         display: aniosSeleccionados.length > 1,
                         position: 'top'
@@ -1106,29 +1106,31 @@
                         align: 'end',
                         color: '#444444',
                         font: { weight: 'bold', size: 9 },
-                        formatter: (val) => val > 0 ? fmt(val) : ''
+                        formatter: (val) => (val > 0 && typeof fmt === 'function') ? fmt(val) : (val > 0 ? val : '')
                     }
                 }
             }
         });
 
-        // 🟢 7. TITULO Y BADGES DESACTIVABLES
+        // 7. CONSTRUIR TÍTULO Y BADGES CLICABLES
         if (elTitulo) {
             const textoAnios = aniosSeleccionados.join(' vs ');
 
             let htmlBadges = apartadosElementos.length > 0
                 ? apartadosElementos.map(item => `
-                <span class="badge bg-light text-dark border me-1 mb-1">
+                <span class="badge bg-light text-dark border me-1 mb-1 style="font-weight: normal;">
                     📌 ${item.nombre}
                     <button type="button" class="btn-close ms-1" style="font-size: 0.55rem;" 
                             onclick="desmarcarApartadoYRenderizar('${item.id}')" aria-label="Quitar"></button>
                 </span>
             `).join('')
-                : '<span class="text-muted small">Todos los apartados</span>';
+                : '<span class="text-muted small">Todos los apartados seleccionados</span>';
+
+            const totalFormateado = typeof fmt === 'function' ? fmt(totalGeneral) : totalGeneral;
 
             elTitulo.innerHTML = `
             <div class="fs-6 fw-bold text-dark mb-1">
-                ${nombreModulo} <span class="text-primary">(${textoAnios})</span> — Total: <strong>${fmt(totalGeneral)}</strong>
+                ${nombreModulo} <span class="text-primary">(${textoAnios})</span> — Total: <strong>${totalFormateado}</strong>
             </div>
             <div class="d-flex flex-wrap align-items-center justify-content-center gap-1 mt-1">
                 <small class="text-muted fw-bold me-1">Apartados:</small>
@@ -1138,14 +1140,14 @@
         }
     }
 
-    // Función auxiliar para quitar la selección al dar clic en la X del badge
+    // Función auxiliar para desmarcar el checkbox al dar clic en la 'X' del badge
     function desmarcarApartadoYRenderizar(idCheckbox) {
         const chk = document.getElementById(idCheckbox) || document.querySelector(`input[value="${idCheckbox}"]`);
         if (chk) {
             chk.checked = false;
             if (typeof realizarConsultaBackend === 'function') {
                 realizarConsultaBackend();
-            } else {
+            } else if (typeof renderGraficaPorUnidad === 'function') {
                 renderGraficaPorUnidad();
             }
         }
