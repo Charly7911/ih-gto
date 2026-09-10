@@ -762,6 +762,7 @@
 
         if (!hayVariablesSeleccionadas()) {
             datosFiltradosSis = [];
+            datosCompletosGraficas = []; // 🟢 Limpiamos también el de las gráficas
             actualizarVistas();
             ocultarCargandoGrafica();
             return;
@@ -774,7 +775,6 @@
         let variablesAPasar = {};
 
         if (moduloActual === "todas") {
-            // Seleccionamos solo las subvariables que están CHECKED en la interfaz
             const subvarsChecked = document.querySelectorAll('.chk-subvar:checked');
 
             subvarsChecked.forEach(chk => {
@@ -787,7 +787,6 @@
                 variablesAPasar[modKey].push(codVariable);
             });
         } else {
-            // Si hay un módulo específico, filtramos solo los checkboxes checked de ese módulo
             const subvarsModulo = document.querySelectorAll(`.chk-subvar[data-modulo="${moduloActual}"]:checked`);
             variablesAPasar[moduloActual] = Array.from(subvarsModulo).map(chk => chk.value);
         }
@@ -795,6 +794,7 @@
         // Si no quedó ninguna variable marcada, cancelamos y limpiamos
         if (Object.keys(variablesAPasar).length === 0 || !Object.values(variablesAPasar).some(arr => arr.length > 0)) {
             datosFiltradosSis = [];
+            datosCompletosGraficas = []; // 🟢 Limpiamos también el de las gráficas
             actualizarVistas();
             ocultarCargandoGrafica();
             return;
@@ -810,20 +810,42 @@
             variables: variablesAPasar
         };
 
+        // 🟢 PAYLOAD GLOBAL: Para mantener todas las categorías/módulos vivas en las gráficas superiores
+        const payloadGlobal = {
+            ...payload,
+            modo_desglose: "por_apartado",
+            variables: {}
+        };
+
         try {
-            const resp = await fetch("/sis_primer_nivel/api/filtrar", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
+            // 🟢 PROMISE.ALL: Hace ambas peticiones en simultáneo sin perder velocidad
+            const [respFiltered, respGlobal] = await Promise.all([
+                fetch("/sis_primer_nivel/api/filtrar", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                }),
+                fetch("/sis_primer_nivel/api/filtrar", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payloadGlobal)
+                })
+            ]);
 
-            if (!resp.ok) throw new Error("Error en la respuesta de la API");
-
-            const res = await resp.json();
-            if (res.status === "success") {
-                datosFiltradosSis = res.data || [];
-                actualizarVistas();
+            if (respFiltered.ok) {
+                const res = await respFiltered.json();
+                if (res.status === "success") datosFiltradosSis = res.data || [];
             }
+
+            if (respGlobal.ok) {
+                const resG = await respGlobal.json();
+                if (resG.status === "success") datosCompletosGraficas = resG.data || [];
+            } else {
+                datosCompletosGraficas = datosFiltradosSis; // Respaldo en caso de error
+            }
+
+            actualizarVistas();
+
         } catch (err) {
             console.error("Error al conectar con la API SIS:", err);
         } finally {
@@ -834,12 +856,19 @@
 
     function actualizarVistas() {
         datosActuales = agruparDatos(datosFiltradosSis);
+        // 🟢 Agrupamos los datos globales completos para las gráficas
+        const datosParaGraficas = agruparDatos(datosCompletosGraficas);
+
         paginaActual = 1;
 
         renderTabsAnios(datosActuales);
         renderTablaSis();
-        renderGraficaPorAnio(datosActuales);
-        renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
+
+        // 🟢 Le pasamos a las gráficas los datos globales completos (no pierden módulos ni categorías)
+        renderGraficaPorAnio(datosParaGraficas);
+        renderGraficaPorUnidad(datosParaGraficas.filter(r => Number(r.anio) === Number(anioActivo)));
+
+        // La gráfica mensual/inferior mantiene el filtro del checkbox seleccionado
         renderGraficaTemporal(datosFiltradosSis);
     }
 
