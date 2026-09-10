@@ -992,186 +992,64 @@
         });
     }
 
-
-
-    function renderGraficaPorUnidad(data = datosFiltradosSis) {
+    function renderGraficaPorUnidad(data = datosActuales.filter(r => r.anio === anioActivo)) {
         const ctx = document.getElementById('graficaSis');
         const elTitulo = document.getElementById("tituloGraficaSis");
         if (!ctx) return;
 
-        // 1. OBTENER AÑOS ACTIVOS
-        let aniosSeleccionados = [];
-        if (Array.isArray(window.aniosActivos) && window.aniosActivos.length > 0) {
-            aniosSeleccionados = window.aniosActivos.map(a => Number(a));
-        } else if (window.anioActivo) {
-            aniosSeleccionados = [Number(window.anioActivo)];
-        } else {
-            aniosSeleccionados = [2026];
-        }
-        aniosSeleccionados.sort((a, b) => a - b);
-
-        // 2. OBTENER NOMBRE DEL MÓDULO
-        const selectModulo = document.getElementById("filtroSisDetalle");
-        let nombreModulo = "Indicadores";
-        if (selectModulo) {
-            const optionSelected = selectModulo.options[selectModulo.selectedIndex];
-            nombreModulo = selectModulo.value === "todas"
-                ? "Todas las Secciones"
-                : (optionSelected ? optionSelected.text.trim() : selectModulo.value);
-        }
-
-        // 3. APARTADOS SELECCIONADOS
-        const apartadosElementos = [];
-        document.querySelectorAll('#contenedorSubvariables input[type="checkbox"]:checked, .chk-apartado:checked, .chk-subvar:checked').forEach(chk => {
-            const valId = chk.value || chk.id;
-            const labelText = chk.nextElementSibling?.textContent?.trim() || chk.parentElement?.textContent?.trim() || valId;
-            if (labelText && !apartadosElementos.some(a => a.id === valId)) {
-                apartadosElementos.push({ id: valId, nombre: labelText });
-            }
-        });
-
-        // 4. FILTRAR DATOS Y DETECTAR NIVEL DEAGREGACIÓN (Unidad vs Jurisdicción)
-        const moduloClave = selectModulo?.value || 'consultas';
-        const datosFiltrados = (data || []).filter(r => aniosSeleccionados.includes(Number(r.anio)));
-
-        // 🟢 DETECTAR SI MOSTRAMOS UNIDAD O JURISDICCIÓN
-        // Prioriza 'nombre_unidad' o 'clues' si existen registros con unidad; de lo contrario usa 'jurisdiccion'.
-        const esVistaUnidad = datosFiltrados.some(r => r.nombre_unidad || r.clues);
-
-        const listaEtiquetas = Array.from(new Set(
-            datosFiltrados.map(r => {
-                if (esVistaUnidad) {
-                    return r.nombre_unidad || r.clues || r.jurisdiccion || "Sin Especificar";
-                }
-                return r.jurisdiccion || r.nombre_unidad || r.clues || "Sin Especificar";
-            })
-        )).filter(Boolean);
-
         if (graficaUnidad) graficaUnidad.destroy();
 
-        if (datosFiltrados.length === 0 || listaEtiquetas.length === 0) {
-            if (elTitulo) {
-                elTitulo.innerHTML = `<div class="fw-bold text-danger">${nombreModulo} — Sin datos registrados para los años seleccionados (${aniosSeleccionados.join(', ')})</div>`;
-            }
+        if (!data || data.length === 0) {
+            if (elTitulo) elTitulo.innerHTML = `Indicadores — Sin variables seleccionadas`;
             return;
         }
 
-        // 5. CONSTRUIR DATASETS POR AÑO (BARRAS PARALELAS - NO SUMA)
-        const paletaColores = ['#4E79A7', '#F28E2B', '#E15759', '#76B7B2', '#59A14F'];
-        let totalGeneralGlobal = 0;
+        const labels = data.map(r => r.nombre_unidad || r.clues);
+        const configVars = {
+            consultas: { label: 'Consultas', color: '#4E79A7' },
+            embarazadas: { label: 'Embarazadas', color: '#F28E2B' },
+            mental: { label: 'Salud Mental', color: '#E15759' },
+            bucal: { label: 'Salud Bucal', color: '#76B7B2' },
+            tamiz: { label: 'Tamiz', color: '#59A14F' },
+            planificacion_familiar: { label: 'Planificación Fam.', color: '#EDC948' },
+            detecciones: { label: 'Detecciones', color: '#B07AA1' },
+            detecciones_cardiometabolicas: { label: 'Detecciones Cardiometabólicas', color: '#9C755F' },
+            orientacion_lac_des_obe: { label: 'Orientación Lactancia/Desnutrición/Obesidad', color: '#8C564B' },
+            orientacion_eda_ira: { label: 'Orientación EDA/IRA', color: '#C4A26A' }
+        };
 
-        const datasets = aniosSeleccionados.map((anio, index) => {
-            const dataPorElemento = listaEtiquetas.map(ejeLabel => {
-                // Filtrar registros que coincidan exactamente con el año y el nombre de la unidad/jurisdicción
-                const registrosCoincidentes = datosFiltrados.filter(r => {
-                    const coincideAnio = Number(r.anio) === anio;
-                    const coincideNombre = esVistaUnidad
-                        ? (r.nombre_unidad === ejeLabel || r.clues === ejeLabel || r.jurisdiccion === ejeLabel)
-                        : (r.jurisdiccion === ejeLabel || r.nombre_unidad === ejeLabel || r.clues === ejeLabel);
-                    return coincideAnio && coincideNombre;
-                });
+        const datasets = Object.keys(configVars).map(v => ({
+            label: configVars[v].label,
+            data: data.map(r => Number(r[v]) || 0),
+            backgroundColor: configVars[v].color
+        }));
 
-                // Obtener el total exclusivo para este año y esta unidad
-                const sumaAnioElemento = registrosCoincidentes.reduce((acc, r) => {
-                    if (moduloClave === 'todas') {
-                        return acc + (Number(r.consultas) || 0) + (Number(r.embarazadas) || 0) +
-                            (Number(r.mental) || 0) + (Number(r.bucal) || 0) +
-                            (Number(r.tamiz) || 0) + (Number(r.planificacion_familiar) || 0) +
-                            (Number(r.detecciones) || 0) + (Number(r.detecciones_cardiometabolicas) || 0);
-                    }
-                    return acc + (Number(r[moduloClave]) || Number(r.total) || Number(r.cantidad) || Number(r.valor) || 0);
-                }, 0);
-
-                totalGeneralGlobal += sumaAnioElemento;
-                return sumaAnioElemento;
-            });
-
-            return {
-                label: `Año ${anio}`,
-                data: dataPorElemento,
-                backgroundColor: paletaColores[index % paletaColores.length]
-            };
-        });
-
-        // 6. RENDERIZAR GRÁFICA CON CHART.JS (stacked: false garantiza barras lado a lado)
         graficaUnidad = new Chart(ctx, {
             type: 'bar',
-            data: { labels: listaEtiquetas, datasets },
+            data: { labels, datasets },
             options: {
                 indexAxis: 'y',
                 responsive: true,
                 animation: false,
-                scales: {
-                    x: { stacked: false, ticks: { callback: v => typeof fmt === 'function' ? fmt(v) : v } },
-                    y: { stacked: false }
-                },
+                scales: { x: { stacked: true, ticks: { callback: v => fmt(v) } }, y: { stacked: true } },
                 plugins: {
-                    legend: {
-                        display: true, // Siempre muestra la leyenda para identificar el color de cada año
-                        position: 'top'
-                    },
                     datalabels: {
-                        anchor: 'end',
-                        align: 'end',
-                        color: '#444444',
-                        font: { weight: 'bold', size: 9 },
-                        formatter: (val) => (val > 0 && typeof fmt === 'function') ? fmt(val) : (val > 0 ? val : '')
+                        anchor: 'center',
+                        align: 'center',
+                        color: '#ffffff',
+                        font: { weight: 'bold', size: 10 },
+                        formatter: (val) => val > 0 ? fmt(val) : ''
                     }
                 }
             }
         });
 
-        // 7. TÍTULO Y RESUMEN LIMPIO
         if (elTitulo) {
-            const textoAnios = aniosSeleccionados.join(' vs ');
-            const totalFormateado = typeof fmt === 'function' ? fmt(totalGeneralGlobal) : totalGeneralGlobal;
-            const totalApartados = apartadosElementos.length;
-            const tipoEtiquetaTexto = esVistaUnidad ? "por Unidad" : "por Jurisdicción";
-
-            let htmlApartados = '';
-            if (totalApartados === 0) {
-                htmlApartados = '<span class="text-muted small">Todos los apartados seleccionados</span>';
-            } else if (totalApartados <= 3) {
-                htmlApartados = apartadosElementos.map(item => `<span class="badge bg-light text-dark border me-1">📌 ${item.nombre}</span>`).join('');
-            } else {
-                const listaNombres = apartadosElementos.map(a => `• ${a.nombre}`).join('\n');
-                htmlApartados = `
-                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" 
-                      title="${listaNombres.replace(/"/g, '&quot;')}" style="cursor: pointer;">
-                    📌 ${totalApartados} apartados seleccionados ℹ️
-                </span>
-                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none ms-2 text-danger small" 
-                        onclick="desmarcarTodosApartados()">
-                    Vaciar selección
-                </button>
-            `;
-            }
-
-            elTitulo.innerHTML = `
-            <div class="d-flex flex-column align-items-center">
-                <div class="fs-6 fw-bold text-dark mb-1">
-                    ${nombreModulo} ${tipoEtiquetaTexto} <span class="text-primary">(${textoAnios})</span> — Total: <strong>${totalFormateado}</strong>
-                </div>
-                <div class="d-flex align-items-center justify-content-center gap-1 mt-1">
-                    <small class="text-muted fw-bold me-1">Apartados:</small>
-                    ${htmlApartados}
-                </div>
-            </div>
-        `;
+            const totalGeneral = datasets.reduce((acc, ds) => acc + ds.data.reduce((a, b) => a + b, 0), 0);
+            elTitulo.innerHTML = `Indicadores <strong>${anioActivo || 'General'}</strong> — Total Seleccionado: <strong>${fmt(totalGeneral)}</strong>`;
         }
     }
 
-    // 🟢 FUNCIÓN AUXILIAR PARA LIMPIAR LA SELECCIÓN
-    function desmarcarTodosApartados() {
-        document.querySelectorAll('#contenedorSubvariables input[type="checkbox"]:checked, .chk-apartado:checked, .chk-subvar:checked').forEach(chk => {
-            chk.checked = false;
-        });
-        if (typeof realizarConsultaBackend === 'function') {
-            realizarConsultaBackend();
-        } else if (typeof renderGraficaPorUnidad === 'function') {
-            renderGraficaPorUnidad();
-        }
-    }
 
 
     // Función helper para visibilidad del botón de desglose
