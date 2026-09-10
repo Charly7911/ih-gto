@@ -432,134 +432,127 @@
 
 
     function exportarFiltradoExcel() {
-        // 1. Verificar si existen datos cargados desde el backend
         if (!datosFiltradosSis || datosFiltradosSis.length === 0) {
             alert("No hay datos disponibles para exportar con los filtros seleccionados.");
             return;
         }
 
-        // 2. Feedback visual en el botón
         const btn = document.getElementById("btnExportarExcel");
         const textoOriginal = btn.innerHTML;
         btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Generando...';
         btn.disabled = true;
 
         try {
-            // 3. Obtener el nivel de agrupación activo del DOM
             const nivelAgrupacion = document.getElementById("nivel_agrupacion")?.value || "clues";
+            const modoDesglose = document.getElementById("selectModoDesglose")?.value || "acumulado";
 
-            // Obtener el módulo activo seleccionado en el dropdown
-            const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
-
-            // Nombres legibles para las columnas según el módulo activo
-            const nombresModulos = {
-                "consultas": "Consultas",
-                "embarazadas": "Embarazadas",
-                "mental": "Salud Mental",
-                "bucal": "Salud Bucal",
-                "tamiz": "Tamiz",
-                "planificacion_familiar": "Planificación Familiar",
-                "detecciones": "Detecciones",
-                "detecciones_cardiometabolicas": "Detecciones Cardiometabólicas",
-                "orientacion_lac_des_obe": "Orientación Lac/Des/Obe",
-                "orientacion_eda_ira": "Orientación EDA/IRA",
-                "otros": "Otros"
+            const nombresMeses = {
+                1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+                5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+                9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
             };
 
-            // 4. Mapear los datos según el Nivel de Agrupación elegido
-            const datosParaExcel = [];
+            // 1. Agrupar datos por la entidad principal según el nivel de agrupación
+            const mapaMatriz = {};
+            const mesesConDatos = new Set();
 
             datosFiltradosSis.forEach(r => {
-                // 🟢 CONSTRUCCIÓN DINÁMICA DE LA CABECERA SEGÚN NIVEL DE AGRUPACIÓN
-                const filaBase = {
-                    "Año": Number(r.anio) || '',
-                    "Mes": Number(r.mes) || '',
-                    "Jurisdicción": r.jurisdiccion || 'Sin Especificar'
-                };
+                const numMes = Number(r.mes);
+                const nombreMes = nombresMeses[numMes] || `Mes ${numMes}`;
+                mesesConDatos.add(numMes);
 
-                // Solo agregamos Municipio si la agrupación es por Municipio o CLUES
-                if (nivelAgrupacion === "municipio" || nivelAgrupacion === "clues") {
-                    filaBase["Municipio"] = (r.municipio && r.municipio !== 'N/A') ? r.municipio : 'Sin Especificar';
+                // Determinar la clave principal de la fila (Jurisdicción, Municipio o Unidad)
+                let claveFila = r.jurisdiccion || 'Sin Especificar';
+                if (nivelAgrupacion === "municipio") {
+                    claveFila = r.municipio && r.municipio !== 'N/A' ? r.municipio : 'Sin Especificar';
+                } else if (nivelAgrupacion === "clues") {
+                    claveFila = r.nombre_unidad || r.clues || 'Sin Especificar';
                 }
 
-                // Solo agregamos CLUES y Unidad si la agrupación es por CLUES
-                if (nivelAgrupacion === "clues") {
-                    filaBase["CLUES"] = (r.clues && r.clues !== 'N/A') ? r.clues : '-';
-                    filaBase["Nombre Unidad"] = (r.nombre_unidad && r.nombre_unidad !== 'N/A') ? r.nombre_unidad : '';
+                // Si es por apartado, la fila incluirá el nombre del apartado
+                if (modoDesglose === "por_apartado" && r.descripcion_apartado) {
+                    claveFila += ` - ${r.descripcion_apartado}`;
                 }
 
-                // 🟢 INCLUSIÓN DE MÓDULOS / VARIABLES
-                // Si la API devuelve el desglose de apartado explícito, priorizamos esa información
-                if (r.descripcion_apartado) {
-                    const totalValor = Number(r.total || r.valor || r.suma || 0);
-                    if (totalValor > 0) {
-                        filaBase["Apartado"] = r.descripcion_apartado;
-                        filaBase["Total"] = totalValor;
-                        datosParaExcel.push(filaBase);
-                    }
-                } else if (moduloActual === "todas") {
-                    let totalFila = 0;
-                    const camposModulo = [
-                        'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
-                        'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
-                        'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
-                    ];
-
-                    camposModulo.forEach(m => {
-                        const val = Number(r[m]) || 0;
-                        filaBase[nombresModulos[m] || m] = val;
-                        totalFila += val;
-                    });
-
-                    filaBase["Total"] = totalFila;
-
-                    if (totalFila > 0) {
-                        datosParaExcel.push(filaBase);
-                    }
-
-                } else {
-                    const valorModulo = Number(r[moduloActual]) || Number(r.total) || Number(r.valor) || 0;
-
-                    if (valorModulo > 0) {
-                        filaBase[nombresModulos[moduloActual] || "Total"] = valorModulo;
-                        datosParaExcel.push(filaBase);
-                    }
+                if (!mapaMatriz[claveFila]) {
+                    mapaMatriz[claveFila] = {
+                        "Entidad": "GUANAJUATO",
+                        [nivelAgrupacion === "jurisdiccion" ? "Jurisdicción" : (nivelAgrupacion === "municipio" ? "Municipio" : "Unidad")]: claveFila
+                    };
                 }
+
+                const valorMonto = Number(r.total || r.consultas || r.suma || 0);
+                mapaMatriz[claveFila][nombreMes] = (mapaMatriz[claveFila][nombreMes] || 0) + valorMonto;
             });
 
-            // 5. Validar si existen registros tras procesar
-            if (datosParaExcel.length === 0) {
-                alert("Los filtros aplicados no arrojaron registros con valores mayores a 0.");
-                return;
-            }
+            // Ordenar los meses de forma cronológica (1 a 12)
+            const mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
 
-            // 6. Generar el libro Excel con SheetJS
+            // 2. Construir filas y calcular totales
+            const datosParaExcel = [];
+            const totalesMes = {};
+            mesesOrdenados.forEach(m => totalesMes[m] = 0);
+            let granTotalGeneral = 0;
+
+            const columnaEtiqueta = nivelAgrupacion === "jurisdiccion" ? "Jurisdicción" : (nivelAgrupacion === "municipio" ? "Municipio" : "Unidad");
+
+            Object.keys(mapaMatriz).forEach(clave => {
+                const fila = {
+                    "Entidad": mapaMatriz[clave]["Entidad"],
+                    [columnaEtiqueta]: mapaMatriz[clave][columnaEtiqueta]
+                };
+
+                let totalFila = 0;
+                mesesOrdenados.forEach(m => {
+                    const val = mapaMatriz[clave][m] || 0;
+                    fila[m] = val;
+                    totalFila += val;
+                    totalesMes[m] += val;
+                });
+
+                fila["Grand Total"] = totalFila;
+                granTotalGeneral += totalFila;
+                datosParaExcel.push(fila);
+            });
+
+            // 3. Fila final de TOTAL
+            const filaTotal = {
+                "Entidad": "Total General",
+                [columnaEtiqueta]: "-"
+            };
+
+            mesesOrdenados.forEach(m => {
+                filaTotal[m] = totalesMes[m];
+            });
+            filaTotal["Grand Total"] = granTotalGeneral;
+
+            datosParaExcel.push(filaTotal);
+
+            // 4. Crear libro de SheetJS
             const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
             const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS Filtrado");
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS Pivote");
 
-            // Auto-ajustar ancho de columnas dinámicamente
+            // Ajuste de anchos de columna
             const maxAnchos = Object.keys(datosParaExcel[0]).map(key => ({
-                wch: Math.max(key.length + 4, 12)
+                wch: Math.max(key.length + 3, 12)
             }));
             worksheet['!cols'] = maxAnchos;
 
-            // Nombre de archivo dinámico reflejando el agrupamiento
+            // Exportar
             const fechaDescarga = new Date().toISOString().slice(0, 10);
-            const nombreArchivo = `SIS_${nivelAgrupacion.toUpperCase()}_${moduloActual}_${fechaDescarga}.xlsx`;
-
-            // Descargar archivo
+            const nombreArchivo = `SIS_PIVOTE_${nivelAgrupacion.toUpperCase()}_${fechaDescarga}.xlsx`;
             XLSX.writeFile(workbook, nombreArchivo);
 
         } catch (error) {
             console.error("Error al exportar a Excel:", error);
-            alert("Ocurrió un error al intentar generar el archivo Excel.");
+            alert("Ocurrió un error al intentar generar la tabla pivote en Excel.");
         } finally {
-            // Restaurar botón
             btn.innerHTML = textoOriginal;
             btn.disabled = false;
         }
     }
+
 
     function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
     function ocultarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.add("d-none"); }
