@@ -194,7 +194,6 @@ def dashboard_sis_primer_nivel():
     )
 
 
-
 @sis_pn.route("/api/filtrar", methods=["POST"])
 @login_required
 @csrf.exempt
@@ -217,6 +216,8 @@ def filtrar_datos_sis():
         for v_list in variables_seleccionadas.values():
             if isinstance(v_list, list):
                 todas_vars.update(v_list)
+    elif isinstance(variables_seleccionadas, list):
+        todas_vars.update(variables_seleccionadas)
 
     # Si no hay variables seleccionadas, retornamos array vacío inmediatamente
     if not todas_vars:
@@ -236,7 +237,7 @@ def filtrar_datos_sis():
             select_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, sr.clues, COALESCE(cu.nombre_unidad, sr.clues) AS nombre_unidad"
             group_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, sr.clues, cu.nombre_unidad"
 
-        # 2. Construir cláusulas WHERE filtrando ESTRICTAMENTE por las variables seleccionadas
+        # 2. Construir cláusulas WHERE
         where_conditions = ["1=1"]
         params = []
 
@@ -246,6 +247,7 @@ def filtrar_datos_sis():
 
         if unidades:
             placeholders_u = ','.join(['%s'] * len(unidades))
+            # Optimización de filtro de unidades / CLUES
             where_conditions.append(f"(sr.clues IN ({placeholders_u}) OR cu.nombre_unidad IN ({placeholders_u}))")
             params.extend(unidades + unidades)
 
@@ -255,24 +257,29 @@ def filtrar_datos_sis():
                 where_conditions.append(f"{col} IN ({placeholders_l})")
                 params.extend(lst)
 
-        # 3. Determinar columnas extra y agrupación según el modo de desglose
+        # 3. Determinar columnas extra según el modo de desglose
         if modo_desglose == "por_apartado":
             select_extra = "cv.apartado, cv.descripcion_apartado, SUM(CAST(sr.total AS UNSIGNED)) AS total"
             group_extra = f"{group_geo}, cv.apartado, cv.descripcion_apartado"
-        elif modo_desglose == "por_variable":
-            select_extra = "sr.variable, cv.descripcion AS descripcion_variable, cv.apartado, SUM(CAST(sr.total AS UNSIGNED)) AS total"
-            group_extra = f"{group_geo}, sr.variable, cv.descripcion, cv.apartado"
+        elif modo_desglose in ["por_variable", "desagregado"]:
+            select_extra = """
+                cv.apartado, 
+                cv.descripcion_apartado, 
+                sr.variable, 
+                cv.descripcion AS descripcion_variable, 
+                SUM(CAST(sr.total AS UNSIGNED)) AS total
+            """
+            group_extra = f"{group_geo}, cv.apartado, cv.descripcion_apartado, sr.variable, cv.descripcion"
         else:
-            # 🟢 MODO ACUMULADO: Suma única de las variables seleccionadas
-            # Incluimos 'consultas' como alias secundario por compatibilidad con renderizadores JS antiguos
             select_extra = "SUM(CAST(sr.total AS UNSIGNED)) AS total, SUM(CAST(sr.total AS UNSIGNED)) AS consultas"
             group_extra = group_geo
 
+        # 🟢 SQL CON JOIN OPTIMIZADO PARA EVITAR NULOS EN VARIABLES Y APARTADOS
         query = f"""
             SELECT {select_geo}, {select_extra}
             FROM sis_registros_primer_nivel sr
             LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
-            LEFT JOIN catalogo_variables cv ON sr.variable = cv.variable
+            LEFT JOIN catalogo_variables cv ON TRIM(UPPER(sr.variable)) = TRIM(UPPER(cv.variable))
             WHERE {" AND ".join(where_conditions)}
             GROUP BY {group_extra}
             ORDER BY sr.anio, sr.mes, sr.jurisdiccion
