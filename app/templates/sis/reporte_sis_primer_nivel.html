@@ -205,7 +205,6 @@
 
     let datosActuales = [];
     let datosFiltradosSis = [...sisResultadosIniciales];
-    let datosCompletosGraficas = [...sisResultadosIniciales];
     let paginaActual = 1;
     let anioActivo = null;
     let mostrarValoresMensual = false;
@@ -758,14 +757,11 @@
     function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
     function ocultarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.add("d-none"); }
 
-
-
     async function realizarConsultaBackend() {
         mostrarCargandoGrafica();
 
         if (!hayVariablesSeleccionadas()) {
             datosFiltradosSis = [];
-            datosCompletosGraficas = [];
             actualizarVistas();
             ocultarCargandoGrafica();
             return;
@@ -774,90 +770,60 @@
         const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const modoDesglose = document.getElementById("selectModoDesglose")?.value || "por_apartado";
 
-        // 1. Recolección para la TABLA y EXCEL (Filtro específico por módulo/subvariable)
+        // 🟢 RECOLECCIÓN EXACTA: Lee directamente del DOM los checkboxes de subvariables marcados
         let variablesAPasar = {};
+
         if (moduloActual === "todas") {
+            // Seleccionamos solo las subvariables que están CHECKED en la interfaz
             const subvarsChecked = document.querySelectorAll('.chk-subvar:checked');
+
             subvarsChecked.forEach(chk => {
                 const modKey = chk.dataset.modulo || "otros";
-                if (!variablesAPasar[modKey]) variablesAPasar[modKey] = [];
-                variablesAPasar[modKey].push(chk.value);
+                const codVariable = chk.value;
+
+                if (!variablesAPasar[modKey]) {
+                    variablesAPasar[modKey] = [];
+                }
+                variablesAPasar[modKey].push(codVariable);
             });
         } else {
+            // Si hay un módulo específico, filtramos solo los checkboxes checked de ese módulo
             const subvarsModulo = document.querySelectorAll(`.chk-subvar[data-modulo="${moduloActual}"]:checked`);
             variablesAPasar[moduloActual] = Array.from(subvarsModulo).map(chk => chk.value);
         }
 
+        // Si no quedó ninguna variable marcada, cancelamos y limpiamos
         if (Object.keys(variablesAPasar).length === 0 || !Object.values(variablesAPasar).some(arr => arr.length > 0)) {
             datosFiltradosSis = [];
-            datosCompletosGraficas = [];
             actualizarVistas();
             ocultarCargandoGrafica();
             return;
         }
 
-        // 🟢 2. Construcción del objeto con TODAS las variables del catálogo para las GRÁFICAS
-        let todasLasVariablesCatalogo = {};
-        Object.keys(DICCIONARIO_VARIABLES).forEach(modKey => {
-            todasLasVariablesCatalogo[modKey] = [];
-            (DICCIONARIO_VARIABLES[modKey] || []).forEach(grupo => {
-                (grupo.variables || []).forEach(v => {
-                    todasLasVariablesCatalogo[modKey].push(v.codigo);
-                });
-            });
-        });
-
-        // Filtros comunes (Años, Meses, Ubicación Geográfica)
-        const filtrosComunes = {
+        const payload = {
             unidades: window.getUnidadesSeleccionadas?.() || [],
             jurisdicciones: window.getJurisdiccionesSeleccionadas?.() || [],
             municipios: window.getMunicipiosSeleccionados?.() || [],
             anios: window.getAniosSeleccionados?.() || [],
-            meses: window.getMesesSeleccionados?.() || []
-        };
-
-        // Payload para la TABLA (Sensible al módulo seleccionado)
-        const payloadTabla = {
-            ...filtrosComunes,
+            meses: window.getMesesSeleccionados?.() || [],
             modo_desglose: modoDesglose,
             variables: variablesAPasar
         };
 
-        // Payload para las GRÁFICAS (Conserva geografía y tiempo, pero solicita TODOS los módulos)
-        const payloadGraficas = {
-            ...filtrosComunes,
-            modo_desglose: "por_apartado",
-            variables: todasLasVariablesCatalogo
-        };
-
         try {
-            const [respFiltered, respGlobal] = await Promise.all([
-                fetch("/sis_primer_nivel/api/filtrar", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payloadTabla)
-                }),
-                fetch("/sis_primer_nivel/api/filtrar", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payloadGraficas)
-                })
-            ]);
+            const resp = await fetch("/sis_primer_nivel/api/filtrar", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
 
-            if (respFiltered.ok) {
-                const res = await respFiltered.json();
-                if (res.status === "success") datosFiltradosSis = res.data || [];
+            if (!resp.ok) throw new Error("Error en la respuesta de la API");
+
+            const res = await resp.json();
+            if (res.status === "success") {
+                datosFiltradosSis = res.data || [];
+                actualizarVistas();
             }
-
-            if (respGlobal.ok) {
-                const resG = await respGlobal.json();
-                if (resG.status === "success") datosCompletosGraficas = resG.data || [];
-            } else {
-                datosCompletosGraficas = datosFiltradosSis;
-            }
-
-            actualizarVistas();
-
         } catch (err) {
             console.error("Error al conectar con la API SIS:", err);
         } finally {
@@ -868,19 +834,12 @@
 
     function actualizarVistas() {
         datosActuales = agruparDatos(datosFiltradosSis);
-        // 🟢 Agrupamos los datos globales completos para las gráficas
-        const datosParaGraficas = agruparDatos(datosCompletosGraficas);
-
         paginaActual = 1;
 
         renderTabsAnios(datosActuales);
         renderTablaSis();
-
-        // 🟢 Le pasamos a las gráficas los datos globales completos (no pierden módulos ni categorías)
-        renderGraficaPorAnio(datosParaGraficas);
-        renderGraficaPorUnidad(datosParaGraficas.filter(r => Number(r.anio) === Number(anioActivo)));
-
-        // La gráfica mensual/inferior mantiene el filtro del checkbox seleccionado
+        renderGraficaPorAnio(datosActuales);
+        renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
         renderGraficaTemporal(datosFiltradosSis);
     }
 
