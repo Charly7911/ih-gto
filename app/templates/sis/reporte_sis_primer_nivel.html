@@ -479,43 +479,47 @@
 
             let fuenteDeDatos = [];
 
-            // 🟢 1. OBTENCIÓN DE DATOS SEGÚN EL MODO
+            /* 🟢 REEMPLAZA ÚNICAMENTE ESTE BLOQUE DENTRO DE exportarFiltradoExcel() */
+
             if (modoDesglose === "desagregado" || modoDesglose === "por_variable") {
 
-                // Helper para extraer arreglos de inputs o selectores
+                // 1. Recolección exacta de subvariables marcadas en el DOM
+                let variablesAPasar = {};
+                const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
+
+                if (moduloActual === "todas") {
+                    document.querySelectorAll('.chk-subvar:checked').forEach(chk => {
+                        const modKey = chk.dataset.modulo || "otros";
+                        if (!variablesAPasar[modKey]) variablesAPasar[modKey] = [];
+                        variablesAPasar[modKey].push(chk.value);
+                    });
+                } else {
+                    const subvarsModulo = document.querySelectorAll(`.chk-subvar[data-modulo="${moduloActual}"]:checked`);
+                    variablesAPasar[moduloActual] = Array.from(subvarsModulo).map(chk => chk.value);
+                }
+
+                // 2. Helper para leer filtros del DOM
                 const obtenerValoresCheck = (selector) => {
                     return Array.from(document.querySelectorAll(selector))
-                        .filter(cb => cb.checked || cb.selected)
+                        .filter(cb => cb.checked)
                         .map(cb => cb.value.trim());
                 };
 
-                // 1. Recolectar variables activas (compatibilidad con objetos o checkboxes)
-                let varsPayload = {};
-                if (typeof obtenerVariablesSeleccionadas === 'function') {
-                    varsPayload = obtenerVariablesSeleccionadas();
-                } else if (typeof variablesSeleccionadas !== 'undefined' && Object.keys(variablesSeleccionadas).length > 0) {
-                    varsPayload = variablesSeleccionadas;
-                } else {
-                    // Mapeo directo por checkboxes en pantalla
-                    const varsArray = obtenerValoresCheck('input[name="variables"]:checked, .sis-variable-check:checked, .filtro-variable:checked');
-                    varsPayload = { lista: varsArray };
-                }
-
-                // 2. Armar el payload heredando de las funciones globales o leyendo el DOM directamente
+                // 3. Payload formateado para el backend
                 const payload = {
-                    anios: typeof obtenerAniosSeleccionados === 'function' ? obtenerAniosSeleccionados() : obtenerValoresCheck('input[name="anios"]:checked, .filtro-anio:checked'),
-                    meses: typeof obtenerMesesSeleccionados === 'function' ? obtenerMesesSeleccionados() : obtenerValoresCheck('input[name="meses"]:checked, .filtro-mes:checked'),
-                    unidades: typeof obtenerUnidadesSeleccionadas === 'function' ? obtenerUnidadesSeleccionadas() : obtenerValoresCheck('input[name="unidades"]:checked, .filtro-unidad:checked'),
-                    jurisdicciones: typeof obtenerJurisdiccionesSeleccionadas === 'function' ? obtenerJurisdiccionesSeleccionadas() : obtenerValoresCheck('input[name="jurisdicciones"]:checked, .filtro-jurisdiccion:checked'),
-                    municipios: typeof obtenerMunicipiosSeleccionados === 'function' ? obtenerMunicipiosSeleccionados() : obtenerValoresCheck('.sis-filtro-municipio:checked, input[name="municipios"]:checked'),
-                    variables: varsPayload,
+                    anios: obtenerValoresCheck('.filtro-anio:checked, input[name="anios"]:checked'),
+                    meses: obtenerValoresCheck('.filtro-mes:checked, input[name="meses"]:checked'),
+                    unidades: obtenerValoresCheck('.filtro-unidad:checked, input[name="unidades"]:checked'),
+                    jurisdicciones: obtenerValoresCheck('.filtro-jurisdiccion:checked, input[name="jurisdicciones"]:checked'),
+                    municipios: obtenerValoresCheck('.sis-filtro-municipio:checked, input[name="municipios"]:checked'),
+                    variables: variablesAPasar,
                     nivel_agrupacion: document.getElementById("selectNivelAgrupacion")?.value || "clues",
                     modo_desglose: "por_variable"
                 };
 
-                console.log("📤 Payload enviado al backend:", payload);
+                console.log("📤 Consultando backend para Excel desagregado:", payload);
 
-                // Consultar datos detallados al Backend
+                // 4. Petición POST al endpoint
                 const resp = await fetch('/sis_primer_nivel/api/filtrar', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -523,14 +527,12 @@
                 });
 
                 const resJson = await resp.json();
-                if (resJson.status === "success" && resJson.data) {
+
+                if (resJson.status === "success" && Array.isArray(resJson.data)) {
                     fuenteDeDatos = resJson.data;
                 } else {
-                    throw new Error(resJson.message || "No se pudieron obtener los datos desagregados del servidor.");
+                    throw new Error(resJson.message || "El servidor no devolvió registros para el desglose por variable.");
                 }
-            } else {
-                // Modo acumulado: Usa la variable global en memoria
-                fuenteDeDatos = (typeof datosFiltradosSis !== "undefined") ? datosFiltradosSis : [];
             }
 
             if (!fuenteDeDatos || fuenteDeDatos.length === 0) {
