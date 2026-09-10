@@ -14,111 +14,76 @@ main = Blueprint('main', __name__)
 # LOGIN SOLO PARA ADMIN
 # -----------------------------
 
-
 @main.route('/login', methods=['GET', 'POST'])
 def login():
+  if current_user.is_authenticated:
+    return redirect(url_for('bienvenida.inicio'))
 
-    if current_user.is_authenticated:
-        return redirect(url_for('bienvenida.inicio'))
+  form = LoginForm()
 
-    form = LoginForm()
+  if form.validate_on_submit():
+    username = form.username.data.strip()
+    password = form.password.data.strip()
 
-    if form.validate_on_submit():
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
-        username = form.username.data
-        password = form.password.data
+    try:
+      cursor.execute(
+          'SELECT * FROM user WHERE username = %s', (username,)
+      )
+      user_data = cursor.fetchone()
 
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+      # Validar usuario y contraseña en conjunto (Buena práctica de seguridad)
+      if not user_data:
+        flash('Usuario o contraseña incorrectos.', 'danger')
+        return render_template(
+            'bienvenida/bienvenida.html', form=form, mostrar_login=True
+        )
 
-        try:
-            cursor.execute(
-                'SELECT * FROM user WHERE username = %s',
-                (username,)
-            )
+      user = User(
+          id=user_data['id'],
+          nombre=user_data['nombre'],
+          primer_apellido=user_data['primer_apellido'],
+          segundo_apellido=user_data['segundo_apellido'],
+          sexo=user_data['sexo'],
+          rfc=user_data['rfc'],
+          email=user_data['email'],
+          username=user_data['username'],
+          password=user_data['password'],
+          fecha_registro=user_data['fecha_registro'],
+          rol_id=user_data['rol_id'],
+          nombre_oculto=user_data['nombre_oculto'],
+      )
 
-            user_data = cursor.fetchone()
+      if not user.check_password(password):
+        flash('Usuario o contraseña incorrectos.', 'danger')
+        return render_template(
+            'bienvenida/bienvenida.html', form=form, mostrar_login=True
+        )
 
-            if not user_data:
-                flash('Usuario no encontrado.', 'danger')
-                return render_template(
-                    'bienvenida/bienvenida.html',
-                    form=form, mostrar_login=True
-                )
+      # Iniciar sesión correctamente
+      login_user(user, remember=False)
+      session.permanent = False
+      session['user_id'] = user.id
+      session['user_rol'] = user.rol_id
 
+      current_app.logger.info(
+          f'LOGIN EXITOSO: {current_user.username} (ID: {current_user.id})'
+      )
 
-            user = User(
-                id=user_data['id'],
-                nombre=user_data['nombre'],
-                primer_apellido=user_data['primer_apellido'],
-                segundo_apellido=user_data['segundo_apellido'],
-                sexo=user_data['sexo'],
-                rfc=user_data['rfc'],
-                email=user_data['email'],
-                username=user_data['username'],
-                password=user_data['password'],
-                fecha_registro=user_data['fecha_registro'],
-                rol_id=user_data['rol_id'],
-                nombre_oculto=user_data['nombre_oculto']
-            )
+      # Redirección general (o puedes personalizar según el rol si más adelante lo necesitas)
+      return redirect(url_for('bienvenida.inicio'))
 
+    except Exception as e:
+      current_app.logger.error(f'Error en login: {e}')
+      flash('Error interno del servidor. Intente más tarde.', 'danger')
 
-            if not user.check_password(password):
+    finally:
+      cursor.close()
 
-                flash('Contraseña incorrecta.', 'danger')
-
-                return render_template(
-                    'bienvenida/bienvenida.html',
-                    form=form, mostrar_login=True
-                )
-
-            
-            login_user(user, remember=False)
-            session.permanent = False
-            session['user_id'] = user.id
-            session['user_rol'] = user.rol_id
-
-            current_app.logger.info(
-                f"LOGIN OK: {current_user.username} - autenticado: {current_user.is_authenticated}"
-            )
-
-
-            # Administrador
-            if user.rol_id == 6:
-                return redirect(
-                    url_for('bienvenida.inicio')
-                )
-
-
-            # Usuario normal
-            if user.rol_id == 1:
-                return redirect(
-                    url_for('bienvenida.inicio')
-                )
-
-
-            return redirect(
-                url_for('bienvenida.inicio')
-            )
-
-
-        except Exception as e:
-
-            current_app.logger.error(e)
-
-            flash(
-                'Error interno del servidor.',
-                'danger'
-            )
-
-
-        finally:
-            cursor.close()
-
-
-    return render_template(
-        'bienvenida/bienvenida.html',
-        form=form, mostrar_login=True
-    )
+  return render_template(
+      'bienvenida/bienvenida.html', form=form, mostrar_login=True
+  )
 
 
 
