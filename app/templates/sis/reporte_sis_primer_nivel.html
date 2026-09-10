@@ -1020,7 +1020,7 @@
                 : (optionSelected ? optionSelected.text.trim() : selectModulo.value);
         }
 
-        // 3. OBTENER APARTADOS SELECCIONADOS (Badges)
+        // 3. OBTENER APARTADOS SELECCIONADOS
         const apartadosElementos = [];
         document.querySelectorAll('#contenedorSubvariables input[type="checkbox"]:checked, .chk-apartado:checked, .chk-subvar:checked').forEach(chk => {
             const valId = chk.value || chk.id;
@@ -1050,19 +1050,17 @@
             return;
         }
 
-        // 5. CONSTRUIR ESTRUCTURA DE DATOS PARA BARRAS AGRUPADAS
+        // 5. CONSTRUIR ESTRUCTURA DE DATOS PARA BARRAS
         const paletaColores = ['#4E79A7', '#F28E2B', '#E15759', '#76B7B2', '#59A14F'];
         let totalGeneral = 0;
 
         const datasets = aniosSeleccionados.map((anio, index) => {
             const dataPorJurisdiccion = listaJurisdicciones.map(unid => {
-                // Filtrar registros correspondientes al año y jurisdicción actual
                 const registrosUnidad = datosFiltrados.filter(r =>
                     Number(r.anio) === anio &&
                     (r.jurisdiccion === unid || r.nombre_unidad === unid || r.clues === unid || r.unidad === unid)
                 );
 
-                // Sumar los valores según el módulo seleccionado
                 const suma = registrosUnidad.reduce((acc, r) => {
                     if (moduloClave === 'todas') {
                         return acc + (Number(r.consultas) || 0) + (Number(r.embarazadas) || 0) +
@@ -1112,47 +1110,62 @@
             }
         });
 
-        // 7. CONSTRUIR TÍTULO Y BADGES CLICABLES
+        // 🟢 7. CONSTRUIR TÍTULO CON RESUMEN INTELIGENTE (SIN DESCOMPONER EL DISEÑO)
         if (elTitulo) {
-            const textoAnios = aniosSeleccionados.join(' vs ');
-
-            let htmlBadges = apartadosElementos.length > 0
-                ? apartadosElementos.map(item => `
-                <span class="badge bg-light text-dark border me-1 mb-1 style="font-weight: normal;">
-                    📌 ${item.nombre}
-                    <button type="button" class="btn-close ms-1" style="font-size: 0.55rem;" 
-                            onclick="desmarcarApartadoYRenderizar('${item.id}')" aria-label="Quitar"></button>
-                </span>
-            `).join('')
-                : '<span class="text-muted small">Todos los apartados seleccionados</span>';
-
+            const textoAnios = aniosSeleccionados.join(', ');
             const totalFormateado = typeof fmt === 'function' ? fmt(totalGeneral) : totalGeneral;
+            const totalApartados = apartadosElementos.length;
+
+            let htmlApartados = '';
+
+            if (totalApartados === 0) {
+                htmlApartados = '<span class="text-muted small">Todos los apartados seleccionados</span>';
+            } else if (totalApartados <= 3) {
+                // Si son pocos, se muestran directo
+                htmlApartados = apartadosElementos.map(item => `
+                <span class="badge bg-light text-dark border me-1">📌 ${item.nombre}</span>
+            `).join('');
+            } else {
+                // Si son más de 3, muestra un badge con contador y un tooltip con el listado
+                const listaNombres = apartadosElementos.map(a => `• ${a.nombre}`).join('\n');
+
+                htmlApartados = `
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" 
+                      title="${listaNombres.replace(/"/g, '&quot;')}" style="cursor: pointer;">
+                    📌 ${totalApartados} apartados seleccionados ℹ️
+                </span>
+                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none ms-2 text-danger small" 
+                        onclick="desmarcarTodosApartados()">
+                    Vaciar selección
+                </button>
+            `;
+            }
 
             elTitulo.innerHTML = `
-            <div class="fs-6 fw-bold text-dark mb-1">
-                ${nombreModulo} <span class="text-primary">(${textoAnios})</span> — Total: <strong>${totalFormateado}</strong>
-            </div>
-            <div class="d-flex flex-wrap align-items-center justify-content-center gap-1 mt-1">
-                <small class="text-muted fw-bold me-1">Apartados:</small>
-                ${htmlBadges}
+            <div class="d-flex flex-column align-items-center">
+                <div class="fs-6 fw-bold text-dark mb-1">
+                    ${nombreModulo} <span class="text-primary">(${textoAnios})</span> — Total: <strong>${totalFormateado}</strong>
+                </div>
+                <div class="d-flex align-items-center justify-content-center gap-1 mt-1">
+                    <small class="text-muted fw-bold me-1">Apartados:</small>
+                    ${htmlApartados}
+                </div>
             </div>
         `;
         }
     }
 
-    // Función auxiliar para desmarcar el checkbox al dar clic en la 'X' del badge
-    function desmarcarApartadoYRenderizar(idCheckbox) {
-        const chk = document.getElementById(idCheckbox) || document.querySelector(`input[value="${idCheckbox}"]`);
-        if (chk) {
+    // 🟢 FUNCIÓN AUXILIAR PARA LIMPIAR LA SELECCIÓN
+    function desmarcarTodosApartados() {
+        document.querySelectorAll('#contenedorSubvariables input[type="checkbox"]:checked, .chk-apartado:checked, .chk-subvar:checked').forEach(chk => {
             chk.checked = false;
-            if (typeof realizarConsultaBackend === 'function') {
-                realizarConsultaBackend();
-            } else if (typeof renderGraficaPorUnidad === 'function') {
-                renderGraficaPorUnidad();
-            }
+        });
+        if (typeof realizarConsultaBackend === 'function') {
+            realizarConsultaBackend();
+        } else if (typeof renderGraficaPorUnidad === 'function') {
+            renderGraficaPorUnidad();
         }
     }
-
 
 
     // Función helper para visibilidad del botón de desglose
