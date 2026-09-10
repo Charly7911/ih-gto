@@ -454,7 +454,7 @@
                 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
             };
 
-            // 🟢 Capturar municipios marcados en el popover (ej. CORTAZAR)
+            // Capturar municipios marcados en el popover
             const municipiosChecklist = Array.from(document.querySelectorAll('.sis-filtro-municipio:checked'))
                 .map(cb => cb.value.trim());
 
@@ -468,23 +468,17 @@
                 const nombreMes = nombresMeses[numMes] || `Mes ${numMes}`;
                 const anioRegistro = r.anio || 'Sin Año';
 
-                // 1. Detección prioritaria del Municipio
-                let nombreMunicipio = r.municipio || r.nombre_municipio || r.nombre;
-                if (!nombreMunicipio || nombreMunicipio === 'N/A' || nombreMunicipio === 'Sin Especificar') {
-                    if (municipiosChecklist.length > 0) {
-                        nombreMunicipio = municipiosChecklist.join(', ');
-                    } else {
-                        nombreMunicipio = 'Sin Especificar';
-                    }
-                }
-
+                // 1. Extraer EL MUNICIPIO PROPIO de este registro individual
+                let nombreMunicipio = r.municipio || r.nombre_municipio || r.nombre || 'Sin Especificar';
                 let nombreUnidad = r.nombre_unidad || r.clues || 'Sin Especificar';
                 let nombreJurisdiccion = r.jurisdiccion ? `Jurisdicción ${r.jurisdiccion}` : 'Sin Especificar';
 
+                // Determinar bajo qué criterio se agruparán las filas del Excel
                 let nombreEntidad = nombreUnidad;
                 if (nivelAgrupacion === "jurisdiccion") {
                     nombreEntidad = nombreJurisdiccion;
-                } else if (nivelAgrupacion === "municipio") {
+                } else if (nivelAgrupacion === "municipio" || municipiosChecklist.length > 0) {
+                    // 🟢 Agrupar de forma independiente por el municipio del registro
                     nombreEntidad = nombreMunicipio;
                 }
 
@@ -492,7 +486,8 @@
                     nombreEntidad += ` - ${r.descripcion_apartado}`;
                 }
 
-                const claveUnicaMatriz = `${nombreEntidad}_${anioRegistro}`;
+                // 🔴 CLAVE ÚNICA INDIVIDUAL: Garantiza que cada municipio tenga su propia fila por año
+                const claveUnicaMatriz = `${nombreEntidad}_${nombreJurisdiccion}_${anioRegistro}`;
 
                 if (!mapaMatriz[claveUnicaMatriz]) {
                     mapaMatriz[claveUnicaMatriz] = {
@@ -510,13 +505,12 @@
 
             const mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
 
-            // 2. Construcción de filas (fuerza la columna Municipio si hay filtro activo)
+            // 2. Construir matriz de filas independientes para el Excel
             const datosParaExcel = [];
             const totalesMes = {};
             mesesOrdenados.forEach(m => totalesMes[m] = 0);
             let granTotalGeneral = 0;
 
-            // Evaluar si debemos mostrar obligatoriamente la columna Municipio
             const mostrarColumnaMunicipio = nivelAgrupacion === "municipio" || municipiosChecklist.length > 0;
 
             Object.keys(mapaMatriz).forEach(clave => {
@@ -527,7 +521,6 @@
                     "Jurisdicción": item["Jurisdicción"]
                 };
 
-                // 🟢 Incluir 'Municipio' siempre que se haya agrupado o filtrado por municipio
                 if (mostrarColumnaMunicipio) {
                     fila["Municipio"] = item["Municipio"];
                 }
@@ -559,14 +552,14 @@
                 return;
             }
 
-            // Ordenar datos
+            // Ordenar por Año y luego por el Nombre del Municipio
             datosParaExcel.sort((a, b) => {
                 if (a["Año"] !== b["Año"]) return a["Año"] - b["Año"];
                 const colRef = mostrarColumnaMunicipio ? "Municipio" : (nivelAgrupacion === "jurisdiccion" ? "Jurisdicción" : "Unidad");
                 return String(a[colRef] || '').localeCompare(String(b[colRef] || ''));
             });
 
-            // 3. Fila de Total General
+            // 3. Fila de Total General que suma todos los municipios listados
             const filaTotal = {
                 "Entidad": "Total General",
                 "Jurisdicción": "-"
@@ -588,7 +581,7 @@
 
             datosParaExcel.push(filaTotal);
 
-            // 4. Generación y descarga
+            // 4. Generación y descarga del archivo Excel
             const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS");
