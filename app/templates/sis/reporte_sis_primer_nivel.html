@@ -432,7 +432,6 @@
 
 
     function exportarFiltradoExcel() {
-        // 1. Validar datos
         if (!datosFiltradosSis || datosFiltradosSis.length === 0) {
             alert("No hay datos disponibles para exportar con los filtros seleccionados.");
             return;
@@ -446,18 +445,15 @@
         }
 
         try {
-            // 2. Obtener el valor REAL del SELECT en el HTML
             const nivelAgrupacion = document.getElementById("selectNivelAgrupacion")?.value || "clues";
             const modoDesglose = document.getElementById("selectModoDesglose")?.value || "acumulado";
 
-            // Mapeo de meses
             const nombresMeses = {
                 1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
                 5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
                 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
             };
 
-            // 3. Etiqueta dinámica para la columna principal de la fila
             let nombreColumnaEntidad = "Unidad";
             if (nivelAgrupacion === "jurisdiccion") {
                 nombreColumnaEntidad = "Jurisdicción";
@@ -468,16 +464,15 @@
             const mapaMatriz = {};
             const mesesConDatos = new Set();
 
-            // 4. Agrupar la información dinámicamente según el Select
+            // 1. Agrupar la información INCLUYENDO el Año en la Clave Unica de la fila
             datosFiltradosSis.forEach(r => {
                 const numMes = Number(r.mes);
                 if (numMes) mesesConDatos.add(numMes);
 
                 const nombreMes = nombresMeses[numMes] || `Mes ${numMes}`;
+                const anioRegistro = r.anio || 'Sin Año';
 
-                // Determinar el nombre de la fila según la opción elegida
                 let nombreEntidad = "Sin Especificar";
-
                 if (nivelAgrupacion === "jurisdiccion") {
                     nombreEntidad = r.jurisdiccion ? `Jurisdicción ${r.jurisdiccion}` : 'Sin Especificar';
                 } else if (nivelAgrupacion === "municipio") {
@@ -486,27 +481,29 @@
                     nombreEntidad = (r.nombre_unidad && r.nombre_unidad !== 'N/A') ? r.nombre_unidad : (r.clues || 'Sin Especificar');
                 }
 
-                // Si se seleccionó desglosar por apartado
                 if (modoDesglose === "por_apartado" && r.descripcion_apartado) {
                     nombreEntidad += ` - ${r.descripcion_apartado}`;
                 }
 
-                // Crear entrada si no existe
-                if (!mapaMatriz[nombreEntidad]) {
-                    mapaMatriz[nombreEntidad] = {
+                // 🟢 CLAVE ÚNICA: Entidad + Año (Separa automáticamente los registros si no se filtró por un solo año)
+                const claveUnicaMatriz = `${nombreEntidad}_${anioRegistro}`;
+
+                if (!mapaMatriz[claveUnicaMatriz]) {
+                    mapaMatriz[claveUnicaMatriz] = {
                         "Entidad": "GUANAJUATO",
+                        "Año": Number(anioRegistro) || anioRegistro,
                         [nombreColumnaEntidad]: nombreEntidad
                     };
                 }
 
                 const valorMonto = Number(r.total || r.consultas || r.suma || 0);
-                mapaMatriz[nombreEntidad][nombreMes] = (mapaMatriz[nombreEntidad][nombreMes] || 0) + valorMonto;
+                mapaMatriz[claveUnicaMatriz][nombreMes] = (mapaMatriz[claveUnicaMatriz][nombreMes] || 0) + valorMonto;
             });
 
             // Ordenar los meses de forma cronológica
             const mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
 
-            // 5. Construir la matriz final para el Excel
+            // 2. Construir matriz final de filas
             const datosParaExcel = [];
             const totalesMes = {};
             mesesOrdenados.forEach(m => totalesMes[m] = 0);
@@ -515,6 +512,7 @@
             Object.keys(mapaMatriz).forEach(clave => {
                 const fila = {
                     "Entidad": mapaMatriz[clave]["Entidad"],
+                    "Año": mapaMatriz[clave]["Año"],
                     [nombreColumnaEntidad]: mapaMatriz[clave][nombreColumnaEntidad]
                 };
 
@@ -529,7 +527,6 @@
                 fila["Grand Total"] = totalFila;
                 granTotalGeneral += totalFila;
 
-                // Descartar filas completamente vacías
                 if (totalFila > 0 || Object.keys(mapaMatriz).length === 1) {
                     datosParaExcel.push(fila);
                 }
@@ -540,9 +537,16 @@
                 return;
             }
 
-            // 6. Fila final de Totales
+            // Ordenar los datos por Año y luego por Entidad/Jurisdicción
+            datosParaExcel.sort((a, b) => {
+                if (a["Año"] !== b["Año"]) return a["Año"] - b["Año"];
+                return a[nombreColumnaEntidad].localeCompare(b[nombreColumnaEntidad]);
+            });
+
+            // 3. Fila final de Totales
             const filaTotal = {
                 "Entidad": "Total General",
+                "Año": "-",
                 [nombreColumnaEntidad]: "-"
             };
 
@@ -553,7 +557,7 @@
 
             datosParaExcel.push(filaTotal);
 
-            // 7. Generar el documento Excel
+            // 4. Generar el documento Excel
             const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS");
@@ -564,7 +568,7 @@
             }));
             worksheet['!cols'] = maxAnchos;
 
-            // Nombre de archivo con fecha y nivel seleccionado
+            // Descargar archivo
             const fechaDescarga = new Date().toISOString().slice(0, 10);
             const nombreArchivo = `SIS_${nivelAgrupacion.toUpperCase()}_${fechaDescarga}.xlsx`;
 
