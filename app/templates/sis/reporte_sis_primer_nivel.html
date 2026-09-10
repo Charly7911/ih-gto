@@ -758,12 +758,14 @@
     function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
     function ocultarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.add("d-none"); }
 
+
+
     async function realizarConsultaBackend() {
         mostrarCargandoGrafica();
 
         if (!hayVariablesSeleccionadas()) {
             datosFiltradosSis = [];
-            datosCompletosGraficas = []; // 🟢 Limpiamos también el de las gráficas
+            datosCompletosGraficas = [];
             actualizarVistas();
             ocultarCargandoGrafica();
             return;
@@ -772,64 +774,73 @@
         const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const modoDesglose = document.getElementById("selectModoDesglose")?.value || "por_apartado";
 
-        // 🟢 RECOLECCIÓN EXACTA: Lee directamente del DOM los checkboxes de subvariables marcados
+        // 1. Recolección para la TABLA y EXCEL (Filtro específico por módulo/subvariable)
         let variablesAPasar = {};
-
         if (moduloActual === "todas") {
             const subvarsChecked = document.querySelectorAll('.chk-subvar:checked');
-
             subvarsChecked.forEach(chk => {
                 const modKey = chk.dataset.modulo || "otros";
-                const codVariable = chk.value;
-
-                if (!variablesAPasar[modKey]) {
-                    variablesAPasar[modKey] = [];
-                }
-                variablesAPasar[modKey].push(codVariable);
+                if (!variablesAPasar[modKey]) variablesAPasar[modKey] = [];
+                variablesAPasar[modKey].push(chk.value);
             });
         } else {
             const subvarsModulo = document.querySelectorAll(`.chk-subvar[data-modulo="${moduloActual}"]:checked`);
             variablesAPasar[moduloActual] = Array.from(subvarsModulo).map(chk => chk.value);
         }
 
-        // Si no quedó ninguna variable marcada, cancelamos y limpiamos
         if (Object.keys(variablesAPasar).length === 0 || !Object.values(variablesAPasar).some(arr => arr.length > 0)) {
             datosFiltradosSis = [];
-            datosCompletosGraficas = []; // 🟢 Limpiamos también el de las gráficas
+            datosCompletosGraficas = [];
             actualizarVistas();
             ocultarCargandoGrafica();
             return;
         }
 
-        const payload = {
+        // 🟢 2. Construcción del objeto con TODAS las variables del catálogo para las GRÁFICAS
+        let todasLasVariablesCatalogo = {};
+        Object.keys(DICCIONARIO_VARIABLES).forEach(modKey => {
+            todasLasVariablesCatalogo[modKey] = [];
+            (DICCIONARIO_VARIABLES[modKey] || []).forEach(grupo => {
+                (grupo.variables || []).forEach(v => {
+                    todasLasVariablesCatalogo[modKey].push(v.codigo);
+                });
+            });
+        });
+
+        // Filtros comunes (Años, Meses, Ubicación Geográfica)
+        const filtrosComunes = {
             unidades: window.getUnidadesSeleccionadas?.() || [],
             jurisdicciones: window.getJurisdiccionesSeleccionadas?.() || [],
             municipios: window.getMunicipiosSeleccionados?.() || [],
             anios: window.getAniosSeleccionados?.() || [],
-            meses: window.getMesesSeleccionados?.() || [],
+            meses: window.getMesesSeleccionados?.() || []
+        };
+
+        // Payload para la TABLA (Sensible al módulo seleccionado)
+        const payloadTabla = {
+            ...filtrosComunes,
             modo_desglose: modoDesglose,
             variables: variablesAPasar
         };
 
-        // 🟢 PAYLOAD GLOBAL: Para mantener todas las categorías/módulos vivas en las gráficas superiores
-        const payloadGlobal = {
-            ...payload,
+        // Payload para las GRÁFICAS (Conserva geografía y tiempo, pero solicita TODOS los módulos)
+        const payloadGraficas = {
+            ...filtrosComunes,
             modo_desglose: "por_apartado",
-            variables: {}
+            variables: todasLasVariablesCatalogo
         };
 
         try {
-            // 🟢 PROMISE.ALL: Hace ambas peticiones en simultáneo sin perder velocidad
             const [respFiltered, respGlobal] = await Promise.all([
                 fetch("/sis_primer_nivel/api/filtrar", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payloadTabla)
                 }),
                 fetch("/sis_primer_nivel/api/filtrar", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payloadGlobal)
+                    body: JSON.stringify(payloadGraficas)
                 })
             ]);
 
@@ -842,7 +853,7 @@
                 const resG = await respGlobal.json();
                 if (resG.status === "success") datosCompletosGraficas = resG.data || [];
             } else {
-                datosCompletosGraficas = datosFiltradosSis; // Respaldo en caso de error
+                datosCompletosGraficas = datosFiltradosSis;
             }
 
             actualizarVistas();
