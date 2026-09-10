@@ -11,6 +11,27 @@
          MENÚ PRINCIPAL DE NAVEGACIÓN
     ========================================= -->
 
+    {% if current_user.is_authenticated %}
+    <!-- Saludo en la parte SUPERIOR del Sidebar -->
+    <div class="sidebar-top-user"
+        style="padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <i class="bi bi-person-circle" style="font-size: 1.5rem; color: #4dabf7;"></i>
+            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <span
+                    style="display: block; font-size: 0.7rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.5px;">Bienvenido</span>
+                <strong style="color: #ffffff; font-weight: 600; font-size: 0.9rem;">
+                    {% set primer_nombre = current_user.nombre.split()[0] if current_user.nombre else '' %}
+                    {% set primer_apellido = current_user.primer_apellido.split()[0] if current_user.primer_apellido
+                    else '' %}
+
+                    {{ primer_nombre }} {{ primer_apellido }}
+                </strong>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- CONTENEDOR CONTENEDOR PADRE DEL SIDEBAR -->
     <aside class="sidebar-container"
         style="display: flex; flex-direction: column; height: 100vh; justify-content: space-between;">
@@ -122,8 +143,8 @@
 
 
             <!-- =========================================
-         SECCIÓN DINÁMICA DE FILTROS SEGÚN RUTA
-    ========================================= -->
+           SECCIÓN DINÁMICA DE FILTROS SEGÚN RUTA
+           ========================================= -->
 
             {# FILTROS: EGRESOS #}
             {% if ruta.startswith('/egresos') %}
@@ -1265,26 +1286,6 @@
         {% if current_user.is_authenticated %}
         <div class="sidebar-bottom"
             style="padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;">
-            <!-- Saludo al usuario con primer nombre y primer apellido -->
-            <div class="user-welcome"
-                style="padding: 8px 15px; color: rgba(255, 255, 255, 0.85); font-size: 0.85rem; display: flex; align-items: center; gap: 8px;">
-                <i class="bi bi-person-circle" style="font-size: 1.2rem; color: #4dabf7;"></i>
-                <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                    <span
-                        style="display: block; font-size: 0.75rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.5px;">Bienvenido</span>
-                    <strong style="color: #ffffff; font-weight: 600;">
-                        {# Extrae solo el primer nombre si tiene dos (ej: "Juan Carlos" -> "Juan") #}
-                        {% set primer_nombre = current_user.nombre.split()[0] if current_user.nombre else '' %}
-                        {# Extrae el primer apellido (ej: "Pérez") #}
-                        {% set primer_apellido = current_user.primer_apellido.split()[0] if current_user.primer_apellido
-                        else '' %}
-
-                        {{ primer_nombre }} {{ primer_apellido }}
-                    </strong>
-                </div>
-            </div>
-
-            <!-- Botón de Cerrar Sesión -->
             <a href="{{ url_for('main.logout') }}" class="menu-item logout">
                 🚪 Cerrar Sesión
             </a>
