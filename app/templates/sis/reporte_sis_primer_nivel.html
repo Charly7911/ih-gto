@@ -181,7 +181,6 @@
     </div>
 </div>
 
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
@@ -234,31 +233,6 @@
             variablesPersonalizadasEstado["todas"] = [];
         } else if (VARIABLES_DEFAULT[modKey]) {
             variablesPersonalizadasEstado[modKey] = [...VARIABLES_DEFAULT[modKey]];
-        }
-    }
-
-    function actualizarTitulosGraficas() {
-        const selectModulo = document.getElementById("filtroSisDetalle");
-        if (!selectModulo) return;
-
-        const moduloValor = selectModulo.value || "consultas";
-        let nombreTexto = "";
-
-        if (moduloValor === "todas") {
-            nombreTexto = "Todas las Secciones";
-        } else {
-            const optionSelected = selectModulo.options[selectModulo.selectedIndex];
-            nombreTexto = optionSelected ? optionSelected.text.trim() : moduloValor;
-        }
-
-        const tituloGraficaAnio = document.getElementById("tituloGraficaAnio");
-        const tituloGraficaSis = document.getElementById("tituloGraficaSis");
-
-        if (tituloGraficaAnio) {
-            tituloGraficaAnio.textContent = `Total Atenciones de ${nombreTexto} por Año`;
-        }
-        if (tituloGraficaSis) {
-            tituloGraficaSis.textContent = `Indicadores de ${nombreTexto} por Unidad`;
         }
     }
 
@@ -864,7 +838,7 @@
     function actualizarVistas() {
         datosActuales = agruparDatos(datosFiltradosSis);
         paginaActual = 1;
-        actualizarTitulosGraficas();
+
         renderTabsAnios(datosActuales);
         renderTablaSis();
         renderGraficaPorAnio(datosActuales);
