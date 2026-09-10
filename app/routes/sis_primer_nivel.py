@@ -194,6 +194,7 @@ def dashboard_sis_primer_nivel():
     )
 
 
+
 @sis_pn.route("/api/filtrar", methods=["POST"])
 @login_required
 @csrf.exempt
@@ -210,197 +211,75 @@ def filtrar_datos_sis():
     nivel_agrupacion = data.get("nivel_agrupacion", "clues")
     modo_desglose = data.get("modo_desglose", "acumulado")
 
-    # 🛠️ FIX 1: Evaluar si el frontend envió variables personalizadas
-    tiene_variables_custom = False
+    # 1. Extraer ÚNICAMENTE las variables activas enviadas por el frontend
+    todas_vars = set()
     if isinstance(variables_seleccionadas, dict):
-        for v in variables_seleccionadas.values():
-            if isinstance(v, list) and len(v) > 0:
-                tiene_variables_custom = True
-                break
+        for v_list in variables_seleccionadas.values():
+            if isinstance(v_list, list):
+                todas_vars.update(v_list)
+
+    # Si no hay variables seleccionadas, retornamos array vacío inmediatamente
+    if not todas_vars:
+        return jsonify({"status": "success", "data": []})
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
-        # Configurar agrupación geográfica para la tabla detallada (sr.)
+        # Configurar agrupación geográfica dinámica
         if nivel_agrupacion == "jurisdiccion":
             select_geo = "sr.anio, sr.mes, sr.jurisdiccion, 'N/A' AS municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
             group_geo = "sr.anio, sr.mes, sr.jurisdiccion"
-            
-            # Para la tabla de agregados (sin prefijo sr.)
-            select_geo_agregados = "anio, mes, jurisdiccion, 'N/A' AS municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
-            group_geo_agregados = "anio, mes, jurisdiccion"
-
         elif nivel_agrupacion == "municipio":
             select_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
             group_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio"
-            
-            select_geo_agregados = "anio, mes, jurisdiccion, municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
-            group_geo_agregados = "anio, mes, jurisdiccion, municipio"
-
         else:
             select_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, sr.clues, COALESCE(cu.nombre_unidad, sr.clues) AS nombre_unidad"
             group_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, sr.clues, cu.nombre_unidad"
-            
-            select_geo_agregados = "anio, mes, jurisdiccion, municipio, clues, nombre_unidad"
-            group_geo_agregados = "anio, mes, jurisdiccion, municipio, clues, nombre_unidad"
 
-        # 🟢 BLOQUE 1: DESGLOSE POR APARTADO O POR VARIABLE
-        if modo_desglose in ["por_apartado", "por_variable"]:
-            todas_vars = set()
-            if isinstance(variables_seleccionadas, dict):
-                for v_list in variables_seleccionadas.values():
-                    if isinstance(v_list, list):
-                        todas_vars.update(v_list)
+        # 2. Construir cláusulas WHERE filtrando ESTRICTAMENTE por las variables seleccionadas
+        where_conditions = ["1=1"]
+        params = []
 
-            if not todas_vars:
-                return jsonify({"status": "success", "data": []})
+        placeholders_v = ','.join(['%s'] * len(todas_vars))
+        where_conditions.append(f"sr.variable IN ({placeholders_v})")
+        params.extend(list(todas_vars))
 
-            where_conditions = ["1=1"]
-            params = []
+        if unidades:
+            placeholders_u = ','.join(['%s'] * len(unidades))
+            where_conditions.append(f"(sr.clues IN ({placeholders_u}) OR cu.nombre_unidad IN ({placeholders_u}))")
+            params.extend(unidades + unidades)
 
-            placeholders_v = ','.join(['%s'] * len(todas_vars))
-            where_conditions.append(f"sr.variable IN ({placeholders_v})")
-            params.extend(list(todas_vars))
+        for col, lst in [('sr.jurisdiccion', jurisdicciones), ('sr.municipio', municipios), ('sr.anio', anios), ('sr.mes', meses)]:
+            if lst:
+                placeholders_l = ','.join(['%s'] * len(lst))
+                where_conditions.append(f"{col} IN ({placeholders_l})")
+                params.extend(lst)
 
-            if unidades:
-                placeholders_u = ','.join(['%s'] * len(unidades))
-                where_conditions.append(f"(sr.clues IN ({placeholders_u}) OR cu.nombre_unidad IN ({placeholders_u}))")
-                params.extend(unidades + unidades)
-
-            for col, lst in [('sr.jurisdiccion', jurisdicciones), ('sr.municipio', municipios), ('sr.anio', anios), ('sr.mes', meses)]:
-                if lst:
-                    placeholders_l = ','.join(['%s'] * len(lst))
-                    where_conditions.append(f"{col} IN ({placeholders_l})")
-                    params.extend(lst)
-
-            if modo_desglose == "por_apartado":
-                select_extra = "cv.apartado, cv.descripcion_apartado, SUM(CAST(sr.total AS UNSIGNED)) AS total"
-                group_extra = f"{group_geo}, cv.apartado, cv.descripcion_apartado"
-            else:
-                select_extra = "sr.variable, cv.descripcion AS descripcion_variable, cv.apartado, SUM(CAST(sr.total AS UNSIGNED)) AS total"
-                group_extra = f"{group_geo}, sr.variable, cv.descripcion, cv.apartado"
-
-            query = f"""
-                SELECT {select_geo}, {select_extra}
-                FROM sis_registros_primer_nivel sr
-                LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
-                LEFT JOIN catalogo_variables cv ON sr.variable = cv.variable
-                WHERE {" AND ".join(where_conditions)}
-                GROUP BY {group_extra}
-                ORDER BY sr.anio, sr.mes, sr.jurisdiccion
-            """
-            cursor.execute(query, params)
-            datos_filtrados = cursor.fetchall() or []
-            return jsonify({"status": "success", "data": datos_filtrados})
-
-        # 🟡 BLOQUE 2 (CASO A): TABLA PRE-AGREGADA (SIN VARIABLES CUSTOM)
-        if not tiene_variables_custom:
-            query_base = f"""
-                SELECT 
-                    {select_geo_agregados},
-                    SUM(consultas) AS consultas, SUM(mental) AS mental, SUM(bucal) AS bucal, 
-                    SUM(embarazadas) AS embarazadas, SUM(planificacion_familiar) AS planificacion_familiar, 
-                    SUM(detecciones) AS detecciones, SUM(tamiz) AS tamiz, 
-                    SUM(detecciones_cardiometabolicas) AS detecciones_cardiometabolicas, 
-                    SUM(orientacion_lac_des_obe) AS orientacion_lac_des_obe, 
-                    SUM(orientacion_eda_ira) AS orientacion_eda_ira
-                FROM sis_registros_agregados_primer_nivel
-                WHERE 1=1
-            """
-            params = []
-
-            if unidades:
-                placeholders = ','.join(['%s'] * len(unidades))
-                query_base += f" AND (clues IN ({placeholders}) OR nombre_unidad IN ({placeholders}))"
-                params.extend(unidades + unidades)
-
-            for col, lst in [('jurisdiccion', jurisdicciones), ('municipio', municipios), ('anio', anios), ('mes', meses)]:
-                if lst:
-                    placeholders_l = ','.join(['%s'] * len(lst))
-                    query_base += f" AND {col} IN ({placeholders_l})"
-                    params.extend(lst)
-
-            query_base += f" GROUP BY {group_geo_agregados} ORDER BY anio, mes, jurisdiccion"
-            cursor.execute(query_base, params)
-            datos_filtrados = cursor.fetchall() or []
-
-        # 🔵 BLOQUE 3 (CASO B): TABLA DETALLADA (CON VARIABLES ESPECÍFICAS)
+        # 3. Determinar columnas extra y agrupación según el modo de desglose
+        if modo_desglose == "por_apartado":
+            select_extra = "cv.apartado, cv.descripcion_apartado, SUM(CAST(sr.total AS UNSIGNED)) AS total"
+            group_extra = f"{group_geo}, cv.apartado, cv.descripcion_apartado"
+        elif modo_desglose == "por_variable":
+            select_extra = "sr.variable, cv.descripcion AS descripcion_variable, cv.apartado, SUM(CAST(sr.total AS UNSIGNED)) AS total"
+            group_extra = f"{group_geo}, sr.variable, cv.descripcion, cv.apartado"
         else:
-            select_sums = []
-            params_select = []
-            todas_las_variables_activas = set()
+            # 🟢 MODO ACUMULADO: Suma única de las variables seleccionadas
+            # Incluimos 'consultas' como alias secundario por compatibilidad con renderizadores JS antiguos
+            select_extra = "SUM(CAST(sr.total AS UNSIGNED)) AS total, SUM(CAST(sr.total AS UNSIGNED)) AS consultas"
+            group_extra = group_geo
 
-            vars_todas = variables_seleccionadas.get("todas", [])
-            if isinstance(vars_todas, list) and len(vars_todas) > 0:
-                placeholders = ','.join(['%s'] * len(vars_todas))
-                select_sums.append(
-                    f"SUM(CASE WHEN sr.variable IN ({placeholders}) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS consultas"
-                )
-                params_select.extend(vars_todas)
-                todas_las_variables_activas.update(vars_todas)
+        query = f"""
+            SELECT {select_geo}, {select_extra}
+            FROM sis_registros_primer_nivel sr
+            LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
+            LEFT JOIN catalogo_variables cv ON sr.variable = cv.variable
+            WHERE {" AND ".join(where_conditions)}
+            GROUP BY {group_extra}
+            ORDER BY sr.anio, sr.mes, sr.jurisdiccion
+        """
 
-            else:
-                def resolver_vars(mod_key):
-                    val = variables_seleccionadas.get(mod_key)
-                    if val is None:
-                        return VARIABLES_DEFAULT.get(mod_key, [])
-                    return val if len(val) > 0 else []
-
-                modulos = [
-                    "consultas", "mental", "bucal", "embarazadas", 
-                    "planificacion_familiar", "detecciones", "tamiz", 
-                    "detecciones_cardiometabolicas", "orientacion_lac_des_obe", 
-                    "orientacion_eda_ira", "otros"
-                ]
-                vars_map = {m: resolver_vars(m) for m in modulos}
-
-                for mod_key, v_list in vars_map.items():
-                    if v_list:
-                        placeholders = ','.join(['%s'] * len(v_list))
-                        select_sums.append(
-                            f"SUM(CASE WHEN sr.variable IN ({placeholders}) THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS {mod_key}"
-                        )
-                        params_select.extend(v_list)
-                        todas_las_variables_activas.update(v_list)
-                    else:
-                        select_sums.append(f"0 AS {mod_key}")
-
-            if not todas_las_variables_activas:
-                return jsonify({"status": "success", "data": []})
-
-            where_conditions = ["1=1"]
-            params_where = []
-
-            placeholders_where = ','.join(['%s'] * len(todas_las_variables_activas))
-            where_conditions.append(f"sr.variable IN ({placeholders_where})")
-            params_where.extend(list(todas_las_variables_activas))
-
-            if unidades:
-                placeholders_u = ','.join(['%s'] * len(unidades))
-                where_conditions.append(f"(sr.clues IN ({placeholders_u}) OR cu.nombre_unidad IN ({placeholders_u}))")
-                params_where.extend(unidades + unidades)
-
-            for col, lst in [('sr.jurisdiccion', jurisdicciones), ('sr.municipio', municipios), ('sr.anio', anios), ('sr.mes', meses)]:
-                if lst:
-                    placeholders_l = ','.join(['%s'] * len(lst))
-                    where_conditions.append(f"{col} IN ({placeholders_l})")
-                    params_where.extend(lst)
-
-            query_base = f"""
-                SELECT 
-                    {select_geo},
-                    {', '.join(select_sums)}
-                FROM sis_registros_primer_nivel sr
-                LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
-                WHERE {" AND ".join(where_conditions)}
-                GROUP BY {group_geo}
-                ORDER BY sr.anio, sr.mes, sr.jurisdiccion
-            """
-
-            params_totales = params_select + params_where
-            cursor.execute(query_base, params_totales)
-            datos_filtrados = cursor.fetchall() or []
-
+        cursor.execute(query, params)
+        datos_filtrados = cursor.fetchall() or []
         return jsonify({"status": "success", "data": datos_filtrados})
 
     except Exception as e:
