@@ -479,7 +479,19 @@
 
             let fuenteDeDatos = [];
 
-            /* 🟢 REEMPLAZA ÚNICAMENTE ESTE BLOQUE DENTRO DE exportarFiltradoExcel() */
+            // 🟢 1. RECOLECCIÓN DE AÑOS FILTRADOS (Pestañas O Checkboxes)
+            const obtenerValoresCheck = (selector) => {
+                return Array.from(document.querySelectorAll(selector))
+                    .filter(cb => cb.checked)
+                    .map(cb => cb.value.trim());
+            };
+
+            let aniosAFiltrar = obtenerValoresCheck('.filtro-anio:checked, input[name="anios"]:checked');
+
+            // Si no hay checkboxes de año marcados, usamos el año de la pestaña activa (anioActivo)
+            if (aniosAFiltrar.length === 0 && typeof anioActivo !== 'undefined' && anioActivo) {
+                aniosAFiltrar = [String(anioActivo)];
+            }
 
             if (modoDesglose === "desagregado" || modoDesglose === "por_variable") {
 
@@ -498,16 +510,9 @@
                     variablesAPasar[moduloActual] = Array.from(subvarsModulo).map(chk => chk.value);
                 }
 
-                // 2. Helper para leer filtros del DOM
-                const obtenerValoresCheck = (selector) => {
-                    return Array.from(document.querySelectorAll(selector))
-                        .filter(cb => cb.checked)
-                        .map(cb => cb.value.trim());
-                };
-
-                // 3. Payload formateado para el backend
+                // 2. Payload para el backend
                 const payload = {
-                    anios: obtenerValoresCheck('.filtro-anio:checked, input[name="anios"]:checked'),
+                    anios: aniosAFiltrar,
                     meses: obtenerValoresCheck('.filtro-mes:checked, input[name="meses"]:checked'),
                     unidades: obtenerValoresCheck('.filtro-unidad:checked, input[name="unidades"]:checked'),
                     jurisdicciones: obtenerValoresCheck('.filtro-jurisdiccion:checked, input[name="jurisdicciones"]:checked'),
@@ -519,7 +524,6 @@
 
                 console.log("📤 Consultando backend para Excel desagregado:", payload);
 
-                // 4. Petición POST al endpoint
                 const resp = await fetch('/sis_primer_nivel/api/filtrar', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -533,6 +537,14 @@
                 } else {
                     throw new Error(resJson.message || "El servidor no devolvió registros para el desglose por variable.");
                 }
+
+            } else {
+                // 🟢 MODO RESUMIDO / ACUMULADO
+                // Filtramos la fuente global por el año activo para no descargar todos los años
+                fuenteDeDatos = (typeof datosFiltradosSis !== "undefined" ? datosFiltradosSis : []).filter(r => {
+                    if (aniosAFiltrar.length === 0) return true;
+                    return aniosAFiltrar.includes(String(r.anio));
+                });
             }
 
             if (!fuenteDeDatos || fuenteDeDatos.length === 0) {
@@ -710,7 +722,7 @@
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS");
 
-            worksheet['!cols'] = Object.keys(datosParaExcel[0]).map(key => ({
+            worksheet['!cols'] = Object.keys(datosParaExcel[0] || {}).map(key => ({
                 wch: Math.max(key.length + 4, 14)
             }));
 
