@@ -482,30 +482,40 @@
             // 🟢 1. OBTENCIÓN DE DATOS SEGÚN EL MODO
             if (modoDesglose === "desagregado" || modoDesglose === "por_variable") {
 
-                // Recolectar variables activas del DOM o variable global de memoria
-                const recolectarVariables = () => {
-                    if (typeof obtenerVariablesSeleccionadas === 'function') {
-                        return obtenerVariablesSeleccionadas();
-                    }
+                // Capturamos el objeto de variables que usa la pantalla/gráfica activa
+                let varsParaPayload = {};
 
-                    // Extraer directamente de checkboxes seleccionados
-                    const listaVars = Array.from(document.querySelectorAll('.sis-filtro-variable:checked, input[name="variables"]:checked'))
-                        .map(cb => cb.value.trim());
+                // Intenta leer las funciones/variables globales comunes de tu sistema
+                if (typeof obtenerVariablesSeleccionadas === 'function') {
+                    varsParaPayload = obtenerVariablesSeleccionadas();
+                } else if (typeof variablesSeleccionadas !== 'undefined') {
+                    varsParaPayload = variablesSeleccionadas;
+                } else if (typeof filtrosSis !== 'undefined' && filtrosSis.variables) {
+                    varsParaPayload = filtrosSis.variables;
+                } else {
+                    // Mapeo automático de respaldo si es un acordeón/treeview de apartados
+                    const mapa = {};
+                    document.querySelectorAll('input[data-apartado]:checked, .sis-variable-check:checked, input[name="variables"]:checked').forEach(cb => {
+                        const apartado = cb.dataset.apartado || cb.getAttribute('data-apartado') || 'general';
+                        if (!mapa[apartado]) mapa[apartado] = [];
+                        mapa[apartado].push(cb.value);
+                    });
+                    varsParaPayload = mapa;
+                }
 
-                    return { seleccionadas: listaVars };
-                };
-
-                // Recolectar todos los filtros activos para enviar al Backend
+                // Armar el payload exacto
                 const payload = {
-                    anios: typeof obtenerAniosSeleccionados === 'function' ? obtenerAniosSeleccionados() : [],
-                    meses: typeof obtenerMesesSeleccionados === 'function' ? obtenerMesesSeleccionados() : [],
-                    unidades: typeof obtenerUnidadesSeleccionadas === 'function' ? obtenerUnidadesSeleccionadas() : [],
-                    jurisdicciones: typeof obtenerJurisdiccionesSeleccionadas === 'function' ? obtenerJurisdiccionesSeleccionadas() : [],
-                    municipios: typeof obtenerMunicipiosSeleccionados === 'function' ? obtenerMunicipiosSeleccionados() : Array.from(document.querySelectorAll('.sis-filtro-municipio:checked')).map(cb => cb.value.trim()),
-                    variables: recolectarVariables(), // 👈 CRÍTICO: Evita que el backend reciba array vacío
+                    anios: typeof obtenerAniosSeleccionados === 'function' ? obtenerAniosSeleccionados() : (window.aniosSeleccionados || []),
+                    meses: typeof obtenerMesesSeleccionados === 'function' ? obtenerMesesSeleccionados() : (window.mesesSeleccionados || []),
+                    unidades: typeof obtenerUnidadesSeleccionadas === 'function' ? obtenerUnidadesSeleccionadas() : (window.unidadesSeleccionadas || []),
+                    jurisdicciones: typeof obtenerJurisdiccionesSeleccionadas === 'function' ? obtenerJurisdiccionesSeleccionadas() : (window.jurisdiccionesSeleccionadas || []),
+                    municipios: typeof obtenerMunicipiosSeleccionados === 'function' ? obtenerMunicipiosSeleccionados() : (window.municipiosSeleccionados || []),
+                    variables: varsParaPayload, // 👈 Se envía la misma estructura que usa la gráfica
                     nivel_agrupacion: document.getElementById("selectNivelAgrupacion")?.value || "clues",
                     modo_desglose: "por_variable"
                 };
+
+                console.log("📤 Payload enviado al backend:", payload); // Imprime esto en F12 para verificar
 
                 // Consultar datos detallados al Backend
                 const resp = await fetch('/sis_primer_nivel/api/filtrar', {
@@ -518,7 +528,7 @@
                 if (resJson.status === "success" && resJson.data) {
                     fuenteDeDatos = resJson.data;
                 } else {
-                    throw new Error(resJson.message || "No se pudieron obtener los datos desagregados del servidor.");
+                    throw new Error(resJson.message || "No se pudieron obtener los datos desagregados.");
                 }
             } else {
                 // Modo acumulado: Usa la variable global en memoria de la pantalla
