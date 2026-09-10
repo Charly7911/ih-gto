@@ -376,17 +376,7 @@
                     <button type="button" id="btnResetAll" class="btn-reset-link">Limpiar</button>
                 </div>
 
-                <!-- 1. NIVEL DE AGRUPACIÓN / VER POR -->
-                <div class="filter-block">
-                    <label class="filter-label">Ver datos por:</label>
-                    <select id="selectNivelAgrupacion" class="input-text" style="width: 100%; cursor: pointer;">
-                        <option value="clues" selected>Unidades</option>
-                        <option value="jurisdiccion">Jurisdicción</option>
-                        <option value="municipio">Municipio</option>
-                    </select>
-                </div>
-
-                <!-- Filtro Años -->
+                 <!-- Filtro Años -->
                 <div class="filter-block">
                     <label class="filter-label">Años</label>
                     <div class="checklist checklist-years">
@@ -398,8 +388,17 @@
                     </div>
                 </div>
 
+                <!-- 1. NIVEL DE AGRUPACIÓN / VER POR -->
+                <div class="filter-block">
+                    <label class="filter-label">Ver datos por:</label>
+                    <select id="selectNivelAgrupacion" class="input-text" style="width: 100%; cursor: pointer;">
+                        <option value="clues" selected>Unidades</option>
+                        <option value="jurisdiccion">Jurisdicción</option>
+                        <option value="municipio">Municipio</option>
+                    </select>
+                </div>
+                
                 <!-- 2. FILTRO DINÁMICO: UNIDAD / JURISDICCIÓN / MUNICIPIO -->
-
                 <!-- Opción A: Unidades (CLUES) -->
                 <div class="filter-block" id="blockUnidades">
                     <label class="filter-label">Unidad</label>
