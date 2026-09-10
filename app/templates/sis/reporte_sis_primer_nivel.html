@@ -95,7 +95,7 @@
                                     <option value="todas">Todas</option>
                                 </select>
 
-                                <!-- 🟢 NUEVO CONTROL CON ONCHANGE -->
+                                <!-- 🟢 Control de Desglose -->
                                 <select id="selectModoDesglose"
                                     class="form-select form-select-sm w-auto fw-bold border-info text-info d-none"
                                     onchange="realizarConsultaBackend();">
@@ -108,37 +108,31 @@
                                     Mostrar valores
                                 </button>
 
+                                <!-- 🟢 Menú Desplegable para Exportación Excel -->
                                 <div class="btn-group">
                                     <button type="button"
                                         class="btn btn-success btn-sm dropdown-toggle d-flex align-items-center gap-1"
                                         id="btnExportarExcel" data-bs-toggle="dropdown" aria-expanded="false">
                                         <i class="bi bi-file-earmark-excel-fill"></i> Excel
                                     </button>
-                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+
+                                    <ul class="dropdown-menu dropdown-menu-end shadow">
                                         <li>
-                                            <a class="dropdown-item d-flex align-items-center gap-2" href="#"
-                                                onclick="exportarExcelConModo('acumulado'); return false;">
+                                            <button type="button" class="dropdown-item d-flex align-items-center gap-2"
+                                                onclick="exportarExcelConModo('acumulado')">
                                                 <i class="bi bi-file-earmark-text text-success"></i>
-                                                <div>
-                                                    <strong>Reporte Acumulado</strong>
-                                                    <div class="text-muted small" style="font-size: 0.75rem;">Resumen
-                                                        general por Municipio/Unidad</div>
-                                                </div>
-                                            </a>
+                                                <span>Reporte Acumulado (Resumen)</span>
+                                            </button>
                                         </li>
                                         <li>
                                             <hr class="dropdown-divider">
                                         </li>
                                         <li>
-                                            <a class="dropdown-item d-flex align-items-center gap-2" href="#"
-                                                onclick="exportarExcelConModo('desagregado'); return false;">
+                                            <button type="button" class="dropdown-item d-flex align-items-center gap-2"
+                                                onclick="exportarExcelConModo('desagregado')">
                                                 <i class="bi bi-list-nested text-primary"></i>
-                                                <div>
-                                                    <strong>Reporte Desagregado</strong>
-                                                    <div class="text-muted small" style="font-size: 0.75rem;">Incluye
-                                                        Apartado, Variable y Subtotales</div>
-                                                </div>
-                                            </a>
+                                                <span>Reporte Desagregado (Apartado y Variable)</span>
+                                            </button>
                                         </li>
                                     </ul>
                                 </div>
@@ -146,9 +140,10 @@
                         </div>
 
                         <div style="position: relative; height: 370px; width: 100%;">
+                            <!-- Spinner corregido con display: none por defecto -->
                             <div id="loaderGraficaTemporal"
-                                class="d-none position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex flex-column align-items-center justify-content-center"
-                                style="z-index: 10; border-radius: 6px;">
+                                class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 flex-column align-items-center justify-content-center"
+                                style="z-index: 10; border-radius: 6px; display: none;">
                                 <div class="spinner-border text-primary" role="status">
                                     <span class="visually-hidden">Cargando...</span>
                                 </div>
@@ -461,22 +456,16 @@
     }
 
 
-    // Función puente para pasar el modo elegido desde el botón Excel
-    function exportarExcelConModo(modo) {
-        // Si existe el select en tu vista, actualizamos su valor; si no, lo manejamos dinámicamente
-        const selectModo = document.getElementById("selectModoDesglose");
-        if (selectModo) {
-            selectModo.value = modo;
-        } else {
-            window.modoExportacionTemporal = modo;
-        }
+    // Variable global para capturar el modo seleccionado desde el botón
+    window.modoExportacionTemporal = 'acumulado';
 
-        // Ejecutar la exportación
+    function exportarExcelConModo(modo) {
+        window.modoExportacionTemporal = modo;
         exportarFiltradoExcel();
     }
 
     function exportarFiltradoExcel() {
-        if (!datosFiltradosSis || datosFiltradosSis.length === 0) {
+        if (typeof datosFiltradosSis === "undefined" || !datosFiltradosSis || datosFiltradosSis.length === 0) {
             alert("No hay datos disponibles para exportar con los filtros seleccionados.");
             return;
         }
@@ -493,10 +482,6 @@
             const modoDesglose = window.modoExportacionTemporal
                 || document.getElementById("selectModoDesglose")?.value
                 || "acumulado";
-
-            // Limpiar la variable temporal
-            window.modoExportacionTemporal = null;
-            // 🟢 'desagregado' o 'por_apartado' / 'acumulado'
 
             const nombresMeses = {
                 1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
@@ -519,10 +504,10 @@
                 const nombreJurisdiccion = r.jurisdiccion ? `Jurisdicción ${r.jurisdiccion}` : 'Sin Especificar';
                 const valorMonto = Number(r.total || r.consultas || r.suma || 0);
 
-                // Determinar Municipios
+                // Detección segura de Municipios
                 let municipiosAProcesar = [];
                 if (r.municipio && r.municipio !== 'N/A' && r.municipio !== 'Sin Especificar') {
-                    municipiosAProcesar.push(r.municipio);
+                    municipiosAProcesar.push(String(r.municipio));
                 } else if (municipiosSeleccionados.length > 0) {
                     municipiosAProcesar = municipiosSeleccionados;
                 } else {
@@ -530,11 +515,10 @@
                 }
 
                 municipiosAProcesar.forEach(mun => {
-                    // Capturar Apartado y Variable (con valores por defecto)
-                    const apartado = r.descripcion_apartado || r.apartado || 'SIN APARTADO';
-                    const variable = r.descripcion_variable || r.variable || r.concepto || 'SIN VARIABLE';
+                    // Capturar Apartado y Variable asegurando un String válido
+                    const apartado = String(r.descripcion_apartado || r.apartado || r.des_apartado || 'SIN APARTADO');
+                    const variable = String(r.descripcion_variable || r.variable || r.des_variable || r.concepto || 'SIN VARIABLE');
 
-                    // 🟢 Clave única adaptada si el modo es 'desagregado'
                     let claveUnicaMatriz = "";
                     if (modoDesglose === "desagregado") {
                         claveUnicaMatriz = `${nombreJurisdiccion}_${mun}_${r.nombre_unidad || ''}_${apartado}_${variable}_${anioRegistro}`;
@@ -571,16 +555,35 @@
             mesesOrdenados.forEach(m => totalesMes[m] = 0);
             let granTotalGeneral = 0;
 
-            // Auxiliares para cálculo de Subtotales por Apartado/Jurisdicción
+            let listaRegistros = Object.values(mapaMatriz);
+
+            if (esDesagregado) {
+                // Ordenar de forma segura protegiendo valores nulos
+                listaRegistros.sort((a, b) => {
+                    const jA = String(a["Jurisdicción"] || '');
+                    const jB = String(b["Jurisdicción"] || '');
+                    if (jA !== jB) return jA.localeCompare(jB);
+
+                    const apA = String(a["Apartado"] || '');
+                    const apB = String(b["Apartado"] || '');
+                    if (apA !== apB) return apA.localeCompare(apB);
+
+                    const vA = String(a["Variable"] || '');
+                    const vB = String(b["Variable"] || '');
+                    return vA.localeCompare(vB);
+                });
+            }
+
             let subtotalApartado = {};
             let apartadoActual = null;
 
             const resetSubtotal = () => {
-                const sub = { "Entidad": "", "Jurisdicción": "", "Año": "Total" };
+                const sub = { "Entidad": "", "Jurisdicción": "" };
                 if (incluirColumnaMunicipio) sub["Municipio"] = "";
                 if (nivelAgrupacion === "clues") sub["Unidad"] = "";
-                sub["Apartado"] = "";
+                sub["Apartado"] = "Total";
                 sub["Variable"] = "";
+                sub["Año"] = "";
                 mesesOrdenados.forEach(m => sub[m] = 0);
                 sub["Grand Total"] = 0;
                 return sub;
@@ -588,19 +591,7 @@
 
             subtotalApartado = resetSubtotal();
 
-            // Convertir y ordenar lista de registros
-            let listaRegistros = Object.values(mapaMatriz);
-
-            if (esDesagregado) {
-                listaRegistros.sort((a, b) => {
-                    if (a["Jurisdicción"] !== b["Jurisdicción"]) return a["Jurisdicción"].localeCompare(b["Jurisdicción"]);
-                    if (a["Apartado"] !== b["Apartado"]) return a["Apartado"].localeCompare(b["Apartado"]);
-                    return a["Variable"].localeCompare(b["Variable"]);
-                });
-            }
-
             listaRegistros.forEach((item, index) => {
-                // Generar fila de Subtotal si cambia el Apartado en modo desagregado
                 if (esDesagregado && apartadoActual && apartadoActual !== item["Apartado"]) {
                     datosParaExcel.push(subtotalApartado);
                     subtotalApartado = resetSubtotal();
@@ -616,7 +607,6 @@
                 if (incluirColumnaMunicipio) fila["Municipio"] = item["Municipio"];
                 if (nivelAgrupacion === "clues") fila["Unidad"] = item["Unidad"];
 
-                // 🟢 Incluir columnas Apartado y Variable si está en modo desagregado
                 if (esDesagregado) {
                     fila["Apartado"] = item["Apartado"];
                     fila["Variable"] = item["Variable"];
@@ -630,7 +620,6 @@
                     fila[m] = val;
                     totalFila += val;
 
-                    // Acumuladores
                     totalesMes[m] += val;
                     if (esDesagregado) subtotalApartado[m] += val;
                 });
@@ -641,13 +630,12 @@
 
                 datosParaExcel.push(fila);
 
-                // Insertar último subtotal
                 if (esDesagregado && index === listaRegistros.length - 1) {
                     datosParaExcel.push(subtotalApartado);
                 }
             });
 
-            // 🟢 Fila de Total General al final
+            // Fila Total General
             const filaTotal = { "Entidad": "Grand Total", "Jurisdicción": "" };
             if (incluirColumnaMunicipio) filaTotal["Municipio"] = "";
             if (nivelAgrupacion === "clues") filaTotal["Unidad"] = "";
@@ -661,21 +649,21 @@
             filaTotal["Grand Total"] = granTotalGeneral;
             datosParaExcel.push(filaTotal);
 
-            // Exportación a Excel
+            // Exportación
             const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS");
 
             worksheet['!cols'] = Object.keys(datosParaExcel[0]).map(key => ({
-                wch: Math.max(key.length + 4, 15)
+                wch: Math.max(key.length + 4, 14)
             }));
 
             const fechaDescarga = new Date().toISOString().slice(0, 10);
             XLSX.writeFile(workbook, `SIS_${modoDesglose.toUpperCase()}_${fechaDescarga}.xlsx`);
 
         } catch (error) {
-            console.error("Error al exportar:", error);
-            alert("Ocurrió un error al generar el desglose.");
+            console.error("Error crítico al exportar:", error);
+            alert("Ocurrió un error al generar el archivo. Presiona F12 (Consola) para ver el detalle.");
         } finally {
             if (btn) {
                 btn.innerHTML = textoOriginal;
