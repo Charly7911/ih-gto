@@ -479,7 +479,7 @@
 
             let fuenteDeDatos = [];
 
-            // 🟢 1. RECOLECCIÓN DE AÑOS FILTRADOS (Pestañas O Checkboxes)
+            // 🟢 1. RECOLECCIÓN Y FILTRADO COMPLETO
             const obtenerValoresCheck = (selector) => {
                 return Array.from(document.querySelectorAll(selector))
                     .filter(cb => cb.checked)
@@ -487,6 +487,10 @@
             };
 
             let aniosAFiltrar = obtenerValoresCheck('.filtro-anio:checked, input[name="anios"]:checked');
+            const mesesSel = obtenerValoresCheck('.filtro-mes:checked, input[name="meses"]:checked');
+            const unidadesSel = obtenerValoresCheck('.filtro-unidad:checked, input[name="unidades"]:checked');
+            const jurisSel = obtenerValoresCheck('.filtro-jurisdiccion:checked, input[name="jurisdicciones"]:checked');
+            const munSel = obtenerValoresCheck('.sis-filtro-municipio:checked, input[name="municipios"]:checked');
 
             // Si no hay checkboxes de año marcados, usamos el año de la pestaña activa (anioActivo)
             if (aniosAFiltrar.length === 0 && typeof anioActivo !== 'undefined' && anioActivo) {
@@ -513,10 +517,10 @@
                 // 2. Payload para el backend
                 const payload = {
                     anios: aniosAFiltrar,
-                    meses: obtenerValoresCheck('.filtro-mes:checked, input[name="meses"]:checked'),
-                    unidades: obtenerValoresCheck('.filtro-unidad:checked, input[name="unidades"]:checked'),
-                    jurisdicciones: obtenerValoresCheck('.filtro-jurisdiccion:checked, input[name="jurisdicciones"]:checked'),
-                    municipios: obtenerValoresCheck('.sis-filtro-municipio:checked, input[name="municipios"]:checked'),
+                    meses: mesesSel,
+                    unidades: unidadesSel,
+                    jurisdicciones: jurisSel,
+                    municipios: munSel,
                     variables: variablesAPasar,
                     nivel_agrupacion: document.getElementById("selectNivelAgrupacion")?.value || "clues",
                     modo_desglose: "por_variable"
@@ -539,11 +543,15 @@
                 }
 
             } else {
-                // 🟢 MODO RESUMIDO / ACUMULADO
-                // Filtramos la fuente global por el año activo para no descargar todos los años
+                // 🟢 MODO RESUMIDO / ACUMULADO CON FILTRADO CLIENTE COMPLETO
                 fuenteDeDatos = (typeof datosFiltradosSis !== "undefined" ? datosFiltradosSis : []).filter(r => {
-                    if (aniosAFiltrar.length === 0) return true;
-                    return aniosAFiltrar.includes(String(r.anio));
+                    const cumpleAnio = aniosAFiltrar.length === 0 || aniosAFiltrar.includes(String(r.anio));
+                    const cumpleMes = mesesSel.length === 0 || mesesSel.includes(String(r.mes));
+                    const cumpleUnidad = unidadesSel.length === 0 || unidadesSel.includes(String(r.clues || r.id_unidad || r.nombre_unidad));
+                    const cumpleJuris = jurisSel.length === 0 || jurisSel.includes(String(r.jurisdiccion));
+                    const cumpleMun = munSel.length === 0 || munSel.includes(String(r.municipio));
+
+                    return cumpleAnio && cumpleMes && cumpleUnidad && cumpleJuris && cumpleMun;
                 });
             }
 
@@ -552,7 +560,7 @@
                 return;
             }
 
-            // 🟢 2. CONFIGURACIÓN Y MAPEO
+            // 🟢 2. CONFIGURACIÓN Y MAPEO CORREGIDO
             const nivelAgrupacion = document.getElementById("selectNivelAgrupacion")?.value || "clues";
             const nombresMeses = {
                 1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
@@ -565,6 +573,8 @@
 
             const mapaMatriz = {};
             const mesesConDatos = new Set();
+            const esDesagregado = modoDesglose === "desagregado" || modoDesglose === "por_variable";
+            const incluirColumnaMunicipio = nivelAgrupacion === "municipio" || municipiosSeleccionados.length > 0;
 
             fuenteDeDatos.forEach(r => {
                 const numMes = Number(r.mes);
@@ -575,49 +585,52 @@
                 const nombreJurisdiccion = r.jurisdiccion ? `Jurisdicción ${r.jurisdiccion}` : 'Sin Especificar';
                 const valorMonto = Number(r.total || r.consultas || r.suma || 0);
 
-                let municipiosAProcesar = [];
-                if (r.municipio && r.municipio !== 'N/A' && r.municipio !== 'Sin Especificar') {
-                    municipiosAProcesar.push(String(r.municipio));
-                } else if (municipiosSeleccionados.length > 0) {
-                    municipiosAProcesar = municipiosSeleccionados;
-                } else {
-                    municipiosAProcesar.push('Sin Especificar');
-                }
+                let claveUnicaMatriz = "";
 
-                municipiosAProcesar.forEach(mun => {
+                if (esDesagregado) {
                     const apartado = String(r.descripcion_apartado || r.apartado || r.des_apartado || 'SIN APARTADO');
                     const variable = String(r.descripcion_variable || r.variable || r.des_variable || r.concepto || 'SIN VARIABLE');
-
-                    let claveUnicaMatriz = "";
-                    if (modoDesglose === "desagregado" || modoDesglose === "por_variable") {
-                        claveUnicaMatriz = `${nombreJurisdiccion}_${mun}_${r.nombre_unidad || ''}_${apartado}_${variable}_${anioRegistro}`;
+                    const mun = r.municipio || 'Sin Especificar';
+                    claveUnicaMatriz = `${nombreJurisdiccion}_${mun}_${r.nombre_unidad || ''}_${apartado}_${variable}_${anioRegistro}`;
+                } else {
+                    // 🟢 CLAVE ÚNICA MODO RESUMIDO: Colapsa a 1 sola línea por Jurisdicción
+                    if (nivelAgrupacion === "clues") {
+                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.nombre_unidad || r.clues || 'S/U'}_${anioRegistro}`;
+                    } else if (incluirColumnaMunicipio) {
+                        const mun = r.municipio || (municipiosSeleccionados.length > 0 ? municipiosSeleccionados.join(',') : 'Sin Especificar');
+                        claveUnicaMatriz = `${nombreJurisdiccion}_${mun}_${anioRegistro}`;
                     } else {
-                        claveUnicaMatriz = `${mun}_${nombreJurisdiccion}_${anioRegistro}`;
+                        // 🎯 AGRUPACIÓN POR DEFECTO: Solo Jurisdicción y Año
+                        claveUnicaMatriz = `${nombreJurisdiccion}_${anioRegistro}`;
+                    }
+                }
+
+                if (!mapaMatriz[claveUnicaMatriz]) {
+                    const registroBase = {
+                        "Entidad": "GUANAJUATO",
+                        "Jurisdicción": nombreJurisdiccion,
+                        "Año": Number(anioRegistro) || anioRegistro
+                    };
+
+                    if (incluirColumnaMunicipio) {
+                        registroBase["Municipio"] = r.municipio || 'Sin Especificar';
+                    }
+                    if (nivelAgrupacion === "clues") {
+                        registroBase["Unidad"] = r.nombre_unidad || r.clues || '-';
+                    }
+                    if (esDesagregado) {
+                        registroBase["Apartado"] = String(r.descripcion_apartado || r.apartado || r.des_apartado || 'SIN APARTADO');
+                        registroBase["Variable"] = String(r.descripcion_variable || r.variable || r.des_variable || r.concepto || 'SIN VARIABLE');
                     }
 
-                    if (!mapaMatriz[claveUnicaMatriz]) {
-                        mapaMatriz[claveUnicaMatriz] = {
-                            "Entidad": "GUANAJUATO",
-                            "Jurisdicción": nombreJurisdiccion,
-                            "Municipio": mun,
-                            "Unidad": r.nombre_unidad || r.clues || '-',
-                            "Apartado": apartado,
-                            "Variable": variable,
-                            "Año": Number(anioRegistro) || anioRegistro
-                        };
-                    }
+                    mapaMatriz[claveUnicaMatriz] = registroBase;
+                }
 
-                    const montoAplica = (municipiosAProcesar.length > 1 && !r.municipio)
-                        ? (valorMonto / municipiosAProcesar.length)
-                        : valorMonto;
-
-                    mapaMatriz[claveUnicaMatriz][nombreMes] = (mapaMatriz[claveUnicaMatriz][nombreMes] || 0) + montoAplica;
-                });
+                // Acumular el valor correspondiente al mes
+                mapaMatriz[claveUnicaMatriz][nombreMes] = (mapaMatriz[claveUnicaMatriz][nombreMes] || 0) + valorMonto;
             });
 
             const mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
-            const incluirColumnaMunicipio = nivelAgrupacion === "municipio" || municipiosSeleccionados.length > 0;
-            const esDesagregado = modoDesglose === "desagregado" || modoDesglose === "por_variable";
 
             const datosParaExcel = [];
             const totalesMes = {};
