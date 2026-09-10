@@ -464,7 +464,6 @@
             const mapaMatriz = {};
             const mesesConDatos = new Set();
 
-            // 1. Agrupar la información INCLUYENDO el Año en la Clave Unica de la fila
             datosFiltradosSis.forEach(r => {
                 const numMes = Number(r.mes);
                 if (numMes) mesesConDatos.add(numMes);
@@ -472,25 +471,40 @@
                 const nombreMes = nombresMeses[numMes] || `Mes ${numMes}`;
                 const anioRegistro = r.anio || 'Sin Año';
 
+                // 🟢 RESOLUCIÓN DINÁMICA DE NOMBRES EN CASCADA
                 let nombreEntidad = "Sin Especificar";
+
                 if (nivelAgrupacion === "jurisdiccion") {
                     nombreEntidad = r.jurisdiccion ? `Jurisdicción ${r.jurisdiccion}` : 'Sin Especificar';
+
                 } else if (nivelAgrupacion === "municipio") {
-                    nombreEntidad = (r.municipio && r.municipio !== 'N/A') ? r.municipio : 'Sin Especificar';
-                } else {
-                    nombreEntidad = (r.nombre_unidad && r.nombre_unidad !== 'N/A') ? r.nombre_unidad : (r.clues || 'Sin Especificar');
+                    // Capturar el nombre del municipio (incluso si viene de un filtro en cascada)
+                    const munNombre = r.municipio || r.nombre_municipio || r.nombre;
+
+                    if (munNombre && munNombre !== 'N/A' && munNombre !== 'Sin Especificar') {
+                        // Si viene la jurisdicción, mostramos el municipio de forma clara
+                        nombreEntidad = String(munNombre).trim();
+                    } else {
+                        nombreEntidad = 'Municipio Sin Especificar';
+                    }
+
+                } else { // nivelAgrupacion === "clues"
+                    const unidadNombre = r.nombre_unidad || r.clues;
+                    nombreEntidad = (unidadNombre && unidadNombre !== 'N/A') ? unidadNombre : 'Sin Especificar';
                 }
 
+                // Desglose opcional por apartado
                 if (modoDesglose === "por_apartado" && r.descripcion_apartado) {
                     nombreEntidad += ` - ${r.descripcion_apartado}`;
                 }
 
-                // 🟢 CLAVE ÚNICA: Entidad + Año (Separa automáticamente los registros si no se filtró por un solo año)
+                // Clave única considerando la Entidad + Año
                 const claveUnicaMatriz = `${nombreEntidad}_${anioRegistro}`;
 
                 if (!mapaMatriz[claveUnicaMatriz]) {
                     mapaMatriz[claveUnicaMatriz] = {
                         "Entidad": "GUANAJUATO",
+                        "Jurisdicción": r.jurisdiccion ? `Jurisdicción ${r.jurisdiccion}` : '-',
                         "Año": Number(anioRegistro) || anioRegistro,
                         [nombreColumnaEntidad]: nombreEntidad
                     };
@@ -500,10 +514,10 @@
                 mapaMatriz[claveUnicaMatriz][nombreMes] = (mapaMatriz[claveUnicaMatriz][nombreMes] || 0) + valorMonto;
             });
 
-            // Ordenar los meses de forma cronológica
+            // Ordenar meses cronológicamente
             const mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
 
-            // 2. Construir matriz final de filas
+            // Construir filas para el archivo
             const datosParaExcel = [];
             const totalesMes = {};
             mesesOrdenados.forEach(m => totalesMes[m] = 0);
@@ -512,6 +526,7 @@
             Object.keys(mapaMatriz).forEach(clave => {
                 const fila = {
                     "Entidad": mapaMatriz[clave]["Entidad"],
+                    "Jurisdicción": mapaMatriz[clave]["Jurisdicción"],
                     "Año": mapaMatriz[clave]["Año"],
                     [nombreColumnaEntidad]: mapaMatriz[clave][nombreColumnaEntidad]
                 };
@@ -537,15 +552,16 @@
                 return;
             }
 
-            // Ordenar los datos por Año y luego por Entidad/Jurisdicción
+            // Ordenar lista por Año y luego por Municipio/Entidad
             datosParaExcel.sort((a, b) => {
                 if (a["Año"] !== b["Año"]) return a["Año"] - b["Año"];
                 return a[nombreColumnaEntidad].localeCompare(b[nombreColumnaEntidad]);
             });
 
-            // 3. Fila final de Totales
+            // Fila final con la suma total
             const filaTotal = {
                 "Entidad": "Total General",
+                "Jurisdicción": "-",
                 "Año": "-",
                 [nombreColumnaEntidad]: "-"
             };
@@ -557,18 +573,17 @@
 
             datosParaExcel.push(filaTotal);
 
-            // 4. Generar el documento Excel
+            // Generar archivo Excel con SheetJS
             const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS");
 
-            // Ajuste de anchos de columna
+            // Ajustar anchos
             const maxAnchos = Object.keys(datosParaExcel[0]).map(key => ({
                 wch: Math.max(key.length + 4, 14)
             }));
             worksheet['!cols'] = maxAnchos;
 
-            // Descargar archivo
             const fechaDescarga = new Date().toISOString().slice(0, 10);
             const nombreArchivo = `SIS_${nivelAgrupacion.toUpperCase()}_${fechaDescarga}.xlsx`;
 
