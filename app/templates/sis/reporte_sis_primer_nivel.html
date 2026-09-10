@@ -482,40 +482,38 @@
             // 🟢 1. OBTENCIÓN DE DATOS SEGÚN EL MODO
             if (modoDesglose === "desagregado" || modoDesglose === "por_variable") {
 
-                // Capturamos el objeto de variables que usa la pantalla/gráfica activa
-                let varsParaPayload = {};
+                // Helper para extraer arreglos de inputs o selectores
+                const obtenerValoresCheck = (selector) => {
+                    return Array.from(document.querySelectorAll(selector))
+                        .filter(cb => cb.checked || cb.selected)
+                        .map(cb => cb.value.trim());
+                };
 
-                // Intenta leer las funciones/variables globales comunes de tu sistema
+                // 1. Recolectar variables activas (compatibilidad con objetos o checkboxes)
+                let varsPayload = {};
                 if (typeof obtenerVariablesSeleccionadas === 'function') {
-                    varsParaPayload = obtenerVariablesSeleccionadas();
-                } else if (typeof variablesSeleccionadas !== 'undefined') {
-                    varsParaPayload = variablesSeleccionadas;
-                } else if (typeof filtrosSis !== 'undefined' && filtrosSis.variables) {
-                    varsParaPayload = filtrosSis.variables;
+                    varsPayload = obtenerVariablesSeleccionadas();
+                } else if (typeof variablesSeleccionadas !== 'undefined' && Object.keys(variablesSeleccionadas).length > 0) {
+                    varsPayload = variablesSeleccionadas;
                 } else {
-                    // Mapeo automático de respaldo si es un acordeón/treeview de apartados
-                    const mapa = {};
-                    document.querySelectorAll('input[data-apartado]:checked, .sis-variable-check:checked, input[name="variables"]:checked').forEach(cb => {
-                        const apartado = cb.dataset.apartado || cb.getAttribute('data-apartado') || 'general';
-                        if (!mapa[apartado]) mapa[apartado] = [];
-                        mapa[apartado].push(cb.value);
-                    });
-                    varsParaPayload = mapa;
+                    // Mapeo directo por checkboxes en pantalla
+                    const varsArray = obtenerValoresCheck('input[name="variables"]:checked, .sis-variable-check:checked, .filtro-variable:checked');
+                    varsPayload = { lista: varsArray };
                 }
 
-                // Armar el payload exacto
+                // 2. Armar el payload heredando de las funciones globales o leyendo el DOM directamente
                 const payload = {
-                    anios: typeof obtenerAniosSeleccionados === 'function' ? obtenerAniosSeleccionados() : (window.aniosSeleccionados || []),
-                    meses: typeof obtenerMesesSeleccionados === 'function' ? obtenerMesesSeleccionados() : (window.mesesSeleccionados || []),
-                    unidades: typeof obtenerUnidadesSeleccionadas === 'function' ? obtenerUnidadesSeleccionadas() : (window.unidadesSeleccionadas || []),
-                    jurisdicciones: typeof obtenerJurisdiccionesSeleccionadas === 'function' ? obtenerJurisdiccionesSeleccionadas() : (window.jurisdiccionesSeleccionadas || []),
-                    municipios: typeof obtenerMunicipiosSeleccionados === 'function' ? obtenerMunicipiosSeleccionados() : (window.municipiosSeleccionados || []),
-                    variables: varsParaPayload, // 👈 Se envía la misma estructura que usa la gráfica
+                    anios: typeof obtenerAniosSeleccionados === 'function' ? obtenerAniosSeleccionados() : obtenerValoresCheck('input[name="anios"]:checked, .filtro-anio:checked'),
+                    meses: typeof obtenerMesesSeleccionados === 'function' ? obtenerMesesSeleccionados() : obtenerValoresCheck('input[name="meses"]:checked, .filtro-mes:checked'),
+                    unidades: typeof obtenerUnidadesSeleccionadas === 'function' ? obtenerUnidadesSeleccionadas() : obtenerValoresCheck('input[name="unidades"]:checked, .filtro-unidad:checked'),
+                    jurisdicciones: typeof obtenerJurisdiccionesSeleccionadas === 'function' ? obtenerJurisdiccionesSeleccionadas() : obtenerValoresCheck('input[name="jurisdicciones"]:checked, .filtro-jurisdiccion:checked'),
+                    municipios: typeof obtenerMunicipiosSeleccionados === 'function' ? obtenerMunicipiosSeleccionados() : obtenerValoresCheck('.sis-filtro-municipio:checked, input[name="municipios"]:checked'),
+                    variables: varsPayload,
                     nivel_agrupacion: document.getElementById("selectNivelAgrupacion")?.value || "clues",
                     modo_desglose: "por_variable"
                 };
 
-                console.log("📤 Payload enviado al backend:", payload); // Imprime esto en F12 para verificar
+                console.log("📤 Payload enviado al backend:", payload);
 
                 // Consultar datos detallados al Backend
                 const resp = await fetch('/sis_primer_nivel/api/filtrar', {
@@ -528,10 +526,10 @@
                 if (resJson.status === "success" && resJson.data) {
                     fuenteDeDatos = resJson.data;
                 } else {
-                    throw new Error(resJson.message || "No se pudieron obtener los datos desagregados.");
+                    throw new Error(resJson.message || "No se pudieron obtener los datos desagregados del servidor.");
                 }
             } else {
-                // Modo acumulado: Usa la variable global en memoria de la pantalla
+                // Modo acumulado: Usa la variable global en memoria
                 fuenteDeDatos = (typeof datosFiltradosSis !== "undefined") ? datosFiltradosSis : [];
             }
 
