@@ -295,3 +295,77 @@ def filtrar_datos_sis():
 
     finally:
         cursor.close()
+
+
+
+
+@sis_pn.route("/api/evolucion-temporal", methods=["POST"])
+@login_required
+@csrf.exempt
+def obtener_evolucion_temporal():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+
+        # 1. Sanitizar parámetros recibidos desde el frontend
+        subvariables = [
+            str(v).strip() for v in data.get("subvariables", []) if str(v).strip()
+        ]
+        filtro_detalle = str(data.get("filtroDetalle", "consultas")).strip()
+        tipo_vista = str(data.get("tipoVista", "mes")).strip()  # 'mes' o 'anio'
+
+        if not subvariables:
+            return jsonify({"status": "success", "data": []})
+
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+        # 2. Construir la consulta SQL dinámicamente según la vista seleccionada
+        placeholders = ",".join(["%s"] * len(subvariables))
+        where_conditions = [f"sr.variable IN ({placeholders})"]
+        params = list(subvariables)
+
+        # Filtro por apartado opcional si aplica
+        if filtro_detalle and filtro_detalle != "todas":
+            where_conditions.append("cv.apartado = %s")
+            params.append(filtro_detalle)
+
+        # 3. Definir SELECT y GROUP BY
+        if tipo_vista == "anio":
+            select_cols = (
+                "sr.anio, 'Acumulado' AS mes, SUM(CAST(sr.total AS UNSIGNED)) AS total"
+            )
+            group_cols = "sr.anio"
+            order_cols = "sr.anio DESC"
+        else:
+            select_cols = (
+                "sr.anio, sr.mes, SUM(CAST(sr.total AS UNSIGNED)) AS total"
+            )
+            group_cols = "sr.anio, sr.mes"
+            order_cols = "sr.anio DESC, sr.mes ASC"
+
+        query = f"""
+            SELECT {select_cols}
+            FROM sis_registros_primer_nivel sr
+            LEFT JOIN catalogo_variables cv ON TRIM(UPPER(sr.variable)) = TRIM(UPPER(cv.variable))
+            WHERE {" AND ".join(where_conditions)}
+            GROUP BY {group_cols}
+            ORDER BY {order_cols}
+        """
+
+        # 4. Ejecutar la consulta con parámetros limpios
+        cursor.execute(query, tuple(params))
+        resultados = cursor.fetchall() or []
+        cursor.close()
+
+        return jsonify({"status": "success", "data": resultados}), 200
+
+    except Exception as e:
+        print(f"❌ Error en API /api/evolucion-temporal: {str(e)}")
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": f"Error al procesar la consulta: {str(e)}",
+                }
+            ),
+            400,
+        )
