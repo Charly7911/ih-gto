@@ -192,6 +192,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
+
 <script>
     if (typeof ChartDataLabels !== 'undefined') {
         Chart.register(ChartDataLabels);
@@ -881,6 +882,9 @@
         });
     }
 
+
+    // PARTE 2
+
     function renderTablaSis() {
         actualizarEncabezadoSIS(anioActivo);
         const tbody = document.getElementById("tablaSIS");
@@ -1042,49 +1046,66 @@
         const ctx = document.getElementById("graficaSisMensual");
 
         if (!ctx) return;
-        if (graficaSisMensual) { graficaSisMensual.destroy(); graficaSisMensual = null; }
 
-        if (typeof hayVariablesSeleccionadas === "function" && !hayVariablesSeleccionadas()) {
-            return;
+        // Destrucción limpia sin afectar otras instancias
+        if (graficaSisMensual) {
+            graficaSisMensual.destroy();
+            graficaSisMensual = null;
         }
 
+        if (typeof hayVariablesSeleccionadas === "function" && !hayVariablesSeleccionadas()) return;
         if (!data || data.length === 0) return;
 
         const paletaColores = [
             '#2b5c8f', '#d9534f', '#20c997', '#f0ad4e', '#6f42c1',
-            '#e83e8c', '#17a2b8', '#fd7e14', '#6c757d', '#343a40', '#4E79A7'
+            '#e83e8c', '#17a2b8', '#fd7e14', '#6c757d', '#343a40', '#17a2b8'
         ];
 
+        // Lista de campos base + COLUMNA COMODÍN exclusiva para la Gráfica 3
         const camposApartados = [
             'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
             'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
-            'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
+            'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros',
+            'comodin' // 👈 Columna comodín aislada
         ];
 
+        // Cálculo exclusivo para las series de tiempo (sin alterar la tabla ni Graf 1 y 2)
         const obtenerSumaFila = (r) => {
             if (modulo === "todas") {
                 let sumaCampos = 0;
                 camposApartados.forEach(c => { sumaCampos += Number(r[c]) || 0; });
-                return sumaCampos > 0 ? sumaCampos : Number(r.total || r.valor || r.suma || 0);
+                // Si viene un valor comodín independiente desde la respuesta
+                const valorComodin = Number(r.comodin || r.monto_comodin || 0);
+                return (sumaCampos > 0 ? sumaCampos : Number(r.total || r.valor || r.suma || 0)) + valorComodin;
             }
+
+            // Si se selecciona específicamente el comodín o una columna estándar
+            if (modulo === "comodin") {
+                return Number(r.comodin || r.monto_comodin || 0);
+            }
+
             return Number(r[modulo]) || Number(r.total) || Number(r.valor) || 0;
         };
 
         let labels = [];
         let datasets = [];
+        const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
         // 🟢 MODO DESGLOSADO POR APARTADO
         if (modoDesglose === "por_apartado") {
-            const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
-
             if (tipoVista === 'anio') {
                 const apartadosAnual = {};
 
                 data.forEach(r => {
                     const numAp = r.id_apartado || r.apartado || r.num_apartado;
-                    const labelApartado = r.descripcion_apartado || (numAp ? `Apartado ${numAp}` : 'Sin Clasificar');
-                    const val = Number(r.total || r.valor || r.suma || 0);
+                    let labelApartado = r.descripcion_apartado || (numAp ? `Apartado ${numAp}` : 'Sin Clasificar');
 
+                    // Marcamos visualmente si el registro corresponde a la columna comodín
+                    if (r.es_comodin) {
+                        labelApartado = `[Comodín] ${labelApartado}`;
+                    }
+
+                    const val = obtenerSumaFila(r);
                     if (val > 0) {
                         apartadosAnual[labelApartado] = (apartadosAnual[labelApartado] || 0) + val;
                     }
@@ -1095,7 +1116,7 @@
 
                 if (valores.length > 0) {
                     datasets = [{
-                        label: 'Total por Apartado',
+                        label: 'Total por Apartado (Inc. Comodín)',
                         data: valores,
                         backgroundColor: paletaColores.slice(0, labels.length)
                     }];
@@ -1109,10 +1130,12 @@
                     if (!mesNum || mesNum < 1 || mesNum > 12) return;
 
                     const numAp = r.id_apartado || r.apartado || r.num_apartado;
-                    const descAp = r.descripcion_apartado || (numAp ? `Apartado ${numAp}` : 'Otros');
+                    let descAp = r.descripcion_apartado || (numAp ? `Apartado ${numAp}` : 'Otros');
+                    if (r.es_comodin) descAp = `[Comodín] ${descAp}`;
+
                     const anio = r.anio || r.año || '';
                     const serieKey = anio ? `${descAp} (${anio})` : descAp;
-                    const val = Number(r.total || r.valor || r.suma || 0);
+                    const val = obtenerSumaFila(r);
 
                     if (val > 0) {
                         if (!seriesMap[serieKey]) {
@@ -1137,13 +1160,9 @@
                     };
                 });
             }
-
-            if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
         }
         // 🟡 MODO ACUMULADO
         else {
-            const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
-
             if (tipoVista === 'anio') {
                 const acumuladoAnual = {};
                 data.forEach(r => {
@@ -1154,13 +1173,13 @@
                 labels = Object.keys(acumuladoAnual).sort();
                 const valores = labels.map(a => Math.round(acumuladoAnual[a]));
 
-                if (valores.reduce((a, b) => a + b, 0) === 0) return;
-
-                datasets = [{
-                    label: `Total ${modulo === 'todas' ? 'Secciones Seleccionadas' : modulo.toUpperCase()}`,
-                    data: valores,
-                    backgroundColor: paletaColores.slice(0, labels.length)
-                }];
+                if (valores.reduce((a, b) => a + b, 0) > 0) {
+                    datasets = [{
+                        label: `Total ${modulo === 'todas' ? 'Secciones + Comodín' : modulo.toUpperCase()}`,
+                        data: valores,
+                        backgroundColor: paletaColores.slice(0, labels.length)
+                    }];
+                }
             } else {
                 labels = Object.values(mesesNombres);
                 const resumen = {};
@@ -1181,12 +1200,12 @@
                     pointRadius: 4,
                     fill: false
                 }));
-
-                if (!datasets.some(ds => ds.data.some(v => v > 0))) return;
             }
         }
 
-        // Dibujar la gráfica
+        if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
+
+        // Renderizar gráfico final
         graficaSisMensual = new Chart(ctx, {
             type: tipoVista === 'anio' ? 'bar' : 'line',
             data: { labels, datasets },
