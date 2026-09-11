@@ -385,51 +385,55 @@
         return Array.isArray(variablesPersonalizadasEstado[modulo]) && variablesPersonalizadasEstado[modulo].length > 0;
     }
 
-
+    /* 3. PROCESAMIENTO Y FILTRADO */
     function agruparDatos(data) {
         if (!data || !Array.isArray(data)) return [];
 
         const mapa = {};
         const nivelAgrupacion = document.getElementById('selectNivelAgrupacion')?.value || 'clues';
 
+        // Columnas exactas que existen físicamente en la tabla HTML
         const campos = [
             'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
             'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
             'orientacion_lac_des_obe', 'orientacion_eda_ira'
         ];
 
-        // Mapeo exhaustivo para evitar que registros de la respuesta desagregada caigan en Consultas
+        // Clasificación estricta según el módulo o descripción
         const normalizarApartado = (desc) => {
-            const text = (desc || '').toLowerCase().trim();
-
-            if (text.includes('embaraz') || text.includes('matern') || text.includes('obstet')) return 'embarazadas';
-            if (text.includes('mental') || text.includes('psico')) return 'mental';
-            if (text.includes('bucal') || text.includes('odont') || text.includes('dient')) return 'bucal';
+            const text = (desc || '').toLowerCase();
+            if (text.includes('consulta')) return 'consultas';
+            if (text.includes('embaraz') || text.includes('matern')) return 'embarazadas';
+            if (text.includes('mental')) return 'mental';
+            if (text.includes('bucal')) return 'bucal';
             if (text.includes('tamiz')) return 'tamiz';
-            if (text.includes('planific') || text.includes('anticoncep')) return 'planificacion_familiar';
-            if (text.includes('cardiometab') || text.includes('diabet') || text.includes('hipertens')) return 'detecciones_cardiometabolicas';
-            if (text.includes('detec') || text.includes('tamiz')) return 'detecciones';
-            if (text.includes('lactan') || text.includes('nutri') || text.includes('obes') || text.includes('peso')) return 'orientacion_lac_des_obe';
-            if (text.includes('eda') || text.includes('ira') || text.includes('diarre') || text.includes('respirat')) return 'orientacion_eda_ira';
-            if (text.includes('consulta') || text.includes('atencion')) return 'consultas';
+            if (text.includes('planific')) return 'planificacion_familiar';
+            if (text.includes('cardiometab')) return 'detecciones_cardiometabolicas';
+            if (text.includes('detec')) return 'detecciones';
+            if (text.includes('lactan') || text.includes('nutri') || text.includes('obes')) return 'orientacion_lac_des_obe';
+            if (text.includes('eda') || text.includes('ira')) return 'orientacion_eda_ira';
 
-            // ⚠️ NUNCA retornar 'consultas' si no se reconoce el texto: se manda a una propiedad inocua en memoria
-            return '_no_clasificado';
+            // Cae en la variable aislada 'comodin' en memoria en lugar de irse a 'consultas'
+            return 'comodin';
         };
 
         for (let i = 0; i < data.length; i++) {
             const r = data[i];
-            const numAnio = Number(r.anio || r.año);
+            const numAnio = Number(r.anio);
             const jur = r.jurisdiccion ? String(r.jurisdiccion).trim() : 'Sin Especificar';
             const mun = r.municipio ? String(r.municipio).trim() : 'Sin Especificar';
             const clues = r.clues || 'Sin CLUES';
-            const nombreUnidad = r.nombre_unidad || (nivelAgrupacion === 'jurisdiccion' ? `Jurisdicción ${jur}` : (nivelAgrupacion === 'municipio' ? mun : clues));
+            const nombreUnidad = r.nombre_unidad || clues;
 
             let key = `${numAnio}-${jur}-${mun}-${clues}`;
+            let nombreEtiqueta = nombreUnidad;
+
             if (nivelAgrupacion === 'jurisdiccion') {
                 key = `${numAnio}-JUR-${jur}`;
+                nombreEtiqueta = `Jurisdicción ${jur}`;
             } else if (nivelAgrupacion === 'municipio') {
                 key = `${numAnio}-MUN-${mun}`;
+                nombreEtiqueta = mun;
             }
 
             if (!mapa[key]) {
@@ -438,34 +442,27 @@
                     jurisdiccion: jur,
                     municipio: mun,
                     clues: (nivelAgrupacion === 'clues') ? clues : '-',
-                    nombre_unidad: nombreUnidad,
+                    nombre_unidad: nombreEtiqueta,
                     consultas: 0, embarazadas: 0, mental: 0, bucal: 0, tamiz: 0,
                     planificacion_familiar: 0, detecciones: 0, detecciones_cardiometabolicas: 0,
-                    orientacion_lac_des_obe: 0, orientacion_eda_ira: 0
+                    orientacion_lac_des_obe: 0, orientacion_eda_ira: 0,
+                    comodin: 0 // Propiedad aislada en objeto JS para consumo de Gráfica 3
                 };
             }
 
-            // 1. Intentar sumar las columnas si vienen de forma explícita en el registro
-            let huboSumaDirecta = false;
+            // 1. Suma de las 10 columnas fijas de la tabla
             campos.forEach(c => {
-                const val = Number(r[c]);
-                if (!isNaN(val) && val > 0) {
-                    mapa[key][c] += val;
-                    huboSumaDirecta = true;
-                }
+                mapa[key][c] += Number(r[c]) || 0;
             });
 
-            // 2. Si no venían como columnas explícitas (filas desagregadas del filtro), clasificar por la descripción
-            if (!huboSumaDirecta) {
-                const valorGenerico = Number(r.total || r.valor || r.suma || r.cantidad || 0);
-                if (valorGenerico > 0) {
-                    const descripcion = r.descripcion_apartado || r.apartado || r.modulo || r.nombre_apartado || '';
-                    const campoDestino = normalizarApartado(descripcion);
+            // 2. Control de montos genéricos o variables adicionales
+            const sumaEstandar = campos.reduce((acc, c) => acc + (Number(r[c]) || 0), 0);
+            const valorGenerico = Number(r.total || r.valor || r.suma || 0);
 
-                    if (mapa[key][campoDestino] !== undefined) {
-                        mapa[key][campoDestino] += valorGenerico;
-                    }
-                }
+            if (sumaEstandar === 0 && valorGenerico > 0) {
+                const descripcion = r.descripcion_apartado || r.apartado || r.modulo || '';
+                const campoDestino = normalizarApartado(descripcion);
+                mapa[key][campoDestino] = (mapa[key][campoDestino] || 0) + valorGenerico;
             }
         }
 
