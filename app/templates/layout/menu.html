@@ -1824,36 +1824,26 @@
         }
 
         async function ejecutarCargaGraficaYDatos() {
+            // 1. Actualización de textos en botones
             const btnActual = obtenerBotonUnidades();
             const totalSelUnidades = obtenerCheckboxesUnidadesGlobal().length;
-            if (btnActual) {
-                btnActual.textContent = totalSelUnidades > 0 ? `🔍 Unidades (${totalSelUnidades})` : "🔍 Seleccionar unidades";
-            }
+            if (btnActual) btnActual.textContent = totalSelUnidades > 0 ? `🔍 Unidades (${totalSelUnidades})` : "🔍 Seleccionar unidades";
 
             const totalSelJur = obtenerJurisdiccionesSeleccionadasGlobal().length;
-            if (btnJurisdicciones) {
-                btnJurisdicciones.textContent = totalSelJur > 0 ? `🔍 Jurisdicciones (${totalSelJur})` : "🔍 Seleccionar jurisdicciones";
-            }
+            if (btnJurisdicciones) btnJurisdicciones.textContent = totalSelJur > 0 ? `🔍 Jurisdicciones (${totalSelJur})` : "🔍 Seleccionar jurisdicciones";
 
             const totalSelMun = obtenerMunicipiosSeleccionadosGlobal().length;
-            if (btnMunicipios) {
-                btnMunicipios.textContent = totalSelMun > 0 ? `🔍 Municipios (${totalSelMun})` : "🔍 Seleccionar municipios";
-            }
+            if (btnMunicipios) btnMunicipios.textContent = totalSelMun > 0 ? `🔍 Municipios (${totalSelMun})` : "🔍 Seleccionar municipios";
 
             const totalSelServicios = obtenerServiciosSeleccionadosGlobal().length;
-            if (btnServicio) {
-                btnServicio.textContent = totalSelServicios > 0 ? `🔍 Egresos (${totalSelServicios})` : "🔍 Seleccionar Egreso";
-            }
+            if (btnServicio) btnServicio.textContent = totalSelServicios > 0 ? `🔍 Egresos (${totalSelServicios})` : "🔍 Seleccionar Egreso";
 
             const totalSelAfecciones = obtenerAfeccionesSeleccionadasGlobal().length;
-            if (btnAfecciones) {
-                btnAfecciones.textContent = totalSelAfecciones > 0 ? `🔍 Afecciones (${totalSelAfecciones})` : "🔍 Seleccionar afecciones";
-            }
+            if (btnAfecciones) btnAfecciones.textContent = totalSelAfecciones > 0 ? `🔍 Afecciones (${totalSelAfecciones})` : "🔍 Seleccionar afecciones";
 
-            const agruparPorVal = selectNivel ? selectNivel.value : 'clues';
-
+            // 2. Preparar Payload
             const payloadFiltros = {
-                agrupar_por: agruparPorVal,
+                agrupar_por: selectNivel ? selectNivel.value : 'clues',
                 anios: obtenerAniosSeleccionadosGlobal(),
                 meses: obtenerMesesSeleccionadosGlobal(),
                 unidades: obtenerCheckboxesUnidadesGlobal(),
@@ -1866,23 +1856,34 @@
             window.filtrosSis = Object.assign(window.filtrosSis || {}, payloadFiltros);
             window.filtros = Object.assign(window.filtros || {}, payloadFiltros);
 
-            if (typeof window.cargarDatosSis === "function") window.cargarDatosSis();
-            if (typeof window.ejecutarFiltradoSis === "function") window.ejecutarFiltradoSis();
-            if (typeof cargarTablaSis === "function") cargarTablaSis();
-            if (typeof cargarDatos === "function") cargarDatos();
-            if (typeof cargarDatosUrgencias === "function") cargarDatosUrgencias();
-            if (typeof cargarDatosIndicadores === "function") cargarDatosIndicadores();
-            if (typeof cargarDatosEgresos === "function") cargarDatosEgresos();
+            // 3. Peticiones HTTP asíncronas (Backend)
+            if (typeof window.cargarDatosSis === "function") await window.cargarDatosSis();
+            if (typeof window.ejecutarFiltradoSis === "function") await window.ejecutarFiltradoSis();
+            if (typeof cargarTablaSis === "function") await cargarTablaSis();
+            if (typeof cargarDatos === "function") await cargarDatos();
+            if (typeof cargarDatosUrgencias === "function") await cargarDatosUrgencias();
+            if (typeof cargarDatosIndicadores === "function") await cargarDatosIndicadores();
+            if (typeof cargarDatosEgresos === "function") await cargarDatosEgresos();
 
-            ejecutarGraficasSis();
+            // 4. Disparar eventos secundarios
+            document.dispatchEvent(new CustomEvent("aplicarFiltroUnidades", { detail: payloadFiltros }));
+
+            // 5. Dibujar gráficas (Render)
+            if (typeof ejecutarGraficasSis === "function") ejecutarGraficasSis();
             if (typeof actualizarGraficaDrag === "function") actualizarGraficaDrag();
             if (typeof renderGraficaUrg === "function") renderGraficaUrg();
             if (typeof renderGraficaIndicadores === "function") renderGraficaIndicadores();
             if (typeof renderGraficaEgresos === "function") renderGraficaEgresos();
 
-            document.dispatchEvent(new CustomEvent("aplicarFiltroUnidades", { detail: payloadFiltros }));
+            // 6. Esperar a que el navegador termine de pintar el DOM y Canvas
+            await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 100)));
 
-            await new Promise(resolve => setTimeout(resolve, 200));
+            // 7. Ocultar la animación/loader de forma segura
+            if (typeof ocultarCargandoGrafica === "function") {
+                ocultarCargandoGrafica();
+            } else if (typeof window.ocultarCargandoGrafica === "function") {
+                window.ocultarCargandoGrafica();
+            }
         }
 
         // ======================================================

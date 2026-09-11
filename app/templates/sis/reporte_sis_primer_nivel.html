@@ -766,14 +766,14 @@
     function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
     function ocultarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.add("d-none"); }
 
-   // Retornamos la promesa para que pueda ser esperada con 'await'
+    // Retornamos la promesa para que pueda ser esperada con 'await'
     async function realizarConsultaBackend() {
         mostrarCargandoGrafica();
 
         if (!hayVariablesSeleccionadas()) {
             datosFiltradosSis = [];
             actualizarVistas();
-            ocultarCargandoGrafica();
+            // NOTA: Se quita ocultarCargandoGrafica() de aquí
             return;
         }
 
@@ -802,7 +802,7 @@
         if (Object.keys(variablesAPasar).length === 0 || !Object.values(variablesAPasar).some(arr => arr.length > 0)) {
             datosFiltradosSis = [];
             actualizarVistas();
-            ocultarCargandoGrafica();
+            // NOTA: Se quita ocultarCargandoGrafica() de aquí
             return;
         }
 
@@ -832,12 +832,12 @@
             }
         } catch (err) {
             console.error("Error al conectar con la API SIS:", err);
-        } finally {
-            ocultarCargandoGrafica();
         }
+        // NOTA: Se elimina el bloque 'finally' con ocultarCargandoGrafica() 
+        // para evitar que el loader se cierre antes del renderizado en pantalla.
     }
 
-    // CORRECCIÓN: Se elimina el setTimeout/debounce para que devuelva la Promesa directamente
+    // Retorna la Promesa para que menu.html pueda usar 'await'
     window.ejecutarFiltradoSis = function () {
         return realizarConsultaBackend();
     };
@@ -854,7 +854,7 @@
         renderGraficaTemporal(datosFiltradosSis);
     }
 
-  
+
     /* 4. TABLA Y PAGINACIÓN */
     function renderTabsAnios(data) {
         const tabs = document.getElementById("tabsAnios");
@@ -1312,7 +1312,7 @@
             window.ejecutarFiltradoSis();
         });
 
-        
+
     });
 </script>
 
