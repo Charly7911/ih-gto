@@ -844,17 +844,17 @@
         renderGraficaTemporal(datosFiltradosSis);
     }
 
-    /* 4. TABLA Y PAGINACIÓN */
+   /* 4. TABLA Y PAGINACIÓN */
     function renderTabsAnios(data) {
         const tabs = document.getElementById("tabsAnios");
         if (!tabs) return;
 
         const anios = [...new Set(data.map(r => Number(r.anio)))].filter(a => !isNaN(a) && a > 0).sort((a, b) => b - a);
 
-        if (anios.length === 0) {
-            anioActivo = null;
-            tabs.innerHTML = "";
-            return;
+        if (anios.length === 0) { 
+            anioActivo = null; 
+            tabs.innerHTML = ""; 
+            return; 
         }
 
         if (!anioActivo || !anios.includes(Number(anioActivo))) {
@@ -875,6 +875,7 @@
                 anioActivo = Number(e.target.getAttribute("data-anio"));
                 paginaActual = 1;
 
+                // Solo actualiza componentes superiores y tabla
                 renderTablaSis();
                 renderGraficaPorUnidad(datosActuales.filter(r => Number(r.anio) === Number(anioActivo)));
             });
@@ -882,14 +883,17 @@
     }
 
     function renderTablaSis() {
-        actualizarEncabezadoSIS(anioActivo);
+        if (typeof actualizarEncabezadoSIS === "function") {
+            actualizarEncabezadoSIS(anioActivo);
+        }
+        
         const tbody = document.getElementById("tablaSIS");
         const paginacion = document.getElementById("paginacionTabla");
         const infoPaging = document.getElementById("infoPaginacion");
 
         if (!tbody || !paginacion) return;
 
-        // Normalización de tipo para comparación estricta segura
+        // Trabaja exclusivamente con los datos generales del reporte
         const datosFiltrados = datosActuales.filter(r => Number(r.anio) === Number(anioActivo));
         const inicio = (paginaActual - 1) * FILAS_POR_PAGINA;
         const paginaDatos = datosFiltrados.slice(inicio, inicio + FILAS_POR_PAGINA);
@@ -929,7 +933,7 @@
         renderTablaSis();
     };
 
-    /* 5. GRÁFICAS CHART.JS */
+    /* 5. GRÁFICAS CHART.JS (SUPERIORES) */
     function renderGraficaPorAnio(data = datosActuales) {
         const ctx = document.getElementById('graficaSisPorAnio');
         if (!ctx) return;
@@ -1022,6 +1026,7 @@
         }
     }
 
+    /* 6. GRÁFICA 3 TEMPORAL (TOTALMENTE AISLADA) */
     function toggleModoDesglose() {
         const modulo = document.getElementById("filtroSisDetalle")?.value;
         const selectDesglose = document.getElementById("selectModoDesglose");
@@ -1038,15 +1043,11 @@
     function renderGraficaTemporal(data = datosFiltradosSis) {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
-        const modoDesglose = document.getElementById("selectModoDesglose")?.value || "por_apartado";
+        const modoDesglose = document.getElementById("selectModoDesglose")?.value || "acumulado";
         const ctx = document.getElementById("graficaSisMensual");
 
         if (!ctx) return;
         if (graficaSisMensual) { graficaSisMensual.destroy(); graficaSisMensual = null; }
-
-        if (typeof hayVariablesSeleccionadas === "function" && !hayVariablesSeleccionadas()) {
-            return;
-        }
 
         if (!data || data.length === 0) return;
 
@@ -1073,21 +1074,16 @@
         let labels = [];
         let datasets = [];
 
-        // 🟢 MODO DESGLOSADO POR APARTADO
         if (modoDesglose === "por_apartado") {
             const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
             if (tipoVista === 'anio') {
                 const apartadosAnual = {};
-
                 data.forEach(r => {
                     const numAp = r.id_apartado || r.apartado || r.num_apartado;
                     const labelApartado = r.descripcion_apartado || (numAp ? `Apartado ${numAp}` : 'Sin Clasificar');
                     const val = Number(r.total || r.valor || r.suma || 0);
-
-                    if (val > 0) {
-                        apartadosAnual[labelApartado] = (apartadosAnual[labelApartado] || 0) + val;
-                    }
+                    if (val > 0) apartadosAnual[labelApartado] = (apartadosAnual[labelApartado] || 0) + val;
                 });
 
                 labels = Object.keys(apartadosAnual);
@@ -1115,9 +1111,7 @@
                     const val = Number(r.total || r.valor || r.suma || 0);
 
                     if (val > 0) {
-                        if (!seriesMap[serieKey]) {
-                            seriesMap[serieKey] = Array(12).fill(0);
-                        }
+                        if (!seriesMap[serieKey]) seriesMap[serieKey] = Array(12).fill(0);
                         seriesMap[serieKey][mesNum - 1] += val;
                     }
                 });
@@ -1139,9 +1133,7 @@
             }
 
             if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
-        }
-        // 🟡 MODO ACUMULADO
-        else {
+        } else {
             const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
             if (tipoVista === 'anio') {
@@ -1186,7 +1178,6 @@
             }
         }
 
-        // Dibujar la gráfica
         graficaSisMensual = new Chart(ctx, {
             type: tipoVista === 'anio' ? 'bar' : 'line',
             data: { labels, datasets },
@@ -1210,11 +1201,11 @@
         });
     }
 
-    /* 6. INICIALIZACIÓN DE EVENTOS */
+    /* 7. INICIALIZACIÓN DE EVENTOS AISLADOS */
     document.addEventListener("DOMContentLoaded", () => {
-        renderSubvariables();
-        actualizarVistas();
+        if (typeof renderSubvariables === "function") renderSubvariables();
 
+        // Escuchadores del catálogo de subvariables (Solo afectan a la Gráfica 3)
         document.getElementById("contenedorSubvariables")?.addEventListener("change", (e) => {
             if (e.target.classList.contains('chk-padre')) {
                 const parentDetails = e.target.closest('details');
@@ -1232,9 +1223,7 @@
 
                     if (chkPadre) {
                         const cuantasMarcadas = hermanos.filter(h => h.checked).length;
-                        const totalHijos = hermanos.length;
-
-                        if (cuantasMarcadas === totalHijos) {
+                        if (cuantasMarcadas === hermanos.length) {
                             chkPadre.checked = true;
                             chkPadre.indeterminate = false;
                         } else if (cuantasMarcadas > 0) {
@@ -1248,61 +1237,47 @@
                 }
             }
 
-            guardarEstadoVariablesActuales();
-            if (typeof window.ejecutarFiltradoSis === "function") {
-                window.ejecutarFiltradoSis();
-            }
+            if (typeof guardarEstadoVariablesActuales === "function") guardarEstadoVariablesActuales();
+            renderGraficaTemporal(); // 🟢 Únicamente re-dibuja la gráfica 3
         });
 
+        // Cambio de módulo en la gráfica 3
         document.getElementById("filtroSisDetalle")?.addEventListener("change", (e) => {
-            const moduloSeleccionado = e.target.value;
-            mostrarCargandoGrafica();
             toggleModoDesglose();
-
-            if (moduloSeleccionado === "todas") {
-                variablesPersonalizadasEstado["todas"] = [];
-            } else {
-                restaurarDefaultModulo(moduloSeleccionado);
-            }
-
-            renderSubvariables();
-            if (typeof window.ejecutarFiltradoSis === "function") {
-                window.ejecutarFiltradoSis();
-            }
+            if (typeof renderSubvariables === "function") renderSubvariables();
+            renderGraficaTemporal(); // 🟢 Únicamente re-dibuja la gráfica 3
         });
 
+        // Cambio de vista (Mes/Año) en la gráfica 3
         document.getElementById("selectTipoVistaTemporal")?.addEventListener("change", () => {
-            renderGraficaTemporal(datosFiltradosSis);
+            renderGraficaTemporal();
         });
 
+        // 🔴 CORREGIDO: En lugar de realizarConsultaBackend(), ahora solo repinta la Gráfica 3
         document.getElementById("selectModoDesglose")?.addEventListener("change", () => {
-            renderGraficaTemporal(datosFiltradosSis);
+            renderGraficaTemporal();
         });
 
         document.getElementById("btnToggleValoresMensual")?.addEventListener("click", (e) => {
             mostrarValoresMensual = !mostrarValoresMensual;
             e.target.textContent = mostrarValoresMensual ? "Ocultar valores" : "Mostrar valores";
-            renderGraficaTemporal(datosFiltradosSis);
+            renderGraficaTemporal();
         });
 
         document.getElementById("btnSeleccionarTodasSub")?.addEventListener("click", () => {
             const contenedor = document.getElementById("contenedorSubvariables");
             if (!contenedor) return;
             contenedor.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = true);
-            guardarEstadoVariablesActuales();
-            if (typeof window.ejecutarFiltradoSis === "function") {
-                window.ejecutarFiltradoSis();
-            }
+            if (typeof guardarEstadoVariablesActuales === "function") guardarEstadoVariablesActuales();
+            renderGraficaTemporal();
         });
 
         document.getElementById("btnDesmarcarTodasSub")?.addEventListener("click", () => {
             const contenedor = document.getElementById("contenedorSubvariables");
             if (!contenedor) return;
             contenedor.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = false);
-            guardarEstadoVariablesActuales();
-            if (typeof window.ejecutarFiltradoSis === "function") {
-                window.ejecutarFiltradoSis();
-            }
+            if (typeof guardarEstadoVariablesActuales === "function") guardarEstadoVariablesActuales();
+            renderGraficaTemporal();
         });
     });
 </script>
