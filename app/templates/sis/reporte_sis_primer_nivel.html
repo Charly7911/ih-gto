@@ -387,15 +387,19 @@
 
     /* 3. PROCESAMIENTO Y FILTRADO */
     function agruparDatos(data) {
+        if (!data || !Array.isArray(data)) return [];
+
         const mapa = {};
         const nivelAgrupacion = document.getElementById('selectNivelAgrupacion')?.value || 'clues';
+
+        // Columnas exactas que existen físicamente en la tabla HTML
         const campos = [
             'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
             'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
-            'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
+            'orientacion_lac_des_obe', 'orientacion_eda_ira'
         ];
 
-        // Helper interno para clasificar según el texto del apartado/módulo
+        // Clasificación estricta según el módulo o descripción
         const normalizarApartado = (desc) => {
             const text = (desc || '').toLowerCase();
             if (text.includes('consulta')) return 'consultas';
@@ -408,7 +412,9 @@
             if (text.includes('detec')) return 'detecciones';
             if (text.includes('lactan') || text.includes('nutri') || text.includes('obes')) return 'orientacion_lac_des_obe';
             if (text.includes('eda') || text.includes('ira')) return 'orientacion_eda_ira';
-            return 'otros';
+
+            // Cae en la variable aislada 'comodin' en memoria en lugar de irse a 'consultas'
+            return 'comodin';
         };
 
         for (let i = 0; i < data.length; i++) {
@@ -439,24 +445,24 @@
                     nombre_unidad: nombreEtiqueta,
                     consultas: 0, embarazadas: 0, mental: 0, bucal: 0, tamiz: 0,
                     planificacion_familiar: 0, detecciones: 0, detecciones_cardiometabolicas: 0,
-                    orientacion_lac_des_obe: 0, orientacion_eda_ira: 0, otros: 0
+                    orientacion_lac_des_obe: 0, orientacion_eda_ira: 0,
+                    comodin: 0 // Propiedad aislada en objeto JS para consumo de Gráfica 3
                 };
             }
 
-            // Suma explícita de campos estándar
+            // 1. Suma de las 10 columnas fijas de la tabla
             campos.forEach(c => {
                 mapa[key][c] += Number(r[c]) || 0;
             });
 
-            // Si los campos estándar venían en 0 y trae un valor genérico
+            // 2. Control de montos genéricos o variables adicionales
             const sumaEstandar = campos.reduce((acc, c) => acc + (Number(r[c]) || 0), 0);
             const valorGenerico = Number(r.total || r.valor || r.suma || 0);
 
             if (sumaEstandar === 0 && valorGenerico > 0) {
-                // Clasifica al campo correspondiente usando la descripción del registro (si existe)
                 const descripcion = r.descripcion_apartado || r.apartado || r.modulo || '';
                 const campoDestino = normalizarApartado(descripcion);
-                mapa[key][campoDestino] += valorGenerico;
+                mapa[key][campoDestino] = (mapa[key][campoDestino] || 0) + valorGenerico;
             }
         }
 
@@ -1061,12 +1067,11 @@
             '#e83e8c', '#17a2b8', '#fd7e14', '#6c757d', '#343a40', '#17a2b8'
         ];
 
-        // Lista de campos base + COLUMNA COMODÍN exclusiva para la Gráfica 3
+        // Lista de campos estándar + la variable en memoria 'comodin'
         const camposApartados = [
             'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
             'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
-            'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros',
-            'comodin' // 👈 Columna comodín aislada
+            'orientacion_lac_des_obe', 'orientacion_eda_ira', 'comodin'
         ];
 
         // Cálculo exclusivo para las series de tiempo (sin alterar la tabla ni Graf 1 y 2)
@@ -1074,17 +1079,13 @@
             if (modulo === "todas") {
                 let sumaCampos = 0;
                 camposApartados.forEach(c => { sumaCampos += Number(r[c]) || 0; });
-                // Si viene un valor comodín independiente desde la respuesta
-                const valorComodin = Number(r.comodin || r.monto_comodin || 0);
-                return (sumaCampos > 0 ? sumaCampos : Number(r.total || r.valor || r.suma || 0)) + valorComodin;
+
+                // Si el backend envía un registro suelto con valor en total/suma y no venía en los campos
+                return sumaCampos > 0 ? sumaCampos : Number(r.total || r.valor || r.suma || 0);
             }
 
-            // Si se selecciona específicamente el comodín o una columna estándar
-            if (modulo === "comodin") {
-                return Number(r.comodin || r.monto_comodin || 0);
-            }
-
-            return Number(r[modulo]) || Number(r.total) || Number(r.valor) || 0;
+            // Si se selecciona un módulo específico o el comodín
+            return Number(r[modulo]) || Number(r.comodin) || Number(r.total) || Number(r.valor) || 0;
         };
 
         let labels = [];
@@ -1098,12 +1099,7 @@
 
                 data.forEach(r => {
                     const numAp = r.id_apartado || r.apartado || r.num_apartado;
-                    let labelApartado = r.descripcion_apartado || (numAp ? `Apartado ${numAp}` : 'Sin Clasificar');
-
-                    // Marcamos visualmente si el registro corresponde a la columna comodín
-                    if (r.es_comodin) {
-                        labelApartado = `[Comodín] ${labelApartado}`;
-                    }
+                    let labelApartado = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : (numAp ? `Apartado ${numAp}` : 'Sin Clasificar'));
 
                     const val = obtenerSumaFila(r);
                     if (val > 0) {
@@ -1116,7 +1112,7 @@
 
                 if (valores.length > 0) {
                     datasets = [{
-                        label: 'Total por Apartado (Inc. Comodín)',
+                        label: 'Total por Apartado',
                         data: valores,
                         backgroundColor: paletaColores.slice(0, labels.length)
                     }];
@@ -1130,8 +1126,7 @@
                     if (!mesNum || mesNum < 1 || mesNum > 12) return;
 
                     const numAp = r.id_apartado || r.apartado || r.num_apartado;
-                    let descAp = r.descripcion_apartado || (numAp ? `Apartado ${numAp}` : 'Otros');
-                    if (r.es_comodin) descAp = `[Comodín] ${descAp}`;
+                    let descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : (numAp ? `Apartado ${numAp}` : 'Otros'));
 
                     const anio = r.anio || r.año || '';
                     const serieKey = anio ? `${descAp} (${anio})` : descAp;
@@ -1175,7 +1170,7 @@
 
                 if (valores.reduce((a, b) => a + b, 0) > 0) {
                     datasets = [{
-                        label: `Total ${modulo === 'todas' ? 'Secciones + Comodín' : modulo.toUpperCase()}`,
+                        label: `Total ${modulo === 'todas' ? 'General' : modulo.toUpperCase()}`,
                         data: valores,
                         backgroundColor: paletaColores.slice(0, labels.length)
                     }];
