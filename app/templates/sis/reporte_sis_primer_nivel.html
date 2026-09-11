@@ -422,6 +422,7 @@
 
         const mapa = {};
         const nivelAgrupacion = document.getElementById('selectNivelAgrupacion')?.value || 'clues';
+        const moduloActual = document.getElementById("filtroSisDetalle")?.value || "todas";
 
         // Columnas exactas que existen físicamente en la tabla HTML
         const campos = [
@@ -430,7 +431,7 @@
             'orientacion_lac_des_obe', 'orientacion_eda_ira'
         ];
 
-        // Clasificación estricta según el módulo o descripción
+        // Clasificación estricta según la descripción
         const normalizarApartado = (desc) => {
             const text = (desc || '').toLowerCase();
             if (text.includes('consulta')) return 'consultas';
@@ -444,13 +445,12 @@
             if (text.includes('lactan') || text.includes('nutri') || text.includes('obes')) return 'orientacion_lac_des_obe';
             if (text.includes('eda') || text.includes('ira')) return 'orientacion_eda_ira';
 
-            // Cae en la variable aislada 'comodin' en memoria en lugar de irse a 'consultas'
             return 'comodin';
         };
 
         for (let i = 0; i < data.length; i++) {
             const r = data[i];
-            const numAnio = Number(r.anio);
+            const numAnio = Number(r.anio || r.año);
             const jur = r.jurisdiccion ? String(r.jurisdiccion).trim() : 'Sin Especificar';
             const mun = r.municipio ? String(r.municipio).trim() : 'Sin Especificar';
             const clues = r.clues || 'Sin CLUES';
@@ -477,22 +477,29 @@
                     consultas: 0, embarazadas: 0, mental: 0, bucal: 0, tamiz: 0,
                     planificacion_familiar: 0, detecciones: 0, detecciones_cardiometabolicas: 0,
                     orientacion_lac_des_obe: 0, orientacion_eda_ira: 0,
-                    comodin: 0 // Propiedad aislada en objeto JS para consumo de Gráfica 3
+                    comodin: 0
                 };
             }
 
-            // 1. Suma de las 10 columnas fijas de la tabla
+            // 1. Acumulación segura de las columnas estándar
             campos.forEach(c => {
                 mapa[key][c] += Number(r[c]) || 0;
             });
 
-            // 2. Control de montos genéricos o variables adicionales
+            // 2. Manejo de valores genéricos cuando la respuesta de la API viene desagregada
             const sumaEstandar = campos.reduce((acc, c) => acc + (Number(r[c]) || 0), 0);
             const valorGenerico = Number(r.total || r.valor || r.suma || 0);
 
             if (sumaEstandar === 0 && valorGenerico > 0) {
-                const descripcion = r.descripcion_apartado || r.apartado || r.modulo || '';
-                const campoDestino = normalizarApartado(descripcion);
+                let campoDestino = 'comodin';
+
+                if (moduloActual !== 'todas' && campos.includes(moduloActual)) {
+                    campoDestino = moduloActual;
+                } else {
+                    const descripcion = r.descripcion_apartado || r.apartado || r.modulo || '';
+                    campoDestino = normalizarApartado(descripcion);
+                }
+
                 mapa[key][campoDestino] = (mapa[key][campoDestino] || 0) + valorGenerico;
             }
         }
