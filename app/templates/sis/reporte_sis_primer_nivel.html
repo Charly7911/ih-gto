@@ -1335,100 +1335,113 @@
     }
 
     /* 6. INICIALIZACIÓN DE EVENTOS */
-    document.addEventListener("DOMContentLoaded", () => {
-        renderSubvariables();
-        actualizarVistas();
+   document.addEventListener("DOMContentLoaded", () => {
+    renderSubvariables();
+    actualizarVistas();
 
-        document.getElementById("contenedorSubvariables")?.addEventListener("change", (e) => {
-            if (e.target.classList.contains('chk-padre')) {
-                const parentDetails = e.target.closest('details');
-                if (parentDetails) {
-                    e.target.indeterminate = false;
-                    parentDetails.querySelectorAll('.chk-subvar').forEach(h => h.checked = e.target.checked);
-                }
+    // 🟢 1. OYENTES PARA CONTROLES DE MENÚ Y AGRUPACIÓN (Jurisdicción / Municipio / CLUES)
+    document.getElementById("selectNivelAgrupacion")?.addEventListener("change", () => {
+        actualizarVistas(); // Recalcula la agruparDatos() y redibuja #tablaSIS sin pedir datos al backend
+    });
+
+    // 🟢 2. SUBVARIABLES Y CHECKBOXES
+    document.getElementById("contenedorSubvariables")?.addEventListener("change", (e) => {
+        if (e.target.classList.contains('chk-padre')) {
+            const parentDetails = e.target.closest('details');
+            if (parentDetails) {
+                e.target.indeterminate = false;
+                parentDetails.querySelectorAll('.chk-subvar').forEach(h => h.checked = e.target.checked);
             }
+        }
 
-            if (e.target.classList.contains('chk-subvar')) {
-                const parentDetails = e.target.closest('details');
-                if (parentDetails) {
-                    const chkPadre = parentDetails.querySelector('.chk-padre');
-                    const hermanos = Array.from(parentDetails.querySelectorAll('.chk-subvar'));
+        if (e.target.classList.contains('chk-subvar')) {
+            const parentDetails = e.target.closest('details');
+            if (parentDetails) {
+                const chkPadre = parentDetails.querySelector('.chk-padre');
+                const hermanos = Array.from(parentDetails.querySelectorAll('.chk-subvar'));
 
-                    if (chkPadre) {
-                        const cuantasMarcadas = hermanos.filter(h => h.checked).length;
-                        const totalHijos = hermanos.length;
+                if (chkPadre) {
+                    const cuantasMarcadas = hermanos.filter(h => h.checked).length;
+                    const totalHijos = hermanos.length;
 
-                        if (cuantasMarcadas === totalHijos) {
-                            chkPadre.checked = true;
-                            chkPadre.indeterminate = false;
-                        } else if (cuantasMarcadas > 0) {
-                            chkPadre.checked = false;
-                            chkPadre.indeterminate = true;
-                        } else {
-                            chkPadre.checked = false;
-                            chkPadre.indeterminate = false;
-                        }
+                    if (cuantasMarcadas === totalHijos) {
+                        chkPadre.checked = true;
+                        chkPadre.indeterminate = false;
+                    } else if (cuantasMarcadas > 0) {
+                        chkPadre.checked = false;
+                        chkPadre.indeterminate = true;
+                    } else {
+                        chkPadre.checked = false;
+                        chkPadre.indeterminate = false;
                     }
                 }
             }
+        }
 
-            guardarEstadoVariablesActuales();
-            if (typeof window.ejecutarFiltradoSis === "function") {
-                window.ejecutarFiltradoSis();
-            }
-        });
-
-        document.getElementById("filtroSisDetalle")?.addEventListener("change", (e) => {
-            const moduloSeleccionado = e.target.value;
-            mostrarCargandoGrafica();
-            toggleModoDesglose();
-
-            if (moduloSeleccionado === "todas") {
-                variablesPersonalizadasEstado["todas"] = [];
-            } else {
-                restaurarDefaultModulo(moduloSeleccionado);
-            }
-
-            renderSubvariables();
-            if (typeof window.ejecutarFiltradoSis === "function") {
-                window.ejecutarFiltradoSis();
-            }
-        });
-
-        document.getElementById("selectTipoVistaTemporal")?.addEventListener("change", () => {
-            renderGraficaTemporal(datosFiltradosSis);
-        });
-
-        document.getElementById("selectModoDesglose")?.addEventListener("change", () => {
-            renderGraficaTemporal(datosFiltradosSis);
-        });
-
-        document.getElementById("btnToggleValoresMensual")?.addEventListener("click", (e) => {
-            mostrarValoresMensual = !mostrarValoresMensual;
-            e.target.textContent = mostrarValoresMensual ? "Ocultar valores" : "Mostrar valores";
-            renderGraficaTemporal(datosFiltradosSis);
-        });
-
-        document.getElementById("btnSeleccionarTodasSub")?.addEventListener("click", () => {
-            const contenedor = document.getElementById("contenedorSubvariables");
-            if (!contenedor) return;
-            contenedor.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = true);
-            guardarEstadoVariablesActuales();
-            if (typeof window.ejecutarFiltradoSis === "function") {
-                window.ejecutarFiltradoSis();
-            }
-        });
-
-        document.getElementById("btnDesmarcarTodasSub")?.addEventListener("click", () => {
-            const contenedor = document.getElementById("contenedorSubvariables");
-            if (!contenedor) return;
-            contenedor.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = false);
-            guardarEstadoVariablesActuales();
-            if (typeof window.ejecutarFiltradoSis === "function") {
-                window.ejecutarFiltradoSis();
-            }
-        });
+        guardarEstadoVariablesActuales();
+        if (typeof window.ejecutarFiltradoSis === "function") {
+            window.ejecutarFiltradoSis();
+        }
     });
+
+    // 🟢 3. SELECTOR DE MÓDULO (Afecta subvariables y gráfica/tabla pequeña)
+    document.getElementById("filtroSisDetalle")?.addEventListener("change", (e) => {
+        const moduloSeleccionado = e.target.value;
+        mostrarCargandoGrafica();
+        toggleModoDesglose();
+
+        if (moduloSeleccionado === "todas") {
+            variablesPersonalizadasEstado["todas"] = [];
+        } else {
+            restaurarDefaultModulo(moduloSeleccionado);
+        }
+
+        renderSubvariables();
+        
+        // Si tienes datos locales, rediseñamos las vistas locales en lugar de romper el dataset principal
+        actualizarTablaEvolucion(datosFiltradosSis);
+        renderGraficaTemporal(datosFiltradosSis);
+        ocultarCargandoGrafica();
+    });
+
+    // 🟢 4. CONTROLES EXCLUSIVOS DE LA GRÁFICA TEMPORAL Y TABLA PEQUEÑA DE EVOLUCIÓN
+    document.getElementById("selectTipoVistaTemporal")?.addEventListener("change", () => {
+        renderGraficaTemporal(datosFiltradosSis);
+        actualizarTablaEvolucion(datosFiltradosSis); // Afecta únicamente a la vista pequeña
+    });
+
+    document.getElementById("selectModoDesglose")?.addEventListener("change", () => {
+        renderGraficaTemporal(datosFiltradosSis);
+        actualizarTablaEvolucion(datosFiltradosSis); // Afecta únicamente a la vista pequeña
+    });
+
+    document.getElementById("btnToggleValoresMensual")?.addEventListener("click", (e) => {
+        mostrarValoresMensual = !mostrarValoresMensual;
+        e.target.textContent = mostrarValoresMensual ? "Ocultar valores" : "Mostrar valores";
+        renderGraficaTemporal(datosFiltradosSis);
+    });
+
+    // 🟢 5. BOTONES SELECCIONAR / DESMARCAR TODAS
+    document.getElementById("btnSeleccionarTodasSub")?.addEventListener("click", () => {
+        const contenedor = document.getElementById("contenedorSubvariables");
+        if (!contenedor) return;
+        contenedor.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = true);
+        guardarEstadoVariablesActuales();
+        if (typeof window.ejecutarFiltradoSis === "function") {
+            window.ejecutarFiltradoSis();
+        }
+    });
+
+    document.getElementById("btnDesmarcarTodasSub")?.addEventListener("click", () => {
+        const contenedor = document.getElementById("contenedorSubvariables");
+        if (!contenedor) return;
+        contenedor.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = false);
+        guardarEstadoVariablesActuales();
+        if (typeof window.ejecutarFiltradoSis === "function") {
+            window.ejecutarFiltradoSis();
+        }
+    });
+});
 </script>
 
 {% endblock %}
