@@ -1889,6 +1889,9 @@
         // ======================================================
         // 6. DISPARO POR BOTONES DE ACCIÓN
         // ======================================================
+        // ======================================================
+        // 6. DISPARO POR BOTONES DE ACCIÓN (Con animación de Carga)
+        // ======================================================
         const selectoresBotonesAccion = [
             `#aplicarUnidades${sufijo}`, "#aplicarUnidades", "#aplicarUnidadesSis", "#btnAplicarSis",
             "#aplicarUnidadesUrgencias", "#aplicarUnidadesIndicadores", "#aplicarUnidadesEgresos",
@@ -1916,7 +1919,19 @@
                 cerrar(popoverServicio);
                 cerrar(popoverAfecciones);
 
-                ejecutarCargaGraficaYDatos();
+                // 1. Mostrar la capa de carga inmediatamente
+                const loader = document.getElementById("loaderOverlay");
+                if (loader) loader.style.display = "flex";
+
+                // 2. Dar margen de 50ms para que el navegador dibuje el loader antes del procesamiento intensivo
+                setTimeout(() => {
+                    try {
+                        ejecutarCargaGraficaYDatos();
+                    } finally {
+                        // 3. Ocultar el loader al finalizar
+                        if (loader) loader.style.display = "none";
+                    }
+                }, 50);
             }
         });
 
