@@ -1348,16 +1348,24 @@
 
     /* 6. INICIALIZACIÓN DE EVENTOS */
     document.addEventListener("DOMContentLoaded", () => {
+        // 🟢 1. DIBUJAR SUBVARIABLES Y SOLICITAR DATOS INICIALES AL SERVIDOR
         renderSubvariables();
-        //actualizarVistas();
 
-        // 🟢 1. OYENTES PARA CONTROLES DE MENÚ Y AGRUPACIÓN (Jurisdicción / Municipio / CLUES)
+        if (typeof window.ejecutarFiltradoSis === "function") {
+            window.ejecutarFiltradoSis(); // Pide datos al backend al abrir la página
+        } else {
+            actualizarVistas();
+        }
+
+        // 🟢 2. CONTROLES DE MENÚ Y AGRUPACIÓN (Jurisdicción / Municipio / CLUES)
         document.getElementById("selectNivelAgrupacion")?.addEventListener("change", () => {
-            actualizarVistas(); // Recalcula la agruparDatos() y redibuja #tablaSIS sin pedir datos al backend
+            actualizarVistas(); // Recalcula agruparDatos() sin consultar servidor
         });
 
-        // 🟢 2. SUBVARIABLES Y CHECKBOXES
+        // 🟢 3. SUBVARIABLES Y CHECKBOXES
         document.getElementById("contenedorSubvariables")?.addEventListener("change", (e) => {
+            e.stopPropagation();
+
             if (e.target.classList.contains('chk-padre')) {
                 const parentDetails = e.target.closest('details');
                 if (parentDetails) {
@@ -1391,16 +1399,17 @@
             }
 
             guardarEstadoVariablesActuales();
+
+            // Pide los datos actualizados a la API tras marcar/desmarcar
             if (typeof window.ejecutarFiltradoSis === "function") {
                 window.ejecutarFiltradoSis();
             }
         });
 
-        // 🟢 3. SELECTOR DE MÓDULO (Afecta subvariables y gráfica/tabla pequeña)
+        // 🟢 4. SELECTOR DE MÓDULO (Pide nuevos datos según el módulo)
         document.getElementById("filtroSisDetalle")?.addEventListener("change", (e) => {
-            e.stopPropagation(); // <-- EVITA QUE EL EVENTO SUBA Y DISPARE OTROS LISTENERS
+            e.stopPropagation();
             const moduloSeleccionado = e.target.value;
-            mostrarCargandoGrafica();
             toggleModoDesglose();
 
             if (moduloSeleccionado === "todas") {
@@ -1410,21 +1419,26 @@
             }
 
             renderSubvariables();
-            actualizarVistas();
-            actualizarTablaEvolucion(datosFiltradosSis);
-            renderGraficaTemporal(datosFiltradosSis);
-            ocultarCargandoGrafica();
+
+            // AQUÍ ESTABA EL FALLO: Debes consultar la API con las variables del nuevo módulo
+            if (typeof window.ejecutarFiltradoSis === "function") {
+                window.ejecutarFiltradoSis();
+            } else {
+                actualizarVistas();
+                actualizarTablaEvolucion(datosFiltradosSis);
+                renderGraficaTemporal(datosFiltradosSis);
+            }
         });
 
-        // 🟢 4. CONTROLES EXCLUSIVOS DE LA GRÁFICA TEMPORAL Y TABLA PEQUEÑA DE EVOLUCIÓN
+        // 🟢 5. CONTROLES EXCLUSIVOS DE LA GRÁFICA TEMPORAL Y EVOLUCIÓN
         document.getElementById("selectTipoVistaTemporal")?.addEventListener("change", () => {
             renderGraficaTemporal(datosFiltradosSis);
-            actualizarTablaEvolucion(datosFiltradosSis); // Afecta únicamente a la vista pequeña
+            actualizarTablaEvolucion(datosFiltradosSis);
         });
 
         document.getElementById("selectModoDesglose")?.addEventListener("change", () => {
             renderGraficaTemporal(datosFiltradosSis);
-            actualizarTablaEvolucion(datosFiltradosSis); // Afecta únicamente a la vista pequeña
+            actualizarTablaEvolucion(datosFiltradosSis);
         });
 
         document.getElementById("btnToggleValoresMensual")?.addEventListener("click", (e) => {
@@ -1433,7 +1447,7 @@
             renderGraficaTemporal(datosFiltradosSis);
         });
 
-        // 🟢 5. BOTONES SELECCIONAR / DESMARCAR TODAS
+        // 🟢 6. BOTONES SELECCIONAR / DESMARCAR TODAS
         document.getElementById("btnSeleccionarTodasSub")?.addEventListener("click", () => {
             const contenedor = document.getElementById("contenedorSubvariables");
             if (!contenedor) return;
