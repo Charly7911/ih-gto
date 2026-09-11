@@ -424,16 +424,15 @@
         const nivelAgrupacion = document.getElementById('selectNivelAgrupacion')?.value || 'clues';
         const moduloActual = document.getElementById("filtroSisDetalle")?.value || "todas";
 
-        // Columnas exactas que existen físicamente en la tabla HTML
+        // Columnas fijas de la tabla HTML
         const campos = [
             'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
             'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
             'orientacion_lac_des_obe', 'orientacion_eda_ira'
         ];
 
-        // Clasificación estricta según la descripción
         const normalizarApartado = (desc) => {
-            const text = (desc || '').toLowerCase();
+            const text = String(desc || '').toLowerCase();
             if (text.includes('consulta')) return 'consultas';
             if (text.includes('embaraz') || text.includes('matern')) return 'embarazadas';
             if (text.includes('mental')) return 'mental';
@@ -445,7 +444,7 @@
             if (text.includes('lactan') || text.includes('nutri') || text.includes('obes')) return 'orientacion_lac_des_obe';
             if (text.includes('eda') || text.includes('ira')) return 'orientacion_eda_ira';
 
-            return 'comodin';
+            return null; // Si no logra emparejar, devuelve null para decidir según el módulo
         };
 
         for (let i = 0; i < data.length; i++) {
@@ -481,26 +480,36 @@
                 };
             }
 
-            // 1. Acumulación segura de las columnas estándar
+            // 1. Mapeo directo: Si la fila trae propiedades con los nombres exactos de las columnas
+            let sumoEnCamposFijos = false;
             campos.forEach(c => {
-                mapa[key][c] += Number(r[c]) || 0;
+                const val = Number(r[c]) || 0;
+                if (val > 0) {
+                    mapa[key][c] += val;
+                    sumoEnCamposFijos = true;
+                }
             });
 
-            // 2. Manejo de valores genéricos cuando la respuesta de la API viene desagregada
-            const sumaEstandar = campos.reduce((acc, c) => acc + (Number(r[c]) || 0), 0);
-            const valorGenerico = Number(r.total || r.valor || r.suma || 0);
+            // 2. Mapeo seguro para cuando los registros vienen desagregados (r.total / r.valor)
+            if (!sumoEnCamposFijos) {
+                const valorGenerico = Number(r.total || r.valor || r.suma || 0);
 
-            if (sumaEstandar === 0 && valorGenerico > 0) {
-                let campoDestino = 'comodin';
+                if (valorGenerico > 0) {
+                    const descripcion = r.descripcion_apartado || r.apartado || r.modulo || r.des_apartado || '';
+                    let campoDestino = normalizarApartado(descripcion);
 
-                if (moduloActual !== 'todas' && campos.includes(moduloActual)) {
-                    campoDestino = moduloActual;
-                } else {
-                    const descripcion = r.descripcion_apartado || r.apartado || r.modulo || '';
-                    campoDestino = normalizarApartado(descripcion);
+                    // Si no se dedujo por texto y hay un módulo específico activo, asignarlo a ese módulo
+                    if (!campoDestino && moduloActual !== 'todas' && campos.includes(moduloActual)) {
+                        campoDestino = moduloActual;
+                    }
+
+                    // Si no se encuentra columna, va a comodin para EVITAR contaminar 'consultas'
+                    if (!campoDestino) {
+                        campoDestino = 'comodin';
+                    }
+
+                    mapa[key][campoDestino] += valorGenerico;
                 }
-
-                mapa[key][campoDestino] = (mapa[key][campoDestino] || 0) + valorGenerico;
             }
         }
 
