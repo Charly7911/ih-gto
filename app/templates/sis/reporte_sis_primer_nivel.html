@@ -818,15 +818,12 @@
     function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
     function ocultarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.add("d-none"); }
 
-
-
     async function realizarConsultaBackend() {
         mostrarCargandoGrafica();
 
-        if (typeof hayVariablesSeleccionadas === "function" && !hayVariablesSeleccionadas()) {
+        if (!hayVariablesSeleccionadas()) {
             datosFiltradosSis = [];
             actualizarVistas();
-            ocultarCargandoGrafica();
             return;
         }
 
@@ -837,6 +834,7 @@
 
         if (moduloActual === "todas") {
             const subvarsChecked = document.querySelectorAll('.chk-subvar:checked');
+
             subvarsChecked.forEach(chk => {
                 const modKey = chk.dataset.modulo || "otros";
                 const codVariable = chk.value;
@@ -854,7 +852,6 @@
         if (Object.keys(variablesAPasar).length === 0 || !Object.values(variablesAPasar).some(arr => arr.length > 0)) {
             datosFiltradosSis = [];
             actualizarVistas();
-            ocultarCargandoGrafica();
             return;
         }
 
@@ -884,8 +881,8 @@
             }
         } catch (err) {
             console.error("Error al conectar con la API SIS:", err);
-        } finally { // <-- AQUÍ ESTABA EL ERROR (se cambió 'final' por 'finally')
-            ocultarCargandoGrafica();
+        } finally {
+            ocultarCargandoGrafica(); // <-- Garantiza quitar el loader
         }
     }
 
@@ -903,7 +900,9 @@
         renderGraficaPorUnidad(datosActuales.filter(r => Number(r.anio) === Number(anioActivo)));
         renderGraficaTemporal(datosFiltradosSis);
 
+        // 🟢 NUEVA INTEGRACIÓN
         actualizarTablaEvolucion(datosFiltradosSis);
+        ocultarCargandoGrafica();
     }
 
     function actualizarTablaEvolucion(data = datosFiltradosSis) {
@@ -937,6 +936,7 @@
             return Number(r[modulo]) || Number(r.comodin) || Number(r.total) || Number(r.valor) || 0;
         };
 
+        // Agrupamiento por año y mes
         const resumenPeriodo = {};
 
         data.forEach(r => {
@@ -951,6 +951,7 @@
             resumenPeriodo[clave].total += obtenerSumaFila(r);
         });
 
+        // Ordenar de forma descendente por Año y Mes
         const listaOrdenada = Object.values(resumenPeriodo).sort((a, b) => {
             if (b.anio !== a.anio) return b.anio - a.anio;
             return b.mes - a.mes;
@@ -988,10 +989,10 @@
         }
 
         tabs.innerHTML = anios.map(anio => `
-        <li class="nav-item">
-            <button class="nav-link ${Number(anio) === Number(anioActivo) ? 'active' : ''}" data-anio="${anio}">${anio}</button>
-        </li>
-    `).join('');
+            <li class="nav-item">
+                <button class="nav-link ${Number(anio) === Number(anioActivo) ? 'active' : ''}" data-anio="${anio}">${anio}</button>
+            </li>
+        `).join('');
 
         tabs.querySelectorAll("button").forEach(btn => {
             btn.addEventListener("click", (e) => {
@@ -1007,17 +1008,18 @@
         });
     }
 
+
+    // PARTE 2
+
     function renderTablaSis() {
-        if (typeof actualizarEncabezadoSIS === "function") {
-            actualizarEncabezadoSIS(anioActivo);
-        }
+        actualizarEncabezadoSIS(anioActivo);
         const tbody = document.getElementById("tablaSIS");
         const paginacion = document.getElementById("paginacionTabla");
         const infoPaging = document.getElementById("infoPaginacion");
 
         if (!tbody || !paginacion) return;
 
-        // Normalización de tipos de datos estricta
+        // Normalización de tipo para comparación estricta segura
         const datosFiltrados = datosActuales.filter(r => Number(r.anio) === Number(anioActivo));
         const inicio = (paginaActual - 1) * FILAS_POR_PAGINA;
         const paginaDatos = datosFiltrados.slice(inicio, inicio + FILAS_POR_PAGINA);
@@ -1026,31 +1028,23 @@
             infoPaging.textContent = `Mostrando ${paginaDatos.length} de ${datosFiltrados.length} registros (Página ${paginaActual})`;
         }
 
-        if (paginaDatos.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="12" class="text-center text-muted">No hay información para este año</td></tr>`;
-            paginacion.innerHTML = "";
-            return;
-        }
-
-        const formatearValor = (val) => typeof fmt === "function" ? fmt(val || 0) : (val || 0);
-
         tbody.innerHTML = paginaDatos.map(r => `
-        <tr>
-            <td class="text-center fw-bold">${r.anio}</td>
-            <td><small class="text-muted">${r.clues}</small></td>
-            <td>${r.nombre_unidad}</td>
-            <td class="text-center">${formatearValor(r.consultas)}</td>
-            <td class="text-center">${formatearValor(r.embarazadas)}</td>
-            <td class="text-center">${formatearValor(r.mental)}</td>
-            <td class="text-center">${formatearValor(r.bucal)}</td>
-            <td class="text-center">${formatearValor(r.tamiz)}</td>
-            <td class="text-center">${formatearValor(r.planificacion_familiar)}</td>
-            <td class="text-center">${formatearValor(r.detecciones)}</td>
-            <td class="text-center">${formatearValor(r.detecciones_cardiometabolicas)}</td>
-            <td class="text-center">${formatearValor(r.orientacion_lac_des_obe)}</td>
-            <td class="text-center">${formatearValor(r.orientacion_eda_ira)}</td>
-        </tr>
-    `).join('');
+            <tr>
+                <td class="text-center fw-bold">${r.anio}</td>
+                <td><small class="text-muted">${r.clues}</small></td>
+                <td>${r.nombre_unidad}</td>
+                <td class="text-center">${fmt(r.consultas)}</td>
+                <td class="text-center">${fmt(r.embarazadas)}</td>
+                <td class="text-center">${fmt(r.mental)}</td>
+                <td class="text-center">${fmt(r.bucal)}</td>
+                <td class="text-center">${fmt(r.tamiz)}</td>
+                <td class="text-center">${fmt(r.planificacion_familiar)}</td>
+                <td class="text-center">${fmt(r.detecciones)}</td>
+                <td class="text-center">${fmt(r.detecciones_cardiometabolicas)}</td>
+                <td class="text-center">${fmt(r.orientacion_lac_des_obe)}</td>
+                <td class="text-center">${fmt(r.orientacion_eda_ira)}</td>
+            </tr>
+        `).join('');
 
         const totalPaginas = Math.ceil(datosFiltrados.length / FILAS_POR_PAGINA);
         let paginasHTML = "";
@@ -1070,17 +1064,11 @@
         const ctx = document.getElementById('graficaSisPorAnio');
         if (!ctx) return;
 
-        if (typeof graficaAnio !== 'undefined' && graficaAnio) graficaAnio.destroy();
+        if (graficaAnio) graficaAnio.destroy();
         if (!data || data.length === 0) return;
 
         const porAnio = {};
-        const campos = ['consultas', 'embarazadas', 'mental', 'bucal', 'tamiz', 'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas', 'orientacion_lac_des_obe', 'orientacion_eda_ira', 'comodin'];
-
-        data.forEach(r => {
-            let sumaFila = 0;
-            campos.forEach(c => sumaFila += Number(r[c]) || 0);
-            porAnio[r.anio] = (porAnio[r.anio] || 0) + sumaFila;
-        });
+        data.forEach(r => { porAnio[r.anio] = (porAnio[r.anio] || 0) + (Number(r.consultas) || 0); });
 
         const anios = Object.keys(porAnio).sort();
         const colores = ['#4E79A7', '#59A14F', '#F28E2B', '#E15759', '#76B7B2', '#EDC948', '#B07AA1'];
@@ -1091,7 +1079,7 @@
             options: {
                 responsive: true,
                 animation: false,
-                scales: { y: { beginAtZero: true, ticks: { callback: v => typeof fmt === "function" ? fmt(v) : v } } },
+                scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
                 plugins: {
                     legend: { display: false },
                     datalabels: {
@@ -1099,7 +1087,7 @@
                         align: 'center',
                         color: '#ffffff',
                         font: { weight: 'bold', size: 11 },
-                        formatter: (val) => (val > 0 && typeof fmt === "function") ? fmt(val) : (val > 0 ? val : '')
+                        formatter: (val) => val > 0 ? fmt(val) : ''
                     }
                 }
             }
@@ -1111,7 +1099,7 @@
         const elTitulo = document.getElementById("tituloGraficaSis");
         if (!ctx) return;
 
-        if (typeof graficaUnidad !== 'undefined' && graficaUnidad) graficaUnidad.destroy();
+        if (graficaUnidad) graficaUnidad.destroy();
 
         if (!data || data.length === 0) {
             if (elTitulo) elTitulo.innerHTML = `Indicadores — Sin variables seleccionadas`;
@@ -1145,14 +1133,14 @@
                 indexAxis: 'y',
                 responsive: true,
                 animation: false,
-                scales: { x: { stacked: true, ticks: { callback: v => typeof fmt === "function" ? fmt(v) : v } }, y: { stacked: true } },
+                scales: { x: { stacked: true, ticks: { callback: v => fmt(v) } }, y: { stacked: true } },
                 plugins: {
                     datalabels: {
                         anchor: 'center',
                         align: 'center',
                         color: '#ffffff',
                         font: { weight: 'bold', size: 10 },
-                        formatter: (val) => (val > 0 && typeof fmt === "function") ? fmt(val) : (val > 0 ? val : '')
+                        formatter: (val) => val > 0 ? fmt(val) : ''
                     }
                 }
             }
@@ -1160,8 +1148,7 @@
 
         if (elTitulo) {
             const totalGeneral = datasets.reduce((acc, ds) => acc + ds.data.reduce((a, b) => a + b, 0), 0);
-            const totalTexto = typeof fmt === "function" ? fmt(totalGeneral) : totalGeneral;
-            elTitulo.innerHTML = `Indicadores <strong>${anioActivo || 'General'}</strong> — Total Seleccionado: <strong>${totalTexto}</strong>`;
+            elTitulo.innerHTML = `Indicadores <strong>${anioActivo || 'General'}</strong> — Total Seleccionado: <strong>${fmt(totalGeneral)}</strong>`;
         }
     }
 
@@ -1178,6 +1165,8 @@
         }
     }
 
+
+
     function renderGraficaTemporal(data = datosFiltradosSis) {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
@@ -1186,7 +1175,8 @@
 
         if (!ctx) return;
 
-        if (typeof graficaSisMensual !== 'undefined' && graficaSisMensual) {
+        // Destrucción limpia sin afectar otras instancias
+        if (graficaSisMensual) {
             graficaSisMensual.destroy();
             graficaSisMensual = null;
         }
@@ -1199,18 +1189,24 @@
             '#e83e8c', '#17a2b8', '#fd7e14', '#6c757d', '#343a40', '#17a2b8'
         ];
 
+        // Lista de campos estándar + la variable en memoria 'comodin'
         const camposApartados = [
             'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
             'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
             'orientacion_lac_des_obe', 'orientacion_eda_ira', 'comodin'
         ];
 
+        // Cálculo exclusivo para las series de tiempo (sin alterar la tabla ni Graf 1 y 2)
         const obtenerSumaFila = (r) => {
             if (modulo === "todas") {
                 let sumaCampos = 0;
                 camposApartados.forEach(c => { sumaCampos += Number(r[c]) || 0; });
+
+                // Si el backend envía un registro suelto con valor en total/suma y no venía en los campos
                 return sumaCampos > 0 ? sumaCampos : Number(r.total || r.valor || r.suma || 0);
             }
+
+            // Si se selecciona un módulo específico o el comodín
             return Number(r[modulo]) || Number(r.comodin) || Number(r.total) || Number(r.valor) || 0;
         };
 
@@ -1218,6 +1214,7 @@
         let datasets = [];
         const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
+        // 🟢 MODO DESGLOSADO POR APARTADO
         if (modoDesglose === "por_apartado") {
             if (tipoVista === 'anio') {
                 const apartadosAnual = {};
@@ -1280,7 +1277,9 @@
                     };
                 });
             }
-        } else {
+        }
+        // 🟡 MODO ACUMULADO
+        else {
             if (tipoVista === 'anio') {
                 const acumuladoAnual = {};
                 data.forEach(r => {
@@ -1323,6 +1322,7 @@
 
         if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
 
+        // Renderizar gráfico final
         graficaSisMensual = new Chart(ctx, {
             type: tipoVista === 'anio' ? 'bar' : 'line',
             data: { labels, datasets },
@@ -1348,19 +1348,15 @@
 
     /* 6. INICIALIZACIÓN DE EVENTOS */
     document.addEventListener("DOMContentLoaded", () => {
-        if (typeof renderSubvariables === "function") renderSubvariables();
+        renderSubvariables();
+        //actualizarVistas();
 
-        // Disparar filtrado inicial únicamente si existen variables activas
-        if (typeof window.ejecutarFiltradoSis === "function") {
-            window.ejecutarFiltradoSis();
-        } else {
-            actualizarVistas();
-        }
-
+        // 🟢 1. OYENTES PARA CONTROLES DE MENÚ Y AGRUPACIÓN (Jurisdicción / Municipio / CLUES)
         document.getElementById("selectNivelAgrupacion")?.addEventListener("change", () => {
-            actualizarVistas();
+            actualizarVistas(); // Recalcula la agruparDatos() y redibuja #tablaSIS sin pedir datos al backend
         });
 
+        // 🟢 2. SUBVARIABLES Y CHECKBOXES
         document.getElementById("contenedorSubvariables")?.addEventListener("change", (e) => {
             if (e.target.classList.contains('chk-padre')) {
                 const parentDetails = e.target.closest('details');
@@ -1394,57 +1390,55 @@
                 }
             }
 
-            if (typeof guardarEstadoVariablesActuales === "function") guardarEstadoVariablesActuales();
+            guardarEstadoVariablesActuales();
             if (typeof window.ejecutarFiltradoSis === "function") {
                 window.ejecutarFiltradoSis();
             }
         });
 
+        // 🟢 3. SELECTOR DE MÓDULO (Afecta subvariables y gráfica/tabla pequeña)
         document.getElementById("filtroSisDetalle")?.addEventListener("change", (e) => {
+            e.stopPropagation(); // <-- EVITA QUE EL EVENTO SUBA Y DISPARE OTROS LISTENERS
             const moduloSeleccionado = e.target.value;
             mostrarCargandoGrafica();
             toggleModoDesglose();
 
-            if (typeof variablesPersonalizadasEstado !== "undefined") {
-                if (moduloSeleccionado === "todas") {
-                    variablesPersonalizadasEstado["todas"] = [];
-                } else if (typeof restaurarDefaultModulo === "function") {
-                    restaurarDefaultModulo(moduloSeleccionado);
-                }
+            if (moduloSeleccionado === "todas") {
+                variablesPersonalizadasEstado["todas"] = [];
+            } else {
+                restaurarDefaultModulo(moduloSeleccionado);
             }
 
-            if (typeof renderSubvariables === "function") renderSubvariables();
-
+            renderSubvariables();
             actualizarVistas();
             actualizarTablaEvolucion(datosFiltradosSis);
             renderGraficaTemporal(datosFiltradosSis);
-
             ocultarCargandoGrafica();
         });
 
+        // 🟢 4. CONTROLES EXCLUSIVOS DE LA GRÁFICA TEMPORAL Y TABLA PEQUEÑA DE EVOLUCIÓN
         document.getElementById("selectTipoVistaTemporal")?.addEventListener("change", () => {
             renderGraficaTemporal(datosFiltradosSis);
-            actualizarTablaEvolucion(datosFiltradosSis);
+            actualizarTablaEvolucion(datosFiltradosSis); // Afecta únicamente a la vista pequeña
         });
 
         document.getElementById("selectModoDesglose")?.addEventListener("change", () => {
             renderGraficaTemporal(datosFiltradosSis);
-            actualizarTablaEvolucion(datosFiltradosSis);
+            actualizarTablaEvolucion(datosFiltradosSis); // Afecta únicamente a la vista pequeña
         });
 
         document.getElementById("btnToggleValoresMensual")?.addEventListener("click", (e) => {
-            if (typeof mostrarValoresMensual !== "undefined") {
-                mostrarValoresMensual = !mostrarValoresMensual;
-                e.target.textContent = mostrarValoresMensual ? "Ocultar valores" : "Mostrar valores";
-            }
+            mostrarValoresMensual = !mostrarValoresMensual;
+            e.target.textContent = mostrarValoresMensual ? "Ocultar valores" : "Mostrar valores";
             renderGraficaTemporal(datosFiltradosSis);
         });
 
+        // 🟢 5. BOTONES SELECCIONAR / DESMARCAR TODAS
         document.getElementById("btnSeleccionarTodasSub")?.addEventListener("click", () => {
             const contenedor = document.getElementById("contenedorSubvariables");
             if (!contenedor) return;
             contenedor.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = true);
-            if (typeof guardarEstadoVariablesActuales === "function") guardarEstadoVariablesActuales();
+            guardarEstadoVariablesActuales();
             if (typeof window.ejecutarFiltradoSis === "function") {
                 window.ejecutarFiltradoSis();
             }
@@ -1454,7 +1448,7 @@
             const contenedor = document.getElementById("contenedorSubvariables");
             if (!contenedor) return;
             contenedor.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = false);
-            if (typeof guardarEstadoVariablesActuales === "function") guardarEstadoVariablesActuales();
+            guardarEstadoVariablesActuales();
             if (typeof window.ejecutarFiltradoSis === "function") {
                 window.ejecutarFiltradoSis();
             }
