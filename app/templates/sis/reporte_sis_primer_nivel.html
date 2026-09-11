@@ -424,15 +424,16 @@
         const nivelAgrupacion = document.getElementById('selectNivelAgrupacion')?.value || 'clues';
         const moduloActual = document.getElementById("filtroSisDetalle")?.value || "todas";
 
-        // Columnas fijas de la tabla HTML
+        // Columnas exactas que existen físicamente en la tabla HTML
         const campos = [
             'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
             'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
             'orientacion_lac_des_obe', 'orientacion_eda_ira'
         ];
 
+        // Clasificación estricta según la descripción
         const normalizarApartado = (desc) => {
-            const text = String(desc || '').toLowerCase();
+            const text = (desc || '').toLowerCase();
             if (text.includes('consulta')) return 'consultas';
             if (text.includes('embaraz') || text.includes('matern')) return 'embarazadas';
             if (text.includes('mental')) return 'mental';
@@ -444,7 +445,7 @@
             if (text.includes('lactan') || text.includes('nutri') || text.includes('obes')) return 'orientacion_lac_des_obe';
             if (text.includes('eda') || text.includes('ira')) return 'orientacion_eda_ira';
 
-            return null; // Si no logra emparejar, devuelve null para decidir según el módulo
+            return 'comodin';
         };
 
         for (let i = 0; i < data.length; i++) {
@@ -480,36 +481,26 @@
                 };
             }
 
-            // 1. Mapeo directo: Si la fila trae propiedades con los nombres exactos de las columnas
-            let sumoEnCamposFijos = false;
+            // 1. Acumulación segura de las columnas estándar
             campos.forEach(c => {
-                const val = Number(r[c]) || 0;
-                if (val > 0) {
-                    mapa[key][c] += val;
-                    sumoEnCamposFijos = true;
-                }
+                mapa[key][c] += Number(r[c]) || 0;
             });
 
-            // 2. Mapeo seguro para cuando los registros vienen desagregados (r.total / r.valor)
-            if (!sumoEnCamposFijos) {
-                const valorGenerico = Number(r.total || r.valor || r.suma || 0);
+            // 2. Manejo de valores genéricos cuando la respuesta de la API viene desagregada
+            const sumaEstandar = campos.reduce((acc, c) => acc + (Number(r[c]) || 0), 0);
+            const valorGenerico = Number(r.total || r.valor || r.suma || 0);
 
-                if (valorGenerico > 0) {
-                    const descripcion = r.descripcion_apartado || r.apartado || r.modulo || r.des_apartado || '';
-                    let campoDestino = normalizarApartado(descripcion);
+            if (sumaEstandar === 0 && valorGenerico > 0) {
+                let campoDestino = 'comodin';
 
-                    // Si no se dedujo por texto y hay un módulo específico activo, asignarlo a ese módulo
-                    if (!campoDestino && moduloActual !== 'todas' && campos.includes(moduloActual)) {
-                        campoDestino = moduloActual;
-                    }
-
-                    // Si no se encuentra columna, va a comodin para EVITAR contaminar 'consultas'
-                    if (!campoDestino) {
-                        campoDestino = 'comodin';
-                    }
-
-                    mapa[key][campoDestino] += valorGenerico;
+                if (moduloActual !== 'todas' && campos.includes(moduloActual)) {
+                    campoDestino = moduloActual;
+                } else {
+                    const descripcion = r.descripcion_apartado || r.apartado || r.modulo || '';
+                    campoDestino = normalizarApartado(descripcion);
                 }
+
+                mapa[key][campoDestino] = (mapa[key][campoDestino] || 0) + valorGenerico;
             }
         }
 
@@ -814,7 +805,6 @@
         }
     }
 
-
     function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
     function ocultarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.add("d-none"); }
 
@@ -881,8 +871,6 @@
             }
         } catch (err) {
             console.error("Error al conectar con la API SIS:", err);
-        } finally {
-            ocultarCargandoGrafica(); // <-- Garantiza quitar el loader
         }
     }
 
@@ -1348,24 +1336,16 @@
 
     /* 6. INICIALIZACIÓN DE EVENTOS */
     document.addEventListener("DOMContentLoaded", () => {
-        // 🟢 1. DIBUJAR SUBVARIABLES Y SOLICITAR DATOS INICIALES AL SERVIDOR
         renderSubvariables();
+        actualizarVistas();
 
-        if (typeof window.ejecutarFiltradoSis === "function") {
-            window.ejecutarFiltradoSis(); // Pide datos al backend al abrir la página
-        } else {
-            actualizarVistas();
-        }
-
-        // 🟢 2. CONTROLES DE MENÚ Y AGRUPACIÓN (Jurisdicción / Municipio / CLUES)
+        // 🟢 1. OYENTES PARA CONTROLES DE MENÚ Y AGRUPACIÓN (Jurisdicción / Municipio / CLUES)
         document.getElementById("selectNivelAgrupacion")?.addEventListener("change", () => {
-            actualizarVistas(); // Recalcula agruparDatos() sin consultar servidor
+            actualizarVistas(); // Recalcula la agruparDatos() y redibuja #tablaSIS sin pedir datos al backend
         });
 
-        // 🟢 3. SUBVARIABLES Y CHECKBOXES
+        // 🟢 2. SUBVARIABLES Y CHECKBOXES
         document.getElementById("contenedorSubvariables")?.addEventListener("change", (e) => {
-            e.stopPropagation();
-
             if (e.target.classList.contains('chk-padre')) {
                 const parentDetails = e.target.closest('details');
                 if (parentDetails) {
@@ -1399,17 +1379,15 @@
             }
 
             guardarEstadoVariablesActuales();
-
-            // Pide los datos actualizados a la API tras marcar/desmarcar
             if (typeof window.ejecutarFiltradoSis === "function") {
                 window.ejecutarFiltradoSis();
             }
         });
 
-        // 🟢 4. SELECTOR DE MÓDULO (Pide nuevos datos según el módulo)
+        // 🟢 3. SELECTOR DE MÓDULO (Afecta subvariables y gráfica/tabla pequeña)
         document.getElementById("filtroSisDetalle")?.addEventListener("change", (e) => {
-            e.stopPropagation();
             const moduloSeleccionado = e.target.value;
+            mostrarCargandoGrafica();
             toggleModoDesglose();
 
             if (moduloSeleccionado === "todas") {
@@ -1420,25 +1398,25 @@
 
             renderSubvariables();
 
-            // AQUÍ ESTABA EL FALLO: Debes consultar la API con las variables del nuevo módulo
-            if (typeof window.ejecutarFiltradoSis === "function") {
-                window.ejecutarFiltradoSis();
-            } else {
-                actualizarVistas();
-                actualizarTablaEvolucion(datosFiltradosSis);
-                renderGraficaTemporal(datosFiltradosSis);
-            }
+            // 🟢 RECALCULA EL MAPA Y ACTUALIZA LA TABLA PRINCIPAL Y TODAS LAS VISTAS LOCALES
+            actualizarVistas();
+
+            // 🟢 MANTIENE SINCRONIZADA LA TABLA DE EVOLUCIÓN Y GRÁFICA TEMPORAL
+            actualizarTablaEvolucion(datosFiltradosSis);
+            renderGraficaTemporal(datosFiltradosSis);
+
+            ocultarCargandoGrafica();
         });
 
-        // 🟢 5. CONTROLES EXCLUSIVOS DE LA GRÁFICA TEMPORAL Y EVOLUCIÓN
+        // 🟢 4. CONTROLES EXCLUSIVOS DE LA GRÁFICA TEMPORAL Y TABLA PEQUEÑA DE EVOLUCIÓN
         document.getElementById("selectTipoVistaTemporal")?.addEventListener("change", () => {
             renderGraficaTemporal(datosFiltradosSis);
-            actualizarTablaEvolucion(datosFiltradosSis);
+            actualizarTablaEvolucion(datosFiltradosSis); // Afecta únicamente a la vista pequeña
         });
 
         document.getElementById("selectModoDesglose")?.addEventListener("change", () => {
             renderGraficaTemporal(datosFiltradosSis);
-            actualizarTablaEvolucion(datosFiltradosSis);
+            actualizarTablaEvolucion(datosFiltradosSis); // Afecta únicamente a la vista pequeña
         });
 
         document.getElementById("btnToggleValoresMensual")?.addEventListener("click", (e) => {
@@ -1447,7 +1425,7 @@
             renderGraficaTemporal(datosFiltradosSis);
         });
 
-        // 🟢 6. BOTONES SELECCIONAR / DESMARCAR TODAS
+        // 🟢 5. BOTONES SELECCIONAR / DESMARCAR TODAS
         document.getElementById("btnSeleccionarTodasSub")?.addEventListener("click", () => {
             const contenedor = document.getElementById("contenedorSubvariables");
             if (!contenedor) return;
@@ -1468,8 +1446,6 @@
             }
         });
     });
-
-
 </script>
 
 {% endblock %}
