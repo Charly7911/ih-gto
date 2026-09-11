@@ -1882,16 +1882,11 @@
 
             document.dispatchEvent(new CustomEvent("aplicarFiltroUnidades", { detail: payloadFiltros }));
 
-            setTimeout(ejecutarGraficasSis, 300);
-            setTimeout(ejecutarGraficasSis, 800);
+            await new Promise(resolve => setTimeout(resolve, 200));
         }
 
         // ======================================================
         // 6. DISPARO POR BOTONES DE ACCIÓN
-        // ======================================================
-
-        // ======================================================
-        // 6. DISPARO POR BOTONES DE ACCIÓN (Con espera asíncrona)
         // ======================================================
         const selectoresBotonesAccion = [
             `#aplicarUnidades${sufijo}`, "#aplicarUnidades", "#aplicarUnidadesSis", "#btnAplicarSis",

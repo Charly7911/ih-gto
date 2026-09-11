@@ -766,6 +766,7 @@
     function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
     function ocultarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.add("d-none"); }
 
+   // Retornamos la promesa para que pueda ser esperada con 'await'
     async function realizarConsultaBackend() {
         mostrarCargandoGrafica();
 
@@ -779,11 +780,9 @@
         const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const modoDesglose = document.getElementById("selectModoDesglose")?.value || "por_apartado";
 
-        // 🟢 RECOLECCIÓN EXACTA: Lee directamente del DOM los checkboxes de subvariables marcados
         let variablesAPasar = {};
 
         if (moduloActual === "todas") {
-            // Seleccionamos solo las subvariables que están CHECKED en la interfaz
             const subvarsChecked = document.querySelectorAll('.chk-subvar:checked');
 
             subvarsChecked.forEach(chk => {
@@ -796,12 +795,10 @@
                 variablesAPasar[modKey].push(codVariable);
             });
         } else {
-            // Si hay un módulo específico, filtramos solo los checkboxes checked de ese módulo
             const subvarsModulo = document.querySelectorAll(`.chk-subvar[data-modulo="${moduloActual}"]:checked`);
             variablesAPasar[moduloActual] = Array.from(subvarsModulo).map(chk => chk.value);
         }
 
-        // Si no quedó ninguna variable marcada, cancelamos y limpiamos
         if (Object.keys(variablesAPasar).length === 0 || !Object.values(variablesAPasar).some(arr => arr.length > 0)) {
             datosFiltradosSis = [];
             actualizarVistas();
@@ -840,6 +837,11 @@
         }
     }
 
+    // CORRECCIÓN: Se elimina el setTimeout/debounce para que devuelva la Promesa directamente
+    window.ejecutarFiltradoSis = function () {
+        return realizarConsultaBackend();
+    };
+
 
     function actualizarVistas() {
         datosActuales = agruparDatos(datosFiltradosSis);
@@ -852,11 +854,7 @@
         renderGraficaTemporal(datosFiltradosSis);
     }
 
-    window.ejecutarFiltradoSis = function (delay = 150) {
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => { realizarConsultaBackend(); }, delay);
-    };
-
+  
     /* 4. TABLA Y PAGINACIÓN */
     function renderTabsAnios(data) {
         const tabs = document.getElementById("tabsAnios");
@@ -1317,4 +1315,5 @@
         
     });
 </script>
+
 {% endblock %}
