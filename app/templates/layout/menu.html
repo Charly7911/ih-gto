@@ -1823,7 +1823,7 @@
             if (typeof renderChartSis === "function") renderChartSis();
         }
 
-        function ejecutarCargaGraficaYDatos() {
+        async function ejecutarCargaGraficaYDatos() {
             const btnActual = obtenerBotonUnidades();
             const totalSelUnidades = obtenerCheckboxesUnidadesGlobal().length;
             if (btnActual) {
@@ -1889,8 +1889,9 @@
         // ======================================================
         // 6. DISPARO POR BOTONES DE ACCIÓN
         // ======================================================
+
         // ======================================================
-        // 6. DISPARO POR BOTONES DE ACCIÓN (Con animación de Carga)
+        // 6. DISPARO POR BOTONES DE ACCIÓN (Con espera asíncrona)
         // ======================================================
         const selectoresBotonesAccion = [
             `#aplicarUnidades${sufijo}`, "#aplicarUnidades", "#aplicarUnidadesSis", "#btnAplicarSis",
@@ -1919,16 +1920,18 @@
                 cerrar(popoverServicio);
                 cerrar(popoverAfecciones);
 
-                // 1. Mostrar la capa de carga inmediatamente
+                // 1. Mostrar la capa de carga
                 const loader = document.getElementById("loaderOverlay");
                 if (loader) loader.style.display = "flex";
 
-                // 2. Dar margen de 50ms para que el navegador dibuje el loader antes del procesamiento intensivo
-                setTimeout(() => {
+                // 2. Ejecutar la función y ESPERAR a que termine todo el procesamiento
+                setTimeout(async () => {
                     try {
-                        ejecutarCargaGraficaYDatos();
+                        await ejecutarCargaGraficaYDatos();
+                    } catch (error) {
+                        console.error("Error al actualizar datos y gráficas:", error);
                     } finally {
-                        // 3. Ocultar el loader al finalizar
+                        // 3. Ocultar el loader solo hasta que las llamadas hayan finalizado
                         if (loader) loader.style.display = "none";
                     }
                 }, 50);
