@@ -192,216 +192,656 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-
 <script>
-    /* ==========================================================================
-       VARIABLES GLOBALES Y ESTADOS DE CONTROL
-       ========================================================================== */
-    let datosConsultasBase = [];  // Datos globales para Tabla + Gráficas Superiores
-    let datosFiltradosSis = [];   // Datos dinámicos para la Gráfica Temporal (3ra)
-    let anioActivo = null;
+    if (typeof ChartDataLabels !== 'undefined') {
+        Chart.register(ChartDataLabels);
+    }
+
+    /* 1. INYECCIÓN DE DATOS Y VALORES PREDETERMINADOS DESDE FLASK */
+    const controlAnual = JSON.parse('{{ (control_anual | default([])) | tojson | safe }}');
+    const sisResultadosIniciales = JSON.parse('{{ (resultados | default([])) | tojson | safe }}');
+    const DICCIONARIO_VARIABLES = JSON.parse('{{ (catalogo_variables | default({})) | tojson | safe }}');
+
+    if (!DICCIONARIO_VARIABLES["otros"]) {
+        DICCIONARIO_VARIABLES["otros"] = [];
+    }
+
+    const VARIABLES_DEFAULT = JSON.parse('{{ (variables_default | default({})) | tojson | safe }}');
+
+    const FILAS_POR_PAGINA = 15;
+
+    let datosActuales = [];
+    let datosFiltradosSis = [...sisResultadosIniciales];
     let paginaActual = 1;
-    const FILAS_POR_PAGINA = 10;
+    let anioActivo = null;
+    let mostrarValoresMensual = false;
+
+    let variablesPersonalizadasEstado = structuredClone(VARIABLES_DEFAULT);
 
     let graficaAnio = null;
     let graficaUnidad = null;
     let graficaSisMensual = null;
-    let debounceTimerSis = null;
-    let mostrarValoresMensual = true;
+    let debounceTimer = null;
 
-    // Almacena qué checkboxes de subvariables están seleccionados por cada módulo
-    const variablesPersonalizadasEstado = {};
+    const fmt = (n) => Number(n || 0).toLocaleString("es-MX");
 
-    /* Helper para formatear números con separador de miles */
-    function fmt(val) {
-        if (val === null || val === undefined || isNaN(val)) return '0';
-        return Number(val).toLocaleString('es-MX');
+    function actualizarEncabezadoSIS(anio) {
+        const meta = document.getElementById("sis-meta");
+        if (!meta) return;
+        const registro = controlAnual.find(r => r.anio === anio);
+        meta.textContent = registro ? ` | ${registro.estatus_inicio} · ${registro.estatus}` : "";
     }
 
-    /* 1. MANEJO DE ACORDEONES Y VARIABLES */
-    function guardarEstadoVariablesActuales() {
-        const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
-        const contenedor = document.getElementById("contenedorSubvariables");
-        if (!contenedor) return;
-
-        const seleccionados = [];
-        contenedor.querySelectorAll(".chk-subvar:checked").forEach(cb => {
-            seleccionados.push(cb.value);
-        });
-
-        variablesPersonalizadasEstado[moduloActual] = seleccionados;
+    function restaurarDefaultModulo(modKey) {
+        if (modKey === "todas") {
+            variablesPersonalizadasEstado["todas"] = [];
+        } else if (VARIABLES_DEFAULT[modKey]) {
+            variablesPersonalizadasEstado[modKey] = [...VARIABLES_DEFAULT[modKey]];
+        }
     }
 
-    function restaurarDefaultModulo(modulo) {
-        if (typeof mapaSubvariables === 'undefined' || !mapaSubvariables[modulo]) return;
-        const subvarsDefault = [];
-        mapaSubvariables[modulo].forEach(cat => {
-            if (cat.variables) {
-                cat.variables.forEach(v => subvarsDefault.push(String(v.id)));
-            }
-        });
-        variablesPersonalizadasEstado[modulo] = subvarsDefault;
-    }
+    /* 2. RENDERIZADO DEL ÁRBOL TIPO TREEVIEW */
 
     function renderSubvariables() {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const contenedor = document.getElementById("contenedorSubvariables");
+        const lbl = document.getElementById("lblSubvariablesModulo");
+
         if (!contenedor) return;
 
-        toggleModoDesglose();
+        const modulosAProcesar = modulo === "todas" ? Object.keys(DICCIONARIO_VARIABLES) : [modulo];
+        const mapaApartados = {};
 
-        if (modulo === "todas" || typeof mapaSubvariables === 'undefined' || !mapaSubvariables[modulo]) {
-            contenedor.innerHTML = `<div class="text-muted small p-2">Mostrando vista consolidada de todas las secciones.</div>`;
-            return;
-        }
+        const seleccionadasTodas = modulo === "todas" ? (variablesPersonalizadasEstado["todas"] || []) : null;
 
-        const categorias = mapaSubvariables[modulo];
-        let seleccionados = variablesPersonalizadasEstado[modulo];
+        // 1. Recorrer la estructura del catálogo (DICCIONARIO_VARIABLES)
+        modulosAProcesar.forEach((modKey) => {
+            const estructuraModulo = DICCIONARIO_VARIABLES[modKey] || [];
 
-        if (!seleccionados) {
-            restaurarDefaultModulo(modulo);
-            seleccionados = variablesPersonalizadasEstado[modulo] || [];
-        }
-
-        let html = '';
-        categorias.forEach((cat, index) => {
-            const idsVariablesCat = cat.variables ? cat.variables.map(v => String(v.id)) : [];
-            const marcadosEnCat = idsVariablesCat.filter(id => seleccionados.includes(id)).length;
-            const totalEnCat = idsVariablesCat.length;
-
-            let parentChecked = false;
-            let parentIndeterminate = false;
-
-            if (marcadosEnCat === totalEnCat && totalEnCat > 0) {
-                parentChecked = true;
-            } else if (marcadosEnCat > 0) {
-                parentIndeterminate = true;
+            if (modulo !== "todas" && !variablesPersonalizadasEstado[modKey] && VARIABLES_DEFAULT[modKey]) {
+                variablesPersonalizadasEstado[modKey] = [...VARIABLES_DEFAULT[modKey]];
             }
 
-            html += `
-                <details class="mb-2 border rounded p-2" ${index === 0 ? 'open' : ''}>
-                    <summary class="fw-bold d-flex align-items-center cursor-pointer list-unstyled justify-content-between">
-                        <span>
-                            <input type="checkbox" class="form-check-input me-2 chk-padre" 
-                                   data-cat="${cat.categoria}" 
-                                   ${parentChecked ? 'checked' : ''} 
-                                   ${parentIndeterminate ? 'data-indeterminate="true"' : ''}>
-                            ${cat.categoria}
-                        </span>
-                        <small class="text-muted fw-normal">(${marcadosEnCat}/${totalEnCat})</small>
-                    </summary>
-                    <div class="ms-4 mt-2">
-            `;
+            const seleccionadasModulo = modulo === "todas"
+                ? seleccionadasTodas
+                : (variablesPersonalizadasEstado[modKey] || []);
 
-            if (cat.variables) {
-                cat.variables.forEach(v => {
-                    const isChecked = seleccionados.includes(String(v.id));
-                    html += `
-                        <div class="form-check form-check-sm">
-                            <input class="form-check-input chk-subvar" type="checkbox" value="${v.id}" id="subvar_${v.id}" ${isChecked ? 'checked' : ''}>
-                            <label class="form-check-label small" for="subvar_${v.id}">${v.nombre}</label>
-                        </div>
-                    `;
+            estructuraModulo.forEach((grupo) => {
+                // Limpieza de clave para evitar pérdida por espacios o formateos
+                const keyApartado = String(grupo.apartado).trim();
+
+                if (!mapaApartados[keyApartado]) {
+                    mapaApartados[keyApartado] = {
+                        apartado: keyApartado,
+                        descripcion: grupo.descripcion_apartado || '',
+                        variables: []
+                    };
+                }
+
+                (grupo.variables || []).forEach(v => {
+                    if (!mapaApartados[keyApartado].variables.some(exist => exist.codigo === v.codigo)) {
+                        mapaApartados[keyApartado].variables.push({
+                            ...v,
+                            modKey: modKey,
+                            isChecked: seleccionadasModulo.includes(v.codigo)
+                        });
+                    }
                 });
+            });
+        });
+
+        // 2. ORDENAMIENTO NATURAL (Mantiene el orden correcto para '02', '08', '144', etc.)
+        const listaApartados = Object.values(mapaApartados).sort((a, b) => {
+            return a.apartado.localeCompare(b.apartado, undefined, { numeric: true, sensitivity: 'base' });
+        });
+
+        let totalVariables = 0;
+        const ulRaiz = document.createElement("ul");
+        ulRaiz.className = "list-unstyled ms-2 mb-0 font-monospace";
+        ulRaiz.style.fontSize = "0.85rem";
+
+        listaApartados.forEach((grupo) => {
+            const varsGrupo = grupo.variables || [];
+            totalVariables += varsGrupo.length;
+
+            const liApartado = document.createElement("li");
+            liApartado.className = "my-1";
+
+            const marcadasCount = varsGrupo.filter(v => v.isChecked).length;
+            const estanTodasMarcadas = varsGrupo.length > 0 && marcadasCount === varsGrupo.length;
+            const hayAlgunasMarcadas = marcadasCount > 0 && !estanTodasMarcadas;
+
+            liApartado.innerHTML = `
+        <details class="tree-item">
+            <summary class="d-flex align-items-center gap-2 py-1 user-select-none" style="cursor: pointer;">
+                <input type="checkbox" class="form-check-input my-0 chk-padre" ${estanTodasMarcadas ? 'checked' : ''}>
+                <span class="fw-bold text-dark">Apartado ${grupo.apartado} ${grupo.descripcion ? '— ' + grupo.descripcion : ''}</span>
+            </summary>
+            <ul class="list-unstyled ms-4 ps-2 border-start border-secondary-subtle my-1">
+                ${varsGrupo.map(v => `
+                    <li class="d-flex align-items-center gap-2 py-1">
+                        <input type="checkbox" class="form-check-input my-0 chk-subvar" data-modulo="${v.modKey}" id="sub_${v.codigo}" value="${v.codigo}" ${v.isChecked ? 'checked' : ''}>
+                        <label for="sub_${v.codigo}" class="mb-0 text-secondary" style="cursor: pointer;">
+                            <strong>${v.codigo}</strong> ${v.nombre}
+                        </label>
+                    </li>
+                `).join('')}
+            </ul>
+        </details>`;
+
+            // Asignar estado indeterminado si existen variables parcialmente seleccionadas
+            const chkPadreElement = liApartado.querySelector('.chk-padre');
+            if (chkPadreElement && hayAlgunasMarcadas) {
+                chkPadreElement.indeterminate = true;
             }
 
-            html += `</div></details>`;
+            ulRaiz.appendChild(liApartado);
         });
 
-        contenedor.innerHTML = html;
+        if (lbl) {
+            const nombreVista = modulo === "todas" ? "Todas las Secciones" : modulo;
+            lbl.innerHTML = `📋 Árbol de Variables: <strong>${nombreVista.toUpperCase()}</strong> (${totalVariables} en catálogo):`;
+        }
 
-        // Establecer estado 'indeterminate' visual a los checkboxes padre
-        contenedor.querySelectorAll('.chk-padre[data-indeterminate="true"]').forEach(cb => {
-            cb.indeterminate = true;
-        });
+        contenedor.innerHTML = "";
+        contenedor.appendChild(ulRaiz);
+    }
+
+    function guardarEstadoVariablesActuales() {
+        const contenedor = document.getElementById("contenedorSubvariables");
+        if (!contenedor) return;
+
+        const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
+
+        if (modulo === "todas") {
+            variablesPersonalizadasEstado["todas"] = [];
+            contenedor.querySelectorAll('.chk-subvar:checked').forEach(cb => {
+                if (!variablesPersonalizadasEstado["todas"].includes(cb.value)) {
+                    variablesPersonalizadasEstado["todas"].push(cb.value);
+                }
+            });
+        } else {
+            const modulosAProcesar = [modulo];
+            modulosAProcesar.forEach(mod => { variablesPersonalizadasEstado[mod] = []; });
+
+            contenedor.querySelectorAll('.chk-subvar:checked').forEach(cb => {
+                const mod = cb.getAttribute('data-modulo');
+                if (mod) {
+                    if (!variablesPersonalizadasEstado[mod]) variablesPersonalizadasEstado[mod] = [];
+                    if (!variablesPersonalizadasEstado[mod].includes(cb.value)) {
+                        variablesPersonalizadasEstado[mod].push(cb.value);
+                    }
+                }
+            });
+        }
     }
 
     function hayVariablesSeleccionadas() {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
-        if (modulo === "todas") return true;
-        const seleccionados = variablesPersonalizadasEstado[modulo] || [];
-        return seleccionados.length > 0;
+        if (modulo === "todas") {
+            return Array.isArray(variablesPersonalizadasEstado["todas"]) && variablesPersonalizadasEstado["todas"].length > 0;
+        }
+        return Array.isArray(variablesPersonalizadasEstado[modulo]) && variablesPersonalizadasEstado[modulo].length > 0;
     }
 
-    /* 2. FILTRADO Y CONSULTA AL BACKEND */
-    window.ejecutarFiltradoSis = function (delay = 300) {
-        clearTimeout(debounceTimerSis);
-        debounceTimerSis = setTimeout(() => {
-            realizarConsultaBackend();
-        }, delay);
-    };
+    /* 3. PROCESAMIENTO Y FILTRADO */
+    function agruparDatos(data) {
+        const mapa = {};
+        const nivelAgrupacion = document.getElementById('selectNivelAgrupacion')?.value || 'clues';
+        const campos = [
+            'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
+            'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
+            'orientacion_lac_des_obe', 'orientacion_eda_ira', 'otros'
+        ];
 
-    function mostrarCargandoGrafica() {
-        const ctx = document.getElementById("graficaSisMensual");
-        if (ctx && graficaSisMensual) {
-            graficaSisMensual.destroy();
-            graficaSisMensual = null;
+        // Helper interno para clasificar según el texto del apartado/módulo
+        const normalizarApartado = (desc) => {
+            const text = (desc || '').toLowerCase();
+            if (text.includes('consulta')) return 'consultas';
+            if (text.includes('embaraz') || text.includes('matern')) return 'embarazadas';
+            if (text.includes('mental')) return 'mental';
+            if (text.includes('bucal')) return 'bucal';
+            if (text.includes('tamiz')) return 'tamiz';
+            if (text.includes('planific')) return 'planificacion_familiar';
+            if (text.includes('cardiometab')) return 'detecciones_cardiometabolicas';
+            if (text.includes('detec')) return 'detecciones';
+            if (text.includes('lactan') || text.includes('nutri') || text.includes('obes')) return 'orientacion_lac_des_obe';
+            if (text.includes('eda') || text.includes('ira')) return 'orientacion_eda_ira';
+            return 'otros';
+        };
+
+        for (let i = 0; i < data.length; i++) {
+            const r = data[i];
+            const numAnio = Number(r.anio);
+            const jur = r.jurisdiccion ? String(r.jurisdiccion).trim() : 'Sin Especificar';
+            const mun = r.municipio ? String(r.municipio).trim() : 'Sin Especificar';
+            const clues = r.clues || 'Sin CLUES';
+            const nombreUnidad = r.nombre_unidad || clues;
+
+            let key = `${numAnio}-${jur}-${mun}-${clues}`;
+            let nombreEtiqueta = nombreUnidad;
+
+            if (nivelAgrupacion === 'jurisdiccion') {
+                key = `${numAnio}-JUR-${jur}`;
+                nombreEtiqueta = `Jurisdicción ${jur}`;
+            } else if (nivelAgrupacion === 'municipio') {
+                key = `${numAnio}-MUN-${mun}`;
+                nombreEtiqueta = mun;
+            }
+
+            if (!mapa[key]) {
+                mapa[key] = {
+                    anio: numAnio,
+                    jurisdiccion: jur,
+                    municipio: mun,
+                    clues: (nivelAgrupacion === 'clues') ? clues : '-',
+                    nombre_unidad: nombreEtiqueta,
+                    consultas: 0, embarazadas: 0, mental: 0, bucal: 0, tamiz: 0,
+                    planificacion_familiar: 0, detecciones: 0, detecciones_cardiometabolicas: 0,
+                    orientacion_lac_des_obe: 0, orientacion_eda_ira: 0, otros: 0
+                };
+            }
+
+            // Suma explícita de campos estándar
+            campos.forEach(c => {
+                mapa[key][c] += Number(r[c]) || 0;
+            });
+
+            // Si los campos estándar venían en 0 y trae un valor genérico
+            const sumaEstandar = campos.reduce((acc, c) => acc + (Number(r[c]) || 0), 0);
+            const valorGenerico = Number(r.total || r.valor || r.suma || 0);
+
+            if (sumaEstandar === 0 && valorGenerico > 0) {
+                // Clasifica al campo correspondiente usando la descripción del registro (si existe)
+                const descripcion = r.descripcion_apartado || r.apartado || r.modulo || '';
+                const campoDestino = normalizarApartado(descripcion);
+                mapa[key][campoDestino] += valorGenerico;
+            }
+        }
+
+        return Object.values(mapa);
+    }
+
+    // Variable global para capturar el modo seleccionado
+    window.modoExportacionTemporal = 'acumulado';
+
+    function exportarExcelConModo(modo) {
+        window.modoExportacionTemporal = modo;
+        exportarFiltradoExcel();
+    }
+
+    async function exportarFiltradoExcel() {
+        const btn = document.getElementById("btnExportarExcel");
+        const textoOriginal = btn ? btn.innerHTML : '';
+
+        if (btn) {
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Generando...';
+            btn.disabled = true;
+        }
+
+        try {
+            const modoDesglose = window.modoExportacionTemporal
+                || document.getElementById("selectModoDesglose")?.value
+                || "acumulado";
+
+            let fuenteDeDatos = [];
+
+            // 1. RECOLECCIÓN Y FILTRADO COMPLETO
+            const obtenerValoresCheck = (selector) => {
+                return Array.from(document.querySelectorAll(selector))
+                    .filter(cb => cb.checked)
+                    .map(cb => cb.value.trim());
+            };
+
+            let aniosAFiltrar = obtenerValoresCheck('.filtro-anio:checked, input[name="anios"]:checked');
+            const mesesSel = obtenerValoresCheck('.filtro-mes:checked, input[name="meses"]:checked');
+            const unidadesSel = obtenerValoresCheck('.filtro-unidad:checked, input[name="unidades"]:checked');
+            const jurisSel = obtenerValoresCheck('.filtro-jurisdiccion:checked, input[name="jurisdicciones"]:checked');
+            const munSel = obtenerValoresCheck('.sis-filtro-municipio:checked, input[name="municipios"]:checked');
+
+            // Si no hay checkboxes de año marcados, usamos el año de la pestaña activa (anioActivo)
+            if (aniosAFiltrar.length === 0 && typeof anioActivo !== 'undefined' && anioActivo) {
+                aniosAFiltrar = [String(anioActivo)];
+            }
+
+            if (modoDesglose === "desagregado" || modoDesglose === "por_variable") {
+
+                // Recolección exacta de subvariables marcadas en el DOM
+                let variablesAPasar = {};
+                const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
+
+                if (moduloActual === "todas") {
+                    document.querySelectorAll('.chk-subvar:checked').forEach(chk => {
+                        const modKey = chk.dataset.modulo || "otros";
+                        if (!variablesAPasar[modKey]) variablesAPasar[modKey] = [];
+                        variablesAPasar[modKey].push(chk.value);
+                    });
+                } else {
+                    const subvarsModulo = document.querySelectorAll(`.chk-subvar[data-modulo="${moduloActual}"]:checked`);
+                    variablesAPasar[moduloActual] = Array.from(subvarsModulo).map(chk => chk.value);
+                }
+
+                // Payload para el backend
+                const payload = {
+                    anios: aniosAFiltrar,
+                    meses: mesesSel,
+                    unidades: unidadesSel,
+                    jurisdicciones: jurisSel,
+                    municipios: munSel,
+                    variables: variablesAPasar,
+                    nivel_agrupacion: document.getElementById("selectNivelAgrupacion")?.value || "clues",
+                    modo_desglose: "por_variable"
+                };
+
+                console.log("📤 Consultando backend para Excel desagregado:", payload);
+
+                const resp = await fetch('/sis_primer_nivel/api/filtrar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const resJson = await resp.json();
+
+                if (resJson.status === "success" && Array.isArray(resJson.data)) {
+                    fuenteDeDatos = resJson.data;
+                } else {
+                    throw new Error(resJson.message || "El servidor no devolvió registros para el desglose por variable.");
+                }
+
+            } else {
+                // MODO RESUMIDO / ACUMULADO CON FILTRADO CLIENTE COMPLETO
+                fuenteDeDatos = (typeof datosFiltradosSis !== "undefined" ? datosFiltradosSis : []).filter(r => {
+                    const cumpleAnio = aniosAFiltrar.length === 0 || aniosAFiltrar.includes(String(r.anio));
+                    const cumpleMes = mesesSel.length === 0 || mesesSel.includes(String(r.mes));
+                    const cumpleUnidad = unidadesSel.length === 0 || unidadesSel.includes(String(r.clues || r.id_unidad || r.nombre_unidad));
+                    const cumpleJuris = jurisSel.length === 0 || jurisSel.includes(String(r.jurisdiccion));
+                    const cumpleMun = munSel.length === 0 || munSel.includes(String(r.municipio));
+
+                    return cumpleAnio && cumpleMes && cumpleUnidad && cumpleJuris && cumpleMun;
+                });
+            }
+
+            if (!fuenteDeDatos || fuenteDeDatos.length === 0) {
+                alert("No hay datos disponibles para exportar con los filtros seleccionados.");
+                return;
+            }
+
+            // 2. CONFIGURACIÓN Y MAPEO CORREGIDO
+            const nivelAgrupacion = document.getElementById("selectNivelAgrupacion")?.value || "clues";
+            const nombresMeses = {
+                1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+                5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+                9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+            };
+
+            const municipiosSeleccionados = Array.from(document.querySelectorAll('.sis-filtro-municipio:checked'))
+                .map(cb => cb.value.trim());
+
+            const mapaMatriz = {};
+            const mesesConDatos = new Set();
+            const esDesagregado = modoDesglose === "desagregado" || modoDesglose === "por_variable";
+            const incluirColumnaMunicipio = nivelAgrupacion === "municipio" || municipiosSeleccionados.length > 0;
+
+            fuenteDeDatos.forEach(r => {
+                const numMes = Number(r.mes);
+                if (numMes) mesesConDatos.add(numMes);
+
+                const nombreMes = nombresMeses[numMes] || `Mes ${numMes}`;
+                const anioRegistro = r.anio || 'Sin Año';
+                const nombreJurisdiccion = r.jurisdiccion ? `Jurisdicción ${r.jurisdiccion}` : 'Sin Especificar';
+                const valorMonto = Number(r.total || r.consultas || r.suma || 0);
+
+                let claveUnicaMatriz = "";
+
+                if (esDesagregado) {
+                    const apartado = String(r.descripcion_apartado || r.apartado || r.des_apartado || 'SIN APARTADO');
+                    const variable = String(r.descripcion_variable || r.variable || r.des_variable || r.concepto || 'SIN VARIABLE');
+                    const mun = r.municipio || 'Sin Especificar';
+                    claveUnicaMatriz = `${nombreJurisdiccion}_${mun}_${r.nombre_unidad || ''}_${apartado}_${variable}_${anioRegistro}`;
+                } else {
+                    // CLAVE ÚNICA MODO RESUMIDO
+                    if (nivelAgrupacion === "clues") {
+                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.nombre_unidad || r.clues || 'S/U'}_${anioRegistro}`;
+                    } else if (incluirColumnaMunicipio) {
+                        const mun = r.municipio || (municipiosSeleccionados.length > 0 ? municipiosSeleccionados.join(',') : 'Sin Especificar');
+                        claveUnicaMatriz = `${nombreJurisdiccion}_${mun}_${anioRegistro}`;
+                    } else {
+                        // AGRUPACIÓN POR DEFECTO: Solo Jurisdicción y Año
+                        claveUnicaMatriz = `${nombreJurisdiccion}_${anioRegistro}`;
+                    }
+                }
+
+                if (!mapaMatriz[claveUnicaMatriz]) {
+                    const registroBase = {
+                        "Entidad": "GUANAJUATO",
+                        "Jurisdicción": nombreJurisdiccion,
+                        "Año": Number(anioRegistro) || anioRegistro
+                    };
+
+                    if (incluirColumnaMunicipio) {
+                        registroBase["Municipio"] = r.municipio || 'Sin Especificar';
+                    }
+                    if (nivelAgrupacion === "clues") {
+                        registroBase["Unidad"] = r.nombre_unidad || r.clues || '-';
+                    }
+                    if (esDesagregado) {
+                        registroBase["Apartado"] = String(r.descripcion_apartado || r.apartado || r.des_apartado || 'SIN APARTADO');
+                        registroBase["Variable"] = String(r.descripcion_variable || r.variable || r.des_variable || r.concepto || 'SIN VARIABLE');
+                    }
+
+                    mapaMatriz[claveUnicaMatriz] = registroBase;
+                }
+
+                // Acumular el valor correspondiente al mes
+                mapaMatriz[claveUnicaMatriz][nombreMes] = (mapaMatriz[claveUnicaMatriz][nombreMes] || 0) + valorMonto;
+            });
+
+            const mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
+
+            const datosParaExcel = [];
+            const totalesMes = {};
+            mesesOrdenados.forEach(m => totalesMes[m] = 0);
+            let granTotalGeneral = 0;
+
+            let listaRegistros = Object.values(mapaMatriz);
+
+            if (esDesagregado) {
+                listaRegistros.sort((a, b) => {
+                    const jA = String(a["Jurisdicción"] || '');
+                    const jB = String(b["Jurisdicción"] || '');
+                    if (jA !== jB) return jA.localeCompare(jB);
+
+                    const apA = String(a["Apartado"] || '');
+                    const apB = String(b["Apartado"] || '');
+                    if (apA !== apB) return apA.localeCompare(apB);
+
+                    const vA = String(a["Variable"] || '');
+                    const vB = String(b["Variable"] || '');
+                    return vA.localeCompare(vB);
+                });
+            }
+
+            let subtotalApartado = {};
+            let apartadoActual = null;
+
+            const resetSubtotal = () => {
+                const sub = { "Entidad": "", "Jurisdicción": "" };
+                if (incluirColumnaMunicipio) sub["Municipio"] = "";
+                if (nivelAgrupacion === "clues") sub["Unidad"] = "";
+                sub["Apartado"] = "Subtotal";
+                sub["Variable"] = "";
+                sub["Año"] = "";
+                mesesOrdenados.forEach(m => sub[m] = 0);
+                sub["Grand Total"] = 0;
+                return sub;
+            };
+
+            subtotalApartado = resetSubtotal();
+
+            listaRegistros.forEach((item, index) => {
+                if (esDesagregado && apartadoActual && apartadoActual !== item["Apartado"]) {
+                    datosParaExcel.push(subtotalApartado);
+                    subtotalApartado = resetSubtotal();
+                }
+
+                apartadoActual = item["Apartado"];
+
+                const fila = {
+                    "Entidad": item["Entidad"],
+                    "Jurisdicción": item["Jurisdicción"]
+                };
+
+                if (incluirColumnaMunicipio) fila["Municipio"] = item["Municipio"];
+                if (nivelAgrupacion === "clues") fila["Unidad"] = item["Unidad"];
+
+                if (esDesagregado) {
+                    fila["Apartado"] = item["Apartado"];
+                    fila["Variable"] = item["Variable"];
+                }
+
+                fila["Año"] = item["Año"];
+
+                let totalFila = 0;
+                mesesOrdenados.forEach(m => {
+                    const val = Math.round(item[m] || 0);
+                    fila[m] = val;
+                    totalFila += val;
+
+                    totalesMes[m] += val;
+                    if (esDesagregado) subtotalApartado[m] += val;
+                });
+
+                fila["Grand Total"] = totalFila;
+                granTotalGeneral += totalFila;
+                if (esDesagregado) subtotalApartado["Grand Total"] += totalFila;
+
+                datosParaExcel.push(fila);
+
+                if (esDesagregado && index === listaRegistros.length - 1) {
+                    datosParaExcel.push(subtotalApartado);
+                }
+            });
+
+            // Fila Total General
+            const filaTotal = { "Entidad": "Grand Total", "Jurisdicción": "" };
+            if (incluirColumnaMunicipio) filaTotal["Municipio"] = "";
+            if (nivelAgrupacion === "clues") filaTotal["Unidad"] = "";
+            if (esDesagregado) {
+                filaTotal["Apartado"] = "";
+                filaTotal["Variable"] = "";
+            }
+            filaTotal["Año"] = "";
+
+            mesesOrdenados.forEach(m => filaTotal[m] = totalesMes[m]);
+            filaTotal["Grand Total"] = granTotalGeneral;
+            datosParaExcel.push(filaTotal);
+
+            // 3. CONSTRUCCIÓN Y DESCARGA DEL ARCHIVO EXCEL
+            const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS");
+
+            worksheet['!cols'] = Object.keys(datosParaExcel[0] || {}).map(key => ({
+                wch: Math.max(key.length + 4, 14)
+            }));
+
+            const fechaDescarga = new Date().toISOString().slice(0, 10);
+            XLSX.writeFile(workbook, `SIS_${modoDesglose.toUpperCase()}_${fechaDescarga}.xlsx`);
+
+        } catch (error) {
+            console.error("Error crítico al exportar:", error);
+            alert("Ocurrió un error al generar el archivo. Verifica la consola con F12.");
+        } finally {
+            if (btn) {
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+            }
         }
     }
 
-    function realizarConsultaBackend() {
-        const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
-        const jurisdiccion = document.getElementById("filtroJurisdiccion")?.value || "";
-        const municipio = document.getElementById("filtroMunicipio")?.value || "";
-        const unidad = document.getElementById("filtroUnidad")?.value || "";
-        const anio = document.getElementById("filtroAnio")?.value || "";
-        const mes = document.getElementById("filtroMes")?.value || "";
+    function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
+    function ocultarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.add("d-none"); }
 
-        const variablesSeleccionadas = variablesPersonalizadasEstado[modulo] || [];
+    async function realizarConsultaBackend() {
+        mostrarCargandoGrafica();
+
+        if (!hayVariablesSeleccionadas()) {
+            datosFiltradosSis = [];
+            actualizarVistas();
+            return;
+        }
+
+        const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
+        const modoDesglose = document.getElementById("selectModoDesglose")?.value || "por_apartado";
+
+        let variablesAPasar = {};
+
+        if (moduloActual === "todas") {
+            const subvarsChecked = document.querySelectorAll('.chk-subvar:checked');
+
+            subvarsChecked.forEach(chk => {
+                const modKey = chk.dataset.modulo || "otros";
+                const codVariable = chk.value;
+
+                if (!variablesAPasar[modKey]) {
+                    variablesAPasar[modKey] = [];
+                }
+                variablesAPasar[modKey].push(codVariable);
+            });
+        } else {
+            const subvarsModulo = document.querySelectorAll(`.chk-subvar[data-modulo="${moduloActual}"]:checked`);
+            variablesAPasar[moduloActual] = Array.from(subvarsModulo).map(chk => chk.value);
+        }
+
+        if (Object.keys(variablesAPasar).length === 0 || !Object.values(variablesAPasar).some(arr => arr.length > 0)) {
+            datosFiltradosSis = [];
+            actualizarVistas();
+            return;
+        }
 
         const payload = {
-            modulo,
-            jurisdiccion,
-            municipio,
-            unidad,
-            anio,
-            mes,
-            variables: variablesSeleccionadas
+            unidades: window.getUnidadesSeleccionadas?.() || [],
+            jurisdicciones: window.getJurisdiccionesSeleccionadas?.() || [],
+            municipios: window.getMunicipiosSeleccionados?.() || [],
+            anios: window.getAniosSeleccionados?.() || [],
+            meses: window.getMesesSeleccionados?.() || [],
+            modo_desglose: modoDesglose,
+            variables: variablesAPasar
         };
 
-        // Si es el módulo base de consultas, actualizamos también datosConsultasBase
-        const esModuloBase = (modulo === "consultas" || modulo === "todas");
+        try {
+            const resp = await fetch("/sis_primer_nivel/api/filtrar", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
 
-        fetch("obtener_datos_sis.php", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        })
-        .then(res => res.json())
-        .then(data => {
-            datosFiltradosSis = data || [];
+            if (!resp.ok) throw new Error("Error en la respuesta de la API");
 
-            if (esModuloBase) {
-                datosConsultasBase = data || [];
-                actualizarVistasBase();
+            const res = await resp.json();
+            if (res.status === "success") {
+                datosFiltradosSis = res.data || [];
+                actualizarVistas();
             }
-
-            // Renderizar únicamente la tercera gráfica con sus datos aislados
-            renderGraficaTemporal(datosFiltradosSis);
-        })
-        .catch(err => {
-            console.error("Error al consultar el servidor:", err);
-        });
+        } catch (err) {
+            console.error("Error al conectar con la API SIS:", err);
+        }
     }
 
-    /* 3. ACTUALIZACIÓN VISTAS SUPERIORES */
-    function actualizarVistasBase() {
-        renderTabsAnios(datosConsultasBase);
-        renderTablaSis();
-        renderGraficaPorAnio(datosConsultasBase);
-        
-        const datosUnidad = datosConsultasBase.filter(r => Number(r.anio) === Number(anioActivo));
-        renderGraficaPorUnidad(datosUnidad);
-    }
+    window.ejecutarFiltradoSis = function () {
+        return realizarConsultaBackend();
+    };
 
-    // Mantenido para inicialización global o cambios en filtros superiores
     function actualizarVistas() {
-        realizarConsultaBackend();
-    }
+        datosActuales = agruparDatos(datosFiltradosSis);
+        paginaActual = 1;
 
-    function actualizarEncabezadoSIS(anio) {
-        const el = document.getElementById("anioSisEncabezado");
-        if (el) el.textContent = anio ? `— Año ${anio}` : '';
+        renderTabsAnios(datosActuales);
+        renderTablaSis();
+        renderGraficaPorAnio(datosActuales);
+        renderGraficaPorUnidad(datosActuales.filter(r => r.anio === anioActivo));
+        renderGraficaTemporal(datosFiltradosSis);
     }
 
     /* 4. TABLA Y PAGINACIÓN */
@@ -411,7 +851,11 @@
 
         const anios = [...new Set(data.map(r => Number(r.anio)))].filter(a => !isNaN(a) && a > 0).sort((a, b) => b - a);
 
-        if (anios.length === 0) { anioActivo = null; tabs.innerHTML = ""; return; }
+        if (anios.length === 0) {
+            anioActivo = null;
+            tabs.innerHTML = "";
+            return;
+        }
 
         if (!anioActivo || !anios.includes(Number(anioActivo))) {
             anioActivo = anios[0];
@@ -432,7 +876,7 @@
                 paginaActual = 1;
 
                 renderTablaSis();
-                renderGraficaPorUnidad(datosConsultasBase.filter(r => Number(r.anio) === Number(anioActivo)));
+                renderGraficaPorUnidad(datosActuales.filter(r => Number(r.anio) === Number(anioActivo)));
             });
         });
     }
@@ -445,7 +889,8 @@
 
         if (!tbody || !paginacion) return;
 
-        const datosFiltrados = datosConsultasBase.filter(r => Number(r.anio) === Number(anioActivo));
+        // Normalización de tipo para comparación estricta segura
+        const datosFiltrados = datosActuales.filter(r => Number(r.anio) === Number(anioActivo));
         const inicio = (paginaActual - 1) * FILAS_POR_PAGINA;
         const paginaDatos = datosFiltrados.slice(inicio, inicio + FILAS_POR_PAGINA);
 
@@ -484,8 +929,8 @@
         renderTablaSis();
     };
 
-    /* 5. GRÁFICAS CHART.JS SUPERIORES */
-    function renderGraficaPorAnio(data = datosConsultasBase) {
+    /* 5. GRÁFICAS CHART.JS */
+    function renderGraficaPorAnio(data = datosActuales) {
         const ctx = document.getElementById('graficaSisPorAnio');
         if (!ctx) return;
 
@@ -519,7 +964,7 @@
         });
     }
 
-    function renderGraficaPorUnidad(data) {
+    function renderGraficaPorUnidad(data = datosActuales.filter(r => Number(r.anio) === Number(anioActivo))) {
         const ctx = document.getElementById('graficaSis');
         const elTitulo = document.getElementById("tituloGraficaSis");
         if (!ctx) return;
@@ -590,7 +1035,6 @@
         }
     }
 
-    /* 6. GRÁFICA TEMPORAL (TERCER GRÁFICO AISLADO) */
     function renderGraficaTemporal(data = datosFiltradosSis) {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
@@ -629,7 +1073,7 @@
         let labels = [];
         let datasets = [];
 
-        // MODO DESGLOSADO POR APARTADO
+        // 🟢 MODO DESGLOSADO POR APARTADO
         if (modoDesglose === "por_apartado") {
             const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
@@ -667,7 +1111,6 @@
                     const numAp = r.id_apartado || r.apartado || r.num_apartado;
                     const descAp = r.descripcion_apartado || (numAp ? `Apartado ${numAp}` : 'Otros');
                     const anio = r.anio || r.año || '';
-
                     const serieKey = anio ? `${descAp} (${anio})` : descAp;
                     const val = Number(r.total || r.valor || r.suma || 0);
 
@@ -697,7 +1140,7 @@
 
             if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
         }
-        // MODO ACUMULADO
+        // 🟡 MODO ACUMULADO
         else {
             const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
@@ -743,6 +1186,7 @@
             }
         }
 
+        // Dibujar la gráfica
         graficaSisMensual = new Chart(ctx, {
             type: tipoVista === 'anio' ? 'bar' : 'line',
             data: { labels, datasets },
@@ -766,56 +1210,54 @@
         });
     }
 
-    /* 7. INICIALIZACIÓN DE EVENTOS */
+    /* 6. INICIALIZACIÓN DE EVENTOS */
     document.addEventListener("DOMContentLoaded", () => {
         renderSubvariables();
         actualizarVistas();
 
-        // Escuchar cambios en los filtros principales del panel superior
-        ["filtroJurisdiccion", "filtroMunicipio", "filtroUnidad", "filtroAnio", "filtroMes"].forEach(id => {
-            document.getElementById(id)?.addEventListener("change", () => {
-                actualizarVistas();
-            });
-        });
-
-        // Manejo de eventos del árbol de checkboxes de subvariables
         document.getElementById("contenedorSubvariables")?.addEventListener("change", (e) => {
             if (e.target.classList.contains('chk-padre')) {
                 const parentDetails = e.target.closest('details');
-                e.target.indeterminate = false;
-                parentDetails.querySelectorAll('.chk-subvar').forEach(h => h.checked = e.target.checked);
+                if (parentDetails) {
+                    e.target.indeterminate = false;
+                    parentDetails.querySelectorAll('.chk-subvar').forEach(h => h.checked = e.target.checked);
+                }
             }
 
             if (e.target.classList.contains('chk-subvar')) {
                 const parentDetails = e.target.closest('details');
-                const chkPadre = parentDetails.querySelector('.chk-padre');
-                const hermanos = Array.from(parentDetails.querySelectorAll('.chk-subvar'));
+                if (parentDetails) {
+                    const chkPadre = parentDetails.querySelector('.chk-padre');
+                    const hermanos = Array.from(parentDetails.querySelectorAll('.chk-subvar'));
 
-                if (chkPadre) {
-                    const cuantasMarcadas = hermanos.filter(h => h.checked).length;
-                    const totalHijos = hermanos.length;
+                    if (chkPadre) {
+                        const cuantasMarcadas = hermanos.filter(h => h.checked).length;
+                        const totalHijos = hermanos.length;
 
-                    if (cuantasMarcadas === totalHijos) {
-                        chkPadre.checked = true;
-                        chkPadre.indeterminate = false;
-                    } else if (cuantasMarcadas > 0) {
-                        chkPadre.checked = false;
-                        chkPadre.indeterminate = true;
-                    } else {
-                        chkPadre.checked = false;
-                        chkPadre.indeterminate = false;
+                        if (cuantasMarcadas === totalHijos) {
+                            chkPadre.checked = true;
+                            chkPadre.indeterminate = false;
+                        } else if (cuantasMarcadas > 0) {
+                            chkPadre.checked = false;
+                            chkPadre.indeterminate = true;
+                        } else {
+                            chkPadre.checked = false;
+                            chkPadre.indeterminate = false;
+                        }
                     }
                 }
             }
 
             guardarEstadoVariablesActuales();
-            window.ejecutarFiltradoSis(300);
+            if (typeof window.ejecutarFiltradoSis === "function") {
+                window.ejecutarFiltradoSis();
+            }
         });
 
-        // Selección de módulo/sección en el tercer gráfico
         document.getElementById("filtroSisDetalle")?.addEventListener("change", (e) => {
             const moduloSeleccionado = e.target.value;
             mostrarCargandoGrafica();
+            toggleModoDesglose();
 
             if (moduloSeleccionado === "todas") {
                 variablesPersonalizadasEstado["todas"] = [];
@@ -824,10 +1266,11 @@
             }
 
             renderSubvariables();
-            window.ejecutarFiltradoSis(200);
+            if (typeof window.ejecutarFiltradoSis === "function") {
+                window.ejecutarFiltradoSis();
+            }
         });
 
-        // Controles específicos de la gráfica temporal
         document.getElementById("selectTipoVistaTemporal")?.addEventListener("change", () => {
             renderGraficaTemporal(datosFiltradosSis);
         });
@@ -842,13 +1285,14 @@
             renderGraficaTemporal(datosFiltradosSis);
         });
 
-        // Botones de selección masiva de subvariables
         document.getElementById("btnSeleccionarTodasSub")?.addEventListener("click", () => {
             const contenedor = document.getElementById("contenedorSubvariables");
             if (!contenedor) return;
             contenedor.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = true);
             guardarEstadoVariablesActuales();
-            window.ejecutarFiltradoSis();
+            if (typeof window.ejecutarFiltradoSis === "function") {
+                window.ejecutarFiltradoSis();
+            }
         });
 
         document.getElementById("btnDesmarcarTodasSub")?.addEventListener("click", () => {
@@ -856,7 +1300,9 @@
             if (!contenedor) return;
             contenedor.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = false);
             guardarEstadoVariablesActuales();
-            window.ejecutarFiltradoSis();
+            if (typeof window.ejecutarFiltradoSis === "function") {
+                window.ejecutarFiltradoSis();
+            }
         });
     });
 </script>
