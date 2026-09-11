@@ -197,6 +197,7 @@ def dashboard_sis_primer_nivel():
 
 
 
+
 @sis_pn.route("/api/filtrar", methods=["POST"])
 @login_required
 @csrf.exempt
@@ -213,7 +214,7 @@ def filtrar_datos_sis():
     nivel_agrupacion = data.get("nivel_agrupacion", "clues")
     modo_desglose = data.get("modo_desglose", "acumulado")
 
-    # 1. Mapeo de listas de variables
+    # 1. Extraer ÚNICAMENTE las variables activas enviadas por el frontend
     todas_vars = set()
     if isinstance(variables_seleccionadas, dict):
         for v_list in variables_seleccionadas.values():
@@ -222,18 +223,14 @@ def filtrar_datos_sis():
     elif isinstance(variables_seleccionadas, list):
         todas_vars.update(variables_seleccionadas)
 
-    # Si no se especificaron variables dinámicas, cargamos las de por defecto
-    if not todas_vars:
-        for v_list in VARIABLES_DEFAULT.values():
-            todas_vars.update(v_list)
-
+    # Si no hay variables seleccionadas, retornamos array vacío inmediatamente
     if not todas_vars:
         return jsonify({"status": "success", "data": []})
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
-        # Configurar agrupación geográfica
+        # Configurar agrupación geográfica dinámica
         if nivel_agrupacion == "jurisdiccion":
             select_geo = "sr.anio, sr.mes, sr.jurisdiccion, 'N/A' AS municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
             group_geo = "sr.anio, sr.mes, sr.jurisdiccion"
@@ -244,7 +241,7 @@ def filtrar_datos_sis():
             select_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, sr.clues, COALESCE(cu.nombre_unidad, sr.clues) AS nombre_unidad"
             group_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, sr.clues, cu.nombre_unidad"
 
-        # 2. Construcción de cláusulas WHERE
+        # 2. Construir cláusulas WHERE
         where_conditions = ["1=1"]
         params = []
 
@@ -254,6 +251,7 @@ def filtrar_datos_sis():
 
         if unidades:
             placeholders_u = ','.join(['%s'] * len(unidades))
+            # Optimización de filtro de unidades / CLUES
             where_conditions.append(f"(sr.clues IN ({placeholders_u}) OR cu.nombre_unidad IN ({placeholders_u}))")
             params.extend(unidades + unidades)
 
@@ -263,7 +261,7 @@ def filtrar_datos_sis():
                 where_conditions.append(f"{col} IN ({placeholders_l})")
                 params.extend(lst)
 
-        # 3. Selección dinámica de columnas por módulo (desglose o acumulado real)
+        # 3. Determinar columnas extra según el modo de desglose
         if modo_desglose == "por_apartado":
             select_extra = "cv.apartado, cv.descripcion_apartado, SUM(CAST(sr.total AS UNSIGNED)) AS total"
             group_extra = f"{group_geo}, cv.apartado, cv.descripcion_apartado"
@@ -277,22 +275,10 @@ def filtrar_datos_sis():
             """
             group_extra = f"{group_geo}, cv.apartado, cv.descripcion_apartado, sr.variable, cv.descripcion"
         else:
-            # 🟢 SE CONDICIONA CADA SUMA SEGÚN EL MÓDULO REAL CORRESPONDIENTE
-            select_extra = """
-                SUM(CAST(sr.total AS UNSIGNED)) AS total,
-                SUM(CASE WHEN cv.apartado IN ('1','01','215') OR sr.variable LIKE 'CON%' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS consultas,
-                SUM(CASE WHEN cv.apartado IN ('2','02') AND sr.variable IN ('CPP07','CPP14') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS mental,
-                SUM(CASE WHEN cv.apartado IN ('2','02') AND sr.variable IN ('CPP06','CPP13','COD01','COD02') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS bucal,
-                SUM(CASE WHEN cv.apartado = '24' OR sr.variable LIKE 'EMB%' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS embarazadas,
-                SUM(CASE WHEN cv.apartado = '36' OR sr.variable LIKE 'PFC%' OR sr.variable LIKE 'PLA%' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS planificacion_familiar,
-                SUM(CASE WHEN cv.apartado = '56' OR sr.variable LIKE 'DET%' OR sr.variable LIKE 'DT%' OR sr.variable LIKE 'DTE%' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS detecciones,
-                SUM(CASE WHEN cv.apartado = '111' OR sr.variable LIKE 'RNL%' OR sr.variable LIKE 'TAM%' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS tamiz,
-                SUM(CASE WHEN sr.variable IN ('DET01','DET02','DET03','DET04','DET25','DET26','DET27','DET28','DET50','DET51','DET52','DET53','DET58','DET59','DET60','DET61') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS detecciones_cardiometabolicas,
-                SUM(CASE WHEN sr.variable IN ('MAC07','MAC08','MAC09','MAC11','MAC12') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS orientacion_lac_des_obe,
-                SUM(CASE WHEN sr.variable IN ('MAC01','MAC02') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS orientacion_eda_ira
-            """
+            select_extra = "SUM(CAST(sr.total AS UNSIGNED)) AS total, SUM(CAST(sr.total AS UNSIGNED)) AS consultas"
             group_extra = group_geo
 
+        # 🟢 SQL CON JOIN OPTIMIZADO PARA EVITAR NULOS EN VARIABLES Y APARTADOS
         query = f"""
             SELECT {select_geo}, {select_extra}
             FROM sis_registros_primer_nivel sr
