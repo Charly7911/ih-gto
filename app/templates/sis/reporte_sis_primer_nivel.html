@@ -491,16 +491,36 @@
             const valorGenerico = Number(r.total || r.valor || r.suma || 0);
 
             if (sumaEstandar === 0 && valorGenerico > 0) {
-                let campoDestino = 'comodin';
 
-                if (moduloActual !== 'todas' && campos.includes(moduloActual)) {
-                    campoDestino = moduloActual;
-                } else {
-                    const descripcion = r.descripcion_apartado || r.apartado || r.modulo || '';
-                    campoDestino = normalizarApartado(descripcion);
+                // Primero intentamos identificar el apartado REAL
+                // que viene desde el backend.
+                const descripcion =
+                    r.descripcion_apartado ||
+                    r.apartado ||
+                    r.modulo ||
+                    r.nombre_apartado ||
+                    '';
+
+                let campoDestino = normalizarApartado(descripcion);
+
+                // Si el backend ya manda explícitamente el nombre
+                // de la columna, respetarlo.
+                if (r.campo && campos.includes(String(r.campo).trim())) {
+                    campoDestino = String(r.campo).trim();
                 }
 
-                mapa[key][campoDestino] = (mapa[key][campoDestino] || 0) + valorGenerico;
+                // SOLO si no pudimos identificar el apartado,
+                // usamos el módulo seleccionado como último recurso.
+                if (!campos.includes(campoDestino)) {
+                    if (moduloActual !== 'todas' && campos.includes(moduloActual)) {
+                        campoDestino = moduloActual;
+                    } else {
+                        campoDestino = 'comodin';
+                    }
+                }
+
+                mapa[key][campoDestino] =
+                    (mapa[key][campoDestino] || 0) + valorGenerico;
             }
         }
 

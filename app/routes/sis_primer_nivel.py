@@ -206,92 +206,248 @@ def filtrar_datos_sis():
     anios = [int(a) for a in data.get("anios", []) if str(a).isdigit()]
     meses = [int(m) for m in data.get("meses", []) if str(m).isdigit()]
     variables_seleccionadas = data.get("variables", {}) or {}
-    
+
     nivel_agrupacion = data.get("nivel_agrupacion", "clues")
-    modo_desglose = data.get("modo_desglose", "acumulado")
+
+    # IMPORTANTE:
+    # El filtrado debe trabajar por apartado.
+    # La evolución temporal se encargará de su propia agrupación.
+    modo_desglose = data.get("modo_desglose", "por_apartado")
+
+    # Si llega un modo no válido, usamos por_apartado
+    # y nunca convertimos los datos automáticamente en "consultas".
+    if modo_desglose not in ("por_apartado", "por_variable", "desagregado"):
+        modo_desglose = "por_apartado"
 
     # 1. Extraer ÚNICAMENTE las variables activas enviadas por el frontend
     todas_vars = set()
+
     if isinstance(variables_seleccionadas, dict):
         for v_list in variables_seleccionadas.values():
             if isinstance(v_list, list):
                 todas_vars.update(v_list)
+
     elif isinstance(variables_seleccionadas, list):
         todas_vars.update(variables_seleccionadas)
 
     # Si no hay variables seleccionadas, retornamos array vacío inmediatamente
     if not todas_vars:
-        return jsonify({"status": "success", "data": []})
+        return jsonify({
+            "status": "success",
+            "data": []
+        })
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
-        # Configurar agrupación geográfica dinámica
-        if nivel_agrupacion == "jurisdiccion":
-            select_geo = "sr.anio, sr.mes, sr.jurisdiccion, 'N/A' AS municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
-            group_geo = "sr.anio, sr.mes, sr.jurisdiccion"
-        elif nivel_agrupacion == "municipio":
-            select_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
-            group_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio"
-        else:
-            select_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, sr.clues, COALESCE(cu.nombre_unidad, sr.clues) AS nombre_unidad"
-            group_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, sr.clues, cu.nombre_unidad"
 
-        # 2. Construir cláusulas WHERE
+        # ==========================================================
+        # 1. CONFIGURAR AGRUPACIÓN GEOGRÁFICA
+        # ==========================================================
+
+        if nivel_agrupacion == "jurisdiccion":
+
+            select_geo = """
+                sr.anio,
+                sr.mes,
+                sr.jurisdiccion,
+                'N/A' AS municipio,
+                'N/A' AS clues,
+                'N/A' AS nombre_unidad
+            """
+
+            group_geo = """
+                sr.anio,
+                sr.mes,
+                sr.jurisdiccion
+            """
+
+        elif nivel_agrupacion == "municipio":
+
+            select_geo = """
+                sr.anio,
+                sr.mes,
+                sr.jurisdiccion,
+                sr.municipio,
+                'N/A' AS clues,
+                'N/A' AS nombre_unidad
+            """
+
+            group_geo = """
+                sr.anio,
+                sr.mes,
+                sr.jurisdiccion,
+                sr.municipio
+            """
+
+        else:
+
+            select_geo = """
+                sr.anio,
+                sr.mes,
+                sr.jurisdiccion,
+                sr.municipio,
+                sr.clues,
+                COALESCE(cu.nombre_unidad, sr.clues) AS nombre_unidad
+            """
+
+            group_geo = """
+                sr.anio,
+                sr.mes,
+                sr.jurisdiccion,
+                sr.municipio,
+                sr.clues,
+                cu.nombre_unidad
+            """
+
+        # ==========================================================
+        # 2. CONSTRUIR WHERE
+        # ==========================================================
+
         where_conditions = ["1=1"]
         params = []
 
-        placeholders_v = ','.join(['%s'] * len(todas_vars))
-        where_conditions.append(f"sr.variable IN ({placeholders_v})")
+        placeholders_v = ",".join(["%s"] * len(todas_vars))
+
+        where_conditions.append(
+            f"sr.variable IN ({placeholders_v})"
+        )
+
         params.extend(list(todas_vars))
 
+        # Filtro de unidades / CLUES
         if unidades:
-            placeholders_u = ','.join(['%s'] * len(unidades))
-            # Optimización de filtro de unidades / CLUES
-            where_conditions.append(f"(sr.clues IN ({placeholders_u}) OR cu.nombre_unidad IN ({placeholders_u}))")
+
+            placeholders_u = ",".join(["%s"] * len(unidades))
+
+            where_conditions.append(
+                f"""
+                (
+                    sr.clues IN ({placeholders_u})
+                    OR cu.nombre_unidad IN ({placeholders_u})
+                )
+                """
+            )
+
             params.extend(unidades + unidades)
 
-        for col, lst in [('sr.jurisdiccion', jurisdicciones), ('sr.municipio', municipios), ('sr.anio', anios), ('sr.mes', meses)]:
+        # Filtros geográficos y temporales
+        for col, lst in [
+            ("sr.jurisdiccion", jurisdicciones),
+            ("sr.municipio", municipios),
+            ("sr.anio", anios),
+            ("sr.mes", meses)
+        ]:
+
             if lst:
-                placeholders_l = ','.join(['%s'] * len(lst))
-                where_conditions.append(f"{col} IN ({placeholders_l})")
+
+                placeholders_l = ",".join(["%s"] * len(lst))
+
+                where_conditions.append(
+                    f"{col} IN ({placeholders_l})"
+                )
+
                 params.extend(lst)
 
-        # 3. Determinar columnas extra según el modo de desglose
+        # ==========================================================
+        # 3. DESGLOSE
+        # ==========================================================
+
         if modo_desglose == "por_apartado":
-            select_extra = "cv.apartado, cv.descripcion_apartado, SUM(CAST(sr.total AS UNSIGNED)) AS total"
-            group_extra = f"{group_geo}, cv.apartado, cv.descripcion_apartado"
-        elif modo_desglose in ["por_variable", "desagregado"]:
+
             select_extra = """
-                cv.apartado, 
-                cv.descripcion_apartado, 
-                sr.variable, 
-                cv.descripcion AS descripcion_variable, 
+                cv.apartado,
+                cv.descripcion_apartado,
                 SUM(CAST(sr.total AS UNSIGNED)) AS total
             """
-            group_extra = f"{group_geo}, cv.apartado, cv.descripcion_apartado, sr.variable, cv.descripcion"
-        else:
-            select_extra = "SUM(CAST(sr.total AS UNSIGNED)) AS total, SUM(CAST(sr.total AS UNSIGNED)) AS consultas"
-            group_extra = group_geo
 
-        # 🟢 SQL CON JOIN OPTIMIZADO PARA EVITAR NULOS EN VARIABLES Y APARTADOS
+            group_extra = f"""
+                {group_geo},
+                cv.apartado,
+                cv.descripcion_apartado
+            """
+
+        elif modo_desglose in ("por_variable", "desagregado"):
+
+            select_extra = """
+                cv.apartado,
+                cv.descripcion_apartado,
+                sr.variable,
+                cv.descripcion AS descripcion_variable,
+                SUM(CAST(sr.total AS UNSIGNED)) AS total
+            """
+
+            group_extra = f"""
+                {group_geo},
+                cv.apartado,
+                cv.descripcion_apartado,
+                sr.variable,
+                cv.descripcion
+            """
+
+        # Este else prácticamente ya no debería ejecutarse porque
+        # validamos modo_desglose arriba.
+        else:
+
+            select_extra = """
+                cv.apartado,
+                cv.descripcion_apartado,
+                SUM(CAST(sr.total AS UNSIGNED)) AS total
+            """
+
+            group_extra = f"""
+                {group_geo},
+                cv.apartado,
+                cv.descripcion_apartado
+            """
+
+        # ==========================================================
+        # 4. CONSULTA SQL
+        # ==========================================================
+
         query = f"""
-            SELECT {select_geo}, {select_extra}
+            SELECT
+                {select_geo},
+                {select_extra}
+
             FROM sis_registros_primer_nivel sr
-            LEFT JOIN catalogo_unidades_primer_nivel cu ON sr.clues = cu.clues
-            LEFT JOIN catalogo_variables cv ON TRIM(UPPER(sr.variable)) = TRIM(UPPER(cv.variable))
+
+            LEFT JOIN catalogo_unidades_primer_nivel cu
+                ON sr.clues = cu.clues
+
+            LEFT JOIN catalogo_variables cv
+                ON TRIM(UPPER(sr.variable)) =
+                   TRIM(UPPER(cv.variable))
+
             WHERE {" AND ".join(where_conditions)}
+
             GROUP BY {group_extra}
-            ORDER BY sr.anio, sr.mes, sr.jurisdiccion
+
+            ORDER BY
+                sr.anio,
+                sr.mes,
+                sr.jurisdiccion
         """
 
         cursor.execute(query, params)
+
         datos_filtrados = cursor.fetchall() or []
-        return jsonify({"status": "success", "data": datos_filtrados})
+
+        return jsonify({
+            "status": "success",
+            "data": datos_filtrados
+        })
 
     except Exception as e:
-        print(f"❌ Error en API /api/filtrar: {str(e)}")
-        return jsonify({"status": "error", "message": f"Error al procesar la consulta: {str(e)}"}), 400
+
+        print(
+            f"❌ Error en API /api/filtrar: {str(e)}"
+        )
+
+        return jsonify({
+            "status": "error",
+            "message": f"Error al procesar la consulta: {str(e)}"
+        }), 400
 
     finally:
         cursor.close()
