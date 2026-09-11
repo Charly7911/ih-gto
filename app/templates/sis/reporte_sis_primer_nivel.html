@@ -1311,6 +1311,23 @@
             guardarEstadoVariablesActuales();
             window.ejecutarFiltradoSis();
         });
+
+        // ==========================================
+        // NUEVO: EVENTO BOTÓN APLICAR FILTROS (LOADER)
+        // ==========================================
+        document.getElementById("btnFiltrarSis")?.addEventListener("click", () => {
+            const loader = document.getElementById("loaderOverlay");
+
+            // 1. Mostrar pantalla de carga
+            if (loader) loader.style.display = "flex";
+
+            // 2. Ejecutar la función de filtrado
+            Promise.resolve(window.ejecutarFiltradoSis())
+                .finally(() => {
+                    // 3. Ocultar el loader al completar la ejecución
+                    if (loader) loader.style.display = "none";
+                });
+        });
     });
 </script>
 {% endblock %}
