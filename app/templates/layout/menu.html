@@ -1533,7 +1533,9 @@
                     if (blockMunicipios) blockMunicipios.style.display = 'block';
                 }
 
-                ejecutarCargaGraficaYDatos();
+                if (typeof ejecutarCargaGraficaYDatos === "function") {
+                    ejecutarCargaGraficaYDatos();
+                }
             });
         }
 
@@ -1681,6 +1683,9 @@
             if (!pop) return [];
             return Array.from(pop.querySelectorAll('input[type="checkbox"]'));
         }
+
+
+        // PARTE 2
 
         function extraerTextoLimpio(cb) {
             const parent = cb.closest('.popover-item') || cb.closest('label') || cb.closest('.check-unidad') || cb.closest('.form-check') || cb.parentElement;
@@ -1989,7 +1994,7 @@
                 // ------------------------------------------------------
                 // A. RESETEAR ESTADO INTERNO DE VARIABLES SIS (NUEVO)
                 // ------------------------------------------------------
-                if (typeof VARIABLES_DEFAULT !== 'undefined') {
+                if (typeof VARIABLES_DEFAULT !== 'undefined' && typeof variablesPersonalizadasEstado !== 'undefined') {
                     variablesPersonalizadasEstado = structuredClone(VARIABLES_DEFAULT);
                 }
 
@@ -2014,8 +2019,8 @@
                 // ------------------------------------------------------
                 if (typeof selectNivel !== 'undefined' && selectNivel) selectNivel.value = 'clues';
                 if (typeof blockUnidades !== 'undefined' && blockUnidades) blockUnidades.style.display = 'block';
-                if (typeof blockJurisdicciones !== 'undefined' && blockJurisdicciones) blockJurisdicciones.style.display = 'none';
-                if (typeof blockMunicipios !== 'undefined' && blockMunicipios) blockMunicipios.style.display = 'none';
+                if (typeof blockJurisdicciones !== 'undefined' && blockJurisdicciones) blockJurisdicciones.style.display = 'block';
+                if (typeof blockMunicipios !== 'undefined' && blockMunicipios) blockMunicipios.style.display = 'block';
 
                 // ------------------------------------------------------
                 // D. LIMPIAR BUSCADORES Y RESTAURAR TEXTOS
