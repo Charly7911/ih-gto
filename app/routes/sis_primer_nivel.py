@@ -197,49 +197,40 @@ def dashboard_sis_primer_nivel():
 
 
 
+
 @sis_pn.route("/api/filtrar", methods=["POST"])
 @login_required
 @csrf.exempt
 def filtrar_datos_sis():
-    data = request.get_json(force=True, silent=True) or {}
+    data = request.get_json(silent=True) or {}
 
-    # 1. Sanitizar y limpiar listas de filtros geográficos y temporales
-    unidades = [str(u).strip() for u in data.get("unidades", []) if str(u).strip()]
-    jurisdicciones = [str(j).strip() for j in data.get("jurisdicciones", []) if str(j).strip()]
-    municipios = [str(m).strip() for m in data.get("municipios", []) if str(m).strip()]
+    unidades = data.get("unidades", []) or []
+    jurisdicciones = data.get("jurisdicciones", []) or []
+    municipios = data.get("municipios", []) or []
     anios = [int(a) for a in data.get("anios", []) if str(a).isdigit()]
     meses = [int(m) for m in data.get("meses", []) if str(m).isdigit()]
+    variables_seleccionadas = data.get("variables", {}) or {}
     
-    nivel_agrupacion = str(data.get("agrupar_por") or data.get("nivel_agrupacion") or "clues").strip()
-    modo_desglose = str(data.get("modo_desglose", "acumulado")).strip()
+    nivel_agrupacion = data.get("nivel_agrupacion", "clues")
+    modo_desglose = data.get("modo_desglose", "acumulado")
 
-    # 2. Extracción de variables con fallback a VARIABLES_DEFAULT
-    variables_input = data.get("variables", {}) or {}
-    todas_vars_set = set()
-
-    if isinstance(variables_input, dict):
-        for v_list in variables_input.values():
+    # 1. Extraer ÚNICAMENTE las variables activas enviadas por el frontend
+    todas_vars = set()
+    if isinstance(variables_seleccionadas, dict):
+        for v_list in variables_seleccionadas.values():
             if isinstance(v_list, list):
-                todas_vars_set.update([str(v).strip() for v in v_list if v])
-    elif isinstance(variables_input, list):
-        todas_vars_set.update([str(v).strip() for v in variables_input if v])
+                todas_vars.update(v_list)
+    elif isinstance(variables_seleccionadas, list):
+        todas_vars.update(variables_seleccionadas)
 
-    # ⚡ SI EL PAYLOAD NO INCLUYE VARIABLES O PIDE 'todas', CARGAR VARIABLES_DEFAULT
-    if not todas_vars_set or data.get("modulo") == "todas":
-        todas_vars_set = set()
-        for v_list in VARIABLES_DEFAULT.values():
-            todas_vars_set.update([str(v).strip() for v in v_list if v])
-
-    lista_variables = list(todas_vars_set)
-
-    # Si incluso después de aplicar los defaults la lista sigue vacía, retornamos array vacío
-    if not lista_variables:
+    # Si no hay variables seleccionadas, retornamos array vacío inmediatamente
+    if not todas_vars:
         return jsonify({"status": "success", "data": []})
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
-        # 3. Configurar agrupación geográfica dinámica
+        # Configurar agrupación geográfica dinámica
         if nivel_agrupacion == "jurisdiccion":
             select_geo = "sr.anio, sr.mes, sr.jurisdiccion, 'N/A' AS municipio, 'N/A' AS clues, 'N/A' AS nombre_unidad"
             group_geo = "sr.anio, sr.mes, sr.jurisdiccion"
@@ -250,41 +241,27 @@ def filtrar_datos_sis():
             select_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, sr.clues, COALESCE(cu.nombre_unidad, sr.clues) AS nombre_unidad"
             group_geo = "sr.anio, sr.mes, sr.jurisdiccion, sr.municipio, sr.clues, cu.nombre_unidad"
 
-        # 4. Construir cláusulas WHERE ignorando arreglos vacíos de forma segura
+        # 2. Construir cláusulas WHERE
         where_conditions = ["1=1"]
         params = []
 
-        if lista_variables:
-            placeholders_v = ','.join(['%s'] * len(lista_variables))
-            where_conditions.append(f"sr.variable IN ({placeholders_v})")
-            params.extend(lista_variables)
+        placeholders_v = ','.join(['%s'] * len(todas_vars))
+        where_conditions.append(f"sr.variable IN ({placeholders_v})")
+        params.extend(list(todas_vars))
 
         if unidades:
             placeholders_u = ','.join(['%s'] * len(unidades))
+            # Optimización de filtro de unidades / CLUES
             where_conditions.append(f"(sr.clues IN ({placeholders_u}) OR cu.nombre_unidad IN ({placeholders_u}))")
             params.extend(unidades + unidades)
 
-        if jurisdicciones:
-            placeholders_j = ','.join(['%s'] * len(jurisdicciones))
-            where_conditions.append(f"sr.jurisdiccion IN ({placeholders_j})")
-            params.extend(jurisdicciones)
+        for col, lst in [('sr.jurisdiccion', jurisdicciones), ('sr.municipio', municipios), ('sr.anio', anios), ('sr.mes', meses)]:
+            if lst:
+                placeholders_l = ','.join(['%s'] * len(lst))
+                where_conditions.append(f"{col} IN ({placeholders_l})")
+                params.extend(lst)
 
-        if municipios:
-            placeholders_m = ','.join(['%s'] * len(municipios))
-            where_conditions.append(f"sr.municipio IN ({placeholders_m})")
-            params.extend(municipios)
-
-        if anios:
-            placeholders_a = ','.join(['%s'] * len(anios))
-            where_conditions.append(f"sr.anio IN ({placeholders_a})")
-            params.extend(anios)
-
-        if meses:
-            placeholders_mes = ','.join(['%s'] * len(meses))
-            where_conditions.append(f"sr.mes IN ({placeholders_mes})")
-            params.extend(meses)
-
-        # 5. Determinar columnas extra según el modo de desglose
+        # 3. Determinar columnas extra según el modo de desglose
         if modo_desglose == "por_apartado":
             select_extra = "cv.apartado, cv.descripcion_apartado, SUM(CAST(sr.total AS UNSIGNED)) AS total"
             group_extra = f"{group_geo}, cv.apartado, cv.descripcion_apartado"
@@ -298,23 +275,10 @@ def filtrar_datos_sis():
             """
             group_extra = f"{group_geo}, cv.apartado, cv.descripcion_apartado, sr.variable, cv.descripcion"
         else:
-            # 🟢 SUMAS CONDICIONALES POR MÓDULO (EVITA ACUMULAR TODO EN CONSULTAS)
-            select_extra = """
-                SUM(CAST(sr.total AS UNSIGNED)) AS total,
-                SUM(CASE WHEN cv.apartado IN ('1','01','215') OR sr.variable LIKE 'CON%' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS consultas,
-                SUM(CASE WHEN cv.apartado IN ('2','02') AND sr.variable IN ('CPP07','CPP14') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS mental,
-                SUM(CASE WHEN cv.apartado IN ('2','02') AND sr.variable IN ('CPP06','CPP13','COD01','COD02') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS bucal,
-                SUM(CASE WHEN cv.apartado = '24' OR sr.variable LIKE 'EMB%' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS embarazadas,
-                SUM(CASE WHEN cv.apartado = '36' OR sr.variable LIKE 'PFC%' OR sr.variable LIKE 'PLA%' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS planificacion_familiar,
-                SUM(CASE WHEN cv.apartado = '56' OR sr.variable LIKE 'DET%' OR sr.variable LIKE 'DT%' OR sr.variable LIKE 'DTE%' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS detecciones,
-                SUM(CASE WHEN cv.apartado = '111' OR sr.variable LIKE 'RNL%' OR sr.variable LIKE 'TAM%' THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS tamiz,
-                SUM(CASE WHEN sr.variable IN ('DET01','DET02','DET03','DET04','DET25','DET26','DET27','DET28','DET50','DET51','DET52','DET53','DET58','DET59','DET60','DET61') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS detecciones_cardiometabolicas,
-                SUM(CASE WHEN sr.variable IN ('MAC07','MAC08','MAC09','MAC11','MAC12') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS orientacion_lac_des_obe,
-                SUM(CASE WHEN sr.variable IN ('MAC01','MAC02') THEN CAST(sr.total AS UNSIGNED) ELSE 0 END) AS orientacion_eda_ira
-            """
+            select_extra = "SUM(CAST(sr.total AS UNSIGNED)) AS total, SUM(CAST(sr.total AS UNSIGNED)) AS consultas"
             group_extra = group_geo
 
-        # 6. Ejecución SQL segura
+        # 🟢 SQL CON JOIN OPTIMIZADO PARA EVITAR NULOS EN VARIABLES Y APARTADOS
         query = f"""
             SELECT {select_geo}, {select_extra}
             FROM sis_registros_primer_nivel sr
@@ -325,7 +289,7 @@ def filtrar_datos_sis():
             ORDER BY sr.anio, sr.mes, sr.jurisdiccion
         """
 
-        cursor.execute(query, tuple(params))
+        cursor.execute(query, params)
         datos_filtrados = cursor.fetchall() or []
         return jsonify({"status": "success", "data": datos_filtrados})
 
