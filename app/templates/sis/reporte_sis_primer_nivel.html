@@ -398,37 +398,23 @@
             'orientacion_lac_des_obe', 'orientacion_eda_ira'
         ];
 
-        // Helper exhaustivo: Busca por ID numérico o por Texto
-        const clasificarRegistro = (r) => {
-            // 1. Detección por ID de apartado (si el backend envía IDs en la consulta filtrada)
-            const idAp = Number(r.id_apartado || r.num_apartado || r.apartado || r.id_modulo);
-            if (idAp === 1) return 'consultas';
-            if (idAp === 2) return 'embarazadas';
-            if (idAp === 3) return 'mental';
-            if (idAp === 4) return 'bucal';
-            if (idAp === 5) return 'tamiz';
-            if (idAp === 6) return 'planificacion_familiar';
-            if (idAp === 7) return 'detecciones';
-            if (idAp === 8) return 'detecciones_cardiometabolicas';
-            if (idAp === 9) return 'orientacion_lac_des_obe';
-            if (idAp === 10) return 'orientacion_eda_ira';
-
-            // 2. Detección por coincidencia de Texto
-            const text = String(r.descripcion_apartado || r.nombre_apartado || r.modulo || r.concepto || '').toLowerCase().trim();
+        // Mapeo exhaustivo para evitar que registros de la respuesta desagregada caigan en Consultas
+        const normalizarApartado = (desc) => {
+            const text = (desc || '').toLowerCase().trim();
 
             if (text.includes('embaraz') || text.includes('matern') || text.includes('obstet')) return 'embarazadas';
             if (text.includes('mental') || text.includes('psico')) return 'mental';
             if (text.includes('bucal') || text.includes('odont') || text.includes('dient')) return 'bucal';
-            if (text.includes('cardiometab') || text.includes('diabet') || text.includes('hipertens')) return 'detecciones_cardiometabolicas';
             if (text.includes('tamiz')) return 'tamiz';
             if (text.includes('planific') || text.includes('anticoncep')) return 'planificacion_familiar';
-            if (text.includes('detec')) return 'detecciones';
+            if (text.includes('cardiometab') || text.includes('diabet') || text.includes('hipertens')) return 'detecciones_cardiometabolicas';
+            if (text.includes('detec') || text.includes('tamiz')) return 'detecciones';
             if (text.includes('lactan') || text.includes('nutri') || text.includes('obes') || text.includes('peso')) return 'orientacion_lac_des_obe';
             if (text.includes('eda') || text.includes('ira') || text.includes('diarre') || text.includes('respirat')) return 'orientacion_eda_ira';
             if (text.includes('consulta') || text.includes('atencion')) return 'consultas';
 
-            // 3. Si no hay coincidencia clara, NO asigna a 'consultas'
-            return null;
+            // ⚠️ NUNCA retornar 'consultas' si no se reconoce el texto: se manda a una propiedad inocua en memoria
+            return '_no_clasificado';
         };
 
         for (let i = 0; i < data.length; i++) {
@@ -459,22 +445,24 @@
                 };
             }
 
-            // Intento A: Leer como columnas individuales (Ej: r.consultas, r.total_consultas)
-            let sumoComoColumna = false;
+            // 1. Intentar sumar las columnas si vienen de forma explícita en el registro
+            let huboSumaDirecta = false;
             campos.forEach(c => {
-                const val = Number(r[c] || r[`total_${c}`] || r[`suma_${c}`]);
+                const val = Number(r[c]);
                 if (!isNaN(val) && val > 0) {
                     mapa[key][c] += val;
-                    sumoComoColumna = true;
+                    huboSumaDirecta = true;
                 }
             });
 
-            // Intento B: Si viene como una fila con total/valor suelto
-            if (!sumoComoColumna) {
+            // 2. Si no venían como columnas explícitas (filas desagregadas del filtro), clasificar por la descripción
+            if (!huboSumaDirecta) {
                 const valorGenerico = Number(r.total || r.valor || r.suma || r.cantidad || 0);
                 if (valorGenerico > 0) {
-                    const campoDestino = clasificarRegistro(r);
-                    if (campoDestino && mapa[key][campoDestino] !== undefined) {
+                    const descripcion = r.descripcion_apartado || r.apartado || r.modulo || r.nombre_apartado || '';
+                    const campoDestino = normalizarApartado(descripcion);
+
+                    if (mapa[key][campoDestino] !== undefined) {
                         mapa[key][campoDestino] += valorGenerico;
                     }
                 }
@@ -1060,7 +1048,6 @@
         }
     }
 
-    
     function renderGraficaTemporal(data = datosFiltradosSis) {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";

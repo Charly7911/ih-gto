@@ -99,8 +99,6 @@ def obtener_modulo_por_apartado(apartado_raw, variable_code=""):
         return "otros"
 
 
-
-
 @sis_pn.route("/")
 @login_required
 def dashboard_sis_primer_nivel():
@@ -194,8 +192,6 @@ def dashboard_sis_primer_nivel():
         tipo="sis",
         title="Reporte SIS - Primer Nivel"
     )
-
-
 
 
 @sis_pn.route("/api/filtrar", methods=["POST"])
