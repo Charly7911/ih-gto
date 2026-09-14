@@ -84,8 +84,7 @@
                                     <option value="anio">Vista Anual (Acumulado)</option>
                                 </select>
 
-                                <select id="filtroSisDetalle" class="form-select form-select-sm w-auto fw-bold"
-                                    onchange="toggleModoDesglose(); renderGraficaTemporal();">
+                                <select id="filtroSisDetalle" class="form-select form-select-sm w-auto fw-bold">
                                     <option value="consultas" selected>Consultas</option>
                                     <option value="embarazadas">Embarazadas</option>
                                     <option value="mental">Salud Mental</option>
@@ -1417,9 +1416,6 @@
             }
 
             renderSubvariables();
-
-            // 🟢 RECALCULA EL MAPA Y ACTUALIZA LA TABLA PRINCIPAL Y TODAS LAS VISTAS LOCALES
-            actualizarVistas();
 
             // 🟢 MANTIENE SINCRONIZADA LA TABLA DE EVOLUCIÓN Y GRÁFICA TEMPORAL
             actualizarTablaEvolucion(datosFiltradosSis);

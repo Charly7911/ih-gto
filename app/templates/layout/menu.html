@@ -1296,6 +1296,7 @@
 
 </div>
 
+
 <script>
     const tipo = "{{ tipo }}"; // morbi | morta | urg | urgencias | sis | egresos | ind | indicadores
     const sufijo = tipo ? (tipo.charAt(0).toUpperCase() + tipo.slice(1)) : "";
@@ -2047,8 +2048,6 @@
                 // Llamar a la consulta/renderizado SIS o general
                 if (typeof ejecutarFiltradoSis === 'function') {
                     ejecutarFiltradoSis(0);
-                } else if (typeof ejecutarCargaGraficaYDatos === 'function') {
-                    ejecutarCargaGraficaYDatos();
                 }
             }
         });
