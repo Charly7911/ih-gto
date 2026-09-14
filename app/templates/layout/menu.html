@@ -2055,37 +2055,36 @@
         });
 
         // ======================================================
-        // 8. CONTROL DE VISTA Y CASCADA EN TIEMPO REAL (HTML INTEGRATION)
+        // 8. CONTROL DE VISTA Y CASCADA EN TIEMPO REAL
         // ======================================================
-        document.addEventListener("DOMContentLoaded", () => {
-            // A. Alternar bloques visibles según el Select "Ver datos por:"
-            const selectNivelAgrupacion = document.getElementById("selectNivelAgrupacion");
-            const blockUnidades = document.getElementById("blockUnidades");
-            const blockJurisdicciones = document.getElementById("blockJurisdicciones");
-            const blockMunicipios = document.getElementById("blockMunicipios");
+        // Reutilizamos el elemento o lo asignamos a una variable local con otro nombre
+        const selectAgrupacionEl = document.getElementById("selectNivelAgrupacion");
 
-            if (selectNivelAgrupacion) {
-                selectNivelAgrupacion.addEventListener("change", (e) => {
-                    const val = e.target.value;
-                    if (blockUnidades) blockUnidades.style.display = (val === "clues") ? "block" : "none";
-                    if (blockJurisdicciones) blockJurisdicciones.style.display = (val === "jurisdiccion") ? "block" : "none";
-                    if (blockMunicipios) blockMunicipios.style.display = (val === "municipio") ? "block" : "none";
-                });
-            }
+        if (selectAgrupacionEl) {
+            selectAgrupacionEl.addEventListener("change", (e) => {
+                const val = e.target.value;
 
-            // B. Cascada instantánea al marcar/desmarcar checkboxes de Jurisdicción
-            const popoverJurisdicciones = document.getElementById("popoverJurisdicciones");
-            if (popoverJurisdicciones) {
-                popoverJurisdicciones.addEventListener("change", (e) => {
-                    if (e.target.matches('input[type="checkbox"]')) {
-                        // Actualiza visualmente qué municipios se muestran en el popover de municipios
-                        if (typeof actualizarRelacionJurisdiccionMunicipio === "function") {
-                            actualizarRelacionJurisdiccionMunicipio();
-                        }
+                // Reobtenemos la referencia en tiempo de ejecución para evitar redeclaraciones
+                const elUnidades = document.getElementById("blockUnidades");
+                const elJurisdicciones = document.getElementById("blockJurisdicciones");
+                const elMunicipios = document.getElementById("blockMunicipios");
+
+                if (elUnidades) elUnidades.style.display = (val === "clues") ? "block" : "none";
+                if (elJurisdicciones) elJurisdicciones.style.display = (val === "jurisdiccion") ? "block" : "none";
+                if (elMunicipios) elMunicipios.style.display = (val === "municipio") ? "block" : "none";
+            });
+        }
+
+        const popoverJurisdiccionesEl = document.getElementById("popoverJurisdicciones");
+        if (popoverJurisdiccionesEl) {
+            popoverJurisdiccionesEl.addEventListener("change", (e) => {
+                if (e.target.matches('input[type="checkbox"]')) {
+                    if (typeof actualizarRelacionJurisdiccionMunicipio === "function") {
+                        actualizarRelacionJurisdiccionMunicipio();
                     }
-                });
-            }
-        });
+                }
+            });
+        }
 
 
     });

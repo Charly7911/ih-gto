@@ -1064,7 +1064,17 @@
         const tabs = document.getElementById("tabsAnios");
         if (!tabs) return;
 
-        const anios = [...new Set(data.map(r => Number(r.anio)))].filter(a => !isNaN(a) && a > 0).sort((a, b) => b - a);
+        if (!data || !Array.isArray(data) || data.length === 0) {
+            anioActivo = null;
+            tabs.innerHTML = "";
+            return;
+        }
+
+        // 🛠️ EXTRACCIÓN Y ORDENACIÓN BLINDADA
+        // Captura 'anio' o 'año', convierte a número válido y ordena descendentemente
+        const anios = [...new Set(data.map(r => Number(r.anio || r.año)))]
+            .filter(a => !isNaN(a) && a > 0)
+            .sort((a, b) => Number(b) - Number(a));
 
         if (anios.length === 0) {
             anioActivo = null;
@@ -1077,10 +1087,10 @@
         }
 
         tabs.innerHTML = anios.map(anio => `
-            <li class="nav-item">
-                <button class="nav-link ${Number(anio) === Number(anioActivo) ? 'active' : ''}" data-anio="${anio}">${anio}</button>
-            </li>
-        `).join('');
+        <li class="nav-item">
+            <button class="nav-link ${Number(anio) === Number(anioActivo) ? 'active' : ''}" data-anio="${anio}">${anio}</button>
+        </li>
+    `).join('');
 
         tabs.querySelectorAll("button").forEach(btn => {
             btn.addEventListener("click", (e) => {
@@ -1090,8 +1100,10 @@
                 anioActivo = Number(e.target.getAttribute("data-anio"));
                 paginaActual = 1;
 
-                renderTablaSis();
-                renderGraficaPorUnidad(datosActuales.filter(r => Number(r.anio) === Number(anioActivo)));
+                if (typeof renderTablaSis === "function") renderTablaSis();
+                if (typeof renderGraficaPorUnidad === "function" && Array.isArray(datosActuales)) {
+                    renderGraficaPorUnidad(datosActuales.filter(r => Number(r.anio || r.año) === Number(anioActivo)));
+                }
             });
         });
     }
