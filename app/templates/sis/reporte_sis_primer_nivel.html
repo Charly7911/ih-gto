@@ -246,6 +246,7 @@
     let paginaActual = 1;
     let anioActivo = null;
     let mostrarValoresMensual = false;
+    let datosGraficaTemporal = [];
 
     let variablesPersonalizadasEstado = structuredClone(VARIABLES_DEFAULT);
 
@@ -831,8 +832,9 @@
         mostrarCargandoGrafica();
 
         if (!hayVariablesSeleccionadas()) {
-            datosFiltradosSis = [];
-            actualizarVistas();
+            datosGraficaTemporal = []; // 🟢 Cambiado: No vacía los datos globales
+            renderGraficaTemporal();
+            actualizarTablaEvolucion();
             return;
         }
 
@@ -859,8 +861,9 @@
         }
 
         if (Object.keys(variablesAPasar).length === 0 || !Object.values(variablesAPasar).some(arr => arr.length > 0)) {
-            datosFiltradosSis = [];
-            actualizarVistas();
+            datosGraficaTemporal = []; // 🟢 Cambiado: No vacía los datos globales
+            renderGraficaTemporal();
+            actualizarTablaEvolucion();
             return;
         }
 
@@ -885,8 +888,12 @@
 
             const res = await resp.json();
             if (res.status === "success") {
-                datosFiltradosSis = res.data || [];
-                actualizarVistas();
+                // 🟢 CLAVE: Guardamos en datosGraficaTemporal (SIN tocar datosFiltradosSis)
+                datosGraficaTemporal = res.data || [];
+
+                // 🟢 Actualizamos solo los componentes de la Gráfica 3
+                renderGraficaTemporal();
+                actualizarTablaEvolucion();
             }
         } catch (err) {
             console.error("Error al conectar con la API SIS:", err);
@@ -912,7 +919,11 @@
         ocultarCargandoGrafica();
     }
 
-    function actualizarTablaEvolucion(data = datosFiltradosSis) {
+
+
+
+    // 🟢 Cambiado: Ahora por defecto consume datosGraficaTemporal en lugar de datosFiltradosSis
+    function actualizarTablaEvolucion(data = datosGraficaTemporal) {
         const tbody = document.getElementById("tbodyEvolucionConsultas");
         if (!tbody) return;
 
@@ -1174,7 +1185,7 @@
 
 
 
-    function renderGraficaTemporal(data = datosFiltradosSis) {
+    function renderGraficaTemporal(data = datosGraficaTemporal) {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
         const modoDesglose = document.getElementById("selectModoDesglose")?.value || "por_apartado";
@@ -1182,7 +1193,7 @@
 
         if (!ctx) return;
 
-        // Destrucción limpia sin afectar otras instancias
+        // Destrucción limpia de la instancia anterior
         if (graficaSisMensual) {
             graficaSisMensual.destroy();
             graficaSisMensual = null;
@@ -1193,27 +1204,21 @@
 
         const paletaColores = [
             '#2b5c8f', '#d9534f', '#20c997', '#f0ad4e', '#6f42c1',
-            '#e83e8c', '#17a2b8', '#fd7e14', '#6c757d', '#343a40', '#17a2b8'
+            '#e83e8c', '#17a2b8', '#fd7e14', '#6c757d', '#343a40'
         ];
 
-        // Lista de campos estándar + la variable en memoria 'comodin'
         const camposApartados = [
             'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
             'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
             'orientacion_lac_des_obe', 'orientacion_eda_ira', 'comodin'
         ];
 
-        // Cálculo exclusivo para las series de tiempo (sin alterar la tabla ni Graf 1 y 2)
         const obtenerSumaFila = (r) => {
             if (modulo === "todas") {
                 let sumaCampos = 0;
                 camposApartados.forEach(c => { sumaCampos += Number(r[c]) || 0; });
-
-                // Si el backend envía un registro suelto con valor en total/suma y no venía en los campos
                 return sumaCampos > 0 ? sumaCampos : Number(r.total || r.valor || r.suma || 0);
             }
-
-            // Si se selecciona un módulo específico o el comodín
             return Number(r[modulo]) || Number(r.comodin) || Number(r.total) || Number(r.valor) || 0;
         };
 
@@ -1329,7 +1334,7 @@
 
         if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
 
-        // Renderizar gráfico final
+        // Renderizado del gráfico Chart.js
         graficaSisMensual = new Chart(ctx, {
             type: tipoVista === 'anio' ? 'bar' : 'line',
             data: { labels, datasets },
