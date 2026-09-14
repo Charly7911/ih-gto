@@ -996,29 +996,29 @@
 
             switch (modoAgrupamiento) {
                 case "jurisdiccion":
-                    conceptoLabel = r.jurisdiccion || r.nom_jurisdiccion || (r.id_jurisdiccion ? `Jurisdicción ${r.id_jurisdiccion}` : "Sin Jurisdicción");
+                    conceptoLabel = String(r.jurisdiccion || r.nom_jurisdiccion || (r.id_jurisdiccion ? `Jurisdicción ${r.id_jurisdiccion}` : "Sin Jurisdicción"));
                     clave = `${conceptoLabel}_${anio}`;
                     break;
 
                 case "municipio":
-                    conceptoLabel = r.municipio || r.nom_municipio || (r.id_municipio ? `Municipio ${r.id_municipio}` : "Sin Municipio");
+                    conceptoLabel = String(r.municipio || r.nom_municipio || (r.id_municipio ? `Municipio ${r.id_municipio}` : "Sin Municipio"));
                     clave = `${conceptoLabel}_${anio}`;
                     break;
 
                 case "unidad":
-                    conceptoLabel = r.unidad || r.nom_unidad || r.clues || (r.id_unidad ? `Unidad ${r.id_unidad}` : "Sin Unidad");
+                    conceptoLabel = String(r.unidad || r.nom_unidad || r.clues || (r.id_unidad ? `Unidad ${r.id_unidad}` : "Sin Unidad"));
                     clave = `${conceptoLabel}_${anio}`;
                     break;
 
                 case "modulo_unico":
-                    conceptoLabel = textoModuloSel;
+                    conceptoLabel = String(textoModuloSel);
                     clave = `${conceptoLabel}_${anio}`;
                     break;
 
                 case "apartado":
                 default:
                     const numAp = r.id_apartado || r.apartado || r.num_apartado;
-                    conceptoLabel = r.descripcion_apartado || (numAp ? `Apartado ${numAp}` : "Sin Clasificar");
+                    conceptoLabel = String(r.descripcion_apartado || (numAp ? `Apartado ${numAp}` : "Sin Clasificar"));
                     clave = `${conceptoLabel}_${anio}`;
                     break;
             }
@@ -1034,10 +1034,13 @@
             resumen[clave].total += obtenerSumaFila(r);
         });
 
-        // Ordenar resultados por Año (Descendente) y luego por Concepto
+        // 🛠️ ORDENACIÓN CORREGIDA: Conversión explícita a String antes del localeCompare
         const listaOrdenada = Object.values(resumen).sort((a, b) => {
-            if (b.anio !== a.anio) return b.anio - a.anio;
-            return a.concepto.localeCompare(b.concepto);
+            if (b.anio !== a.anio) return Number(b.anio) - Number(a.anio);
+
+            const conceptoA = String(a.concepto || '');
+            const conceptoB = String(b.concepto || '');
+            return conceptoA.localeCompare(conceptoB);
         });
 
         if (listaOrdenada.length === 0) {
