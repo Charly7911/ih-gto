@@ -182,8 +182,8 @@
                             <!-- COLUMNA DERECHA: NUEVA TABLA DEDICADA A ESTA GRÁFICA (5/12 del ancho) -->
                             <div class="col-md-5 ps-3">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <label class="form-label font-weight-bold mb-0 text-secondary">
-                                        📊 Resumen por Mes (Grafica 3):
+                                    <label class="form-label font-weight-bold mb-0 text-secondary" id="tituloTabla3">
+                                        📊 Resumen Acumulado (Gráfica 3):
                                     </label>
                                 </div>
 
@@ -192,9 +192,9 @@
                                         id="tablaEvolucionConsultas">
                                         <thead class="table-dark sticky-top">
                                             <tr>
-                                                <th>Año</th>
-                                                <th>Mes</th>
-                                                <th>Total</th>
+                                                <th style="width: 20%;">Año</th>
+                                                <th id="thDetalleTabla3" style="width: 50%;">Descripción / Concepto</th>
+                                                <th style="width: 30%;" class="text-end pe-3">Total Acumulado</th>
                                             </tr>
                                         </thead>
                                         <tbody id="tbodyEvolucionConsultas">
@@ -924,7 +924,6 @@
 
     // 🟢 Cambiado: Ahora por defecto consume datosGraficaTemporal en lugar de datosFiltradosSis
     function actualizarTablaEvolucion(data = datosGraficaTemporal) {
-        const tableElement = document.getElementById("tablaEvolucionConsultas"); // El id del <table> o contenedor de la tabla
         const tbody = document.getElementById("tbodyEvolucionConsultas");
         if (!tbody) return;
 
@@ -933,13 +932,37 @@
             return;
         }
 
-        // 1. Detectar el tipo de agrupación/filtro seleccionado en el menú
-        // Ajusta los IDs si en tu HTML tienen nombres ligeramente distintos
-        const nivelAgrupacion = document.getElementById("selectNivelTabla")?.value
-            || document.getElementById("filtroJurisdiccion")?.value
-            || "periodo";
+        // 1. Detectar automáticamente la entidad seleccionada en el menú global
+        const unidsSel = window.getUnidadesSeleccionadas?.() || [];
+        const munisSel = window.getMunicipiosSeleccionados?.() || [];
+        const jurisSel = window.getJurisdiccionesSeleccionadas?.() || [];
 
-        // Módulo activo para realizar las sumas correctas
+        let modoAgrupamiento = "periodo";
+        let etiquetaColumna = "Mes";
+
+        if (unidsSel.length > 0) {
+            modoAgrupamiento = "unidad";
+            etiquetaColumna = "Unidad Médica";
+        } else if (munisSel.length > 0) {
+            modoAgrupamiento = "municipio";
+            etiquetaColumna = "Municipio";
+        } else if (jurisSel.length > 0) {
+            modoAgrupamiento = "jurisdiccion";
+            etiquetaColumna = "Jurisdicción";
+        } else {
+            // Si no hay filtro geográfico, agrupa por la descripción del apartado seleccionado
+            modoAgrupamiento = "apartado";
+            etiquetaColumna = "Descripción del Apartado";
+        }
+
+        // 2. Modificar los encabezados directamente en el HTML usando los nuevos IDs
+        const elThDetalle = document.getElementById("thDetalleTabla3");
+        const elTituloTabla = document.getElementById("tituloTabla3");
+
+        if (elThDetalle) elThDetalle.textContent = etiquetaColumna;
+        if (elTituloTabla) elTituloTabla.textContent = `📊 Resumen por ${etiquetaColumna} (Gráfica 3):`;
+
+        // 3. Módulo activo para sumas
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const camposApartados = [
             'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
@@ -962,7 +985,7 @@
             9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
         };
 
-        // 2. Agrupar la información dinámicamente según la selección
+        // 4. Agrupar la información
         const resumen = {};
 
         data.forEach(r => {
@@ -970,7 +993,7 @@
             let clave = "";
             let conceptoLabel = "";
 
-            switch (nivelAgrupacion) {
+            switch (modoAgrupamiento) {
                 case "jurisdiccion":
                     conceptoLabel = r.jurisdiccion || r.nom_jurisdiccion || `Jurisdicción ${r.id_jurisdiccion || ''}`;
                     clave = `${conceptoLabel}_${anio}`;
@@ -982,13 +1005,18 @@
                     break;
 
                 case "unidad":
-                    conceptoLabel = r.unidad || r.nom_unidad || `Unidad ${r.clues || ''}`;
+                    conceptoLabel = r.unidad || r.nom_unidad || r.clues || `Unidad ${r.id_unidad || ''}`;
+                    clave = `${conceptoLabel}_${anio}`;
+                    break;
+
+                case "apartado":
+                    const numAp = r.id_apartado || r.apartado || r.num_apartado;
+                    conceptoLabel = r.descripcion_apartado || (numAp ? `Apartado ${numAp}` : "Sin Apartado");
                     clave = `${conceptoLabel}_${anio}`;
                     break;
 
                 case "periodo":
                 default:
-                    // Agrupamiento por Año y Mes por defecto
                     const mes = Number(r.mes) || 0;
                     conceptoLabel = mesesNombres[mes] || `Mes ${mes}`;
                     clave = `${anio}_${String(mes).padStart(2, '0')}`;
@@ -1006,7 +1034,7 @@
             resumen[clave].total += obtenerSumaFila(r);
         });
 
-        // 3. Ordenar resultados
+        // 5. Ordenar resultados por Año (Descendente) y luego por Concepto (Ascendente)
         const listaOrdenada = Object.values(resumen).sort((a, b) => {
             if (b.anio !== a.anio) return b.anio - a.anio;
             return a.concepto.localeCompare(b.concepto);
@@ -1017,33 +1045,15 @@
             return;
         }
 
-        // 4. Cambiar dinámicamente el ENCABEZADO (<thead>) de la Tabla
-        const thead = tableElement?.querySelector("thead");
-        if (thead) {
-            let tituloColumna = "Mes";
-            if (nivelAgrupacion === "jurisdiccion") tituloColumna = "Jurisdicción";
-            if (nivelAgrupacion === "municipio") tituloColumna = "Municipio";
-            if (nivelAgrupacion === "unidad") tituloColumna = "Unidad Médica";
-
-            thead.innerHTML = `
-            <tr>
-                <th class="text-center">Año</th>
-                <th>${tituloColumna}</th>
-                <th class="text-end">Total Acumulado</th>
-            </tr>
-        `;
-        }
-
-        // 5. Renderizar FILAS (<tbody>)
+        // 6. Renderizar FILAS (<tbody>)
         tbody.innerHTML = listaOrdenada.map(r => `
         <tr>
             <td class="text-center fw-bold">${r.anio}</td>
-            <td>${r.concepto}</td>
-            <td class="text-end fw-bold">${typeof fmt === "function" ? fmt(r.total) : r.total.toLocaleString()}</td>
+            <td class="text-start">${r.concepto}</td>
+            <td class="text-end fw-bold pe-3">${typeof fmt === "function" ? fmt(r.total) : r.total.toLocaleString()}</td>
         </tr>
     `).join('');
     }
-
 
 
     /* 4. TABLA Y PAGINACIÓN */
