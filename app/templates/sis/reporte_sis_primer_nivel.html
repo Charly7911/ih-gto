@@ -932,14 +932,19 @@
             return;
         }
 
-        // 1. Detectar automáticamente la entidad seleccionada en el menú global
-        const unidsSel = window.getUnidadesSeleccionadas?.() || [];
-        const munisSel = window.getMunicipiosSeleccionados?.() || [];
+        // Captura de selectores y filtros
+        const selectModulo = document.getElementById("filtroSisDetalle");
+        const valModulo = selectModulo?.value || "consultas";
+        const textoModuloSel = selectModulo?.options[selectModulo.selectedIndex]?.text?.toUpperCase() || "MÓDULO";
+
         const jurisSel = window.getJurisdiccionesSeleccionadas?.() || [];
+        const munisSel = window.getMunicipiosSeleccionados?.() || [];
+        const unidsSel = window.getUnidadesSeleccionadas?.() || [];
 
-        let modoAgrupamiento = "periodo";
-        let etiquetaColumna = "Mes";
+        let modoAgrupamiento = "";
+        let etiquetaColumna = "";
 
+        // 🟢 REGLA 1: Prioridad a filtros geográficos del menú lateral
         if (unidsSel.length > 0) {
             modoAgrupamiento = "unidad";
             etiquetaColumna = "Unidad Médica";
@@ -949,21 +954,23 @@
         } else if (jurisSel.length > 0) {
             modoAgrupamiento = "jurisdiccion";
             etiquetaColumna = "Jurisdicción";
+        }
+        // 🟢 REGLA 2 y 3: Si no hay filtros geográficos, evaluar el select de Módulo
+        else if (valModulo !== "todas") {
+            modoAgrupamiento = "modulo_unico";
+            etiquetaColumna = `Módulo (${textoModuloSel})`;
         } else {
-            // Si no hay filtro geográfico, agrupa por la descripción del apartado seleccionado
             modoAgrupamiento = "apartado";
             etiquetaColumna = "Descripción del Apartado";
         }
 
-        // 2. Modificar los encabezados directamente en el HTML usando los nuevos IDs
+        // Actualizar dinámicamente los encabezados HTML de la tabla
         const elThDetalle = document.getElementById("thDetalleTabla3");
         const elTituloTabla = document.getElementById("tituloTabla3");
 
         if (elThDetalle) elThDetalle.textContent = etiquetaColumna;
         if (elTituloTabla) elTituloTabla.textContent = `📊 Resumen por ${etiquetaColumna} (Gráfica 3):`;
 
-        // 3. Módulo activo para sumas
-        const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const camposApartados = [
             'consultas', 'embarazadas', 'mental', 'bucal', 'tamiz',
             'planificacion_familiar', 'detecciones', 'detecciones_cardiometabolicas',
@@ -971,21 +978,15 @@
         ];
 
         const obtenerSumaFila = (r) => {
-            if (modulo === "todas") {
+            if (valModulo === "todas") {
                 let suma = 0;
                 camposApartados.forEach(c => { suma += Number(r[c]) || 0; });
                 return suma > 0 ? suma : Number(r.total || r.valor || r.suma || 0);
             }
-            return Number(r[modulo]) || Number(r.comodin) || Number(r.total) || Number(r.valor) || 0;
+            return Number(r[valModulo]) || Number(r.comodin) || Number(r.total) || Number(r.valor) || 0;
         };
 
-        const mesesNombres = {
-            1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
-            5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
-            9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
-        };
-
-        // 4. Agrupar la información
+        // Agrupamiento de datos
         const resumen = {};
 
         data.forEach(r => {
@@ -995,31 +996,30 @@
 
             switch (modoAgrupamiento) {
                 case "jurisdiccion":
-                    conceptoLabel = r.jurisdiccion || r.nom_jurisdiccion || `Jurisdicción ${r.id_jurisdiccion || ''}`;
+                    conceptoLabel = r.jurisdiccion || r.nom_jurisdiccion || (r.id_jurisdiccion ? `Jurisdicción ${r.id_jurisdiccion}` : "Sin Jurisdicción");
                     clave = `${conceptoLabel}_${anio}`;
                     break;
 
                 case "municipio":
-                    conceptoLabel = r.municipio || r.nom_municipio || `Municipio ${r.id_municipio || ''}`;
+                    conceptoLabel = r.municipio || r.nom_municipio || (r.id_municipio ? `Municipio ${r.id_municipio}` : "Sin Municipio");
                     clave = `${conceptoLabel}_${anio}`;
                     break;
 
                 case "unidad":
-                    conceptoLabel = r.unidad || r.nom_unidad || r.clues || `Unidad ${r.id_unidad || ''}`;
+                    conceptoLabel = r.unidad || r.nom_unidad || r.clues || (r.id_unidad ? `Unidad ${r.id_unidad}` : "Sin Unidad");
+                    clave = `${conceptoLabel}_${anio}`;
+                    break;
+
+                case "modulo_unico":
+                    conceptoLabel = textoModuloSel;
                     clave = `${conceptoLabel}_${anio}`;
                     break;
 
                 case "apartado":
-                    const numAp = r.id_apartado || r.apartado || r.num_apartado;
-                    conceptoLabel = r.descripcion_apartado || (numAp ? `Apartado ${numAp}` : "Sin Apartado");
-                    clave = `${conceptoLabel}_${anio}`;
-                    break;
-
-                case "periodo":
                 default:
-                    const mes = Number(r.mes) || 0;
-                    conceptoLabel = mesesNombres[mes] || `Mes ${mes}`;
-                    clave = `${anio}_${String(mes).padStart(2, '0')}`;
+                    const numAp = r.id_apartado || r.apartado || r.num_apartado;
+                    conceptoLabel = r.descripcion_apartado || (numAp ? `Apartado ${numAp}` : "Sin Clasificar");
+                    clave = `${conceptoLabel}_${anio}`;
                     break;
             }
 
@@ -1034,7 +1034,7 @@
             resumen[clave].total += obtenerSumaFila(r);
         });
 
-        // 5. Ordenar resultados por Año (Descendente) y luego por Concepto (Ascendente)
+        // Ordenar resultados por Año (Descendente) y luego por Concepto
         const listaOrdenada = Object.values(resumen).sort((a, b) => {
             if (b.anio !== a.anio) return b.anio - a.anio;
             return a.concepto.localeCompare(b.concepto);
@@ -1045,7 +1045,7 @@
             return;
         }
 
-        // 6. Renderizar FILAS (<tbody>)
+        // Renderizar filas en el <tbody>
         tbody.innerHTML = listaOrdenada.map(r => `
         <tr>
             <td class="text-center fw-bold">${r.anio}</td>
