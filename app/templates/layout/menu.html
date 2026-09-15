@@ -1535,6 +1535,8 @@
                 }
 
                 if (typeof ejecutarCargaGraficaYDatos === "function") {
+
+
                     ejecutarCargaGraficaYDatos();
                 }
             });
@@ -2053,39 +2055,6 @@
                 }
             }
         });
-
-        // ======================================================
-        // 8. CONTROL DE VISTA Y CASCADA EN TIEMPO REAL
-        // ======================================================
-        // Reutilizamos el elemento o lo asignamos a una variable local con otro nombre
-        const selectAgrupacionEl = document.getElementById("selectNivelAgrupacion");
-
-        if (selectAgrupacionEl) {
-            selectAgrupacionEl.addEventListener("change", (e) => {
-                const val = e.target.value;
-
-                // Reobtenemos la referencia en tiempo de ejecución para evitar redeclaraciones
-                const elUnidades = document.getElementById("blockUnidades");
-                const elJurisdicciones = document.getElementById("blockJurisdicciones");
-                const elMunicipios = document.getElementById("blockMunicipios");
-
-                if (elUnidades) elUnidades.style.display = (val === "clues") ? "block" : "none";
-                if (elJurisdicciones) elJurisdicciones.style.display = (val === "jurisdiccion") ? "block" : "none";
-                if (elMunicipios) elMunicipios.style.display = (val === "municipio") ? "block" : "none";
-            });
-        }
-
-        const popoverJurisdiccionesEl = document.getElementById("popoverJurisdicciones");
-        if (popoverJurisdiccionesEl) {
-            popoverJurisdiccionesEl.addEventListener("change", (e) => {
-                if (e.target.matches('input[type="checkbox"]')) {
-                    if (typeof actualizarRelacionJurisdiccionMunicipio === "function") {
-                        actualizarRelacionJurisdiccionMunicipio();
-                    }
-                }
-            });
-        }
-
 
     });
 </script>

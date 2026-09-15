@@ -828,6 +828,8 @@
     function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
     function ocultarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.add("d-none"); }
 
+
+
     async function realizarConsultaBackend() {
         mostrarCargandoGrafica();
 
@@ -891,9 +893,14 @@
                 // 🟢 CLAVE: Guardamos en datosGraficaTemporal (SIN tocar datosFiltradosSis)
                 datosGraficaTemporal = res.data || [];
 
-                // 🟢 Actualizamos solo los componentes de la Gráfica 3
+                // 🟢 Actualiza la gráfica temporal (comportamiento que ya tenías)
+                datosGraficaTemporal = datos;
                 renderGraficaTemporal();
                 actualizarTablaEvolucion();
+
+                // 🟢 NUEVO: también sincroniza la tabla principal y gráficas 1 y 2
+                datosFiltradosSis = datos;
+                actualizarVistas();
             }
         } catch (err) {
             console.error("Error al conectar con la API SIS:", err);
