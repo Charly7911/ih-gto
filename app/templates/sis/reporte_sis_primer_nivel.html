@@ -247,6 +247,7 @@
     let anioActivo = null;
     let mostrarValoresMensual = false;
     let datosGraficaTemporal = [];
+    let idPeticionActual = 0;
 
     let variablesPersonalizadasEstado = structuredClone(VARIABLES_DEFAULT);
 
@@ -832,10 +833,11 @@
 
     async function realizarConsultaBackend() {
         mostrarCargandoGrafica();
-        console.log("🔵 realizarConsultaBackend() ejecutado");
+
+         const miId = ++idPeticionActual;
 
         if (!hayVariablesSeleccionadas()) {
-            console.log("🔴 SALIÓ AQUÍ: no hay variables seleccionadas");
+           
             datosGraficaTemporal = [];
             renderGraficaTemporal();
             actualizarTablaEvolucion();
@@ -882,8 +884,7 @@
             variables: variablesAPasar
         };
 
-        console.log("📤 PAYLOAD ENVIADO:", JSON.parse(JSON.stringify(payload)));
-
+       
         try {
             const resp = await fetch("/sis_primer_nivel/api/filtrar", {
                 method: "POST",
@@ -894,14 +895,16 @@
             if (!resp.ok) throw new Error("Error en la respuesta de la API");
 
             const res = await resp.json();
-            console.log("📥 RESPUESTA BACKEND:", res);
+
+            if (miId !== idPeticionActual) {
+            console.log("⏭️ Respuesta descartada por ser obsoleta (id:", miId, "vs actual:", idPeticionActual, ")");
+            return;
+        }
+            
 
             if (res.status === "success") {
                 const datos = res.data || [];
-                console.log("📊 Registros recibidos:", datos.length);
-                console.log("🔍 Ejemplo de un registro:", datos[0]);
-                console.log("🔍 Todas las llaves:", Object.keys(datos[0] || {}));
-
+               
                 // Gráfica temporal + tabla de evolución
                 datosGraficaTemporal = datos;
                 renderGraficaTemporal();
@@ -910,8 +913,7 @@
                 // Tabla principal + gráficas 1 y 2
                 datosFiltradosSis = datos;
                 actualizarVistas();
-
-                console.log("✅ datosFiltradosSis actualizado, longitud:", datosFiltradosSis.length);
+               
             }
         } catch (err) {
             console.error("Error al conectar con la API SIS:", err);
