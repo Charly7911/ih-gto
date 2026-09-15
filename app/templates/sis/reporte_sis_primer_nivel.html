@@ -832,9 +832,11 @@
 
     async function realizarConsultaBackend() {
         mostrarCargandoGrafica();
+        console.log("🔵 realizarConsultaBackend() ejecutado");
 
         if (!hayVariablesSeleccionadas()) {
-            datosGraficaTemporal = []; // 🟢 Cambiado: No vacía los datos globales
+            console.log("🔴 SALIÓ AQUÍ: no hay variables seleccionadas");
+            datosGraficaTemporal = [];
             renderGraficaTemporal();
             actualizarTablaEvolucion();
             return;
@@ -863,7 +865,8 @@
         }
 
         if (Object.keys(variablesAPasar).length === 0 || !Object.values(variablesAPasar).some(arr => arr.length > 0)) {
-            datosGraficaTemporal = []; // 🟢 Cambiado: No vacía los datos globales
+            console.log("🔴 SALIÓ AQUÍ: variablesAPasar vacío");
+            datosGraficaTemporal = [];
             renderGraficaTemporal();
             actualizarTablaEvolucion();
             return;
@@ -879,6 +882,8 @@
             variables: variablesAPasar
         };
 
+        console.log("📤 PAYLOAD ENVIADO:", JSON.parse(JSON.stringify(payload)));
+
         try {
             const resp = await fetch("/sis_primer_nivel/api/filtrar", {
                 method: "POST",
@@ -889,18 +894,22 @@
             if (!resp.ok) throw new Error("Error en la respuesta de la API");
 
             const res = await resp.json();
-            if (res.status === "success") {
-                // 🟢 CLAVE: Guardamos en datosGraficaTemporal (SIN tocar datosFiltradosSis)
-                datosGraficaTemporal = res.data || [];
+            console.log("📥 RESPUESTA BACKEND:", res);
 
-                // 🟢 Actualiza la gráfica temporal (comportamiento que ya tenías)
+            if (res.status === "success") {
+                const datos = res.data || [];
+                console.log("📊 Registros recibidos:", datos.length);
+
+                // Gráfica temporal + tabla de evolución
                 datosGraficaTemporal = datos;
                 renderGraficaTemporal();
                 actualizarTablaEvolucion();
 
-                // 🟢 NUEVO: también sincroniza la tabla principal y gráficas 1 y 2
+                // Tabla principal + gráficas 1 y 2
                 datosFiltradosSis = datos;
                 actualizarVistas();
+
+                console.log("✅ datosFiltradosSis actualizado, longitud:", datosFiltradosSis.length);
             }
         } catch (err) {
             console.error("Error al conectar con la API SIS:", err);
