@@ -194,7 +194,6 @@ def dashboard_sis_primer_nivel():
     )
 
 
-
 @sis_pn.route("/api/filtrar", methods=["POST"])
 @login_required
 @csrf.exempt
@@ -356,18 +355,19 @@ def filtrar_datos_sis():
 
         if modo_desglose == "por_apartado":
 
+            # 🟢 CAMBIO: quitamos sr.variable del SELECT/GROUP BY.
+            # Este modo debe sumar directamente por apartado (cada apartado
+            # es su propia serie/barra), sin colapsar por módulo ni por variable.
             select_extra = """
                 cv.apartado,
                 cv.descripcion_apartado,
-                sr.variable,
                 SUM(CAST(sr.total AS UNSIGNED)) AS total
             """
 
             group_extra = f"""
                 {group_geo},
                 cv.apartado,
-                cv.descripcion_apartado,
-                sr.variable
+                cv.descripcion_apartado
             """
 
         elif modo_desglose in ("por_variable", "desagregado"):
@@ -392,18 +392,17 @@ def filtrar_datos_sis():
         # validamos modo_desglose arriba.
         else:
 
+            # 🟢 CAMBIO: mismo ajuste que en "por_apartado" arriba
             select_extra = """
                 cv.apartado,
                 cv.descripcion_apartado,
-                sr.variable,
                 SUM(CAST(sr.total AS UNSIGNED)) AS total
             """
 
             group_extra = f"""
                 {group_geo},
                 cv.apartado,
-                cv.descripcion_apartado,
-                sr.variable
+                cv.descripcion_apartado
             """
 
         # ==========================================================
@@ -438,45 +437,15 @@ def filtrar_datos_sis():
 
         datos_filtrados = cursor.fetchall() or []
 
-        # ==========================================================
-        # 5. CLASIFICAR CADA FILA EN SU MÓDULO/COLUMNA REAL
-        #    y volver a sumar (ya que ahora quedaron desagregadas por variable)
-        # ==========================================================
-        if modo_desglose == "por_apartado":
-            agregados = {}
+        # 🟢 CAMBIO: se eliminó por completo el bloque de reclasificación por
+        # "campo" (obtener_modulo_por_apartado) para el modo "por_apartado".
+        # Ya no aplica aquí: ese endpoint alimenta la gráfica temporal, que
+        # debe mostrar cada apartado como su propia serie, no agrupado por módulo.
+        # (La reclasificación por módulo sigue viviendo, si la necesitas,
+        # únicamente en el endpoint de la tabla principal / datos agregados.)
 
-            for row in datos_filtrados:
-                campo = obtener_modulo_por_apartado(row.get("apartado"), row.get("variable"))
-
-                clave = (
-                    row.get("anio"), row.get("mes"), row.get("jurisdiccion"),
-                    row.get("municipio"), row.get("clues"), row.get("nombre_unidad"),
-                    campo
-                )
-
-                if clave not in agregados:
-                    agregados[clave] = {
-                        "anio": row.get("anio"),
-                        "mes": row.get("mes"),
-                        "jurisdiccion": row.get("jurisdiccion"),
-                        "municipio": row.get("municipio"),
-                        "clues": row.get("clues"),
-                        "nombre_unidad": row.get("nombre_unidad"),
-                        "campo": campo,   # 👈 el frontend ya sabe usar esto (agruparDatos() lo respeta)
-                        "total": 0
-                    }
-
-                agregados[clave]["total"] += int(row.get("total") or 0)
-
-            datos_filtrados = list(agregados.values())
-
-        else:
-            # por_variable / desagregado: agregamos "campo" también por si se necesita,
-            # sin perder el desglose por variable individual.
-            for row in datos_filtrados:
-                row["campo"] = obtener_modulo_por_apartado(row.get("apartado"), row.get("variable"))
-
-
+        # Para "por_variable"/"desagregado" seguimos agregando descripcion_variable
+        # tal cual venía de la consulta, sin tocar nada adicional.
 
         return jsonify({
             "status": "success",

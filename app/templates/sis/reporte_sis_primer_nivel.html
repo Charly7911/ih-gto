@@ -248,7 +248,7 @@
     let mostrarValoresMensual = false;
     let datosGraficaTemporal = [];
     let idPeticionActual = 0;
-    let idPeticionPrincipal = 0; 
+    let idPeticionPrincipal = 0;
 
     let variablesPersonalizadasEstado = structuredClone(VARIABLES_DEFAULT);
 
@@ -948,7 +948,7 @@
                 renderGraficaTemporal();
                 actualizarTablaEvolucion();
 
-              
+
             }
         } catch (err) {
             console.error("Error al conectar con la API SIS:", err);
@@ -1370,7 +1370,10 @@
 
                 data.forEach(r => {
                     const numAp = r.id_apartado || r.apartado || r.num_apartado;
-                    let labelApartado = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : (numAp ? `Apartado ${numAp}` : 'Sin Clasificar'));
+                    const descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : (numAp ? `Apartado ${numAp}` : 'Sin Clasificar'));
+                    // 🟢 CAMBIO: se agrega el código de apartado al label para no fusionar
+                    // apartados distintos que comparten la misma descripción de texto.
+                    const labelApartado = numAp ? `${descAp} (Apt. ${numAp})` : descAp;
 
                     const val = obtenerSumaFila(r);
                     if (val > 0) {
@@ -1397,10 +1400,12 @@
                     if (!mesNum || mesNum < 1 || mesNum > 12) return;
 
                     const numAp = r.id_apartado || r.apartado || r.num_apartado;
-                    let descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : (numAp ? `Apartado ${numAp}` : 'Otros'));
+                    const descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : (numAp ? `Apartado ${numAp}` : 'Otros'));
+                    // 🟢 CAMBIO: mismo ajuste que en la vista anual
+                    const descApConCodigo = numAp ? `${descAp} (Apt. ${numAp})` : descAp;
 
                     const anio = r.anio || r.año || '';
-                    const serieKey = anio ? `${descAp} (${anio})` : descAp;
+                    const serieKey = anio ? `${descApConCodigo} (${anio})` : descApConCodigo;
                     const val = obtenerSumaFila(r);
 
                     if (val > 0) {
