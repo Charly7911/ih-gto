@@ -899,6 +899,8 @@
             if (res.status === "success") {
                 const datos = res.data || [];
                 console.log("📊 Registros recibidos:", datos.length);
+                console.log("🔍 Ejemplo de un registro:", datos[0]);
+                console.log("🔍 Todas las llaves:", Object.keys(datos[0] || {}));
 
                 // Gráfica temporal + tabla de evolución
                 datosGraficaTemporal = datos;
