@@ -570,3 +570,62 @@ def obtener_evolucion_temporal():
             ),
             400,
         )
+
+
+
+@sis_pn.route("/api/filtrar_tabla_principal", methods=["POST"])
+@login_required
+@csrf.exempt
+def filtrar_tabla_principal():
+    data = request.get_json(silent=True) or {}
+
+    unidades = data.get("unidades", []) or []
+    jurisdicciones = data.get("jurisdicciones", []) or []
+    municipios = data.get("municipios", []) or []
+    anios = [int(a) for a in data.get("anios", []) if str(a).isdigit()]
+    meses = [int(m) for m in data.get("meses", []) if str(m).isdigit()]
+
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        where_conditions = ["1=1"]
+        params = []
+
+        if unidades:
+            ph = ",".join(["%s"] * len(unidades))
+            where_conditions.append(f"(clues IN ({ph}) OR nombre_unidad IN ({ph}))")
+            params.extend(unidades + unidades)
+
+        for col, lst in [
+            ("jurisdiccion", jurisdicciones),
+            ("municipio", municipios),
+            ("anio", anios),
+            ("mes", meses)
+        ]:
+            if lst:
+                ph = ",".join(["%s"] * len(lst))
+                where_conditions.append(f"{col} IN ({ph})")
+                params.extend(lst)
+
+        query = f"""
+            SELECT 
+                anio, mes, clues, nombre_unidad, jurisdiccion, municipio,
+                consultas, mental, bucal, embarazadas, planificacion_familiar, detecciones, tamiz,
+                detecciones_cardiometabolicas, orientacion_lac_des_obe, orientacion_eda_ira
+            FROM sis_registros_agregados_primer_nivel
+            WHERE {" AND ".join(where_conditions)}
+            ORDER BY anio DESC, mes DESC, clues
+        """
+        cursor.execute(query, params)
+        datos = cursor.fetchall() or []
+
+        for r in datos:
+            if r.get("anio") is not None:
+                r["anio"] = int(r["anio"])
+
+        return jsonify({"status": "success", "data": datos})
+
+    except Exception as e:
+        print(f"❌ Error en /api/filtrar_tabla_principal: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 400
+    finally:
+        cursor.close()

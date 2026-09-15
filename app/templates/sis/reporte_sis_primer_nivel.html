@@ -531,6 +531,43 @@
     // Variable global para capturar el modo seleccionado
     window.modoExportacionTemporal = 'acumulado';
 
+
+    async function cargarDatosTablaPrincipal() {
+        const miId = ++idPeticionPrincipal;
+        mostrarCargandoGrafica();
+
+        const payload = {
+            unidades: window.getUnidadesSeleccionadas?.() || [],
+            jurisdicciones: window.getJurisdiccionesSeleccionadas?.() || [],
+            municipios: window.getMunicipiosSeleccionados?.() || [],
+            anios: window.getAniosSeleccionados?.() || [],
+            meses: window.getMesesSeleccionados?.() || []
+        };
+
+        try {
+            const resp = await fetch("/sis_primer_nivel/api/filtrar_tabla_principal", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            if (!resp.ok) throw new Error("Error en la respuesta de la API");
+
+            const res = await resp.json();
+            if (miId !== idPeticionPrincipal) return; // descarta respuestas obsoletas
+
+            if (res.status === "success") {
+                datosFiltradosSis = res.data || [];
+                actualizarVistas();
+            }
+        } catch (err) {
+            console.error("Error al cargar tabla principal:", err);
+        } finally {
+            ocultarCargandoGrafica();
+        }
+    }
+
+    window.cargarDatosSis = cargarDatosTablaPrincipal;
+
     function exportarExcelConModo(modo) {
         window.modoExportacionTemporal = modo;
         exportarFiltradoExcel();
@@ -834,10 +871,10 @@
     async function realizarConsultaBackend() {
         mostrarCargandoGrafica();
 
-         const miId = ++idPeticionActual;
+        const miId = ++idPeticionActual;
 
         if (!hayVariablesSeleccionadas()) {
-           
+
             datosGraficaTemporal = [];
             renderGraficaTemporal();
             actualizarTablaEvolucion();
@@ -884,7 +921,7 @@
             variables: variablesAPasar
         };
 
-       
+
         try {
             const resp = await fetch("/sis_primer_nivel/api/filtrar", {
                 method: "POST",
@@ -897,23 +934,20 @@
             const res = await resp.json();
 
             if (miId !== idPeticionActual) {
-            console.log("⏭️ Respuesta descartada por ser obsoleta (id:", miId, "vs actual:", idPeticionActual, ")");
-            return;
-        }
-            
+                console.log("⏭️ Respuesta descartada por ser obsoleta (id:", miId, "vs actual:", idPeticionActual, ")");
+                return;
+            }
+
 
             if (res.status === "success") {
                 const datos = res.data || [];
-               
+
                 // Gráfica temporal + tabla de evolución
                 datosGraficaTemporal = datos;
                 renderGraficaTemporal();
                 actualizarTablaEvolucion();
 
-                // Tabla principal + gráficas 1 y 2
-                datosFiltradosSis = datos;
-                actualizarVistas();
-               
+              
             }
         } catch (err) {
             console.error("Error al conectar con la API SIS:", err);
