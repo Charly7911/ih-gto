@@ -194,6 +194,7 @@ def dashboard_sis_primer_nivel():
     )
 
 
+
 @sis_pn.route("/api/filtrar", methods=["POST"])
 @login_required
 @csrf.exempt
@@ -358,13 +359,15 @@ def filtrar_datos_sis():
             select_extra = """
                 cv.apartado,
                 cv.descripcion_apartado,
+                sr.variable,
                 SUM(CAST(sr.total AS UNSIGNED)) AS total
             """
 
             group_extra = f"""
                 {group_geo},
                 cv.apartado,
-                cv.descripcion_apartado
+                cv.descripcion_apartado,
+                sr.variable
             """
 
         elif modo_desglose in ("por_variable", "desagregado"):
@@ -392,13 +395,15 @@ def filtrar_datos_sis():
             select_extra = """
                 cv.apartado,
                 cv.descripcion_apartado,
+                sr.variable,
                 SUM(CAST(sr.total AS UNSIGNED)) AS total
             """
 
             group_extra = f"""
                 {group_geo},
                 cv.apartado,
-                cv.descripcion_apartado
+                cv.descripcion_apartado,
+                sr.variable
             """
 
         # ==========================================================
@@ -432,6 +437,46 @@ def filtrar_datos_sis():
         cursor.execute(query, params)
 
         datos_filtrados = cursor.fetchall() or []
+
+        # ==========================================================
+        # 5. CLASIFICAR CADA FILA EN SU MÓDULO/COLUMNA REAL
+        #    y volver a sumar (ya que ahora quedaron desagregadas por variable)
+        # ==========================================================
+        if modo_desglose == "por_apartado":
+            agregados = {}
+
+            for row in datos_filtrados:
+                campo = obtener_modulo_por_apartado(row.get("apartado"), row.get("variable"))
+
+                clave = (
+                    row.get("anio"), row.get("mes"), row.get("jurisdiccion"),
+                    row.get("municipio"), row.get("clues"), row.get("nombre_unidad"),
+                    campo
+                )
+
+                if clave not in agregados:
+                    agregados[clave] = {
+                        "anio": row.get("anio"),
+                        "mes": row.get("mes"),
+                        "jurisdiccion": row.get("jurisdiccion"),
+                        "municipio": row.get("municipio"),
+                        "clues": row.get("clues"),
+                        "nombre_unidad": row.get("nombre_unidad"),
+                        "campo": campo,   # 👈 el frontend ya sabe usar esto (agruparDatos() lo respeta)
+                        "total": 0
+                    }
+
+                agregados[clave]["total"] += int(row.get("total") or 0)
+
+            datos_filtrados = list(agregados.values())
+
+        else:
+            # por_variable / desagregado: agregamos "campo" también por si se necesita,
+            # sin perder el desglose por variable individual.
+            for row in datos_filtrados:
+                row["campo"] = obtener_modulo_por_apartado(row.get("apartado"), row.get("variable"))
+
+
 
         return jsonify({
             "status": "success",
