@@ -960,6 +960,10 @@
     };
 
     function actualizarVistas() {
+        // 1. Guardamos los datos desglosados originales intactos
+        const datosDesglosadosOriginales = JSON.parse(JSON.stringify(datosFiltradosSis || []));
+
+        // 2. Agrupamos para las vistas que lo requieren
         datosActuales = agruparDatos(datosFiltradosSis);
         paginaActual = 1;
 
@@ -967,10 +971,12 @@
         renderTablaSis();
         renderGraficaPorAnio(datosActuales);
         renderGraficaPorUnidad(datosActuales.filter(r => Number(r.anio) === Number(anioActivo)));
-        renderGraficaTemporal(datosFiltradosSis);
+
+        // 🟢 CLAVE DEL ARREGLO: Se pasa la copia limpia con el desglose intacto por apartado
+        renderGraficaTemporal(datosDesglosadosOriginales);
 
         // 🟢 NUEVA INTEGRACIÓN
-        actualizarTablaEvolucion(datosFiltradosSis);
+        actualizarTablaEvolucion(datosDesglosadosOriginales);
         ocultarCargandoGrafica();
     }
 
@@ -1307,6 +1313,7 @@
         }
     }
 
+
     function toggleModoDesglose() {
         const modulo = document.getElementById("filtroSisDetalle")?.value;
         const selectDesglose = document.getElementById("selectModoDesglose");
@@ -1519,7 +1526,7 @@
             }
         });
     }
-    
+
 
     /* 6. INICIALIZACIÓN DE EVENTOS */
     document.addEventListener("DOMContentLoaded", () => {
@@ -1571,6 +1578,7 @@
             }
         });
 
+
         // 🟢 3. SELECTOR DE MÓDULO (Afecta subvariables y gráfica/tabla pequeña)
         document.getElementById("filtroSisDetalle")?.addEventListener("change", (e) => {
             const moduloSeleccionado = e.target.value;
@@ -1585,22 +1593,36 @@
 
             renderSubvariables();
 
-            // 🟢 MANTIENE SINCRONIZADA LA TABLA DE EVOLUCIÓN Y GRÁFICA TEMPORAL
-            actualizarTablaEvolucion(datosFiltradosSis);
-            renderGraficaTemporal(datosFiltradosSis);
+            // 🟢 Copia profunda limpia para evitar que renderSubvariables contamine los datos
+            const copiaDatos = JSON.parse(JSON.stringify(datosFiltradosSis || []));
+
+            actualizarTablaEvolucion(copiaDatos);
+            renderGraficaTemporal(copiaDatos);
 
             ocultarCargandoGrafica();
         });
 
-        // 🟢 4. CONTROLES EXCLUSIVOS DE LA GRÁFICA TEMPORAL Y TABLA PEQUEÑA DE EVOLUCIÓN
+        // 🟢 4. CONTROLES EXCLUSIVOS DE LA GRÁFICA TEMPORAL Y TABLA PEQUEÑA DE EVOLUCIÓN (CORREGIDOS)
         document.getElementById("selectTipoVistaTemporal")?.addEventListener("change", () => {
-            renderGraficaTemporal(datosFiltradosSis);
-            actualizarTablaEvolucion(datosFiltradosSis); // Afecta únicamente a la vista pequeña
+            // Re-evaluar el filtrado antes de renderizar para garantizar que el árbol de subvariables siga intacto
+            if (typeof window.ejecutarFiltradoSis === "function") {
+                window.ejecutarFiltradoSis();
+            } else {
+                const copiaDatos = JSON.parse(JSON.stringify(datosFiltradosSis || []));
+                renderGraficaTemporal(copiaDatos);
+                actualizarTablaEvolucion(copiaDatos);
+            }
         });
 
         document.getElementById("selectModoDesglose")?.addEventListener("change", () => {
-            renderGraficaTemporal(datosFiltradosSis);
-            actualizarTablaEvolucion(datosFiltradosSis); // Afecta únicamente a la vista pequeña
+            // Re-evaluar el filtrado antes de renderizar para garantizar que el árbol de subvariables siga intacto
+            if (typeof window.ejecutarFiltradoSis === "function") {
+                window.ejecutarFiltradoSis();
+            } else {
+                const copiaDatos = JSON.parse(JSON.stringify(datosFiltradosSis || []));
+                renderGraficaTemporal(copiaDatos);
+                actualizarTablaEvolucion(copiaDatos);
+            }
         });
 
         document.getElementById("btnToggleValoresMensual")?.addEventListener("click", (e) => {
@@ -1608,32 +1630,11 @@
             e.target.textContent = mostrarValoresMensual ? "Ocultar valores" : "Mostrar valores";
 
             if (graficaSisMensual) {
-                // Actualiza solo la propiedad sin destruir ni filtrar la gráfica
                 graficaSisMensual.options.plugins.datalabels.display = mostrarValoresMensual;
                 graficaSisMensual.update();
             } else {
-                renderGraficaTemporal(datosFiltradosSis);
-            }
-        });
-
-        // 🟢 5. BOTONES SELECCIONAR / DESMARCAR TODAS
-        document.getElementById("btnSeleccionarTodasSub")?.addEventListener("click", () => {
-            const contenedor = document.getElementById("contenedorSubvariables");
-            if (!contenedor) return;
-            contenedor.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = true);
-            guardarEstadoVariablesActuales();
-            if (typeof window.ejecutarFiltradoSis === "function") {
-                window.ejecutarFiltradoSis();
-            }
-        });
-
-        document.getElementById("btnDesmarcarTodasSub")?.addEventListener("click", () => {
-            const contenedor = document.getElementById("contenedorSubvariables");
-            if (!contenedor) return;
-            contenedor.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = false);
-            guardarEstadoVariablesActuales();
-            if (typeof window.ejecutarFiltradoSis === "function") {
-                window.ejecutarFiltradoSis();
+                const copiaDatos = JSON.parse(JSON.stringify(datosFiltradosSis || []));
+                renderGraficaTemporal(copiaDatos);
             }
         });
     });
