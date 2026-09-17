@@ -1322,9 +1322,9 @@
 
 
 
-    function renderGraficaTemporal(dataParam) {
-        // 1. Obtener la fuente de datos correcta sin perder referencias
-        const data = window.datosFiltradosSis || dataParam || window.datosGraficaTemporal;
+    function renderGraficaTemporal(data = datosGraficaTemporal) {
+        // Mantener la referencia de datos sin perder el objeto original
+        const datosFuente = window.datosFiltradosSis || data;
 
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
@@ -1339,7 +1339,7 @@
         }
 
         if (typeof hayVariablesSeleccionadas === "function" && !hayVariablesSeleccionadas()) return;
-        if (!Array.isArray(data) || data.length === 0) return;
+        if (!datosFuente || datosFuente.length === 0) return;
 
         const paletaColores = [
             '#2b5c8f', '#d9534f', '#20c997', '#f0ad4e', '#6f42c1',
@@ -1352,87 +1352,75 @@
             'orientacion_lac_des_obe', 'orientacion_eda_ira', 'comodin'
         ];
 
-        // Helper flexible para obtener el valor numérico
-        const obtenerValor = (r) => {
-            if (r.comodin !== undefined || r.valor !== undefined || r.total !== undefined || r.suma !== undefined) {
-                const v = Number(r.comodin ?? r.valor ?? r.total ?? r.suma ?? 0);
-                if (v > 0) return v;
+        // 🟢 Obtener valor del registro
+        const obtenerValorRegistro = (r) => {
+            if (r.comodin !== undefined || r.valor !== undefined || r.total !== undefined) {
+                const valDirecto = Number(r.comodin ?? r.valor ?? r.total ?? r.suma ?? 0);
+                if (valDirecto > 0) return valDirecto;
             }
             if (modulo === "todas") {
-                let suma = 0;
-                camposApartados.forEach(c => { suma += Number(r[c]) || 0; });
-                return suma > 0 ? suma : Number(r.total || r.valor || r.suma || 0);
+                let sumaCampos = 0;
+                camposApartados.forEach(c => { sumaCampos += Number(r[c]) || 0; });
+                return sumaCampos > 0 ? sumaCampos : Number(r.total || r.valor || r.suma || 0);
             }
             return Number(r[modulo]) || Number(r.comodin) || Number(r.total) || Number(r.valor) || 0;
         };
 
-        // Helper flexible para obtener la etiqueta del apartado
-        const obtenerEtiquetaApartado = (r) => {
+        // 🟢 Helper único para nombrar las series EXACTAMENTE IGUAL en Mensual y Anual
+        const obtenerNombreSerie = (r) => {
             const numAp = r.id_apartado || r.apartado || r.num_apartado;
-            const descAp = r.descripcion_apartado || r.subvariable || r.variable || r.nombre_apartado || (r.comodin ? "Variables Adicionales" : null);
-
-            if (descAp) {
-                return (numAp && !descAp.includes(`Apt. ${numAp}`)) ? `${descAp} (Apt. ${numAp})` : descAp;
-            }
-            if (numAp) return `Apartado ${numAp}`;
-
-            // Si no hay campos explícitos de subvariable, buscar si la fila trae columnas conocidas
-            for (const campo of camposApartados) {
-                if (Number(r[campo]) > 0) {
-                    return campo.toUpperCase();
-                }
-            }
-            return 'Sin Clasificar';
+            const descAp = r.descripcion_apartado || r.subvariable || r.variable || (r.comodin ? "Variables Adicionales" : (numAp ? `Apartado ${numAp}` : 'Sin Clasificar'));
+            return numAp && !descAp.includes(`Apt. ${numAp}`) ? `${descAp} (Apt. ${numAp})` : descAp;
         };
 
         let labels = [];
         let datasets = [];
         const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
-        // 🟢 MODO 1: POR APARTADO
+        // 🟢 MODO DESGLOSADO POR APARTADO
         if (modoDesglose === "por_apartado") {
 
-            // --- A) VISTA ANUAL POR APARTADO ---
+            // --- VISTA ANUAL ---
             if (tipoVista === 'anio') {
-                const seriesAnualMap = {};
+                const apartadosAnual = {};
 
-                data.forEach(r => {
-                    const val = obtenerValor(r);
+                datosFuente.forEach(r => {
+                    const val = obtenerValorRegistro(r);
                     if (val <= 0) return;
 
-                    const etiqueta = obtenerEtiquetaApartado(r);
-                    const anio = String(r.anio || r.año || r.id_anio || '');
-                    const serieKey = anio ? `${etiqueta} (${anio})` : etiqueta;
+                    const nombreSerie = obtenerNombreSerie(r);
+                    const anio = r.anio || r.año || '';
+                    const clave = anio ? `${nombreSerie} (${anio})` : nombreSerie;
 
-                    seriesAnualMap[serieKey] = (seriesAnualMap[serieKey] || 0) + val;
+                    apartadosAnual[clave] = (apartadosAnual[clave] || 0) + val;
                 });
 
-                labels = Object.keys(seriesAnualMap);
-                const valores = labels.map(k => Math.round(seriesAnualMap[k]));
+                labels = Object.keys(apartadosAnual);
+                const valores = labels.map(k => Math.round(apartadosAnual[k]));
 
                 if (valores.length > 0) {
                     datasets = [{
-                        label: 'Total por Apartado / Año',
+                        label: 'Total por Apartado',
                         data: valores,
                         backgroundColor: labels.map((_, i) => paletaColores[i % paletaColores.length])
                     }];
                 }
             }
-            // --- B) VISTA MENSUAL POR APARTADO ---
+            // --- VISTA MENSUAL ---
             else {
                 labels = Object.values(mesesNombres);
                 const seriesMap = {};
 
-                data.forEach(r => {
+                datosFuente.forEach(r => {
                     const mesNum = Number(r.mes);
                     if (!mesNum || mesNum < 1 || mesNum > 12) return;
 
-                    const val = obtenerValor(r);
+                    const val = obtenerValorRegistro(r);
                     if (val <= 0) return;
 
-                    const etiqueta = obtenerEtiquetaApartado(r);
-                    const anio = String(r.anio || r.año || '');
-                    const serieKey = anio ? `${etiqueta} (${anio})` : etiqueta;
+                    const nombreSerie = obtenerNombreSerie(r);
+                    const anio = r.anio || r.año || '';
+                    const serieKey = anio ? `${nombreSerie} (${anio})` : nombreSerie;
 
                     if (!seriesMap[serieKey]) {
                         seriesMap[serieKey] = Array(12).fill(0);
@@ -1444,7 +1432,6 @@
                 datasets = Object.keys(seriesMap).map(serieKey => {
                     const color = paletaColores[colorIdx % paletaColores.length];
                     colorIdx++;
-
                     return {
                         label: serieKey,
                         data: seriesMap[serieKey].map(v => Math.round(v)),
@@ -1457,15 +1444,13 @@
                 });
             }
         }
-        // 🟡 MODO 2: ACUMULADO GENERAL
+        // 🟡 MODO ACUMULADO GENERAL
         else {
             if (tipoVista === 'anio') {
                 const acumuladoAnual = {};
-                data.forEach(r => {
-                    const val = obtenerValor(r);
-                    if (val <= 0) return;
-                    const anioKey = String(r.anio || r.año || "Año");
-                    acumuladoAnual[anioKey] = (acumuladoAnual[anioKey] || 0) + val;
+                datosFuente.forEach(r => {
+                    const anioKey = r.anio || r.año || "Año";
+                    acumuladoAnual[anioKey] = (acumuladoAnual[anioKey] || 0) + obtenerValorRegistro(r);
                 });
 
                 labels = Object.keys(acumuladoAnual).sort();
@@ -1482,15 +1467,11 @@
                 labels = Object.values(mesesNombres);
                 const resumen = {};
 
-                data.forEach(r => {
-                    const mesNum = Number(r.mes);
-                    if (!mesNum || mesNum < 1 || mesNum > 12) return;
-                    const val = obtenerValor(r);
-                    if (val <= 0) return;
-
+                datosFuente.forEach(r => {
+                    if (!r.mes) return;
                     const key = `Año ${r.anio || r.año || ''}`.trim();
                     if (!resumen[key]) resumen[key] = {};
-                    resumen[key][mesNum] = (resumen[key][mesNum] || 0) + val;
+                    resumen[key][Number(r.mes)] = (resumen[key][Number(r.mes)] || 0) + obtenerValorRegistro(r);
                 });
 
                 datasets = Object.keys(resumen).map((key, index) => ({
@@ -1538,6 +1519,7 @@
             }
         });
     }
+    
 
     /* 6. INICIALIZACIÓN DE EVENTOS */
     document.addEventListener("DOMContentLoaded", () => {
