@@ -723,24 +723,26 @@
                     const variable = String(r.descripcion_variable || r.variable || r.concepto || 'SIN VARIABLE');
 
                     if (nivelAgrupacion === "jurisdiccion") {
-                        claveUnicaMatriz = `${nombreJurisdiccion}_${apartado}_${variable}_${codigoVar}_${anioRegistro}`;
+                        claveUnicaMatriz = `${anioRegistro}_${nombreJurisdiccion}_${apartado}_${variable}_${codigoVar}`;
                     } else if (nivelAgrupacion === "municipio") {
-                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.municipio || 'S/M'}_${apartado}_${variable}_${codigoVar}_${anioRegistro}`;
+                        claveUnicaMatriz = `${anioRegistro}_${nombreJurisdiccion}_${r.municipio || 'S/M'}_${apartado}_${variable}_${codigoVar}`;
                     } else {
-                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.municipio || 'S/M'}_${r.nombre_unidad || r.clues || 'S/U'}_${apartado}_${variable}_${codigoVar}_${anioRegistro}`;
+                        claveUnicaMatriz = `${anioRegistro}_${nombreJurisdiccion}_${r.municipio || 'S/M'}_${r.nombre_unidad || r.clues || 'S/U'}_${apartado}_${variable}_${codigoVar}`;
                     }
                 } else {
                     if (nivelAgrupacion === "jurisdiccion") {
-                        claveUnicaMatriz = `${nombreJurisdiccion}_${anioRegistro}`;
+                        claveUnicaMatriz = `${anioRegistro}_${nombreJurisdiccion}`;
                     } else if (nivelAgrupacion === "municipio") {
-                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.municipio || 'Sin Especificar'}_${anioRegistro}`;
+                        claveUnicaMatriz = `${anioRegistro}_${nombreJurisdiccion}_${r.municipio || 'Sin Especificar'}`;
                     } else {
-                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.municipio || 'Sin Especificar'}_${r.nombre_unidad || r.clues || 'S/U'}_${anioRegistro}`;
+                        claveUnicaMatriz = `${anioRegistro}_${nombreJurisdiccion}_${r.municipio || 'Sin Especificar'}_${r.nombre_unidad || r.clues || 'S/U'}`;
                     }
                 }
 
                 if (!mapaMatriz[claveUnicaMatriz]) {
+                    // 🟢 AÑO COMO PRIMER ATRIBUTO EN EL OBJETO
                     const registroBase = {
+                        "Año": Number(anioRegistro) || anioRegistro,
                         "Entidad": "GUANAJUATO",
                         "Jurisdicción": nombreJurisdiccion
                     };
@@ -753,18 +755,15 @@
                         registroBase["Unidad"] = r.nombre_unidad || r.clues || '-';
                     }
 
-                    // 🟢 CÓDIGO AL LADO DE LA VARIABLE (Apartado -> Variable -> Código)
                     if (esDesagregado) {
                         registroBase["Apartado"] = String(r.descripcion_apartado || r.apartado || r.des_apartado || 'SIN APARTADO');
                         registroBase["Variable"] = String(r.descripcion_variable || r.variable || r.concepto || 'SIN VARIABLE');
                         registroBase["Código"] = String(r.variable || r.cve_variable || r.codigo || '-');
                     }
 
-                    registroBase["Año"] = Number(anioRegistro) || anioRegistro;
                     mapaMatriz[claveUnicaMatriz] = registroBase;
                 }
 
-                // ⚡ ACUMULACIÓN ULTRA RÁPIDA EN VISTA ANUAL
                 if (esVistaAnio) {
                     mapaMatriz[claveUnicaMatriz]["Total Anual"] = (mapaMatriz[claveUnicaMatriz]["Total Anual"] || 0) + valorMonto;
                 } else {
@@ -784,7 +783,6 @@
             });
 
             if (esVistaAnio) {
-                // RUTA RÁPIDA: Si es vista Anual, no hace ciclos por meses
                 for (let i = 0; i < listaRegistros.length; i++) {
                     const item = listaRegistros[i];
                     const totalAnio = Math.round(item["Total Anual"] || 0);
@@ -793,7 +791,6 @@
                     datosParaExcel.push(item);
                 }
             } else {
-                // RUTA MENSUAL
                 const mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
                 const totalesMes = {};
                 mesesOrdenados.forEach(m => totalesMes[m] = 0);
@@ -813,8 +810,13 @@
                 });
             }
 
-            // Fila Total General
-            const filaTotal = { "Entidad": "Grand Total", "Jurisdicción": "" };
+            // 🟢 FILA TOTAL GENERAL (Año primera celda)
+            const filaTotal = {
+                "Año": "",
+                "Entidad": "Grand Total",
+                "Jurisdicción": ""
+            };
+
             if (nivelAgrupacion === "municipio") {
                 filaTotal["Municipio"] = "";
             } else if (nivelAgrupacion === "clues") {
@@ -828,7 +830,6 @@
                 filaTotal["Variable"] = "";
                 filaTotal["Código"] = "";
             }
-            filaTotal["Año"] = "";
 
             if (esVistaAnio) {
                 filaTotal["Total Anual"] = granTotalGeneral;
@@ -862,7 +863,6 @@
             }
         }
     }
-
 
     function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
     function ocultarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.add("d-none"); }
