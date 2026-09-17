@@ -587,7 +587,13 @@
 
         try {
             const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
-            const tipoVistaTemp = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
+
+            // 🟢 1. DETECTAR VISTA TEMPORAL (ANUAL VS MENSUAL) Y NIVEL REAL
+            const selectVistaElem = document.getElementById("selectTipoVistaTemporal");
+            const tipoVistaTemp = selectVistaElem ? selectVistaElem.value : "mes"; // "anio" o "mes"
+
+            const selectNivelElem = document.getElementById("selectNivel") || (typeof selectNivel !== 'undefined' ? selectNivel : null);
+            const nivelAgrupacion = selectNivelElem ? selectNivelElem.value : "jurisdiccion"; // "jurisdiccion", "municipio", "clues"
 
             const modoDesglose = window.modoExportacionTemporal
                 || document.getElementById("selectModoDesglose")?.value
@@ -597,25 +603,19 @@
 
             let fuenteDeDatos = [];
 
+            // 🟢 2. OBTENER FILTROS DE MEMORIA / DOM
             const obtenerValoresCheck = (selector) => {
                 return Array.from(document.querySelectorAll(selector))
                     .filter(cb => cb.checked)
                     .map(cb => cb.value.trim());
             };
 
-            // 🟢 1. RECOLECCIÓN DE FILTROS SIN RESTRICCIÓN DE AÑO ÚNICO
             let aniosAFiltrar = obtenerValoresCheck('.filtro-anio:checked, input[name="anios"]:checked');
             const mesesSel = obtenerValoresCheck('.filtro-mes:checked, input[name="meses"]:checked');
             const unidadesSel = obtenerValoresCheck('.filtro-unidad:checked, input[name="unidades"]:checked');
             const jurisSel = obtenerValoresCheck('.filtro-jurisdiccion:checked, input[name="jurisdicciones"]:checked');
             const munSel = obtenerValoresCheck('.sis-filtro-municipio:checked, input[name="municipios"]:checked');
 
-            // 🟢 NOTA: Si aniosAFiltrar está vacío ([]), se enviará vacío al backend/cliente 
-            // para que traiga TODOS los años disponibles (2023, 2024, 2025, 2026...).
-
-            const nivelAgrupacion = document.getElementById("selectNivel")?.value || "clues";
-
-            // 🟢 2. CONSULTA / OBTENCIÓN DE DATOS
             if (esDesagregado) {
                 let variablesAPasar = {};
 
@@ -634,7 +634,7 @@
                 const payload = {
                     modulo: moduloActual,
                     vista_temporal: tipoVistaTemp,
-                    anios: aniosAFiltrar, // Si va [] trae todos los años
+                    anios: aniosAFiltrar,
                     meses: mesesSel,
                     unidades: unidadesSel,
                     jurisdicciones: jurisSel,
@@ -655,11 +655,11 @@
                 if (resJson.status === "success" && Array.isArray(resJson.data)) {
                     fuenteDeDatos = resJson.data;
                 } else {
-                    throw new Error(resJson.message || "No se obtuvieron registros del servidor.");
+                    throw new Error(resJson.message || "No se obtuvieron datos.");
                 }
 
             } else {
-                // MODO ACUMULADO LOCAL
+                // FILTRADO LOCAL
                 const datosBase = typeof datosFiltradosSis !== "undefined" ? datosFiltradosSis : [];
 
                 fuenteDeDatos = datosBase.filter(r => {
@@ -678,7 +678,7 @@
                 return;
             }
 
-            // 🟢 3. CONSTRUCCIÓN DE LA MATRIZ CON AGRUPACIÓN ESTRICTA
+            // 🟢 3. MAPPING Y CONSTRUCCIÓN DE LA MATRIZ DE EXCEL
             const nombresMeses = {
                 1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
                 5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
@@ -697,9 +697,9 @@
                 const nombreJurisdiccion = r.jurisdiccion ? `Jurisdicción ${r.jurisdiccion}` : 'Sin Especificar';
                 const valorMonto = Number(r.total || r.consultas || r.suma || 0);
 
+                // 🟢 GENERAR CLAVE ÚNICA SEGÚN EL NIVEL DE AGRUPACIÓN SELECCIONADO
                 let claveUnicaMatriz = "";
 
-                // 🟢 LÓGICA DE AGRUPACIÓN RESUMIDA POR NIVEL
                 if (esDesagregado) {
                     const apartado = String(r.descripcion_apartado || r.apartado || r.des_apartado || 'SIN APARTADO');
                     const variable = String(r.descripcion_variable || r.variable || r.des_variable || r.concepto || 'SIN VARIABLE');
@@ -708,17 +708,16 @@
                         claveUnicaMatriz = `${nombreJurisdiccion}_${apartado}_${variable}_${anioRegistro}`;
                     } else if (nivelAgrupacion === "municipio") {
                         claveUnicaMatriz = `${nombreJurisdiccion}_${r.municipio || 'S/M'}_${apartado}_${variable}_${anioRegistro}`;
-                    } else {
-                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.nombre_unidad || r.clues || 'S/U'}_${apartado}_${variable}_${anioRegistro}`;
+                    } else { // clues
+                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.municipio || 'S/M'}_${r.nombre_unidad || r.clues || 'S/U'}_${apartado}_${variable}_${anioRegistro}`;
                     }
                 } else {
                     if (nivelAgrupacion === "jurisdiccion") {
-                        // Resumen exclusivo por Jurisdicción + Año (Oculta Unidad y Municipio)
                         claveUnicaMatriz = `${nombreJurisdiccion}_${anioRegistro}`;
                     } else if (nivelAgrupacion === "municipio") {
                         claveUnicaMatriz = `${nombreJurisdiccion}_${r.municipio || 'Sin Especificar'}_${anioRegistro}`;
-                    } else {
-                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.nombre_unidad || r.clues || 'S/U'}_${anioRegistro}`;
+                    } else { // clues
+                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.municipio || 'Sin Especificar'}_${r.nombre_unidad || r.clues || 'S/U'}_${anioRegistro}`;
                     }
                 }
 
@@ -728,11 +727,11 @@
                         "Jurisdicción": nombreJurisdiccion
                     };
 
-                    // Incluir campos solo si corresponden al nivel seleccionado
+                    // 🟢 AGREGAR COLUMNAS SOLO SI EL NIVEL LO REQUIERE
                     if (nivelAgrupacion === "municipio") {
                         registroBase["Municipio"] = r.municipio || 'Sin Especificar';
                     } else if (nivelAgrupacion === "clues") {
-                        if (r.municipio) registroBase["Municipio"] = r.municipio;
+                        registroBase["Municipio"] = r.municipio || 'Sin Especificar';
                         registroBase["Unidad"] = r.nombre_unidad || r.clues || '-';
                     }
 
@@ -746,43 +745,56 @@
                     mapaMatriz[claveUnicaMatriz] = registroBase;
                 }
 
-                // Sumatoria acumulada por mes
-                mapaMatriz[claveUnicaMatriz][nombreMes] = (mapaMatriz[claveUnicaMatriz][nombreMes] || 0) + valorMonto;
+                // ACUMULAR SUMAS SEGÚN LA VISTA TEMPORAL
+                if (tipoVistaTemp === "anio") {
+                    // Si la vista es ANUAL, acumular todo en un solo campo Total
+                    mapaMatriz[claveUnicaMatriz]["Total Anual"] = (mapaMatriz[claveUnicaMatriz]["Total Anual"] || 0) + valorMonto;
+                } else {
+                    // Si la vista es MENSUAL, acumular por mes individual
+                    mapaMatriz[claveUnicaMatriz][nombreMes] = (mapaMatriz[claveUnicaMatriz][nombreMes] || 0) + valorMonto;
+                }
             });
 
-            // 🟢 4. ORDENAMIENTO Y MAPEO A EXCEL
+            // 🟢 4. FORMATO Y COLUMNAS DE SALIDA
             const mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
             const datosParaExcel = [];
-            const totalesMes = {};
-            mesesOrdenados.forEach(m => totalesMes[m] = 0);
             let granTotalGeneral = 0;
 
             let listaRegistros = Object.values(mapaMatriz);
 
-            // Ordenar por Año y Jurisdicción
             listaRegistros.sort((a, b) => {
                 if (a["Año"] !== b["Año"]) return a["Año"] - b["Año"];
                 return String(a["Jurisdicción"]).localeCompare(String(b["Jurisdicción"]));
             });
 
+            const totalesMes = {};
+            if (tipoVistaTemp === "mes") {
+                mesesOrdenados.forEach(m => totalesMes[m] = 0);
+            }
+
             listaRegistros.forEach((item) => {
                 const fila = { ...item };
-                let totalFila = 0;
 
-                mesesOrdenados.forEach(m => {
-                    const val = Math.round(item[m] || 0);
-                    fila[m] = val;
-                    totalFila += val;
-                    totalesMes[m] += val;
-                });
-
-                fila["Grand Total"] = totalFila;
-                granTotalGeneral += totalFila;
+                if (tipoVistaTemp === "anio") {
+                    const totalAnio = Math.round(item["Total Anual"] || 0);
+                    fila["Total Anual"] = totalAnio;
+                    granTotalGeneral += totalAnio;
+                } else {
+                    let totalFila = 0;
+                    mesesOrdenados.forEach(m => {
+                        const val = Math.round(item[m] || 0);
+                        fila[m] = val;
+                        totalFila += val;
+                        totalesMes[m] += val;
+                    });
+                    fila["Grand Total"] = totalFila;
+                    granTotalGeneral += totalFila;
+                }
 
                 datosParaExcel.push(fila);
             });
 
-            // Fila de Total General
+            // FILA DE TOTAL GENERAL
             const filaTotal = { "Entidad": "Grand Total", "Jurisdicción": "" };
             if (nivelAgrupacion === "municipio") filaTotal["Municipio"] = "";
             if (nivelAgrupacion === "clues") {
@@ -795,11 +807,16 @@
             }
             filaTotal["Año"] = "";
 
-            mesesOrdenados.forEach(m => filaTotal[m] = totalesMes[m]);
-            filaTotal["Grand Total"] = granTotalGeneral;
+            if (tipoVistaTemp === "anio") {
+                filaTotal["Total Anual"] = granTotalGeneral;
+            } else {
+                mesesOrdenados.forEach(m => filaTotal[m] = totalesMes[m]);
+                filaTotal["Grand Total"] = granTotalGeneral;
+            }
+
             datosParaExcel.push(filaTotal);
 
-            // 🟢 5. DESCARGA
+            // 🟢 5. EXPORTACIÓN DEL ARCHIVO
             const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS");
@@ -809,7 +826,7 @@
             }));
 
             const fechaDescarga = new Date().toISOString().slice(0, 10);
-            XLSX.writeFile(workbook, `SIS_${nivelAgrupacion.toUpperCase()}_TODOS_LOS_ANIOS_${fechaDescarga}.xlsx`);
+            XLSX.writeFile(workbook, `SIS_${nivelAgrupacion.toUpperCase()}_VISTA_${tipoVistaTemp.toUpperCase()}_${fechaDescarga}.xlsx`);
 
         } catch (error) {
             console.error("Error al exportar:", error);
