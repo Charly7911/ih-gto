@@ -437,16 +437,7 @@ def filtrar_datos_sis():
 
         datos_filtrados = cursor.fetchall() or []
 
-        # 🟢 CAMBIO: se eliminó por completo el bloque de reclasificación por
-        # "campo" (obtener_modulo_por_apartado) para el modo "por_apartado".
-        # Ya no aplica aquí: ese endpoint alimenta la gráfica temporal, que
-        # debe mostrar cada apartado como su propia serie, no agrupado por módulo.
-        # (La reclasificación por módulo sigue viviendo, si la necesitas,
-        # únicamente en el endpoint de la tabla principal / datos agregados.)
-
-        # Para "por_variable"/"desagregado" seguimos agregando descripcion_variable
-        # tal cual venía de la consulta, sin tocar nada adicional.
-
+       
         return jsonify({
             "status": "success",
             "data": datos_filtrados

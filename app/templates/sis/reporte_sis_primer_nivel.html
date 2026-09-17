@@ -603,12 +603,12 @@
                 nivelAgrupacion = String(window.nivelAgrupacionActual).toLowerCase().trim();
             }
 
-            // Normalizar nombres por si el select usa valores alternativos
+            // Normalizar nombres
             if (nivelAgrupacion.includes("juris")) nivelAgrupacion = "jurisdiccion";
             else if (nivelAgrupacion.includes("muni")) nivelAgrupacion = "municipio";
             else nivelAgrupacion = "clues";
 
-            // 🟢 2. DETECTAR VISTA TEMPORAL (ANUAL O MENSUAL)
+            // 🟢 2. DETECTAR VISTA TEMPORAL Y MODO DESGLOSE
             const selectVistaElem = document.getElementById("selectTipoVistaTemporal") || document.getElementById("selectVista");
             const tipoVistaTemp = selectVistaElem ? selectVistaElem.value : "mes";
 
@@ -717,17 +717,18 @@
 
                 let claveUnicaMatriz = "";
 
-                // Generación de clave estricta según el nivel
                 if (esDesagregado) {
+                    // 🟢 EXTRAER CÓDIGO (r.variable devuelto por la API Flask)
+                    const codigoVar = String(r.variable || r.cve_variable || r.codigo || '-');
                     const apartado = String(r.descripcion_apartado || r.apartado || r.des_apartado || 'SIN APARTADO');
-                    const variable = String(r.descripcion_variable || r.variable || r.des_variable || r.concepto || 'SIN VARIABLE');
+                    const variable = String(r.descripcion_variable || r.variable || r.concepto || 'SIN VARIABLE');
 
                     if (nivelAgrupacion === "jurisdiccion") {
-                        claveUnicaMatriz = `${nombreJurisdiccion}_${apartado}_${variable}_${anioRegistro}`;
+                        claveUnicaMatriz = `${nombreJurisdiccion}_${codigoVar}_${apartado}_${variable}_${anioRegistro}`;
                     } else if (nivelAgrupacion === "municipio") {
-                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.municipio || 'S/M'}_${apartado}_${variable}_${anioRegistro}`;
+                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.municipio || 'S/M'}_${codigoVar}_${apartado}_${variable}_${anioRegistro}`;
                     } else {
-                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.municipio || 'S/M'}_${r.nombre_unidad || r.clues || 'S/U'}_${apartado}_${variable}_${anioRegistro}`;
+                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.municipio || 'S/M'}_${r.nombre_unidad || r.clues || 'S/U'}_${codigoVar}_${apartado}_${variable}_${anioRegistro}`;
                     }
                 } else {
                     if (nivelAgrupacion === "jurisdiccion") {
@@ -745,7 +746,7 @@
                         "Jurisdicción": nombreJurisdiccion
                     };
 
-                    // 🟢 AGREGAR CAMPOS EXCLUSIVAMENTE SI EL NIVEL CORRESPONDE
+                    // Campos según el nivel
                     if (nivelAgrupacion === "municipio") {
                         registroBase["Municipio"] = r.municipio || 'Sin Especificar';
                     } else if (nivelAgrupacion === "clues") {
@@ -755,8 +756,10 @@
                     }
 
                     if (esDesagregado) {
+                        // 🟢 SE AGREGA EL CÓDIGO A LAS COLUMNAS DEL EXCEL
+                        registroBase["Código"] = String(r.variable || r.cve_variable || r.codigo || '-');
                         registroBase["Apartado"] = String(r.descripcion_apartado || r.apartado || r.des_apartado || 'SIN APARTADO');
-                        registroBase["Variable"] = String(r.descripcion_variable || r.variable || r.des_variable || r.concepto || 'SIN VARIABLE');
+                        registroBase["Variable"] = String(r.descripcion_variable || r.variable || r.concepto || 'SIN VARIABLE');
                     }
 
                     registroBase["Año"] = Number(anioRegistro) || anioRegistro;
@@ -822,6 +825,7 @@
             }
 
             if (esDesagregado) {
+                filaTotal["Código"] = "";
                 filaTotal["Apartado"] = "";
                 filaTotal["Variable"] = "";
             }
@@ -836,7 +840,7 @@
 
             datosParaExcel.push(filaTotal);
 
-            // 🟢 7. DESCARGA
+            // 🟢 7. DESCARGA EXCEL
             const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS");
