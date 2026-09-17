@@ -1479,7 +1479,7 @@
 
         if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
 
-        // Renderizado con Chart.js corrigiendo etiquetas y escalas
+        // Renderizado corregido para evitar la desaparición de las líneas/barras
         graficaSisMensual = new Chart(ctx, {
             type: tipoVista === 'anio' ? 'bar' : 'line',
             data: { labels, datasets },
@@ -1497,10 +1497,12 @@
                 },
                 plugins: {
                     legend: { display: true, position: 'top' },
+                    // 🟢 CORRECCIÓN: Garantiza que la visibilidad de los valores
+                    // no afecte el renderizado de las series/líneas del gráfico.
                     datalabels: {
-                        display: () => (typeof mostrarValoresMensual !== 'undefined' ? mostrarValoresMensual : true),
+                        display: Boolean(typeof mostrarValoresMensual !== 'undefined' && mostrarValoresMensual),
                         anchor: 'end',
-                        align: (context) => (context.datasetIndex % 2 === 0 ? 'top' : 'bottom'), // Alterna la etiqueta arriba/abajo para no encimarse
+                        align: (context) => (context.datasetIndex % 2 === 0 ? 'top' : 'bottom'),
                         color: '#333333',
                         formatter: (val) => (val > 0 && typeof fmt === "function") ? fmt(val) : (val > 0 ? val : ''),
                         font: { size: 9, weight: 'bold' }
@@ -1595,7 +1597,14 @@
         document.getElementById("btnToggleValoresMensual")?.addEventListener("click", (e) => {
             mostrarValoresMensual = !mostrarValoresMensual;
             e.target.textContent = mostrarValoresMensual ? "Ocultar valores" : "Mostrar valores";
-            renderGraficaTemporal(datosFiltradosSis);
+
+            if (graficaSisMensual) {
+                // Actualiza solo la propiedad sin destruir ni filtrar la gráfica
+                graficaSisMensual.options.plugins.datalabels.display = mostrarValoresMensual;
+                graficaSisMensual.update();
+            } else {
+                renderGraficaTemporal(datosFiltradosSis);
+            }
         });
 
         // 🟢 5. BOTONES SELECCIONAR / DESMARCAR TODAS
