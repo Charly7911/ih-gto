@@ -79,7 +79,7 @@
                             <div class="d-flex gap-2 align-items-center flex-wrap">
                                 <select id="selectTipoVistaTemporal"
                                     class="form-select form-select-sm w-auto fw-bold text-primary border-primary"
-                                    onchange="renderGraficaTemporal(window.datosFiltradosSis || window.datosGraficaTemporal);">
+                                    onchange="renderGraficaTemporal();">
                                     <option value="mes" selected>Vista Mensual</option>
                                     <option value="anio">Vista Anual (Acumulado)</option>
                                 </select>
@@ -1369,29 +1369,37 @@
         let datasets = [];
         const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
-        // 🟢 MODO DESGLOSADO POR APARTADO
+
         // 🟢 MODO DESGLOSADO POR APARTADO
         if (modoDesglose === "por_apartado") {
             if (tipoVista === 'anio') {
                 const apartadosAnual = {};
+                const labelsPorClave = {}; // 🟢 guarda el label "bonito" asociado a cada clave normalizada
 
                 data.forEach(r => {
                     const numAp = r.id_apartado || r.apartado || r.num_apartado;
                     const descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : (numAp ? `Apartado ${numAp}` : 'Sin Clasificar'));
-                    const descApConCodigo = numAp ? `${descAp} (Apt. ${numAp})` : descAp;
-
-                    // 🟢 CORRECCIÓN CLAVE: Incluir el año en la clave para no encimar los años
                     const anio = r.anio || r.año || r.id_anio || '';
-                    const labelApartadoAnio = anio ? `${descApConCodigo} - ${anio}` : descApConCodigo;
+
+                    // 🟢 CLAVE NORMALIZADA: usa el código de apartado (no el texto) + año,
+                    // así variaciones de mayúsculas/espacios en descripcion_apartado ya no dividen la suma.
+                    const claveNormalizada = `${numAp || 'SC'}_${anio || 'SA'}`;
 
                     const val = obtenerValorRegistro(r);
                     if (val > 0) {
-                        apartadosAnual[labelApartadoAnio] = (apartadosAnual[labelApartadoAnio] || 0) + val;
+                        apartadosAnual[claveNormalizada] = (apartadosAnual[claveNormalizada] || 0) + val;
+
+                        // Solo guardamos el label una vez (o lo sobreescribimos, da igual, es el mismo apartado)
+                        if (!labelsPorClave[claveNormalizada]) {
+                            const descApConCodigo = numAp ? `${descAp} (Apt. ${numAp})` : descAp;
+                            labelsPorClave[claveNormalizada] = anio ? `${descApConCodigo} - ${anio}` : descApConCodigo;
+                        }
                     }
                 });
 
-                labels = Object.keys(apartadosAnual);
-                const valores = labels.map(k => Math.round(apartadosAnual[k]));
+                const claves = Object.keys(apartadosAnual);
+                labels = claves.map(k => labelsPorClave[k]);
+                const valores = claves.map(k => Math.round(apartadosAnual[k]));
 
                 if (valores.length > 0) {
                     datasets = [{
