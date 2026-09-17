@@ -257,6 +257,7 @@
     let graficaSisMensual = null;
     let debounceTimer = null;
 
+
     const fmt = (n) => Number(n || 0).toLocaleString("es-MX");
 
     function actualizarEncabezadoSIS(anio) {
@@ -1322,27 +1323,25 @@
 
 
 
-    function renderGraficaTemporal(data = datosGraficaTemporal) {
+
+
+    function renderGraficaTemporal(data = window.datosFiltradosSis || window.datosGraficaTemporal) {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
         const modoDesglose = document.getElementById("selectModoDesglose")?.value || "por_apartado";
-        const ctx = document.getElementById("graficaSisMensual");
+        const canvasElement = document.getElementById("graficaSisMensual");
 
-        console.log("🟢 renderGraficaTemporal ->", { modulo, tipoVista, modoDesglose, cantidadRegistros: data?.length });
-        if (data && data.length > 0) {
-            console.log("🟢 Ejemplo de registro:", data[0]);
-        }
+        if (!canvasElement) return;
 
-
-        if (!ctx) return;
-
-        if (graficaSisMensual) {
-            graficaSisMensual.destroy();
+        // Destrucción segura del gráfico anterior
+        const chartExistente = Chart.getChart(canvasElement) || graficaSisMensual;
+        if (chartExistente) {
+            chartExistente.destroy();
             graficaSisMensual = null;
         }
 
         if (typeof hayVariablesSeleccionadas === "function" && !hayVariablesSeleccionadas()) return;
-        if (!data || data.length === 0) return;
+        if (!Array.isArray(data) || data.length === 0) return;
 
         const paletaColores = [
             '#2b5c8f', '#d9534f', '#20c997', '#f0ad4e', '#6f42c1',
@@ -1355,86 +1354,110 @@
             'orientacion_lac_des_obe', 'orientacion_eda_ira', 'comodin'
         ];
 
-        // 🟢 Extrae el valor REAL del registro según el modo activo
-        const obtenerValorRegistro = (r) => {
-            // En modo "por_apartado", NO debemos sumar todas las columnas entre sí,
-            // tomamos el valor del módulo activo o el total propio de esa fila/apartado.
-            if (modoDesglose === "por_apartado" && modulo === "todas") {
-                return Number(r.total || r.valor || r.suma || r.comodin || 0);
-            }
-
-            if (modulo === "todas") {
-                let sumaCampos = 0;
-                camposApartados.forEach(c => { sumaCampos += Number(r[c]) || 0; });
-                return sumaCampos > 0 ? sumaCampos : Number(r.total || r.valor || r.suma || 0);
-            }
-            return Number(r[modulo]) || Number(r.comodin) || Number(r.total) || Number(r.valor) || 0;
+        const nombresApartadosMap = {
+            consultas: 'Consultas (Apt. 1)',
+            embarazadas: 'Embarazadas (Apt. 2)',
+            mental: 'Salud Mental (Apt. 3)',
+            bucal: 'Salud Bucal (Apt. 4)',
+            tamiz: 'Tamiz (Apt. 5)',
+            planificacion_familiar: 'Planificación Fam. (Apt. 6)',
+            detecciones: 'Detecciones (Apt. 7)',
+            detecciones_cardiometabolicas: 'Cardiometabólicas (Apt. 8)',
+            orientacion_lac_des_obe: 'Orientación Lac/Des/Obe',
+            orientacion_eda_ira: 'Orientación EDA/IRA',
+            comodin: 'Variables Adicionales'
         };
 
         let labels = [];
         let datasets = [];
         const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
-
-        // 🟢 MODO DESGLOSADO POR APARTADO
+        // 🟢 MODO 1: DESGLOSADO POR APARTADO
         if (modoDesglose === "por_apartado") {
             if (tipoVista === 'anio') {
-                const apartadosAnual = {};
-                const labelsPorClave = {}; // 🟢 guarda el label "bonito" asociado a cada clave normalizada
+                const apartadosSet = new Set();
+                const mapaAnios = {};
 
                 data.forEach(r => {
-                    const numAp = r.id_apartado || r.apartado || r.num_apartado;
-                    const descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : (numAp ? `Apartado ${numAp}` : 'Sin Clasificar'));
-                    const anio = r.anio || r.año || r.id_anio || '';
+                    const anio = String(r.anio || r.año || r.id_anio || 'Sin Año');
+                    if (!mapaAnios[anio]) mapaAnios[anio] = {};
 
-                    // 🟢 CLAVE NORMALIZADA: usa el código de apartado (no el texto) + año,
-                    // así variaciones de mayúsculas/espacios en descripcion_apartado ya no dividen la suma.
-                    const claveNormalizada = `${numAp || 'SC'}_${anio || 'SA'}`;
+                    // Caso A: Si el registro viene desglosado por filas (id_apartado)
+                    if (r.id_apartado || r.descripcion_apartado) {
+                        const numAp = r.id_apartado || r.apartado || r.num_apartado;
+                        const descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : `Apartado ${numAp}`);
+                        const nombreAp = numAp ? `${descAp} (Apt. ${numAp})` : descAp;
+                        const val = Number(r.total || r.valor || r.suma || r.comodin || 0);
 
-                    const val = obtenerValorRegistro(r);
-                    if (val > 0) {
-                        apartadosAnual[claveNormalizada] = (apartadosAnual[claveNormalizada] || 0) + val;
-
-                        // Solo guardamos el label una vez (o lo sobreescribimos, da igual, es el mismo apartado)
-                        if (!labelsPorClave[claveNormalizada]) {
-                            const descApConCodigo = numAp ? `${descAp} (Apt. ${numAp})` : descAp;
-                            labelsPorClave[claveNormalizada] = anio ? `${descApConCodigo} - ${anio}` : descApConCodigo;
+                        if (val > 0) {
+                            apartadosSet.add(nombreAp);
+                            mapaAnios[anio][nombreAp] = (mapaAnios[anio][nombreAp] || 0) + val;
                         }
+                    }
+                    // Caso B: Si viene en columnas ("consultas", "embarazadas", etc.) y módulo está en "Todas" o específico
+                    else {
+                        const camposAEvaluar = (modulo === 'todas') ? camposApartados : [modulo];
+
+                        camposAEvaluar.forEach(campo => {
+                            const val = Number(r[campo]) || 0;
+                            if (val > 0) {
+                                const nombreAp = nombresApartadosMap[campo] || campo;
+                                apartadosSet.add(nombreAp);
+                                mapaAnios[anio][nombreAp] = (mapaAnios[anio][nombreAp] || 0) + val;
+                            }
+                        });
                     }
                 });
 
-                const claves = Object.keys(apartadosAnual);
-                labels = claves.map(k => labelsPorClave[k]);
-                const valores = claves.map(k => Math.round(apartadosAnual[k]));
+                labels = Array.from(apartadosSet);
+                const aniosEncontrados = Object.keys(mapaAnios).sort();
 
-                if (valores.length > 0) {
-                    datasets = [{
-                        label: 'Total por Apartado / Año',
-                        data: valores,
-                        backgroundColor: labels.map((_, i) => paletaColores[i % paletaColores.length])
-                    }];
-                }
+                datasets = aniosEncontrados.map((anioKey, idx) => {
+                    const color = paletaColores[idx % paletaColores.length];
+                    const dataValores = labels.map(apt => Math.round(mapaAnios[anioKey][apt] || 0));
+
+                    return {
+                        label: `Año ${anioKey}`,
+                        data: dataValores,
+                        backgroundColor: color,
+                        borderColor: color,
+                        borderWidth: 1
+                    };
+                });
+
             } else {
+                // MODO MENSUAL POR APARTADO
                 labels = Object.values(mesesNombres);
                 const seriesMap = {};
 
                 data.forEach(r => {
-                    const mesNum = Number(r.mes);
-                    if (!mesNum || mesNum < 1 || mesNum > 12) return;
+                    const mesNum = parseInt(r.mes, 10);
+                    if (isNaN(mesNum) || mesNum < 1 || mesNum > 12) return;
+                    const anio = String(r.anio || r.año || '');
 
-                    const numAp = r.id_apartado || r.apartado || r.num_apartado;
-                    const descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : (numAp ? `Apartado ${numAp}` : 'Otros'));
-                    const descApConCodigo = numAp ? `${descAp} (Apt. ${numAp})` : descAp;
+                    if (r.id_apartado || r.descripcion_apartado) {
+                        const numAp = r.id_apartado || r.apartado || r.num_apartado;
+                        const descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : `Apartado ${numAp}`);
+                        const serieKey = anio ? `${descAp} (${anio})` : descAp;
+                        const val = Number(r.total || r.valor || r.suma || r.comodin || 0);
 
-                    const anio = r.anio || r.año || '';
-                    const serieKey = anio ? `${descApConCodigo} (${anio})` : descApConCodigo;
-                    const val = obtenerValorRegistro(r);
-
-                    if (val > 0) {
-                        if (!seriesMap[serieKey]) {
-                            seriesMap[serieKey] = Array(12).fill(0);
+                        if (val > 0) {
+                            if (!seriesMap[serieKey]) seriesMap[serieKey] = Array(12).fill(0);
+                            seriesMap[serieKey][mesNum - 1] += val;
                         }
-                        seriesMap[serieKey][mesNum - 1] += val;
+                    } else {
+                        const camposAEvaluar = (modulo === 'todas') ? camposApartados : [modulo];
+
+                        camposAEvaluar.forEach(campo => {
+                            const val = Number(r[campo]) || 0;
+                            if (val > 0) {
+                                const nombreAp = nombresApartadosMap[campo] || campo;
+                                const serieKey = anio ? `${nombreAp} (${anio})` : nombreAp;
+
+                                if (!seriesMap[serieKey]) seriesMap[serieKey] = Array(12).fill(0);
+                                seriesMap[serieKey][mesNum - 1] += val;
+                            }
+                        });
                     }
                 });
 
@@ -1454,19 +1477,27 @@
                 });
             }
         }
-        // 🟡 MODO ACUMULADO
+        // 🟡 MODO 2: ACUMULADO GENERAL (NO DESGLOSADO)
         else {
+            const obtenerValorRegistro = (r) => {
+                if (modulo === "todas") {
+                    let sumaCampos = camposApartados.reduce((acc, c) => acc + (Number(r[c]) || 0), 0);
+                    return sumaCampos > 0 ? sumaCampos : Number(r.total || r.valor || r.suma || 0);
+                }
+                return Number(r[modulo] || r.comodin || r.total || r.valor || 0);
+            };
+
             if (tipoVista === 'anio') {
                 const acumuladoAnual = {};
                 data.forEach(r => {
-                    const anioKey = r.anio || r.año || "Año";
+                    const anioKey = String(r.anio || r.año || "Sin Año");
                     acumuladoAnual[anioKey] = (acumuladoAnual[anioKey] || 0) + obtenerValorRegistro(r);
                 });
 
                 labels = Object.keys(acumuladoAnual).sort();
                 const valores = labels.map(a => Math.round(acumuladoAnual[a]));
 
-                if (valores.reduce((a, b) => a + b, 0) > 0) {
+                if (valores.some(v => v > 0)) {
                     datasets = [{
                         label: `Total ${modulo === 'todas' ? 'General' : modulo.toUpperCase()}`,
                         data: valores,
@@ -1478,10 +1509,12 @@
                 const resumen = {};
 
                 data.forEach(r => {
-                    if (!r.mes) return;
-                    const key = `Año ${r.anio || r.año}`;
+                    const mesNum = parseInt(r.mes, 10);
+                    if (isNaN(mesNum) || mesNum < 1 || mesNum > 12) return;
+
+                    const key = `Año ${r.anio || r.año || ''}`;
                     if (!resumen[key]) resumen[key] = {};
-                    resumen[key][Number(r.mes)] = (resumen[key][Number(r.mes)] || 0) + obtenerValorRegistro(r);
+                    resumen[key][mesNum] = (resumen[key][mesNum] || 0) + obtenerValorRegistro(r);
                 });
 
                 datasets = Object.keys(resumen).map((key, index) => ({
@@ -1496,14 +1529,11 @@
             }
         }
 
-        console.log("🟢 datasets generados:", datasets.length, "labels:", labels.length);
-        if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) {
-            console.log("🔴 SALIÓ SIN DIBUJAR: datasets vacíos o todos en 0");
-            return;
-        }
+        // Validación final antes de pintar
+        if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
 
-        // Renderizado corregido para evitar la desaparición de las líneas/barras
-        graficaSisMensual = new Chart(ctx, {
+        // Renderizar gráfica
+        graficaSisMensual = new Chart(canvasElement, {
             type: tipoVista === 'anio' ? 'bar' : 'line',
             data: { labels, datasets },
             options: {
@@ -1520,10 +1550,8 @@
                 },
                 plugins: {
                     legend: { display: true, position: 'top' },
-                    // 🟢 CORRECCIÓN: Garantiza que la visibilidad de los valores
-                    // no afecte el renderizado de las series/líneas del gráfico.
                     datalabels: {
-                        display: Boolean(typeof mostrarValoresMensual !== 'undefined' && mostrarValoresMensual),
+                        display: typeof mostrarValoresMensual !== 'undefined' ? Boolean(mostrarValoresMensual) : false,
                         anchor: 'end',
                         align: (context) => (context.datasetIndex % 2 === 0 ? 'top' : 'bottom'),
                         color: '#333333',
