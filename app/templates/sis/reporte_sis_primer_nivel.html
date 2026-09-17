@@ -629,11 +629,12 @@
                 return res;
             };
 
-            let aniosAFiltrar = obtenerValoresCheck('.filtro-anio:checked, input[name="anios"]:checked');
-            const mesesSel = obtenerValoresCheck('.filtro-mes:checked, input[name="meses"]:checked');
-            const unidadesSel = obtenerValoresCheck('.filtro-unidad:checked, input[name="unidades"]:checked');
-            const jurisSel = obtenerValoresCheck('.filtro-jurisdiccion:checked, input[name="jurisdicciones"]:checked');
-            const munSel = obtenerValoresCheck('.sis-filtro-municipio:checked, input[name="municipios"]:checked');
+            // Normalización a String para comparación exacta
+            let aniosAFiltrar = obtenerValoresCheck('.filtro-anio:checked, input[name="anios"]:checked').map(String);
+            const mesesSel = obtenerValoresCheck('.filtro-mes:checked, input[name="meses"]:checked').map(String);
+            const unidadesSel = obtenerValoresCheck('.filtro-unidad:checked, input[name="unidades"]:checked').map(String);
+            const jurisSel = obtenerValoresCheck('.filtro-jurisdiccion:checked, input[name="jurisdicciones"]:checked').map(String);
+            const munSel = obtenerValoresCheck('.sis-filtro-municipio:checked, input[name="municipios"]:checked').map(String);
 
             // 🟢 4. CONSULTA DE DATOS
             if (esDesagregado) {
@@ -679,17 +680,27 @@
                 }
 
             } else {
-                const datosBase = typeof datosFiltradosSis !== "undefined" ? datosFiltradosSis : [];
-                fuenteDeDatos = datosBase.filter(r => {
-                    const cumpleAnio = aniosAFiltrar.length === 0 || aniosAFiltrar.includes(String(r.anio));
-                    const cumpleMes = mesesSel.length === 0 || mesesSel.includes(String(r.mes));
+                fuenteDeDatos = typeof datosFiltradosSis !== "undefined" ? datosFiltradosSis : [];
+            }
+
+            // 🛡️ FILTRADO ESTRICTO LOCAL EN CLIENTE (AÑO, MES, JURISDICCIÓN, MUNICIPIO Y UNIDAD)
+            fuenteDeDatos = fuenteDeDatos.filter(r => {
+                const anioStr = String(r.anio || r.Año || '');
+                const mesStr = String(r.mes || '');
+
+                const cumpleAnio = aniosAFiltrar.length === 0 || aniosAFiltrar.includes(anioStr);
+                const cumpleMes = mesesSel.length === 0 || mesesSel.includes(mesStr);
+
+                let cumpleOtros = true;
+                if (!esDesagregado) {
                     const cumpleUnidad = unidadesSel.length === 0 || unidadesSel.includes(String(r.clues || r.id_unidad || r.nombre_unidad));
                     const cumpleJuris = jurisSel.length === 0 || jurisSel.includes(String(r.jurisdiccion));
                     const cumpleMun = munSel.length === 0 || munSel.includes(String(r.municipio));
+                    cumpleOtros = cumpleUnidad && cumpleJuris && cumpleMun;
+                }
 
-                    return cumpleAnio && cumpleMes && cumpleUnidad && cumpleJuris && cumpleMun;
-                });
-            }
+                return cumpleAnio && cumpleMes && cumpleOtros;
+            });
 
             if (!fuenteDeDatos || fuenteDeDatos.length === 0) {
                 alert("No hay datos disponibles para exportar con los criterios seleccionados.");
@@ -776,7 +787,6 @@
             let granTotalGeneral = 0;
             let listaRegistros = Object.values(mapaMatriz);
 
-            // 🛠️ VARIABLE DECLARADA EN ÁMBITO SUPERIOR PARA EVITAR EL ReferenceError
             let totalesMes = {};
             let mesesOrdenados = [];
 
@@ -794,6 +804,7 @@
                     datosParaExcel.push(item);
                 }
             } else {
+                // Solo se incluirán como columnas los meses que sobrevivieron al filtro
                 mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
                 mesesOrdenados.forEach(m => totalesMes[m] = 0);
 
