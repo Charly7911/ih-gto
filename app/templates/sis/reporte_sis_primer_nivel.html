@@ -1378,37 +1378,39 @@
         const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
         // 🟢 MODO DESGLOSADO POR APARTADO
+        // 🟢 MODO DESGLOSADO POR APARTADO
         if (modoDesglose === "por_apartado") {
             if (tipoVista === 'anio') {
                 const apartadosAnual = {};
-                const labelsPorClave = {};
 
                 data.forEach(r => {
+                    // Extraer identificador del apartado
                     const numAp = r.id_apartado || r.apartado || r.num_apartado;
-                    const descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : (numAp ? `Apartado ${numAp}` : 'Sin Clasificar'));
-                    const anio = r.anio || r.año || r.id_anio || '';
 
-                    const claveNormalizada = `${numAp || 'SC'}_${anio || 'SA'}`;
+                    // Priorizar el nombre de la subvariable/apartado real
+                    const descAp = r.descripcion_apartado || r.subvariable || r.variable || (r.comodin ? "Variables Adicionales" : null);
+
+                    // Si no hay descripción pero hay ID de apartado, o viceversa:
+                    let nombreFinalApartado = descAp || (numAp ? `Apartado ${numAp}` : 'Otros Apartados');
+                    if (numAp && !nombreFinalApartado.includes(`Apt. ${numAp}`)) {
+                        nombreFinalApartado = `${nombreFinalApartado} (Apt. ${numAp})`;
+                    }
+
                     const val = obtenerValorRegistro(r);
-
                     if (val > 0) {
-                        apartadosAnual[claveNormalizada] = (apartadosAnual[claveNormalizada] || 0) + val;
-
-                        if (!labelsPorClave[claveNormalizada]) {
-                            const descApConCodigo = numAp ? `${descAp} (Apt. ${numAp})` : descAp;
-                            labelsPorClave[claveNormalizada] = anio ? `${descApConCodigo} - ${anio}` : descApConCodigo;
-                        }
+                        apartadosAnual[nombreFinalApartado] = (apartadosAnual[nombreFinalApartado] || 0) + val;
                     }
                 });
 
-                const claves = Object.keys(apartadosAnual);
-                labels = claves.map(k => labelsPorClave[k]);
-                const valores = claves.map(k => Math.round(apartadosAnual[k]));
+                // Etiquetas = Nombres de los apartados individuales (Ej. ESTUDIOS DE RADIOLOGÍA, LABORATORIO CLÍNICO)
+                labels = Object.keys(apartadosAnual);
+                const valores = labels.map(k => Math.round(apartadosAnual[k]));
 
                 if (valores.length > 0) {
                     datasets = [{
-                        label: 'Total por Apartado / Año',
+                        label: 'Total Anual por Apartado',
                         data: valores,
+                        // Asigna un color diferente a cada barra de apartado
                         backgroundColor: labels.map((_, i) => paletaColores[i % paletaColores.length])
                     }];
                 }
