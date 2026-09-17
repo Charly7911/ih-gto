@@ -724,11 +724,11 @@
                     const variable = String(r.descripcion_variable || r.variable || r.concepto || 'SIN VARIABLE');
 
                     if (nivelAgrupacion === "jurisdiccion") {
-                        claveUnicaMatriz = `${nombreJurisdiccion}_${codigoVar}_${apartado}_${variable}_${anioRegistro}`;
+                        claveUnicaMatriz = `${nombreJurisdiccion}_${apartado}_${variable}_${codigoVar}_${anioRegistro}`;
                     } else if (nivelAgrupacion === "municipio") {
-                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.municipio || 'S/M'}_${codigoVar}_${apartado}_${variable}_${anioRegistro}`;
+                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.municipio || 'S/M'}_${apartado}_${variable}_${codigoVar}_${anioRegistro}`;
                     } else {
-                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.municipio || 'S/M'}_${r.nombre_unidad || r.clues || 'S/U'}_${codigoVar}_${apartado}_${variable}_${anioRegistro}`;
+                        claveUnicaMatriz = `${nombreJurisdiccion}_${r.municipio || 'S/M'}_${r.nombre_unidad || r.clues || 'S/U'}_${apartado}_${variable}_${codigoVar}_${anioRegistro}`;
                     }
                 } else {
                     if (nivelAgrupacion === "jurisdiccion") {
@@ -862,6 +862,7 @@
             }
         }
     }
+
 
     function mostrarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.remove("d-none"); }
     function ocultarCargandoGrafica() { document.getElementById("loaderGraficaTemporal")?.classList.add("d-none"); }
