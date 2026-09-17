@@ -1322,7 +1322,10 @@
 
 
 
-    function renderGraficaTemporal(data = datosGraficaTemporal) {
+    function renderGraficaTemporal(dataParam) {
+        // 🟢 1. FORZAR LECTURA DE LA FUENTE DE DATOS MÁS ACTUALIZADA
+        const data = window.datosFiltradosSis || dataParam || window.datosGraficaTemporal;
+
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
         const modoDesglose = document.getElementById("selectModoDesglose")?.value || "por_apartado";
@@ -1330,14 +1333,13 @@
 
         if (!ctx) return;
 
-        // Destrucción limpia e incondicional del gráfico previo para evitar residuos en memoria
         if (graficaSisMensual) {
             graficaSisMensual.destroy();
             graficaSisMensual = null;
         }
 
         if (typeof hayVariablesSeleccionadas === "function" && !hayVariablesSeleccionadas()) return;
-        if (!data || data.length === 0) return;
+        if (!Array.isArray(data) || data.length === 0) return;
 
         const paletaColores = [
             '#2b5c8f', '#d9534f', '#20c997', '#f0ad4e', '#6f42c1',
@@ -1350,76 +1352,77 @@
             'orientacion_lac_des_obe', 'orientacion_eda_ira', 'comodin'
         ];
 
-        // Extracción limpia del valor sin mutar propiedades ni alterar la fila
-        const obtenerValorRegistro = (r) => {
-            if (r.comodin !== undefined || r.valor !== undefined || r.total !== undefined) {
-                const valDirecto = Number(r.comodin ?? r.valor ?? r.total ?? r.suma ?? 0);
-                if (valDirecto > 0) return valDirecto;
-            }
-
-            if (modulo === "todas") {
-                let sumaCampos = 0;
-                camposApartados.forEach(c => { sumaCampos += Number(r[c]) || 0; });
-                return sumaCampos > 0 ? sumaCampos : Number(r.total || r.valor || r.suma || 0);
-            }
-
-            return Number(r[modulo]) || Number(r.comodin) || Number(r.total) || Number(r.valor) || 0;
-        };
-
-        // Obtiene el identificador / nombre único para separar series
-        const obtenerNombreSerie = (r) => {
-            const numAp = r.id_apartado || r.apartado || r.num_apartado;
-            const descAp = r.descripcion_apartado || r.subvariable || r.variable || (r.comodin ? "Variables Adicionales" : null);
-
-            let nombre = descAp || (numAp ? `Apartado ${numAp}` : 'Otros Apartados');
-            if (numAp && !nombre.includes(`Apt. ${numAp}`)) {
-                nombre = `${nombre} (Apt. ${numAp})`;
-            }
-            return nombre;
+        const nombresApartadosMap = {
+            consultas: 'Consultas (Apt. 1)',
+            embarazadas: 'Embarazadas (Apt. 2)',
+            mental: 'Salud Mental (Apt. 3)',
+            bucal: 'Salud Bucal (Apt. 4)',
+            tamiz: 'Tamiz (Apt. 5)',
+            planificacion_familiar: 'Planificación Fam. (Apt. 6)',
+            detecciones: 'Detecciones (Apt. 7)',
+            detecciones_cardiometabolicas: 'Cardiometabólicas (Apt. 8)',
+            orientacion_lac_des_obe: 'Orientación Lac/Des/Obe',
+            orientacion_eda_ira: 'Orientación EDA/IRA',
+            comodin: 'Variables Adicionales'
         };
 
         let labels = [];
         let datasets = [];
         const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
-        // 🟢 MODO 1: DESGLOSADO POR APARTADO
+        // 🟢 MODO DESGLOSADO POR APARTADO
         if (modoDesglose === "por_apartado") {
 
-            // --- 1.A) VISTA ANUAL DESGLOSADA ---
+            // --- 1. VISTA ANUAL POR APARTADO ---
             if (tipoVista === 'anio') {
-                const aniosSet = new Set();
-                const seriesMap = {};
+                const apartadosAnual = {};
 
                 data.forEach(r => {
-                    const val = obtenerValorRegistro(r);
-                    if (val <= 0) return;
+                    const anio = r.anio || r.año || r.id_anio || '';
 
-                    const anio = String(r.anio || r.año || r.id_anio || 'Año');
-                    const serieKey = obtenerNombreSerie(r);
+                    // Si viene desglosado en filas individuales (como tus subvariables de radiología/laboratorio)
+                    if (r.id_apartado || r.descripcion_apartado || r.subvariable || r.variable) {
+                        const numAp = r.id_apartado || r.apartado || r.num_apartado;
+                        const descAp = r.descripcion_apartado || r.subvariable || r.variable || (r.comodin ? "Variables Adicionales" : "Otros Apartados");
 
-                    aniosSet.add(anio);
-                    if (!seriesMap[serieKey]) seriesMap[serieKey] = {};
-                    seriesMap[serieKey][anio] = (seriesMap[serieKey][anio] || 0) + val;
+                        let key = descAp;
+                        if (numAp && !key.includes(`Apt. ${numAp}`)) {
+                            key = `${descAp} (Apt. ${numAp})`;
+                        }
+                        if (anio) key = `${key} (${anio})`;
+
+                        const val = Number(r.comodin ?? r.valor ?? r.total ?? r.suma ?? 0);
+                        if (val > 0) {
+                            apartadosAnual[key] = (apartadosAnual[key] || 0) + val;
+                        }
+                    }
+                    // Si viene en formato matricial (columnas "consultas", "embarazadas", etc.)
+                    else {
+                        const camposAEvaluar = (modulo === 'todas') ? camposApartados : [modulo];
+                        camposAEvaluar.forEach(campo => {
+                            const val = Number(r[campo]) || 0;
+                            if (val > 0) {
+                                const desc = nombresApartadosMap[campo] || campo;
+                                const key = anio ? `${desc} (${anio})` : desc;
+                                apartadosAnual[key] = (apartadosAnual[key] || 0) + val;
+                            }
+                        });
+                    }
                 });
 
-                labels = Array.from(aniosSet).sort();
+                labels = Object.keys(apartadosAnual);
+                const valores = labels.map(k => Math.round(apartadosAnual[k]));
 
-                let colorIdx = 0;
-                datasets = Object.keys(seriesMap).map(serieKey => {
-                    const color = paletaColores[colorIdx % paletaColores.length];
-                    colorIdx++;
-
-                    return {
-                        label: serieKey,
-                        data: labels.map(anio => Math.round(seriesMap[serieKey][anio] || 0)),
-                        backgroundColor: color,
-                        borderColor: color,
-                        borderWidth: 1
-                    };
-                });
-
+                if (valores.length > 0) {
+                    datasets = [{
+                        label: 'Total por Apartado / Año',
+                        data: valores,
+                        backgroundColor: labels.map((_, i) => paletaColores[i % paletaColores.length])
+                    }];
+                }
             }
-            // --- 1.B) VISTA MENSUAL DESGLOSADA (Línea independiente por apartado) ---
+
+            // --- 2. VISTA MENSUAL POR APARTADO ---
             else {
                 labels = Object.values(mesesNombres);
                 const seriesMap = {};
@@ -1427,18 +1430,37 @@
                 data.forEach(r => {
                     const mesNum = Number(r.mes);
                     if (!mesNum || mesNum < 1 || mesNum > 12) return;
-
-                    const val = obtenerValorRegistro(r);
-                    if (val <= 0) return;
-
-                    const nombreAp = obtenerNombreSerie(r);
                     const anio = r.anio || r.año || '';
-                    const serieKey = anio ? `${nombreAp} (${anio})` : nombreAp;
 
-                    if (!seriesMap[serieKey]) {
-                        seriesMap[serieKey] = Array(12).fill(0);
+                    if (r.id_apartado || r.descripcion_apartado || r.subvariable || r.variable) {
+                        const numAp = r.id_apartado || r.apartado || r.num_apartado;
+                        const descAp = r.descripcion_apartado || r.subvariable || r.variable || (r.comodin ? "Variables Adicionales" : "Otros");
+
+                        let nombreSerie = descAp;
+                        if (numAp && !nombreSerie.includes(`Apt. ${numAp}`)) {
+                            nombreSerie = `${descAp} (Apt. ${numAp})`;
+                        }
+                        const serieKey = anio ? `${nombreSerie} (${anio})` : nombreSerie;
+                        const val = Number(r.comodin ?? r.valor ?? r.total ?? r.suma ?? 0);
+
+                        if (val > 0) {
+                            if (!seriesMap[serieKey]) seriesMap[serieKey] = Array(12).fill(0);
+                            seriesMap[serieKey][mesNum - 1] += val;
+                        }
+                    } else {
+                        const camposAEvaluar = (modulo === 'todas') ? camposApartados : [modulo];
+
+                        camposAEvaluar.forEach(campo => {
+                            const val = Number(r[campo]) || 0;
+                            if (val > 0) {
+                                const desc = nombresApartadosMap[campo] || campo;
+                                const serieKey = anio ? `${desc} (${anio})` : desc;
+
+                                if (!seriesMap[serieKey]) seriesMap[serieKey] = Array(12).fill(0);
+                                seriesMap[serieKey][mesNum - 1] += val;
+                            }
+                        });
                     }
-                    seriesMap[serieKey][mesNum - 1] += val;
                 });
 
                 let colorIdx = 0;
@@ -1458,13 +1480,27 @@
                 });
             }
         }
-        // 🟡 MODO 2: ACUMULADO GENERAL
+
+        // 🟡 MODO ACUMULADO GENERAL
         else {
+            const obtenerValorGeneral = (r) => {
+                if (r.comodin !== undefined || r.valor !== undefined || r.total !== undefined) {
+                    const valDirecto = Number(r.comodin ?? r.valor ?? r.total ?? r.suma ?? 0);
+                    if (valDirecto > 0) return valDirecto;
+                }
+                if (modulo === "todas") {
+                    let sumaCampos = 0;
+                    camposApartados.forEach(c => { sumaCampos += Number(r[c]) || 0; });
+                    return sumaCampos > 0 ? sumaCampos : Number(r.total || r.valor || r.suma || 0);
+                }
+                return Number(r[modulo]) || Number(r.comodin) || Number(r.total) || Number(r.valor) || 0;
+            };
+
             if (tipoVista === 'anio') {
                 const acumuladoAnual = {};
                 data.forEach(r => {
                     const anioKey = String(r.anio || r.año || "Año");
-                    acumuladoAnual[anioKey] = (acumuladoAnual[anioKey] || 0) + obtenerValorRegistro(r);
+                    acumuladoAnual[anioKey] = (acumuladoAnual[anioKey] || 0) + obtenerValorGeneral(r);
                 });
 
                 labels = Object.keys(acumuladoAnual).sort();
@@ -1485,7 +1521,7 @@
                     if (!r.mes) return;
                     const key = `Año ${r.anio || r.año || ''}`.trim();
                     if (!resumen[key]) resumen[key] = {};
-                    resumen[key][Number(r.mes)] = (resumen[key][Number(r.mes)] || 0) + obtenerValorRegistro(r);
+                    resumen[key][Number(r.mes)] = (resumen[key][Number(r.mes)] || 0) + obtenerValorGeneral(r);
                 });
 
                 datasets = Object.keys(resumen).map((key, index) => ({
@@ -1504,7 +1540,6 @@
             return;
         }
 
-        // Creación limpia de la gráfica según el tipo de vista seleccionado
         graficaSisMensual = new Chart(ctx, {
             type: tipoVista === 'anio' ? 'bar' : 'line',
             data: { labels, datasets },
