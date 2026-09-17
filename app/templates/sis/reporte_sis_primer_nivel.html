@@ -1323,8 +1323,6 @@
 
 
 
-
-
     function renderGraficaTemporal(data = window.datosFiltradosSis || window.datosGraficaTemporal) {
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
@@ -1333,7 +1331,7 @@
 
         if (!canvasElement) return;
 
-        // Destrucción segura del gráfico anterior
+        // Destrucción limpia del gráfico anterior
         const chartExistente = Chart.getChart(canvasElement) || graficaSisMensual;
         if (chartExistente) {
             chartExistente.destroy();
@@ -1368,6 +1366,27 @@
             comodin: 'Variables Adicionales'
         };
 
+        // 🟢 EXTRACCIÓN ROBUSTA DE VALORES PARA TODOS LOS MODOS
+        const extraerValorFila = (r, campoEspecifico = null) => {
+            if (campoEspecifico) {
+                return Number(r[campoEspecifico]) || 0;
+            }
+
+            // Si es una subvariable / comodín / selección del árbol
+            if (r.comodin !== undefined || r.id_variable !== undefined || r.subvariable !== undefined) {
+                return Number(r.comodin ?? r.valor ?? r.total ?? r.suma ?? 0);
+            }
+
+            // Si el módulo es "todas"
+            if (modulo === "todas") {
+                let suma = camposApartados.reduce((acc, c) => acc + (Number(r[c]) || 0), 0);
+                return suma > 0 ? suma : Number(r.total ?? r.valor ?? r.suma ?? 0);
+            }
+
+            // Módulo específico
+            return Number(r[modulo] ?? r.total ?? r.valor ?? r.suma ?? 0);
+        };
+
         let labels = [];
         let datasets = [];
         const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
@@ -1382,24 +1401,21 @@
                     const anio = String(r.anio || r.año || r.id_anio || 'Sin Año');
                     if (!mapaAnios[anio]) mapaAnios[anio] = {};
 
-                    // Caso A: Si el registro viene desglosado por filas (id_apartado)
                     if (r.id_apartado || r.descripcion_apartado) {
                         const numAp = r.id_apartado || r.apartado || r.num_apartado;
                         const descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : `Apartado ${numAp}`);
                         const nombreAp = numAp ? `${descAp} (Apt. ${numAp})` : descAp;
-                        const val = Number(r.total || r.valor || r.suma || r.comodin || 0);
+                        const val = extraerValorFila(r);
 
                         if (val > 0) {
                             apartadosSet.add(nombreAp);
                             mapaAnios[anio][nombreAp] = (mapaAnios[anio][nombreAp] || 0) + val;
                         }
-                    }
-                    // Caso B: Si viene en columnas ("consultas", "embarazadas", etc.) y módulo está en "Todas" o específico
-                    else {
+                    } else {
                         const camposAEvaluar = (modulo === 'todas') ? camposApartados : [modulo];
 
                         camposAEvaluar.forEach(campo => {
-                            const val = Number(r[campo]) || 0;
+                            const val = extraerValorFila(r, campo);
                             if (val > 0) {
                                 const nombreAp = nombresApartadosMap[campo] || campo;
                                 apartadosSet.add(nombreAp);
@@ -1426,7 +1442,7 @@
                 });
 
             } else {
-                // MODO MENSUAL POR APARTADO
+                // MENSUAL POR APARTADO
                 labels = Object.values(mesesNombres);
                 const seriesMap = {};
 
@@ -1439,7 +1455,7 @@
                         const numAp = r.id_apartado || r.apartado || r.num_apartado;
                         const descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : `Apartado ${numAp}`);
                         const serieKey = anio ? `${descAp} (${anio})` : descAp;
-                        const val = Number(r.total || r.valor || r.suma || r.comodin || 0);
+                        const val = extraerValorFila(r);
 
                         if (val > 0) {
                             if (!seriesMap[serieKey]) seriesMap[serieKey] = Array(12).fill(0);
@@ -1449,7 +1465,7 @@
                         const camposAEvaluar = (modulo === 'todas') ? camposApartados : [modulo];
 
                         camposAEvaluar.forEach(campo => {
-                            const val = Number(r[campo]) || 0;
+                            const val = extraerValorFila(r, campo);
                             if (val > 0) {
                                 const nombreAp = nombresApartadosMap[campo] || campo;
                                 const serieKey = anio ? `${nombreAp} (${anio})` : nombreAp;
@@ -1477,27 +1493,23 @@
                 });
             }
         }
-        // 🟡 MODO 2: ACUMULADO GENERAL (NO DESGLOSADO)
+        // 🟡 MODO 2: ACUMULADO GENERAL (Resuelve la imagen del fallo en "Acumulado")
         else {
-            const obtenerValorRegistro = (r) => {
-                if (modulo === "todas") {
-                    let sumaCampos = camposApartados.reduce((acc, c) => acc + (Number(r[c]) || 0), 0);
-                    return sumaCampos > 0 ? sumaCampos : Number(r.total || r.valor || r.suma || 0);
-                }
-                return Number(r[modulo] || r.comodin || r.total || r.valor || 0);
-            };
-
             if (tipoVista === 'anio') {
                 const acumuladoAnual = {};
+
                 data.forEach(r => {
-                    const anioKey = String(r.anio || r.año || "Sin Año");
-                    acumuladoAnual[anioKey] = (acumuladoAnual[anioKey] || 0) + obtenerValorRegistro(r);
+                    const anioKey = String(r.anio || r.año || r.id_anio || "Sin Año");
+                    const val = extraerValorFila(r);
+                    if (val > 0) {
+                        acumuladoAnual[anioKey] = (acumuladoAnual[anioKey] || 0) + val;
+                    }
                 });
 
                 labels = Object.keys(acumuladoAnual).sort();
                 const valores = labels.map(a => Math.round(acumuladoAnual[a]));
 
-                if (valores.some(v => v > 0)) {
+                if (valores.length > 0) {
                     datasets = [{
                         label: `Total ${modulo === 'todas' ? 'General' : modulo.toUpperCase()}`,
                         data: valores,
@@ -1505,6 +1517,7 @@
                     }];
                 }
             } else {
+                // VISTA MENSUAL ACUMULADA
                 labels = Object.values(mesesNombres);
                 const resumen = {};
 
@@ -1512,9 +1525,13 @@
                     const mesNum = parseInt(r.mes, 10);
                     if (isNaN(mesNum) || mesNum < 1 || mesNum > 12) return;
 
-                    const key = `Año ${r.anio || r.año || ''}`;
-                    if (!resumen[key]) resumen[key] = {};
-                    resumen[key][mesNum] = (resumen[key][mesNum] || 0) + obtenerValorRegistro(r);
+                    const key = `Año ${r.anio || r.año || ''}`.trim();
+                    const val = extraerValorFila(r);
+
+                    if (val > 0) {
+                        if (!resumen[key]) resumen[key] = {};
+                        resumen[key][mesNum] = (resumen[key][mesNum] || 0) + val;
+                    }
                 });
 
                 datasets = Object.keys(resumen).map((key, index) => ({
@@ -1529,10 +1546,10 @@
             }
         }
 
-        // Validación final antes de pintar
-        if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
+        // Validación de seguridad para dibujar
+        if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => Number(v) > 0))) return;
 
-        // Renderizar gráfica
+        // Renderizar gráfico
         graficaSisMensual = new Chart(canvasElement, {
             type: tipoVista === 'anio' ? 'bar' : 'line',
             data: { labels, datasets },
