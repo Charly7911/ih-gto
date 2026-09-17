@@ -1328,6 +1328,12 @@
         const modoDesglose = document.getElementById("selectModoDesglose")?.value || "por_apartado";
         const ctx = document.getElementById("graficaSisMensual");
 
+        console.log("🟢 renderGraficaTemporal ->", { modulo, tipoVista, modoDesglose, cantidadRegistros: data?.length });
+        if (data && data.length > 0) {
+            console.log("🟢 Ejemplo de registro:", data[0]);
+        }
+
+
         if (!ctx) return;
 
         if (graficaSisMensual) {
@@ -1490,7 +1496,11 @@
             }
         }
 
-        if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
+        console.log("🟢 datasets generados:", datasets.length, "labels:", labels.length);
+        if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) {
+            console.log("🔴 SALIÓ SIN DIBUJAR: datasets vacíos o todos en 0");
+            return;
+        }
 
         // Renderizado corregido para evitar la desaparición de las líneas/barras
         graficaSisMensual = new Chart(ctx, {
