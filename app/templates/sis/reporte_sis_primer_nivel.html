@@ -574,6 +574,7 @@
         exportarFiltradoExcel();
     }
 
+
     async function exportarFiltradoExcel() {
         const btn = document.getElementById("btnExportarExcel");
         const textoOriginal = btn ? btn.innerHTML : '';
@@ -584,13 +585,21 @@
         }
 
         try {
+            // 🟢 1. LECTURA Y EVALUACIÓN DE CONTROLES VISUALES DE AMBAS VISTAS
+            const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
+            const tipoVistaTemp = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
+
+            // Evaluar modo de desglose activo desde el selector o variable global
             const modoDesglose = window.modoExportacionTemporal
                 || document.getElementById("selectModoDesglose")?.value
-                || "acumulado";
+                || "por_apartado";
+
+            // Determinar si requiere consulta desagregada por subvariables
+            const esDesagregado = (modoDesglose === "desagregado" || modoDesglose === "por_variable" || modoDesglose === "por_apartado");
 
             let fuenteDeDatos = [];
 
-            // 1. RECOLECCIÓN Y FILTRADO COMPLETO
+            // RECOLECCIÓN COMPLETA DE FILTROS DESDE EL DOM (MENU.HTML Y REPORTES)
             const obtenerValoresCheck = (selector) => {
                 return Array.from(document.querySelectorAll(selector))
                     .filter(cb => cb.checked)
@@ -603,42 +612,46 @@
             const jurisSel = obtenerValoresCheck('.filtro-jurisdiccion:checked, input[name="jurisdicciones"]:checked');
             const munSel = obtenerValoresCheck('.sis-filtro-municipio:checked, input[name="municipios"]:checked');
 
-            // Si no hay checkboxes de año marcados, usamos el año de la pestaña activa (anioActivo)
+            // Fallback de año activo si no hay checkboxes explícitos
             if (aniosAFiltrar.length === 0 && typeof anioActivo !== 'undefined' && anioActivo) {
                 aniosAFiltrar = [String(anioActivo)];
             }
 
-            if (modoDesglose === "desagregado" || modoDesglose === "por_variable") {
-
-                // Recolección exacta de subvariables marcadas en el DOM
+            // 🟢 2. CONSULTA O FILTRADO DE DATOS CON RESPETO A MÓDULOS Y SUBVARIABLES
+            if (esDesagregado) {
                 let variablesAPasar = {};
-                const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
 
                 if (moduloActual === "todas") {
+                    // Si está en 'todas', recolectar todas las subvariables marcadas agrupadas por módulo
                     document.querySelectorAll('.chk-subvar:checked').forEach(chk => {
                         const modKey = chk.dataset.modulo || "otros";
                         if (!variablesAPasar[modKey]) variablesAPasar[modKey] = [];
                         variablesAPasar[modKey].push(chk.value);
                     });
                 } else {
+                    // Si hay un módulo específico seleccionado, filtrar solo sus subvariables marcadas
                     const subvarsModulo = document.querySelectorAll(`.chk-subvar[data-modulo="${moduloActual}"]:checked`);
-                    variablesAPasar[moduloActual] = Array.from(subvarsModulo).map(chk => chk.value);
+                    const listaSubs = Array.from(subvarsModulo).map(chk => chk.value);
+
+                    if (listaSubs.length > 0) {
+                        variablesAPasar[moduloActual] = listaSubs;
+                    }
                 }
 
-                // Payload para el backend
                 const payload = {
+                    modulo: moduloActual,
+                    vista_temporal: tipoVistaTemp,
                     anios: aniosAFiltrar,
                     meses: mesesSel,
                     unidades: unidadesSel,
                     jurisdicciones: jurisSel,
                     municipios: munSel,
                     variables: variablesAPasar,
-                    nivel_agrupacion: document.getElementById("selectNivelAgrupacion")?.value || "clues",
-                    modo_desglose: "por_variable"
+                    nivel_agrupacion: document.getElementById("selectNivel")?.value || "clues",
+                    modo_desglose: modoDesglose
                 };
 
-                console.log("📤 Consultando backend para Excel desagregado:", payload);
-
+             
                 const resp = await fetch('/sis_primer_nivel/api/filtrar', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -650,12 +663,14 @@
                 if (resJson.status === "success" && Array.isArray(resJson.data)) {
                     fuenteDeDatos = resJson.data;
                 } else {
-                    throw new Error(resJson.message || "El servidor no devolvió registros para el desglose por variable.");
+                    throw new Error(resJson.message || "El servidor no devolvió registros con los filtros seleccionados.");
                 }
 
             } else {
-                // MODO RESUMIDO / ACUMULADO CON FILTRADO CLIENTE COMPLETO
-                fuenteDeDatos = (typeof datosFiltradosSis !== "undefined" ? datosFiltradosSis : []).filter(r => {
+                // MODO ACUMULADO DIRECTO CLIENTE
+                const datosBase = typeof datosFiltradosSis !== "undefined" ? datosFiltradosSis : [];
+
+                fuenteDeDatos = datosBase.filter(r => {
                     const cumpleAnio = aniosAFiltrar.length === 0 || aniosAFiltrar.includes(String(r.anio));
                     const cumpleMes = mesesSel.length === 0 || mesesSel.includes(String(r.mes));
                     const cumpleUnidad = unidadesSel.length === 0 || unidadesSel.includes(String(r.clues || r.id_unidad || r.nombre_unidad));
@@ -667,25 +682,21 @@
             }
 
             if (!fuenteDeDatos || fuenteDeDatos.length === 0) {
-                alert("No hay datos disponibles para exportar con los filtros seleccionados.");
+                alert("No hay datos disponibles para exportar con los filtros activos.");
                 return;
             }
 
-            // 2. CONFIGURACIÓN Y MAPEO CORREGIDO
-            const nivelAgrupacion = document.getElementById("selectNivelAgrupacion")?.value || "clues";
+            // 🟢 3. CONSTRUCCIÓN DE LA MATRIZ DE DATOS PARA EXCEL
+            const nivelAgrupacion = document.getElementById("selectNivel")?.value || "clues";
             const nombresMeses = {
                 1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
                 5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
                 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
             };
 
-            const municipiosSeleccionados = Array.from(document.querySelectorAll('.sis-filtro-municipio:checked'))
-                .map(cb => cb.value.trim());
-
             const mapaMatriz = {};
             const mesesConDatos = new Set();
-            const esDesagregado = modoDesglose === "desagregado" || modoDesglose === "por_variable";
-            const incluirColumnaMunicipio = nivelAgrupacion === "municipio" || municipiosSeleccionados.length > 0;
+            const incluirColumnaMunicipio = nivelAgrupacion === "municipio" || munSel.length > 0;
 
             fuenteDeDatos.forEach(r => {
                 const numMes = Number(r.mes);
@@ -704,14 +715,12 @@
                     const mun = r.municipio || 'Sin Especificar';
                     claveUnicaMatriz = `${nombreJurisdiccion}_${mun}_${r.nombre_unidad || ''}_${apartado}_${variable}_${anioRegistro}`;
                 } else {
-                    // CLAVE ÚNICA MODO RESUMIDO
                     if (nivelAgrupacion === "clues") {
                         claveUnicaMatriz = `${nombreJurisdiccion}_${r.nombre_unidad || r.clues || 'S/U'}_${anioRegistro}`;
                     } else if (incluirColumnaMunicipio) {
-                        const mun = r.municipio || (municipiosSeleccionados.length > 0 ? municipiosSeleccionados.join(',') : 'Sin Especificar');
+                        const mun = r.municipio || 'Sin Especificar';
                         claveUnicaMatriz = `${nombreJurisdiccion}_${mun}_${anioRegistro}`;
                     } else {
-                        // AGRUPACIÓN POR DEFECTO: Solo Jurisdicción y Año
                         claveUnicaMatriz = `${nombreJurisdiccion}_${anioRegistro}`;
                     }
                 }
@@ -723,12 +732,9 @@
                         "Año": Number(anioRegistro) || anioRegistro
                     };
 
-                    if (incluirColumnaMunicipio) {
-                        registroBase["Municipio"] = r.municipio || 'Sin Especificar';
-                    }
-                    if (nivelAgrupacion === "clues") {
-                        registroBase["Unidad"] = r.nombre_unidad || r.clues || '-';
-                    }
+                    if (incluirColumnaMunicipio) registroBase["Municipio"] = r.municipio || 'Sin Especificar';
+                    if (nivelAgrupacion === "clues") registroBase["Unidad"] = r.nombre_unidad || r.clues || '-';
+
                     if (esDesagregado) {
                         registroBase["Apartado"] = String(r.descripcion_apartado || r.apartado || r.des_apartado || 'SIN APARTADO');
                         registroBase["Variable"] = String(r.descripcion_variable || r.variable || r.des_variable || r.concepto || 'SIN VARIABLE');
@@ -737,12 +743,12 @@
                     mapaMatriz[claveUnicaMatriz] = registroBase;
                 }
 
-                // Acumular el valor correspondiente al mes
+                // Mapeo dinámico mensual
                 mapaMatriz[claveUnicaMatriz][nombreMes] = (mapaMatriz[claveUnicaMatriz][nombreMes] || 0) + valorMonto;
             });
 
+            // 🟢 4. ORDENAMIENTO Y CÁLCULO DE TOTALES/SUBTOTALES
             const mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
-
             const datosParaExcel = [];
             const totalesMes = {};
             mesesOrdenados.forEach(m => totalesMes[m] = 0);
@@ -760,37 +766,11 @@
                     const apB = String(b["Apartado"] || '');
                     if (apA !== apB) return apA.localeCompare(apB);
 
-                    const vA = String(a["Variable"] || '');
-                    const vB = String(b["Variable"] || '');
-                    return vA.localeCompare(vB);
+                    return String(a["Variable"] || '').localeCompare(String(b["Variable"] || ''));
                 });
             }
 
-            let subtotalApartado = {};
-            let apartadoActual = null;
-
-            const resetSubtotal = () => {
-                const sub = { "Entidad": "", "Jurisdicción": "" };
-                if (incluirColumnaMunicipio) sub["Municipio"] = "";
-                if (nivelAgrupacion === "clues") sub["Unidad"] = "";
-                sub["Apartado"] = "Subtotal";
-                sub["Variable"] = "";
-                sub["Año"] = "";
-                mesesOrdenados.forEach(m => sub[m] = 0);
-                sub["Grand Total"] = 0;
-                return sub;
-            };
-
-            subtotalApartado = resetSubtotal();
-
-            listaRegistros.forEach((item, index) => {
-                if (esDesagregado && apartadoActual && apartadoActual !== item["Apartado"]) {
-                    datosParaExcel.push(subtotalApartado);
-                    subtotalApartado = resetSubtotal();
-                }
-
-                apartadoActual = item["Apartado"];
-
+            listaRegistros.forEach((item) => {
                 const fila = {
                     "Entidad": item["Entidad"],
                     "Jurisdicción": item["Jurisdicción"]
@@ -811,23 +791,16 @@
                     const val = Math.round(item[m] || 0);
                     fila[m] = val;
                     totalFila += val;
-
                     totalesMes[m] += val;
-                    if (esDesagregado) subtotalApartado[m] += val;
                 });
 
                 fila["Grand Total"] = totalFila;
                 granTotalGeneral += totalFila;
-                if (esDesagregado) subtotalApartado["Grand Total"] += totalFila;
 
                 datosParaExcel.push(fila);
-
-                if (esDesagregado && index === listaRegistros.length - 1) {
-                    datosParaExcel.push(subtotalApartado);
-                }
             });
 
-            // Fila Total General
+            // Fila de Total General
             const filaTotal = { "Entidad": "Grand Total", "Jurisdicción": "" };
             if (incluirColumnaMunicipio) filaTotal["Municipio"] = "";
             if (nivelAgrupacion === "clues") filaTotal["Unidad"] = "";
@@ -841,7 +814,7 @@
             filaTotal["Grand Total"] = granTotalGeneral;
             datosParaExcel.push(filaTotal);
 
-            // 3. CONSTRUCCIÓN Y DESCARGA DEL ARCHIVO EXCEL
+            // 🟢 5. GENERACIÓN Y DESCARGA DEL EXCEL
             const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS");
@@ -851,11 +824,11 @@
             }));
 
             const fechaDescarga = new Date().toISOString().slice(0, 10);
-            XLSX.writeFile(workbook, `SIS_${modoDesglose.toUpperCase()}_${fechaDescarga}.xlsx`);
+            XLSX.writeFile(workbook, `SIS_${moduloActual.toUpperCase()}_${modoDesglose.toUpperCase()}_${fechaDescarga}.xlsx`);
 
         } catch (error) {
-            console.error("Error crítico al exportar:", error);
-            alert("Ocurrió un error al generar el archivo. Verifica la consola con F12.");
+           
+            alert("Ocurrió un error al generar el archivo. Verifica la consola.");
         } finally {
             if (btn) {
                 btn.innerHTML = textoOriginal;
@@ -905,7 +878,7 @@
         }
 
         if (Object.keys(variablesAPasar).length === 0 || !Object.values(variablesAPasar).some(arr => arr.length > 0)) {
-            console.log("🔴 SALIÓ AQUÍ: variablesAPasar vacío");
+           
             datosGraficaTemporal = [];
             renderGraficaTemporal();
             actualizarTablaEvolucion();
@@ -935,7 +908,7 @@
             const res = await resp.json();
 
             if (miId !== idPeticionActual) {
-                console.log("⏭️ Respuesta descartada por ser obsoleta (id:", miId, "vs actual:", idPeticionActual, ")");
+                
                 return;
             }
 
@@ -951,7 +924,7 @@
 
             }
         } catch (err) {
-            console.error("Error al conectar con la API SIS:", err);
+           
         }
     }
 
