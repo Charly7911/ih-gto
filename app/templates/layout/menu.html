@@ -2037,35 +2037,33 @@
                 }
 
                 // ------------------------------------------------------
-                // C. RESTAURAR SELECTS Y CASCADE DE NIVELES (OCULTACIÓN EXPLICITA)
+                // C. RESTAURAR SELECTS, ESTADOS Y VISIBILIDAD DE NIVELES
                 // ------------------------------------------------------
-                const selectNivelElem = document.getElementById("selectNivel") || (typeof selectNivel !== 'undefined' ? selectNivel : null);
+                // 1. Vaciar cualquier arreglo global de elecciones previas (Ajusta los nombres según tus variables globales)
+                if (typeof jurisdiccionesSeleccionadas !== 'undefined') jurisdiccionesSeleccionadas = [];
+                if (typeof municipiosSeleccionados !== 'undefined') municipiosSeleccionados = [];
+                if (typeof unidadesSeleccionadas !== 'undefined') unidadesSeleccionadas = [];
 
+                // 2. Restaurar el valor del select principal
+                const selectNivelElem = document.getElementById("selectNivel") || (typeof selectNivel !== 'undefined' ? selectNivel : null);
                 if (selectNivelElem) {
                     selectNivelElem.value = 'clues';
                 }
 
-                // Obtener referencias a los contenedores
+                // 3. Ocultar físicamente los contenedores que NO deben verse al inicio
                 const contUnidades = document.getElementById("blockUnidades") || (typeof blockUnidades !== 'undefined' ? blockUnidades : null);
                 const contJurisdicciones = document.getElementById("blockJurisdicciones") || (typeof blockJurisdicciones !== 'undefined' ? blockJurisdicciones : null);
                 const contMunicipios = document.getElementById("blockMunicipios") || (typeof blockMunicipios !== 'undefined' ? blockMunicipios : null);
 
-                // 🟢 OCULTAR MANUALMENTE LOS BLOQUES SECUNDARIOS Y MOSTRAR SOLO UNIDADES
-                if (contUnidades) contUnidades.style.display = 'block';
-                if (contJurisdicciones) contJurisdicciones.style.display = 'none';
-                if (contMunicipios) contMunicipios.style.display = 'none';
-
-                // Disparar el evento change por si existe alguna función interna dependiente
-                if (selectNivelElem) {
-                    selectNivelElem.dispatchEvent(new Event("change"));
-                }
+                if (contUnidades) contUnidades.style.setProperty('display', 'block', 'important');
+                if (contJurisdicciones) contJurisdicciones.style.setProperty('display', 'none', 'important');
+                if (contMunicipios) contMunicipios.style.setProperty('display', 'none', 'important');
 
                 // ------------------------------------------------------
                 // D. LIMPIAR BUSCADORES Y RESTAURAR TEXTOS
                 // ------------------------------------------------------
                 document.querySelectorAll('input[type="text"], input[type="search"]').forEach(inp => {
                     inp.value = "";
-                    inp.dispatchEvent(new Event("input"));
                 });
 
                 const btnUnidades = typeof obtenerBotonUnidades === 'function' ? obtenerBotonUnidades() : null;
@@ -2076,31 +2074,34 @@
                 if (typeof btnAfecciones !== 'undefined' && btnAfecciones) btnAfecciones.textContent = "🔍 Seleccionar afecciones";
 
                 // ------------------------------------------------------
-                // E. REBOOT COMPLETO DE TODAS LAS TABLAS Y GRÁFICAS (CORREGIDO)
+                // E. REBOOT COMPLETO SINCRO VISTAS Y DATOS
                 // ------------------------------------------------------
-                if (typeof actualizarRelacionJurisdiccionMunicipio === 'function') {
-                    actualizarRelacionJurisdiccionMunicipio();
-                }
-
-                // 1. Resetear el arreglo de datos con el respaldo original
                 if (typeof window.datosOriginalesSis !== 'undefined') {
                     window.datosFiltradosSis = JSON.parse(JSON.stringify(window.datosOriginalesSis));
                 }
 
-                // 2. Reiniciar la paginación a la página 1
                 if (typeof paginaActual !== 'undefined') {
                     paginaActual = 1;
                 }
 
-                // 3. Restaurar el año activo al primer año base si existe
-                if (Array.isArray(window.datosFiltradosSis) && window.datosFiltradosSis.length > 0) {
-                    const aniosDisponibles = [...new Set(window.datosFiltradosSis.map(r => r.anio || r.año))].filter(Boolean).sort();
-                    if (aniosDisponibles.length > 0 && typeof anioActivo !== 'undefined') {
-                        anioActivo = aniosDisponibles[0]; // Restablece al primer año disponible
-                    }
+                // 🟢 IMPORTANTE: Si actualizarRelacionJurisdiccionMunicipio vuelve a mostrar los bloques, 
+                // ejecutamos la sincronización de niveles después de invocarla.
+                if (typeof actualizarRelacionJurisdiccionMunicipio === 'function') {
+                    actualizarRelacionJurisdiccionMunicipio();
                 }
 
-                // 4. Ejecutar el orquestador principal que renderiza Tabla, Pestañas y las 3 Gráficas
+                // Si tienes una función que controla el cambio de nivel (ej. manejarCambioNivel o toggleNivel)
+                if (typeof cambiarNivel === 'function') {
+                    cambiarNivel('clues');
+                } else if (selectNivelElem) {
+                    selectNivelElem.dispatchEvent(new Event("change"));
+                }
+
+                // Re-ocultar asegurado como último paso
+                if (contJurisdicciones) contJurisdicciones.style.display = 'none';
+                if (contMunicipios) contMunicipios.style.display = 'none';
+
+                // Renderizado global
                 if (typeof actualizarVistas === 'function') {
                     actualizarVistas();
                 } else if (typeof ejecutarFiltradoSis === 'function') {
