@@ -740,7 +740,6 @@
                 }
 
                 if (!mapaMatriz[claveUnicaMatriz]) {
-                    // 🟢 AÑO COMO PRIMER ATRIBUTO EN EL OBJETO
                     const registroBase = {
                         "Año": Number(anioRegistro) || anioRegistro,
                         "Entidad": "GUANAJUATO",
@@ -777,6 +776,10 @@
             let granTotalGeneral = 0;
             let listaRegistros = Object.values(mapaMatriz);
 
+            // 🛠️ VARIABLE DECLARADA EN ÁMBITO SUPERIOR PARA EVITAR EL ReferenceError
+            let totalesMes = {};
+            let mesesOrdenados = [];
+
             listaRegistros.sort((a, b) => {
                 if (a["Año"] !== b["Año"]) return a["Año"] - b["Año"];
                 return String(a["Jurisdicción"]).localeCompare(String(b["Jurisdicción"]));
@@ -791,8 +794,7 @@
                     datosParaExcel.push(item);
                 }
             } else {
-                const mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
-                const totalesMes = {};
+                mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
                 mesesOrdenados.forEach(m => totalesMes[m] = 0);
 
                 listaRegistros.forEach((item) => {
@@ -810,7 +812,7 @@
                 });
             }
 
-            // 🟢 FILA TOTAL GENERAL (Año primera celda)
+            // 🟢 FILA TOTAL GENERAL
             const filaTotal = {
                 "Año": "",
                 "Entidad": "Grand Total",
@@ -834,7 +836,6 @@
             if (esVistaAnio) {
                 filaTotal["Total Anual"] = granTotalGeneral;
             } else {
-                const mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
                 mesesOrdenados.forEach(m => filaTotal[m] = totalesMes[m]);
                 filaTotal["Grand Total"] = granTotalGeneral;
             }
