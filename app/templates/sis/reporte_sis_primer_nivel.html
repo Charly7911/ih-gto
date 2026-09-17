@@ -588,9 +588,8 @@
         try {
             const moduloActual = document.getElementById("filtroSisDetalle")?.value || "consultas";
 
-            // 🟢 1. OBTENCIÓN ROBUSTA DEL NIVEL SELECCIONADO
-            let nivelAgrupacion = "clues"; // Valor fallback
-
+            // 🟢 1. OBTENCIÓN DEL NIVEL SELECCIONADO
+            let nivelAgrupacion = "clues";
             const selectNivel = document.getElementById("selectNivel")
                 || document.getElementById("filtroNivel")
                 || document.getElementById("selectNivelAgrupacion")
@@ -603,7 +602,6 @@
                 nivelAgrupacion = String(window.nivelAgrupacionActual).toLowerCase().trim();
             }
 
-            // Normalizar nombres
             if (nivelAgrupacion.includes("juris")) nivelAgrupacion = "jurisdiccion";
             else if (nivelAgrupacion.includes("muni")) nivelAgrupacion = "municipio";
             else nivelAgrupacion = "clues";
@@ -611,6 +609,7 @@
             // 🟢 2. DETECTAR VISTA TEMPORAL Y MODO DESGLOSE
             const selectVistaElem = document.getElementById("selectTipoVistaTemporal") || document.getElementById("selectVista");
             const tipoVistaTemp = selectVistaElem ? selectVistaElem.value : "mes";
+            const esVistaAnio = (tipoVistaTemp === "anio");
 
             const modoDesglose = window.modoExportacionTemporal
                 || document.getElementById("selectModoDesglose")?.value
@@ -622,9 +621,12 @@
 
             // 🟢 3. RECOLECCIÓN DE FILTROS DE LA INTERFAZ
             const obtenerValoresCheck = (selector) => {
-                return Array.from(document.querySelectorAll(selector))
-                    .filter(cb => cb.checked)
-                    .map(cb => cb.value.trim());
+                const nodos = document.querySelectorAll(selector);
+                const res = [];
+                for (let i = 0; i < nodos.length; i++) {
+                    if (nodos[i].checked) res.push(nodos[i].value.trim());
+                }
+                return res;
             };
 
             let aniosAFiltrar = obtenerValoresCheck('.filtro-anio:checked, input[name="anios"]:checked');
@@ -633,7 +635,7 @@
             const jurisSel = obtenerValoresCheck('.filtro-jurisdiccion:checked, input[name="jurisdicciones"]:checked');
             const munSel = obtenerValoresCheck('.sis-filtro-municipio:checked, input[name="municipios"]:checked');
 
-            // 🟢 4. CONSULTA / FILTRADO DE DATOS
+            // 🟢 4. CONSULTA DE DATOS
             if (esDesagregado) {
                 let variablesAPasar = {};
 
@@ -677,9 +679,7 @@
                 }
 
             } else {
-                // MODO LOCAL RESUMIDO
                 const datosBase = typeof datosFiltradosSis !== "undefined" ? datosFiltradosSis : [];
-
                 fuenteDeDatos = datosBase.filter(r => {
                     const cumpleAnio = aniosAFiltrar.length === 0 || aniosAFiltrar.includes(String(r.anio));
                     const cumpleMes = mesesSel.length === 0 || mesesSel.includes(String(r.mes));
@@ -696,7 +696,7 @@
                 return;
             }
 
-            // 🟢 5. CONSTRUCCIÓN DE FILAS AGRUPADAS SEGÚN NIVEL
+            // 🟢 5. CONSTRUCCIÓN OPTIMIZADA DE FILAS
             const nombresMeses = {
                 1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
                 5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
@@ -706,11 +706,11 @@
             const mapaMatriz = {};
             const mesesConDatos = new Set();
 
-            fuenteDeDatos.forEach(r => {
+            for (let i = 0; i < fuenteDeDatos.length; i++) {
+                const r = fuenteDeDatos[i];
                 const numMes = Number(r.mes);
-                if (numMes) mesesConDatos.add(numMes);
+                if (!esVistaAnio && numMes) mesesConDatos.add(numMes);
 
-                const nombreMes = nombresMeses[numMes] || `Mes ${numMes}`;
                 const anioRegistro = r.anio || 'Sin Año';
                 const nombreJurisdiccion = r.jurisdiccion ? `Jurisdicción ${r.jurisdiccion}` : 'Sin Especificar';
                 const valorMonto = Number(r.total || r.consultas || r.suma || 0);
@@ -718,7 +718,6 @@
                 let claveUnicaMatriz = "";
 
                 if (esDesagregado) {
-                    // 🟢 EXTRAER CÓDIGO (r.variable devuelto por la API Flask)
                     const codigoVar = String(r.variable || r.cve_variable || r.codigo || '-');
                     const apartado = String(r.descripcion_apartado || r.apartado || r.des_apartado || 'SIN APARTADO');
                     const variable = String(r.descripcion_variable || r.variable || r.concepto || 'SIN VARIABLE');
@@ -746,7 +745,6 @@
                         "Jurisdicción": nombreJurisdiccion
                     };
 
-                    // Campos según el nivel
                     if (nivelAgrupacion === "municipio") {
                         registroBase["Municipio"] = r.municipio || 'Sin Especificar';
                     } else if (nivelAgrupacion === "clues") {
@@ -755,31 +753,29 @@
                         registroBase["Unidad"] = r.nombre_unidad || r.clues || '-';
                     }
 
+                    // 🟢 CÓDIGO AL LADO DE LA VARIABLE (Apartado -> Variable -> Código)
                     if (esDesagregado) {
-                        // 🟢 SE AGREGA EL CÓDIGO A LAS COLUMNAS DEL EXCEL
-                        registroBase["Código"] = String(r.variable || r.cve_variable || r.codigo || '-');
                         registroBase["Apartado"] = String(r.descripcion_apartado || r.apartado || r.des_apartado || 'SIN APARTADO');
                         registroBase["Variable"] = String(r.descripcion_variable || r.variable || r.concepto || 'SIN VARIABLE');
+                        registroBase["Código"] = String(r.variable || r.cve_variable || r.codigo || '-');
                     }
 
                     registroBase["Año"] = Number(anioRegistro) || anioRegistro;
-
                     mapaMatriz[claveUnicaMatriz] = registroBase;
                 }
 
-                // Acumular valores
-                if (tipoVistaTemp === "anio") {
+                // ⚡ ACUMULACIÓN ULTRA RÁPIDA EN VISTA ANUAL
+                if (esVistaAnio) {
                     mapaMatriz[claveUnicaMatriz]["Total Anual"] = (mapaMatriz[claveUnicaMatriz]["Total Anual"] || 0) + valorMonto;
                 } else {
+                    const nombreMes = nombresMeses[numMes] || `Mes ${numMes}`;
                     mapaMatriz[claveUnicaMatriz][nombreMes] = (mapaMatriz[claveUnicaMatriz][nombreMes] || 0) + valorMonto;
                 }
-            });
+            }
 
-            // 🟢 6. ORDENAR Y CONSTRUIR TABLA FINAL
-            const mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
+            // 🟢 6. CONSTRUCCIÓN DE LA TABLA Y TOTALES
             const datosParaExcel = [];
             let granTotalGeneral = 0;
-
             let listaRegistros = Object.values(mapaMatriz);
 
             listaRegistros.sort((a, b) => {
@@ -787,19 +783,23 @@
                 return String(a["Jurisdicción"]).localeCompare(String(b["Jurisdicción"]));
             });
 
-            const totalesMes = {};
-            if (tipoVistaTemp === "mes") {
-                mesesOrdenados.forEach(m => totalesMes[m] = 0);
-            }
-
-            listaRegistros.forEach((item) => {
-                const fila = { ...item };
-
-                if (tipoVistaTemp === "anio") {
+            if (esVistaAnio) {
+                // RUTA RÁPIDA: Si es vista Anual, no hace ciclos por meses
+                for (let i = 0; i < listaRegistros.length; i++) {
+                    const item = listaRegistros[i];
                     const totalAnio = Math.round(item["Total Anual"] || 0);
-                    fila["Total Anual"] = totalAnio;
+                    item["Total Anual"] = totalAnio;
                     granTotalGeneral += totalAnio;
-                } else {
+                    datosParaExcel.push(item);
+                }
+            } else {
+                // RUTA MENSUAL
+                const mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
+                const totalesMes = {};
+                mesesOrdenados.forEach(m => totalesMes[m] = 0);
+
+                listaRegistros.forEach((item) => {
+                    const fila = { ...item };
                     let totalFila = 0;
                     mesesOrdenados.forEach(m => {
                         const val = Math.round(item[m] || 0);
@@ -809,10 +809,9 @@
                     });
                     fila["Grand Total"] = totalFila;
                     granTotalGeneral += totalFila;
-                }
-
-                datosParaExcel.push(fila);
-            });
+                    datosParaExcel.push(fila);
+                });
+            }
 
             // Fila Total General
             const filaTotal = { "Entidad": "Grand Total", "Jurisdicción": "" };
@@ -825,28 +824,29 @@
             }
 
             if (esDesagregado) {
-                filaTotal["Código"] = "";
                 filaTotal["Apartado"] = "";
                 filaTotal["Variable"] = "";
+                filaTotal["Código"] = "";
             }
             filaTotal["Año"] = "";
 
-            if (tipoVistaTemp === "anio") {
+            if (esVistaAnio) {
                 filaTotal["Total Anual"] = granTotalGeneral;
             } else {
+                const mesesOrdenados = Array.from(mesesConDatos).sort((a, b) => a - b).map(m => nombresMeses[m]);
                 mesesOrdenados.forEach(m => filaTotal[m] = totalesMes[m]);
                 filaTotal["Grand Total"] = granTotalGeneral;
             }
 
             datosParaExcel.push(filaTotal);
 
-            // 🟢 7. DESCARGA EXCEL
+            // 🟢 7. GENERACIÓN DEL EXCEL
             const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte SIS");
 
             worksheet['!cols'] = Object.keys(datosParaExcel[0] || {}).map(key => ({
-                wch: Math.max(key.length + 4, 14)
+                wch: Math.max(key.length + 4, 12)
             }));
 
             const fechaDescarga = new Date().toISOString().slice(0, 10);
