@@ -2001,27 +2001,46 @@
                 e.preventDefault();
 
                 // ------------------------------------------------------
-                // A. RESETEAR ESTADO INTERNO DE VARIABLES SIS (NUEVO)
+                // A. RESETEAR ESTADO INTERNO Y SELECTS DE LA GRÁFICA TEMPORAL
                 // ------------------------------------------------------
                 if (typeof VARIABLES_DEFAULT !== 'undefined' && typeof variablesPersonalizadasEstado !== 'undefined') {
-                    variablesPersonalizadasEstado = structuredClone(VARIABLES_DEFAULT);
+                    variablesPersonalizadasEstado = typeof structuredClone === 'function'
+                        ? structuredClone(VARIABLES_DEFAULT)
+                        : JSON.parse(JSON.stringify(VARIABLES_DEFAULT));
                 }
 
+                // 1. Restaurar Módulo a "consultas"
                 const selectModulo = document.getElementById("filtroSisDetalle");
                 if (selectModulo) selectModulo.value = "consultas";
 
+                // 2. Restaurar Vista a "mes" (Vista Mensual)
                 const selectVista = document.getElementById("selectTipoVistaTemporal");
                 if (selectVista) selectVista.value = "mes";
 
-                // Redibujar el árbol de subvariables con el estado original por defecto
+                // 3. Restaurar Desglose a "por_apartado"
+                const selectDesglose = document.getElementById("selectModoDesglose");
+                if (selectDesglose) selectDesglose.value = "por_apartado";
+
+                // 4. 🟢 CLAVE: Ajustar la visibilidad DOM del combo de desglose para "consultas"
+                if (typeof toggleModoDesglose === 'function') {
+                    toggleModoDesglose();
+                }
+
+                // 5. Redibujar el árbol de subvariables con el estado por defecto
                 if (typeof renderSubvariables === 'function') {
                     renderSubvariables();
                 }
 
                 // ------------------------------------------------------
-                // B. DESMARCAR ELEMENTOS DEL MENÚ Y POPOVERS
+                // B. DESMARCAR ELEMENTOS DEL MENÚ, POPOVERS Y SUBVARIABLES
                 // ------------------------------------------------------
                 document.querySelectorAll('.menu-filtros input[type="checkbox"], .popover-unidades input[type="checkbox"], .popover-content input[type="checkbox"]').forEach(cb => cb.checked = false);
+
+                // 🟢 Re-activar los checkboxes de subvariables por defecto
+                const contenedorSub = document.getElementById("contenedorSubvariables");
+                if (contenedorSub) {
+                    contenedorSub.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = true);
+                }
 
                 // ------------------------------------------------------
                 // C. RESTAURAR SELECTS Y BLOQUES DE NIVELES
@@ -2047,15 +2066,22 @@
                 if (typeof btnAfecciones !== 'undefined' && btnAfecciones) btnAfecciones.textContent = "🔍 Seleccionar afecciones";
 
                 // ------------------------------------------------------
-                // E. RECARGAR VISTAS Y DATOS
+                // E. RECARGAR VISTAS Y RESTAURAR DATOS LIMPIOS
                 // ------------------------------------------------------
                 if (typeof actualizarRelacionJurisdiccionMunicipio === 'function') {
                     actualizarRelacionJurisdiccionMunicipio();
                 }
 
-                // Llamar a la consulta/renderizado SIS o general
+                // 🟢 Restaurar el arreglo global de datos antes de volver a consultar
+                if (typeof window.datosOriginalesSis !== 'undefined') {
+                    window.datosFiltradosSis = JSON.parse(JSON.stringify(window.datosOriginalesSis));
+                }
+
+                // Ejecutar el filtrado general
                 if (typeof ejecutarFiltradoSis === 'function') {
                     ejecutarFiltradoSis(0);
+                } else if (typeof actualizarVistas === 'function') {
+                    actualizarVistas();
                 }
             }
         });
