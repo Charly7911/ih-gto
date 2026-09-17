@@ -1370,6 +1370,7 @@
         const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
 
         // 🟢 MODO DESGLOSADO POR APARTADO
+        // 🟢 MODO DESGLOSADO POR APARTADO
         if (modoDesglose === "por_apartado") {
             if (tipoVista === 'anio') {
                 const apartadosAnual = {};
@@ -1377,11 +1378,15 @@
                 data.forEach(r => {
                     const numAp = r.id_apartado || r.apartado || r.num_apartado;
                     const descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : (numAp ? `Apartado ${numAp}` : 'Sin Clasificar'));
-                    const labelApartado = numAp ? `${descAp} (Apt. ${numAp})` : descAp;
+                    const descApConCodigo = numAp ? `${descAp} (Apt. ${numAp})` : descAp;
+
+                    // 🟢 CORRECCIÓN CLAVE: Incluir el año en la clave para no encimar los años
+                    const anio = r.anio || r.año || r.id_anio || '';
+                    const labelApartadoAnio = anio ? `${descApConCodigo} - ${anio}` : descApConCodigo;
 
                     const val = obtenerValorRegistro(r);
                     if (val > 0) {
-                        apartadosAnual[labelApartado] = (apartadosAnual[labelApartado] || 0) + val;
+                        apartadosAnual[labelApartadoAnio] = (apartadosAnual[labelApartadoAnio] || 0) + val;
                     }
                 });
 
@@ -1390,9 +1395,9 @@
 
                 if (valores.length > 0) {
                     datasets = [{
-                        label: 'Total por Apartado',
+                        label: 'Total por Apartado / Año',
                         data: valores,
-                        backgroundColor: paletaColores.slice(0, labels.length)
+                        backgroundColor: labels.map((_, i) => paletaColores[i % paletaColores.length])
                     }];
                 }
             } else {
