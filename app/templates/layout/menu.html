@@ -2037,11 +2037,26 @@
                 }
 
                 // ------------------------------------------------------
-                // C. RESTAURAR SELECTS Y CASCADE DE NIVELES (RESPECTANDO EVENTO)
+                // C. RESTAURAR SELECTS Y CASCADE DE NIVELES (OCULTACIÓN EXPLICITA)
                 // ------------------------------------------------------
                 const selectNivelElem = document.getElementById("selectNivel") || (typeof selectNivel !== 'undefined' ? selectNivel : null);
+
                 if (selectNivelElem) {
                     selectNivelElem.value = 'clues';
+                }
+
+                // Obtener referencias a los contenedores
+                const contUnidades = document.getElementById("blockUnidades") || (typeof blockUnidades !== 'undefined' ? blockUnidades : null);
+                const contJurisdicciones = document.getElementById("blockJurisdicciones") || (typeof blockJurisdicciones !== 'undefined' ? blockJurisdicciones : null);
+                const contMunicipios = document.getElementById("blockMunicipios") || (typeof blockMunicipios !== 'undefined' ? blockMunicipios : null);
+
+                // 🟢 OCULTAR MANUALMENTE LOS BLOQUES SECUNDARIOS Y MOSTRAR SOLO UNIDADES
+                if (contUnidades) contUnidades.style.display = 'block';
+                if (contJurisdicciones) contJurisdicciones.style.display = 'none';
+                if (contMunicipios) contMunicipios.style.display = 'none';
+
+                // Disparar el evento change por si existe alguna función interna dependiente
+                if (selectNivelElem) {
                     selectNivelElem.dispatchEvent(new Event("change"));
                 }
 
