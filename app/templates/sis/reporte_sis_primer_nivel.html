@@ -79,7 +79,7 @@
                             <div class="d-flex gap-2 align-items-center flex-wrap">
                                 <select id="selectTipoVistaTemporal"
                                     class="form-select form-select-sm w-auto fw-bold text-primary border-primary"
-                                    onchange="renderGraficaTemporal();">
+                                    onchange="renderGraficaTemporal(window.datosFiltradosSis || window.datosGraficaTemporal);">
                                     <option value="mes" selected>Vista Mensual</option>
                                     <option value="anio">Vista Anual (Acumulado)</option>
                                 </select>
@@ -1322,7 +1322,10 @@
 
 
 
-    function renderGraficaTemporal(data = datosGraficaTemporal) {
+    function renderGraficaTemporal(data) {
+        // 🟢 1. Fallback de datos si se llama desde el HTML sin argumentos
+        const datosProcesar = data || window.datosFiltradosSis || window.datosGraficaTemporal || [];
+
         const modulo = document.getElementById("filtroSisDetalle")?.value || "consultas";
         const tipoVista = document.getElementById("selectTipoVistaTemporal")?.value || "mes";
         const modoDesglose = document.getElementById("selectModoDesglose")?.value || "por_apartado";
@@ -1330,13 +1333,14 @@
 
         if (!ctx) return;
 
+        // Destrucción de la instancia anterior
         if (graficaSisMensual) {
             graficaSisMensual.destroy();
             graficaSisMensual = null;
         }
 
         if (typeof hayVariablesSeleccionadas === "function" && !hayVariablesSeleccionadas()) return;
-        if (!data || data.length === 0) return;
+        if (!datosProcesar || datosProcesar.length === 0) return;
 
         const paletaColores = [
             '#2b5c8f', '#d9534f', '#20c997', '#f0ad4e', '#6f42c1',
@@ -1349,10 +1353,7 @@
             'orientacion_lac_des_obe', 'orientacion_eda_ira', 'comodin'
         ];
 
-        // 🟢 Extrae el valor REAL del registro según el modo activo
         const obtenerValorRegistro = (r) => {
-            // En modo "por_apartado", NO debemos sumar todas las columnas entre sí,
-            // tomamos el valor del módulo activo o el total propio de esa fila/apartado.
             if (modoDesglose === "por_apartado" && modulo === "todas") {
                 return Number(r.total || r.valor || r.suma || r.comodin || 0);
             }
@@ -1365,6 +1366,9 @@
             return Number(r[modulo]) || Number(r.comodin) || Number(r.total) || Number(r.valor) || 0;
         };
 
+        // Función auxiliar para obtener el año sin importar el nombre del atributo
+        const obtenerAnioFila = (r) => String(r.anio || r.año || r.id_anio || r.year || 'S/A');
+
         let labels = [];
         let datasets = [];
         const mesesNombres = { 1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun", 7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic" };
@@ -1374,7 +1378,7 @@
             if (tipoVista === 'anio') {
                 const apartadosAnual = {};
 
-                data.forEach(r => {
+                datosProcesar.forEach(r => {
                     const numAp = r.id_apartado || r.apartado || r.num_apartado;
                     const descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : (numAp ? `Apartado ${numAp}` : 'Sin Clasificar'));
                     const labelApartado = numAp ? `${descAp} (Apt. ${numAp})` : descAp;
@@ -1399,7 +1403,7 @@
                 labels = Object.values(mesesNombres);
                 const seriesMap = {};
 
-                data.forEach(r => {
+                datosProcesar.forEach(r => {
                     const mesNum = Number(r.mes);
                     if (!mesNum || mesNum < 1 || mesNum > 12) return;
 
@@ -1407,8 +1411,8 @@
                     const descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : (numAp ? `Apartado ${numAp}` : 'Otros'));
                     const descApConCodigo = numAp ? `${descAp} (Apt. ${numAp})` : descAp;
 
-                    const anio = r.anio || r.año || '';
-                    const serieKey = anio ? `${descApConCodigo} (${anio})` : descApConCodigo;
+                    const anio = obtenerAnioFila(r);
+                    const serieKey = (anio && anio !== 'S/A') ? `${descApConCodigo} (${anio})` : descApConCodigo;
                     const val = obtenerValorRegistro(r);
 
                     if (val > 0) {
@@ -1439,15 +1443,19 @@
         else {
             if (tipoVista === 'anio') {
                 const acumuladoAnual = {};
-                data.forEach(r => {
-                    const anioKey = r.anio || r.año || "Año";
-                    acumuladoAnual[anioKey] = (acumuladoAnual[anioKey] || 0) + obtenerValorRegistro(r);
+
+                datosProcesar.forEach(r => {
+                    const anioKey = obtenerAnioFila(r);
+                    const val = obtenerValorRegistro(r);
+                    if (val > 0) {
+                        acumuladoAnual[anioKey] = (acumuladoAnual[anioKey] || 0) + val;
+                    }
                 });
 
                 labels = Object.keys(acumuladoAnual).sort();
                 const valores = labels.map(a => Math.round(acumuladoAnual[a]));
 
-                if (valores.reduce((a, b) => a + b, 0) > 0) {
+                if (valores.length > 0) {
                     datasets = [{
                         label: `Total ${modulo === 'todas' ? 'General' : modulo.toUpperCase()}`,
                         data: valores,
@@ -1458,9 +1466,9 @@
                 labels = Object.values(mesesNombres);
                 const resumen = {};
 
-                data.forEach(r => {
+                datosProcesar.forEach(r => {
                     if (!r.mes) return;
-                    const key = `Año ${r.anio || r.año}`;
+                    const key = `Año ${obtenerAnioFila(r)}`;
                     if (!resumen[key]) resumen[key] = {};
                     resumen[key][Number(r.mes)] = (resumen[key][Number(r.mes)] || 0) + obtenerValorRegistro(r);
                 });
@@ -1479,7 +1487,7 @@
 
         if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
 
-        // Renderizado corregido para evitar la desaparición de las líneas/barras
+        // Renderizar Chart.js
         graficaSisMensual = new Chart(ctx, {
             type: tipoVista === 'anio' ? 'bar' : 'line',
             data: { labels, datasets },
@@ -1497,8 +1505,6 @@
                 },
                 plugins: {
                     legend: { display: true, position: 'top' },
-                    // 🟢 CORRECCIÓN: Garantiza que la visibilidad de los valores
-                    // no afecte el renderizado de las series/líneas del gráfico.
                     datalabels: {
                         display: Boolean(typeof mostrarValoresMensual !== 'undefined' && mostrarValoresMensual),
                         anchor: 'end',
