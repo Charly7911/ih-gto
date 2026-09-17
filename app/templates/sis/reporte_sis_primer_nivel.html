@@ -183,7 +183,7 @@
                             <div class="col-md-5 ps-3">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <label class="form-label font-weight-bold mb-0 text-secondary" id="tituloTabla3">
-                                        📊 Resumen Acumulado (Gráfica 3):
+                                        📊 Resumen Acumulado:
                                     </label>
                                 </div>
 
@@ -1330,7 +1330,6 @@
 
         if (!ctx) return;
 
-        // Destrucción limpia de la instancia anterior
         if (graficaSisMensual) {
             graficaSisMensual.destroy();
             graficaSisMensual = null;
@@ -1350,7 +1349,14 @@
             'orientacion_lac_des_obe', 'orientacion_eda_ira', 'comodin'
         ];
 
-        const obtenerSumaFila = (r) => {
+        // 🟢 Extrae el valor REAL del registro según el modo activo
+        const obtenerValorRegistro = (r) => {
+            // En modo "por_apartado", NO debemos sumar todas las columnas entre sí,
+            // tomamos el valor del módulo activo o el total propio de esa fila/apartado.
+            if (modoDesglose === "por_apartado" && modulo === "todas") {
+                return Number(r.total || r.valor || r.suma || r.comodin || 0);
+            }
+
             if (modulo === "todas") {
                 let sumaCampos = 0;
                 camposApartados.forEach(c => { sumaCampos += Number(r[c]) || 0; });
@@ -1371,11 +1377,9 @@
                 data.forEach(r => {
                     const numAp = r.id_apartado || r.apartado || r.num_apartado;
                     const descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : (numAp ? `Apartado ${numAp}` : 'Sin Clasificar'));
-                    // 🟢 CAMBIO: se agrega el código de apartado al label para no fusionar
-                    // apartados distintos que comparten la misma descripción de texto.
                     const labelApartado = numAp ? `${descAp} (Apt. ${numAp})` : descAp;
 
-                    const val = obtenerSumaFila(r);
+                    const val = obtenerValorRegistro(r);
                     if (val > 0) {
                         apartadosAnual[labelApartado] = (apartadosAnual[labelApartado] || 0) + val;
                     }
@@ -1401,12 +1405,11 @@
 
                     const numAp = r.id_apartado || r.apartado || r.num_apartado;
                     const descAp = r.descripcion_apartado || (r.comodin ? "Variables Adicionales" : (numAp ? `Apartado ${numAp}` : 'Otros'));
-                    // 🟢 CAMBIO: mismo ajuste que en la vista anual
                     const descApConCodigo = numAp ? `${descAp} (Apt. ${numAp})` : descAp;
 
                     const anio = r.anio || r.año || '';
                     const serieKey = anio ? `${descApConCodigo} (${anio})` : descApConCodigo;
-                    const val = obtenerSumaFila(r);
+                    const val = obtenerValorRegistro(r);
 
                     if (val > 0) {
                         if (!seriesMap[serieKey]) {
@@ -1438,7 +1441,7 @@
                 const acumuladoAnual = {};
                 data.forEach(r => {
                     const anioKey = r.anio || r.año || "Año";
-                    acumuladoAnual[anioKey] = (acumuladoAnual[anioKey] || 0) + obtenerSumaFila(r);
+                    acumuladoAnual[anioKey] = (acumuladoAnual[anioKey] || 0) + obtenerValorRegistro(r);
                 });
 
                 labels = Object.keys(acumuladoAnual).sort();
@@ -1459,7 +1462,7 @@
                     if (!r.mes) return;
                     const key = `Año ${r.anio || r.año}`;
                     if (!resumen[key]) resumen[key] = {};
-                    resumen[key][Number(r.mes)] = (resumen[key][Number(r.mes)] || 0) + obtenerSumaFila(r);
+                    resumen[key][Number(r.mes)] = (resumen[key][Number(r.mes)] || 0) + obtenerValorRegistro(r);
                 });
 
                 datasets = Object.keys(resumen).map((key, index) => ({
@@ -1476,7 +1479,7 @@
 
         if (datasets.length === 0 || !datasets.some(ds => ds.data.some(v => v > 0))) return;
 
-        // Renderizado del gráfico Chart.js
+        // Renderizado con Chart.js corrigiendo etiquetas y escalas
         graficaSisMensual = new Chart(ctx, {
             type: tipoVista === 'anio' ? 'bar' : 'line',
             data: { labels, datasets },
@@ -1484,13 +1487,20 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: false,
-                scales: { y: { beginAtZero: true, ticks: { callback: v => typeof fmt === "function" ? fmt(v) : v } } },
+                scales: {
+                    x: { stacked: false },
+                    y: {
+                        stacked: false,
+                        beginAtZero: true,
+                        ticks: { callback: v => typeof fmt === "function" ? fmt(v) : v }
+                    }
+                },
                 plugins: {
                     legend: { display: true, position: 'top' },
                     datalabels: {
                         display: () => (typeof mostrarValoresMensual !== 'undefined' ? mostrarValoresMensual : true),
                         anchor: 'end',
-                        align: 'top',
+                        align: (context) => (context.datasetIndex % 2 === 0 ? 'top' : 'bottom'), // Alterna la etiqueta arriba/abajo para no encimarse
                         color: '#333333',
                         formatter: (val) => (val > 0 && typeof fmt === "function") ? fmt(val) : (val > 0 ? val : ''),
                         font: { size: 9, weight: 'bold' }
