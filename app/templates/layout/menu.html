@@ -2009,24 +2009,19 @@
                         : JSON.parse(JSON.stringify(VARIABLES_DEFAULT));
                 }
 
-                // 1. Restaurar Módulo a "consultas"
                 const selectModulo = document.getElementById("filtroSisDetalle");
                 if (selectModulo) selectModulo.value = "consultas";
 
-                // 2. Restaurar Vista a "mes" (Vista Mensual)
                 const selectVista = document.getElementById("selectTipoVistaTemporal");
                 if (selectVista) selectVista.value = "mes";
 
-                // 3. Restaurar Desglose a "por_apartado"
                 const selectDesglose = document.getElementById("selectModoDesglose");
                 if (selectDesglose) selectDesglose.value = "por_apartado";
 
-                // 4. 🟢 CLAVE: Ajustar la visibilidad DOM del combo de desglose para "consultas"
                 if (typeof toggleModoDesglose === 'function') {
                     toggleModoDesglose();
                 }
 
-                // 5. Redibujar el árbol de subvariables con el estado por defecto
                 if (typeof renderSubvariables === 'function') {
                     renderSubvariables();
                 }
@@ -2036,19 +2031,19 @@
                 // ------------------------------------------------------
                 document.querySelectorAll('.menu-filtros input[type="checkbox"], .popover-unidades input[type="checkbox"], .popover-content input[type="checkbox"]').forEach(cb => cb.checked = false);
 
-                // 🟢 Re-activar los checkboxes de subvariables por defecto
                 const contenedorSub = document.getElementById("contenedorSubvariables");
                 if (contenedorSub) {
                     contenedorSub.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = true);
                 }
 
                 // ------------------------------------------------------
-                // C. RESTAURAR SELECTS Y BLOQUES DE NIVELES
+                // C. RESTAURAR SELECTS Y CASCADE DE NIVELES (RESPECTANDO EVENTO)
                 // ------------------------------------------------------
-                if (typeof selectNivel !== 'undefined' && selectNivel) selectNivel.value = 'clues';
-                if (typeof blockUnidades !== 'undefined' && blockUnidades) blockUnidades.style.display = 'block';
-                if (typeof blockJurisdicciones !== 'undefined' && blockJurisdicciones) blockJurisdicciones.style.display = 'block';
-                if (typeof blockMunicipios !== 'undefined' && blockMunicipios) blockMunicipios.style.display = 'block';
+                const selectNivelElem = document.getElementById("selectNivel") || (typeof selectNivel !== 'undefined' ? selectNivel : null);
+                if (selectNivelElem) {
+                    selectNivelElem.value = 'clues';
+                    selectNivelElem.dispatchEvent(new Event("change"));
+                }
 
                 // ------------------------------------------------------
                 // D. LIMPIAR BUSCADORES Y RESTAURAR TEXTOS
@@ -2066,22 +2061,35 @@
                 if (typeof btnAfecciones !== 'undefined' && btnAfecciones) btnAfecciones.textContent = "🔍 Seleccionar afecciones";
 
                 // ------------------------------------------------------
-                // E. RECARGAR VISTAS Y RESTAURAR DATOS LIMPIOS
+                // E. REBOOT COMPLETO DE TODAS LAS TABLAS Y GRÁFICAS (CORREGIDO)
                 // ------------------------------------------------------
                 if (typeof actualizarRelacionJurisdiccionMunicipio === 'function') {
                     actualizarRelacionJurisdiccionMunicipio();
                 }
 
-                // 🟢 Restaurar el arreglo global de datos antes de volver a consultar
+                // 1. Resetear el arreglo de datos con el respaldo original
                 if (typeof window.datosOriginalesSis !== 'undefined') {
                     window.datosFiltradosSis = JSON.parse(JSON.stringify(window.datosOriginalesSis));
                 }
 
-                // Ejecutar el filtrado general
-                if (typeof ejecutarFiltradoSis === 'function') {
-                    ejecutarFiltradoSis(0);
-                } else if (typeof actualizarVistas === 'function') {
+                // 2. Reiniciar la paginación a la página 1
+                if (typeof paginaActual !== 'undefined') {
+                    paginaActual = 1;
+                }
+
+                // 3. Restaurar el año activo al primer año base si existe
+                if (Array.isArray(window.datosFiltradosSis) && window.datosFiltradosSis.length > 0) {
+                    const aniosDisponibles = [...new Set(window.datosFiltradosSis.map(r => r.anio || r.año))].filter(Boolean).sort();
+                    if (aniosDisponibles.length > 0 && typeof anioActivo !== 'undefined') {
+                        anioActivo = aniosDisponibles[0]; // Restablece al primer año disponible
+                    }
+                }
+
+                // 4. Ejecutar el orquestador principal que renderiza Tabla, Pestañas y las 3 Gráficas
+                if (typeof actualizarVistas === 'function') {
                     actualizarVistas();
+                } else if (typeof ejecutarFiltradoSis === 'function') {
+                    ejecutarFiltradoSis(0);
                 }
             }
         });
