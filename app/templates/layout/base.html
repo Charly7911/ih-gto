@@ -48,7 +48,6 @@
                 background-color: rgba(0, 0, 0, 0.6) !important;
                 backdrop-filter: blur(2px) !important;
                 z-index: 9998 !important;
-                /* Capa inmediatamente debajo del menú */
                 opacity: 0;
                 visibility: hidden;
                 transition: opacity 0.3s ease, visibility 0.3s ease;
@@ -68,25 +67,32 @@
                 height: 100vh !important;
                 max-width: 85vw !important;
                 z-index: 99999 !important;
-                /* Forzar el nivel superior máximo */
                 background-color: #1e293b !important;
-                /* Color sólido para que no transparentes */
                 display: block !important;
                 visibility: hidden !important;
                 opacity: 0 !important;
                 transform: translateX(-100%) !important;
-                /* Ocultar a la izquierda con Transform */
                 transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s ease !important;
                 box-shadow: 5px 0 25px rgba(0, 0, 0, 0.7) !important;
                 overflow-y: auto !important;
+                overflow-x: visible !important;
+                /* 🟢 Permite desplegar popovers */
             }
 
-            /* 3. Menú Lateral Activo (Visibilidad Forzada) */
+            /* 3. Menú Lateral Activo */
             #sidebar.show-sidebar {
                 visibility: visible !important;
                 opacity: 1 !important;
                 transform: translateX(0) !important;
-                /* Desplazar al frente */
+            }
+
+            /* 🟢 4. CORRECCIÓN PARA POPOVERS Y DESPLEGABLES DENTRO DEL SIDEBAR MÓVIL */
+            #sidebar .popover-unidades,
+            #sidebar .popover-list,
+            #sidebar select {
+                z-index: 100000 !important;
+                /* Capa por encima del propio contenedor */
+                position: relative;
             }
         }
     </style>
@@ -133,25 +139,13 @@
 
     <!-- LÓGICA DE CONTROL DEL FOOTER Y MENÚ LATERAL -->
     <script>
-        // Lógica original del footer
-        window.addEventListener("scroll", function () {
-            const footer = document.getElementById("footer");
-
-            if (footer && (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 5) {
-                footer.classList.add("footer-visible");
-            } else if (footer) {
-                footer.classList.remove("footer-visible");
-            }
-        });
-
-        // Lógica responsiva para despliegue del Sidebar en móviles
         document.addEventListener("DOMContentLoaded", function () {
             const btnToggle = document.getElementById("btnToggleSidebar");
             const sidebar = document.getElementById("sidebar");
 
             if (!sidebar) return;
 
-            // Crear el fondo oscuro si no existe
+            // Crear el overlay si no existe
             let overlay = document.querySelector(".sidebar-overlay-backdrop");
             if (!overlay) {
                 overlay = document.createElement("div");
@@ -159,7 +153,15 @@
                 document.body.appendChild(overlay);
             }
 
-            // Abrir / Cerrar al hacer clic en el botón
+            // Función auxiliar para cerrar el menú
+            function cerrarSidebar() {
+                if (window.innerWidth <= 768) {
+                    sidebar.classList.remove("show-sidebar");
+                    overlay.classList.remove("active");
+                }
+            }
+
+            // Abrir / Cerrar mediante el botón principal
             if (btnToggle) {
                 btnToggle.addEventListener("click", function (e) {
                     e.stopPropagation();
@@ -168,18 +170,24 @@
                 });
             }
 
-            // Cerrar menú al presionar la capa oscura externa
-            overlay.addEventListener("click", function () {
-                sidebar.classList.remove("show-sidebar");
-                overlay.classList.remove("active");
-            });
+            // Cerrar menú al presionar la capa oscura de fondo
+            overlay.addEventListener("click", cerrarSidebar);
 
             // Cerrar menú al presionar la tecla Escape
             document.addEventListener("keydown", function (e) {
                 if (e.key === "Escape" && sidebar.classList.contains("show-sidebar")) {
-                    sidebar.classList.remove("show-sidebar");
-                    overlay.classList.remove("active");
+                    cerrarSidebar();
                 }
+            });
+
+            // 🟢 CERRAR AUTOMÁTICAMENTE EL MENÚ AL APLICAR FILTROS EN CUALQUIER SUBSISTEMA
+            // Detecta botones con la clase .btn-apply o cuyos IDs comiencen por 'btnFiltrar'
+            const botonesFiltro = document.querySelectorAll('.btn-apply, [id^="btnFiltrar"]');
+            botonesFiltro.forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    // Un pequeño retardo para asegurar que el evento de filtrado se dispare
+                    setTimeout(cerrarSidebar, 150);
+                });
             });
         });
     </script>
