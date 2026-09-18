@@ -1360,3 +1360,27 @@ canvas {
     transform: rotate(360deg);
   }
 }
+
+/* 🟢 CONTROL DE PAGINACIÓN RESPONSIVA */
+#contenedorPaginacion {
+    display: flex !important;
+    flex-wrap: wrap !important; /* Permite que los números bajen de fila si la pantalla es muy estrecha */
+    justify-content: flex-end;
+    max-width: 100%;
+    gap: 2px;
+}
+
+/* En pantallas pequeñas (móviles/laptops reducidas), ajusta el tamaño y scroll */
+@media (max-width: 768px) {
+    #contenedorPaginacion {
+        justify-content: center !important; /* Centra los números al reducir */
+        overflow-x: auto; /* Agrega scroll suave si son bastantes números */
+        white-space: nowrap;
+        padding-bottom: 5px;
+    }
+    
+    #contenedorPaginacion .page-link {
+        padding: 0.2rem 0.4rem;
+        font-size: 0.75rem;
+    }
+}
