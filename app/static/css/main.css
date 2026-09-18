@@ -1361,26 +1361,22 @@ canvas {
   }
 }
 
-/* 🟢 CONTROL DE PAGINACIÓN RESPONSIVA */
-#contenedorPaginacion {
+/* Asegura que los botones numéricos no fuercen un desbordamiento horizontal */
+#paginacionTabla {
     display: flex !important;
-    flex-wrap: wrap !important; /* Permite que los números bajen de fila si la pantalla es muy estrecha */
-    justify-content: flex-end;
+    flex-wrap: wrap !important;
     max-width: 100%;
-    gap: 2px;
 }
 
-/* En pantallas pequeñas (móviles/laptops reducidas), ajusta el tamaño y scroll */
+#paginacionTabla .page-link {
+    padding: 0.2rem 0.45rem;
+    font-size: 0.75rem;
+}
+
 @media (max-width: 768px) {
-    #contenedorPaginacion {
-        justify-content: center !important; /* Centra los números al reducir */
-        overflow-x: auto; /* Agrega scroll suave si son bastantes números */
+    #paginacionTabla {
+        justify-content: center !important;
+        overflow-x: auto;
         white-space: nowrap;
-        padding-bottom: 5px;
-    }
-    
-    #contenedorPaginacion .page-link {
-        padding: 0.2rem 0.4rem;
-        font-size: 0.75rem;
     }
 }
