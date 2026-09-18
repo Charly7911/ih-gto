@@ -29,7 +29,7 @@
             position: sticky;
             top: 0;
             z-index: 1040;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
 
         /* COMPORTAMIENTO DEL SIDEBAR EN PANTALLAS PEQUEÑAS (<768px) */
@@ -38,34 +38,17 @@
                 display: flex !important;
             }
 
-            #sidebar {
-                position: fixed !important;
-                top: 0;
-                left: -310px !important; /* Esconde el menú fuera de pantalla */
-                width: 290px !important;
-                height: 100vh !important;
-                z-index: 1055 !important;
-                background-color: #1e293b !important;
-                transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-                box-shadow: 4px 0 15px rgba(0, 0, 0, 0.5) !important;
-                overflow-y: auto !important;
-            }
-
-            /* Clase activa inyectada por JS al presionar el botón hamburguesa */
-            #sidebar.show-sidebar {
-                left: 0 !important; /* Desplaza el menú a la vista */
-            }
-
-            /* Fondo oscuro semitransparente al abrir el menú */
+            /* 1. Fondo oscuro semitransparente (z-index inferior) */
             .sidebar-overlay-backdrop {
                 position: fixed;
                 top: 0;
                 left: 0;
                 width: 100vw;
                 height: 100vh;
-                background-color: rgba(0, 0, 0, 0.5);
+                background-color: rgba(0, 0, 0, 0.6);
                 backdrop-filter: blur(2px);
-                z-index: 1050;
+                z-index: 9990 !important;
+                /* Capa por debajo del menú */
                 opacity: 0;
                 visibility: hidden;
                 transition: opacity 0.3s ease, visibility 0.3s ease;
@@ -75,6 +58,30 @@
                 opacity: 1;
                 visibility: visible;
             }
+
+            /* 2. Menú Lateral (z-index superior para quedar POR ENCIMA del overlay) */
+            #sidebar {
+                position: fixed !important;
+                top: 0;
+                left: -320px !important;
+                /* Esconde el menú fuera de pantalla */
+                width: 300px !important;
+                height: 100vh !important;
+                z-index: 9999 !important;
+                /* Capa más alta de toda la app */
+                background-color: #1e293b !important;
+                /* Asegura fondo sólido */
+                display: block !important;
+                transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                box-shadow: 5px 0 25px rgba(0, 0, 0, 0.6) !important;
+                overflow-y: auto !important;
+            }
+
+            /* Clase activa cuando se pulsa el botón */
+            #sidebar.show-sidebar {
+                left: 0 !important;
+                /* Muestra el menú al frente */
+            }
         }
     </style>
 </head>
@@ -83,7 +90,8 @@
 
     <!-- 🟢 CABECERA SUPERIOR SOLO EN MÓVILES / PANTALLAS PEQUEÑAS -->
     <div class="mobile-header-toggle">
-        <button type="button" id="btnToggleSidebar" class="btn btn-outline-light btn-sm d-flex align-items-center gap-2">
+        <button type="button" id="btnToggleSidebar"
+            class="btn btn-outline-light btn-sm d-flex align-items-center gap-2">
             <i class="bi bi-list fs-5"></i>
             <span class="fw-bold">Menú / Filtros</span>
         </button>
