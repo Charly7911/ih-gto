@@ -1765,18 +1765,18 @@
         }
 
         function obtenerJurisdiccionesSeleccionadasGlobal() {
-            console.log("🟣 popoverJurisdicciones existe:", !!popoverJurisdicciones, popoverJurisdicciones);
+            
             if (!popoverJurisdicciones) return [];
             const checkboxes = popoverJurisdicciones.querySelectorAll('input[type="checkbox"]:checked');
-            console.log("🟣 checkboxes marcados:", checkboxes.length);
+            
             return Array.from(checkboxes).map(cb => cb.value);
         }
 
         function obtenerMunicipiosSeleccionadosGlobal() {
-            console.log("🟠 popoverMunicipios existe:", !!popoverMunicipios, popoverMunicipios);
+            
             if (!popoverMunicipios) return [];
             const checkboxes = popoverMunicipios.querySelectorAll('input[type="checkbox"]:checked');
-            console.log("🟠 checkboxes marcados:", checkboxes.length);
+           
             return Array.from(checkboxes).map(cb => cb.value);
         }
 
