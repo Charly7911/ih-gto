@@ -38,49 +38,55 @@
                 display: flex !important;
             }
 
-            /* 1. Fondo oscuro semitransparente (z-index inferior) */
+            /* 1. Capa Oscura de Fondo */
             .sidebar-overlay-backdrop {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100vw;
-                height: 100vh;
-                background-color: rgba(0, 0, 0, 0.6);
-                backdrop-filter: blur(2px);
-                z-index: 9990 !important;
-                /* Capa por debajo del menú */
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                background-color: rgba(0, 0, 0, 0.6) !important;
+                backdrop-filter: blur(2px) !important;
+                z-index: 9998 !important;
+                /* Capa inmediatamente debajo del menú */
                 opacity: 0;
                 visibility: hidden;
                 transition: opacity 0.3s ease, visibility 0.3s ease;
             }
 
             .sidebar-overlay-backdrop.active {
-                opacity: 1;
-                visibility: visible;
+                opacity: 1 !important;
+                visibility: visible !important;
             }
 
-            /* 2. Menú Lateral (z-index superior para quedar POR ENCIMA del overlay) */
+            /* 2. Menú Lateral Oculto */
             #sidebar {
                 position: fixed !important;
-                top: 0;
-                left: -320px !important;
-                /* Esconde el menú fuera de pantalla */
+                top: 0 !important;
+                left: 0 !important;
                 width: 300px !important;
                 height: 100vh !important;
-                z-index: 9999 !important;
-                /* Capa más alta de toda la app */
+                max-width: 85vw !important;
+                z-index: 99999 !important;
+                /* Forzar el nivel superior máximo */
                 background-color: #1e293b !important;
-                /* Asegura fondo sólido */
+                /* Color sólido para que no transparentes */
                 display: block !important;
-                transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-                box-shadow: 5px 0 25px rgba(0, 0, 0, 0.6) !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                transform: translateX(-100%) !important;
+                /* Ocultar a la izquierda con Transform */
+                transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s ease !important;
+                box-shadow: 5px 0 25px rgba(0, 0, 0, 0.7) !important;
                 overflow-y: auto !important;
             }
 
-            /* Clase activa cuando se pulsa el botón */
+            /* 3. Menú Lateral Activo (Visibilidad Forzada) */
             #sidebar.show-sidebar {
-                left: 0 !important;
-                /* Muestra el menú al frente */
+                visibility: visible !important;
+                opacity: 1 !important;
+                transform: translateX(0) !important;
+                /* Desplazar al frente */
             }
         }
     </style>
