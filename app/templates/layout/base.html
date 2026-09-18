@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title if title else "Dashboard Hospitalario" }}</title>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
@@ -11,11 +12,87 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
         integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
 
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
     <link rel="shortcut icon" href="{{ url_for('static', filename='salud_favicon.ico') }}">
+
+    <!-- 🟢 ESTILOS RESPONSIVOS PARA EL MENÚ LATERAL -->
+    <style>
+        /* CABECERA PARA MÓVILES */
+        .mobile-header-toggle {
+            display: none;
+            background-color: #1e293b;
+            color: #ffffff;
+            padding: 10px 15px;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 1040;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* COMPORTAMIENTO DEL SIDEBAR EN PANTALLAS PEQUEÑAS (<768px) */
+        @media (max-width: 768px) {
+            .mobile-header-toggle {
+                display: flex !important;
+            }
+
+            #sidebar {
+                position: fixed !important;
+                top: 0;
+                left: -310px !important; /* Esconde el menú fuera de pantalla */
+                width: 290px !important;
+                height: 100vh !important;
+                z-index: 1055 !important;
+                background-color: #1e293b !important;
+                transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                box-shadow: 4px 0 15px rgba(0, 0, 0, 0.5) !important;
+                overflow-y: auto !important;
+            }
+
+            /* Clase activa inyectada por JS al presionar el botón hamburguesa */
+            #sidebar.show-sidebar {
+                left: 0 !important; /* Desplaza el menú a la vista */
+            }
+
+            /* Fondo oscuro semitransparente al abrir el menú */
+            .sidebar-overlay-backdrop {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background-color: rgba(0, 0, 0, 0.5);
+                backdrop-filter: blur(2px);
+                z-index: 1050;
+                opacity: 0;
+                visibility: hidden;
+                transition: opacity 0.3s ease, visibility 0.3s ease;
+            }
+
+            .sidebar-overlay-backdrop.active {
+                opacity: 1;
+                visibility: visible;
+            }
+        }
+    </style>
 </head>
 
 <body data-login="{{ 'true' if mostrar_login else 'false' }}">
 
+    <!-- 🟢 CABECERA SUPERIOR SOLO EN MÓVILES / PANTALLAS PEQUEÑAS -->
+    <div class="mobile-header-toggle">
+        <button type="button" id="btnToggleSidebar" class="btn btn-outline-light btn-sm d-flex align-items-center gap-2">
+            <i class="bi bi-list fs-5"></i>
+            <span class="fw-bold">Menú / Filtros</span>
+        </button>
+        <span class="fw-bold text-truncate ms-2" style="font-size: 0.9rem;">
+            {{ title if title else "Dashboard Hospitalario" }}
+        </span>
+    </div>
+
+    <!-- INCLUSIÓN DE TU MENÚ ORIGINAL (SIN MODIFICAR SU ESTRUCTURA INTERNA) -->
     {% include 'layout/menu.html' %}
 
     <div id="page-wrapper">
@@ -40,15 +117,56 @@
 
     </div>
 
+    <!-- LÓGICA DE CONTROL DEL FOOTER Y MENÚ LATERAL -->
     <script>
+        // Lógica original del footer
         window.addEventListener("scroll", function () {
             const footer = document.getElementById("footer");
 
-            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 5) {
+            if (footer && (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 5) {
                 footer.classList.add("footer-visible");
-            } else {
+            } else if (footer) {
                 footer.classList.remove("footer-visible");
             }
+        });
+
+        // Lógica responsiva para despliegue del Sidebar en móviles
+        document.addEventListener("DOMContentLoaded", function () {
+            const btnToggle = document.getElementById("btnToggleSidebar");
+            const sidebar = document.getElementById("sidebar");
+
+            if (!sidebar) return;
+
+            // Crear el fondo oscuro si no existe
+            let overlay = document.querySelector(".sidebar-overlay-backdrop");
+            if (!overlay) {
+                overlay = document.createElement("div");
+                overlay.className = "sidebar-overlay-backdrop";
+                document.body.appendChild(overlay);
+            }
+
+            // Abrir / Cerrar al hacer clic en el botón
+            if (btnToggle) {
+                btnToggle.addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    sidebar.classList.toggle("show-sidebar");
+                    overlay.classList.toggle("active");
+                });
+            }
+
+            // Cerrar menú al presionar la capa oscura externa
+            overlay.addEventListener("click", function () {
+                sidebar.classList.remove("show-sidebar");
+                overlay.classList.remove("active");
+            });
+
+            // Cerrar menú al presionar la tecla Escape
+            document.addEventListener("keydown", function (e) {
+                if (e.key === "Escape" && sidebar.classList.contains("show-sidebar")) {
+                    sidebar.classList.remove("show-sidebar");
+                    overlay.classList.remove("active");
+                }
+            });
         });
     </script>
 

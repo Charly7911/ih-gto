@@ -10,6 +10,7 @@
     <!-- =========================================
          MENÚ PRINCIPAL DE NAVEGACIÓN
     ========================================= -->
+    
 
     {% if current_user.is_authenticated %}
     <!-- Saludo en la parte SUPERIOR del Sidebar -->
@@ -1765,18 +1766,18 @@
         }
 
         function obtenerJurisdiccionesSeleccionadasGlobal() {
-            
+
             if (!popoverJurisdicciones) return [];
             const checkboxes = popoverJurisdicciones.querySelectorAll('input[type="checkbox"]:checked');
-            
+
             return Array.from(checkboxes).map(cb => cb.value);
         }
 
         function obtenerMunicipiosSeleccionadosGlobal() {
-            
+
             if (!popoverMunicipios) return [];
             const checkboxes = popoverMunicipios.querySelectorAll('input[type="checkbox"]:checked');
-           
+
             return Array.from(checkboxes).map(cb => cb.value);
         }
 
