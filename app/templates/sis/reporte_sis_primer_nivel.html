@@ -231,12 +231,10 @@
     if (typeof ChartDataLabels !== 'undefined') {
         Chart.register(ChartDataLabels);
     }
-     const controlAnual = JSON.parse(
-        document.getElementById("sis-meta")?.dataset.control || "[]"
-    );
+     
 
     /* 1. INYECCIÓN DE DATOS Y VALORES PREDETERMINADOS DESDE FLASK */
-    //const controlAnual = JSON.parse('{{ (control_anual | default([])) | tojson | safe }}');
+    const controlAnual = JSON.parse('{{ (control_anual | default([])) | tojson | safe }}');
     const sisResultadosIniciales = JSON.parse('{{ (resultados | default([])) | tojson | safe }}');
     const DICCIONARIO_VARIABLES = JSON.parse('{{ (catalogo_variables | default({})) | tojson | safe }}');
 
@@ -269,14 +267,8 @@
     function actualizarEncabezadoSIS(anio) {
         const meta = document.getElementById("sis-meta");
         if (!meta) return;
-
         const registro = controlAnual.find(r => r.anio === anio);
-        if (!registro) {
-            meta.textContent = "";
-            return;
-        }
-
-        meta.textContent = ` | ${registro.estatus_inicio} al ${formatearFechaES(registro.fecha_actualizacion)} · ${registro.estatus}`;
+        meta.textContent = registro ? ` | ${registro.estatus_inicio} · ${registro.estatus}` : "";
     }
 
     function restaurarDefaultModulo(modKey) {
