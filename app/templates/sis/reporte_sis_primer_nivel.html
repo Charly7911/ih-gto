@@ -5,7 +5,8 @@
 
         <h2 class="mb-3" id="sis-title">
             🏥 SIS - Primer Nivel
-            <span id="sis-meta" style="font-size: 18px;"></span>
+            <span id="sis-meta" style="font-size: 18px;" data-control='{{ control_anual | tojson | safe }}'>
+            </span>
         </h2>
 
         <div id="loaderOverlay" class="overlay-loader">
