@@ -268,15 +268,36 @@
         const meta = document.getElementById("sis-meta");
         if (!meta) return;
 
-        // Convertimos anio a Number por si viene como String desde un select o tab
+        // Convertir anio a número para asegurar la coincidencia en .find()
         const registro = controlAnual.find(r => Number(r.anio) === Number(anio));
 
         if (registro) {
-            // Extraemos la fecha de actualización si existe
-            const fecha = registro.fecha_actualizacion ? ` · Actualizado: ${registro.fecha_actualizacion}` : '';
+            let textoFecha = "";
 
-            // Formateamos el texto del encabezado
-            meta.textContent = ` | ${registro.estatus_inicio} · ${registro.estatus}${fecha}`;
+            // Formatear la fecha si existe en el registro
+            if (registro.fecha_actualizacion) {
+                // Reemplazar guiones si la fecha viene en formato 'YYYY-MM-DD'
+                const fechaObj = new Date(registro.fecha_actualizacion.replace(/-/g, '\/'));
+
+                // Validar que la fecha sea válida
+                if (!isNaN(fechaObj)) {
+                    const opciones = { day: 'numeric', month: 'long', year: 'numeric' };
+                    let fechaFormateada = fechaObj.toLocaleDateString('es-ES', opciones);
+
+                    // Capitalizar el nombre del mes (ej. "16 de Septiembre de 2026")
+                    fechaFormateada = fechaFormateada.replace(/de ([a-z])/g, (match, p1) => `de ${p1.toUpperCase()}`);
+
+                    textoFecha = `Actualizado al ${fechaFormateada}`;
+                } else {
+                    // En caso de que ya venga formateada como texto desde el backend
+                    textoFecha = `Actualizado al ${registro.fecha_actualizacion}`;
+                }
+            }
+
+            // Construir el texto final
+            const estatus = registro.estatus ? ` · ${registro.estatus}` : "";
+
+            meta.textContent = textoFecha ? ` | ${textoFecha}${estatus}` : "";
         } else {
             meta.textContent = "";
         }
