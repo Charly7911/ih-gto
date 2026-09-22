@@ -231,7 +231,7 @@
     if (typeof ChartDataLabels !== 'undefined') {
         Chart.register(ChartDataLabels);
     }
-     
+
 
     /* 1. INYECCIÓN DE DATOS Y VALORES PREDETERMINADOS DESDE FLASK */
     const controlAnual = JSON.parse('{{ (control_anual | default([])) | tojson | safe }}');
@@ -267,8 +267,19 @@
     function actualizarEncabezadoSIS(anio) {
         const meta = document.getElementById("sis-meta");
         if (!meta) return;
-        const registro = controlAnual.find(r => r.anio === anio);
-        meta.textContent = registro ? ` | ${registro.estatus_inicio} · ${registro.estatus}` : "";
+
+        // Convertimos anio a Number por si viene como String desde un select o tab
+        const registro = controlAnual.find(r => Number(r.anio) === Number(anio));
+
+        if (registro) {
+            // Extraemos la fecha de actualización si existe
+            const fecha = registro.fecha_actualizacion ? ` · Actualizado: ${registro.fecha_actualizacion}` : '';
+
+            // Formateamos el texto del encabezado
+            meta.textContent = ` | ${registro.estatus_inicio} · ${registro.estatus}${fecha}`;
+        } else {
+            meta.textContent = "";
+        }
     }
 
     function restaurarDefaultModulo(modKey) {
