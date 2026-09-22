@@ -91,7 +91,7 @@
                 {% if es_home or (ruta.startswith('/sis') and not ruta.startswith('/sis_primer_nivel')) %}
                 <a href="{{ url_for('sis.inicio') if 'sis.inicio' in config else '/sis' }}"
                     class="menu-item {% if ruta.startswith('/sis') and not ruta.startswith('/sis_primer_nivel') %}active{% endif %}">
-                    🏨 Sistema (SIS)
+                    🏨 SIS Hospitalización
                 </a>
                 {% endif %}
 
@@ -99,7 +99,7 @@
                 {% if es_home or ruta.startswith('/sis_primer_nivel') %}
                 <a href="{{ url_for('sis_pn.inicio') if 'sis_pn.inicio' in config else '/sis_primer_nivel' }}"
                     class="menu-item {% if ruta.startswith('/sis_primer_nivel') %}active{% endif %}">
-                    🏨 Sistema (SIS) Primer Nivel
+                    🏨 SIS Primer Nivel
                 </a>
                 {% endif %}
 
