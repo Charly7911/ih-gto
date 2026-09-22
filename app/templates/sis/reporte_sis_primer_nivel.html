@@ -269,8 +269,14 @@
     function actualizarEncabezadoSIS(anio) {
         const meta = document.getElementById("sis-meta");
         if (!meta) return;
+
         const registro = controlAnual.find(r => r.anio === anio);
-        meta.textContent = registro ? ` | ${registro.estatus_inicio} · ${registro.estatus}` : "";
+        if (!registro) {
+            meta.textContent = "";
+            return;
+        }
+
+        meta.textContent = ` | ${registro.estatus_inicio} al ${formatearFechaES(registro.fecha_actualizacion)} · ${registro.estatus}`;
     }
 
     function restaurarDefaultModulo(modKey) {
