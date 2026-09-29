@@ -1796,6 +1796,98 @@ def subir_csv_sis():
     return render_template("admin/subir_csv_sis.html")
 
 
+#********************************************************************
+#*****************  ELIMINAR BASES SIS ********************************
+#********************************************************************
+
+@admin.route("/eliminar_csv_sis", methods=["POST"])
+@login_required
+def eliminar_csv_sis():
+
+    anio = request.form.get("anio_eliminar")
+
+    if not anio:
+        flash("Debes seleccionar un año para eliminar.", "danger")
+        return redirect(url_for("admin.subir_csv_sis"))
+
+    conn = None
+    cursor = None
+
+    try:
+        anio = int(anio)
+
+        conn = mysql.connection
+        cursor = conn.cursor()
+
+        # Desactivar temporalmente las restricciones FK
+        cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+
+        # Eliminar registros principales
+        cursor.execute(
+            "DELETE FROM sis_registros WHERE anio = %s",
+            (anio,)
+        )
+
+        registros_eliminados = cursor.rowcount
+
+        # Eliminar registros agregados
+        cursor.execute(
+            "DELETE FROM sis_registros_agregados WHERE anio = %s",
+            (anio,)
+        )
+
+        agregados_eliminados = cursor.rowcount
+
+        # Eliminar control anual
+        cursor.execute(
+            "DELETE FROM sis_control_anual WHERE anio = %s",
+            (anio,)
+        )
+
+        control_eliminado = cursor.rowcount
+
+        # Reactivar restricciones FK
+        cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+
+        conn.commit()
+
+        flash(
+            f"Base SIS del año {anio} eliminada correctamente. "
+            f"Registros: {registros_eliminados}, "
+            f"agregados: {agregados_eliminados}, "
+            f"control anual: {control_eliminado}.",
+            "success"
+        )
+
+    except ValueError:
+        flash("El año seleccionado no es válido.", "danger")
+
+    except Exception as e:
+        if conn is not None:
+            conn.rollback()
+
+        flash(
+            f"Error al eliminar la base SIS del año {anio}: {str(e)}",
+            "danger"
+        )
+
+        print(f"❌ Error eliminando SIS {anio}: {e}")
+
+    finally:
+        if cursor is not None:
+
+            try:
+                cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+            except Exception as e:
+                print(
+                    f"⚠️ No se pudo restaurar FOREIGN_KEY_CHECKS: {e}"
+                )
+
+            cursor.close()
+
+    return redirect(url_for("admin.subir_csv_sis"))
+
+
 # *****************************************************************
 # ********** CARGAR SIS PRIMER NIVEL *****************************
 # *****************************************************************
