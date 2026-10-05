@@ -379,7 +379,6 @@ def indicadores():
         "camas_gineco",
         "camas_pediatria",
         "camas_otros",
-        "camas_psiquiatria",
         "quirofanos",
         "hab_urgencias",
         "hab_observacion",
@@ -1190,7 +1189,7 @@ def indicadores():
             camas = f(data["camas_total"])
             camas_pediatria = f(data["camas_pediatria"])
             dias_est_ped = f(data["dias_est_ped"])
-            dias_est_psi = f(data["dias_est_psiquiatria"])
+           
           
 
            
