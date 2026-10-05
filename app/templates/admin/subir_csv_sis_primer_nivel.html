@@ -7,6 +7,7 @@
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         background-color: #f4f6f8;
         padding: 40px 0;
+        min-height: 100vh;
     }
 
     .zona-formulario h1 {
@@ -18,11 +19,18 @@
 
     .zona-formulario .form-container {
         max-width: 500px;
-        margin: 0 auto;
+        margin: 0 auto 30px auto;
         padding: 30px 40px;
         background-color: #ffffff;
         border-radius: 12px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-container h2 {
+        text-align: center;
+        color: #2c3e50;
+        font-size: 1.3rem;
+        margin-bottom: 25px;
     }
 
     .zona-formulario form label {
@@ -75,7 +83,7 @@
         border-radius: 10px;
         height: 22px;
         overflow: hidden;
-        box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
     }
 
     .progress-bar-fill {
@@ -101,16 +109,125 @@
         text-align: center;
         font-weight: 500;
     }
-    .alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-    .alert-danger { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    /* ----------------------------- */
+    /* ESTILOS SECCIÓN ELIMINAR      */
+    /* ----------------------------- */
+
+    .eliminar-container {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 30px 40px;
+        background-color: #fff5f5;
+        border: 1px solid #f5c2c7;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .eliminar-container h2 {
+        text-align: center;
+        color: #b02a37;
+        font-size: 1.3rem;
+        margin-bottom: 15px;
+    }
+
+    .advertencia {
+        background-color: #fff3cd;
+        border: 1px solid #ffecb5;
+        color: #664d03;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
+
+    .btn-eliminar {
+        width: 100%;
+        padding: 12px;
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        cursor: pointer;
+        font-weight: 600;
+        margin-top: 20px;
+    }
+
+    .btn-eliminar:hover {
+        background-color: #b02a37;
+    }
+
+    .zona-formulario ul {
+        max-width: 500px;
+        margin: 0 auto 20px auto;
+        padding: 15px;
+        background-color: #e7f7e7;
+        border: 1px solid #b2ddb2;
+        border-radius: 8px;
+        list-style-type: none;
+        color: #2e7d32;
+    }
+
+    .msg-flash {
+        max-width: 500px;
+        margin: 0 auto 20px auto;
+        padding: 15px;
+        border-radius: 8px;
+        list-style-type: none;
+        font-weight: 500;
+    }
+
+    .msg-flash-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    .msg-flash-success {
+        background-color: #e7f7e7;
+        color: #2e7d32;
+        border: 1px solid #b2ddb2;
+    }
 </style>
 
 <div class="zona-formulario">
     <h1>Subir base CSV - Sistema SIS Primer Nivel</h1>
 
+    <!-- ===================================================== -->
+    <!-- MENSAJES FLASH DEL SISTEMA                            -->
+    <!-- ===================================================== -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, msg in messages %}
+    <ul class="msg-flash {% if category == 'danger' %}msg-flash-danger{% else %}msg-flash-success{% endif %}">
+        <li>{{ msg }}</li>
+    </ul>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <!-- ===================================================== -->
+    <!-- FORMULARIO PARA SUBIR BASE                            -->
+    <!-- ===================================================== -->
     <div class="form-container">
-        <!-- Envío estándar mediante el action del backend -->
-        <form id="uploadForm" action="{{ url_for('admin.subir_csv_sis_primer_nivel') }}" method="POST" enctype="multipart/form-data">
+        <h2>📁 Cargar base SIS Primer Nivel</h2>
+
+        <form id="uploadForm" action="{{ url_for('admin.subir_csv_sis_primer_nivel') }}" method="POST"
+            enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <label for="file">Selecciona archivo CSV:</label>
@@ -154,66 +271,128 @@
 
         <div id="alertBox" class="alert-box"></div>
     </div>
+
+    <!-- ===================================================== -->
+    <!-- FORMULARIO PARA ELIMINAR AÑO                          -->
+    <!-- ===================================================== -->
+    <div class="eliminar-container">
+        <h2>🗑️ Eliminar base SIS Primer Nivel</h2>
+
+        <div class="advertencia">
+            <strong>⚠️ Atención:</strong>
+            Esta opción eliminará todos los registros del <strong>SIS Primer Nivel</strong> correspondientes al año
+            seleccionado.
+
+            También se eliminarán los registros agregados y el control anual de Primer Nivel.
+            <br><br>
+            <strong>Esta operación no se puede deshacer.</strong>
+        </div>
+
+        <form method="POST" action="{{ url_for('admin.eliminar_csv_sis_primer_nivel') }}"
+            onsubmit="return confirmarEliminacionPrimerNivel();">
+
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <label for="anio_eliminar">Selecciona el año que deseas eliminar:</label>
+            <select id="anio_eliminar" name="anio_eliminar" required>
+                <option value="">-- Selecciona un año --</option>
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+                <option value="2023">2023</option>
+                <option value="2022">2022</option>
+                <option value="2021">2021</option>
+                <option value="2020">2020</option>
+                <option value="2019">2019</option>
+                <option value="2018">2018</option>
+                <option value="2017">2017</option>
+                <option value="2016">2016</option>
+                <option value="2015">2015</option>
+            </select>
+
+            <button type="submit" class="btn-eliminar">
+                🗑️ Eliminar base de Primer Nivel
+            </button>
+        </form>
+    </div>
 </div>
 
 <script>
-document.getElementById('uploadForm').addEventListener('submit', function() {
-    const btnSubmit = document.getElementById('btnSubmit');
-    const progressWrapper = document.getElementById('progressWrapper');
-    const progressBar = document.getElementById('progressBar');
-    const progressText = document.getElementById('progressText');
-    const alertBox = document.getElementById('alertBox');
+    // Script para el control de la barra de progreso al cargar
+    document.getElementById('uploadForm').addEventListener('submit', function () {
+        const btnSubmit = document.getElementById('btnSubmit');
+        const progressWrapper = document.getElementById('progressWrapper');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const alertBox = document.getElementById('alertBox');
 
-    // Deshabilitar botón y activar la vista de carga
-    btnSubmit.disabled = true;
-    alertBox.style.display = 'none';
-    progressWrapper.style.display = 'block';
-    progressBar.style.width = '5%';
-    progressBar.style.backgroundColor = '#007BFF';
-    progressText.innerText = 'Enviando archivo al servidor...';
+        btnSubmit.disabled = true;
+        alertBox.style.display = 'none';
+        progressWrapper.style.display = 'block';
+        progressBar.style.width = '5%';
+        progressBar.style.backgroundColor = '#007BFF';
+        progressText.innerText = 'Enviando archivo al servidor...';
 
-    // Iniciar consulta periódica a la base de datos
-    const interval = setInterval(() => {
-        fetch("{{ url_for('admin.estado_carga_sis_primer_nivel') }}")
-            .then(res => res.json())
-            .then(data => {
-                const estatus = data.estatus || "Procesando...";
-                progressText.innerText = estatus;
+        const interval = setInterval(() => {
+            fetch("{{ url_for('admin.estado_carga_sis_primer_nivel') }}")
+                .then(res => res.json())
+                .then(data => {
+                    const estatus = data.estatus || "Procesando...";
+                    progressText.innerText = estatus;
 
-                // Extrae el porcentaje dentro del texto (Ej: "CARGANDO REGISTROS (45%)")
-                const match = estatus.match(/\((\d+)%\)/);
-                if (match) {
-                    const porcentaje = match[1];
-                    progressBar.style.width = `${porcentaje}%`;
-                }
+                    const match = estatus.match(/\((\d+)\%\)/);
+                    if (match) {
+                        const porcentaje = match[1];
+                        progressBar.style.width = `${porcentaje}%`;
+                    }
 
-                // Carga completada
-                if (estatus.includes('COMPLETADO')) {
-                    clearInterval(interval);
-                    progressBar.style.width = '100%';
-                    progressBar.style.backgroundColor = '#28a745'; // Verde
-                    btnSubmit.disabled = false;
-                    
-                    alertBox.className = 'alert-box alert-success';
-                    alertBox.innerText = '¡El archivo se procesó e insertó con éxito!';
-                    alertBox.style.display = 'block';
-                } 
-                // Error reportado durante el proceso
-                else if (estatus.includes('ERROR')) {
-                    clearInterval(interval);
-                    progressBar.style.backgroundColor = '#dc3545'; // Rojo
-                    btnSubmit.disabled = false;
+                    if (estatus.includes('COMPLETADO')) {
+                        clearInterval(interval);
+                        progressBar.style.width = '100%';
+                        progressBar.style.backgroundColor = '#28a745';
+                        btnSubmit.disabled = false;
 
-                    alertBox.className = 'alert-box alert-danger';
-                    alertBox.innerText = estatus;
-                    alertBox.style.display = 'block';
-                }
-            })
-            .catch(err => {
-                console.error("Error consultando el progreso:", err);
-            });
-    }, 1200);
-});
+                        alertBox.className = 'alert-box alert-success';
+                        alertBox.innerText = '¡El archivo se procesó e insertó con éxito!';
+                        alertBox.style.display = 'block';
+                    }
+                    else if (estatus.includes('ERROR')) {
+                        clearInterval(interval);
+                        progressBar.style.backgroundColor = '#dc3545';
+                        btnSubmit.disabled = false;
+
+                        alertBox.className = 'alert-box alert-danger';
+                        alertBox.innerText = estatus;
+                        alertBox.style.display = 'block';
+                    }
+                })
+                .catch(err => {
+                    console.error("Error consultando el progreso:", err);
+                });
+        }, 1200);
+    });
+
+    // Script para la confirmación de eliminación exclusiva de Primer Nivel
+    function confirmarEliminacionPrimerNivel() {
+        const select = document.getElementById("anio_eliminar");
+        const anio = select.value;
+
+        if (!anio) {
+            alert("Selecciona un año.");
+            return false;
+        }
+
+        return confirm(
+            "⚠️ ADVERTENCIA\n\n" +
+            "Vas a eliminar TODOS los registros de SIS Primer Nivel correspondientes al año " + anio + ".\n\n" +
+            "Se eliminarán:\n" +
+            "• Registros de Primer Nivel\n" +
+            "• Registros agregados de Primer Nivel\n" +
+            "• Control anual de Primer Nivel\n\n" +
+            "Esta operación NO afectará los registros de Hospitalización / SIS General.\n\n" +
+            "¿Deseas continuar?"
+        );
+    }
 </script>
 
 {% endblock %}

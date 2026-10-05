@@ -1822,37 +1822,34 @@ def eliminar_csv_sis():
         # Desactivar temporalmente las restricciones FK
         cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
 
-        # Eliminar registros principales
+        # 1. Eliminar registros principales de Hospitalización / SIS General
         cursor.execute(
             "DELETE FROM sis_registros WHERE anio = %s",
             (anio,)
         )
-
         registros_eliminados = cursor.rowcount
 
-        # Eliminar registros agregados
+        # 2. Eliminar registros agregados de Hospitalización / SIS General
         cursor.execute(
             "DELETE FROM sis_registros_agregados WHERE anio = %s",
             (anio,)
         )
-
         agregados_eliminados = cursor.rowcount
 
-        # Eliminar control anual
+        # 3. Eliminar control anual de Hospitalización / SIS General
         cursor.execute(
             "DELETE FROM sis_control_anual WHERE anio = %s",
             (anio,)
         )
-
         control_eliminado = cursor.rowcount
 
-        # Reactivar restricciones FK
+        # Reactivar restricciones FK antes del commit
         cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
 
         conn.commit()
 
         flash(
-            f"Base SIS del año {anio} eliminada correctamente. "
+            f"Base SIS General (Hospitalización) del año {anio} eliminada correctamente. "
             f"Registros: {registros_eliminados}, "
             f"agregados: {agregados_eliminados}, "
             f"control anual: {control_eliminado}.",
@@ -1866,23 +1863,22 @@ def eliminar_csv_sis():
         if conn is not None:
             conn.rollback()
 
+        # Reactivar restricciones FK en caso de error si la conexión sigue viva
+        if cursor is not None:
+            try:
+                cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+            except Exception:
+                pass
+
         flash(
-            f"Error al eliminar la base SIS del año {anio}: {str(e)}",
+            f"Error al eliminar la base SIS General del año {anio}: {str(e)}",
             "danger"
         )
 
-        print(f"❌ Error eliminando SIS {anio}: {e}")
+        print(f"❌ Error eliminando SIS General {anio}: {e}")
 
     finally:
         if cursor is not None:
-
-            try:
-                cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
-            except Exception as e:
-                print(
-                    f"⚠️ No se pudo restaurar FOREIGN_KEY_CHECKS: {e}"
-                )
-
             cursor.close()
 
     return redirect(url_for("admin.subir_csv_sis"))
@@ -2215,6 +2211,95 @@ def subir_csv_sis_primer_nivel():
         return redirect(url_for("admin.subir_csv_sis_primer_nivel"))
 
     return render_template("admin/subir_csv_sis_primer_nivel.html")
+
+
+
+
+
+@admin.route("/eliminar_csv_sis_primer_nivel", methods=["POST"])
+@login_required
+def eliminar_csv_sis_primer_nivel():
+
+    anio = request.form.get("anio_eliminar")
+
+    if not anio:
+        flash("Debes seleccionar un año para eliminar en Primer Nivel.", "danger")
+        return redirect(url_for("admin.subir_csv_sis_primer_nivel"))
+
+    conn = None
+    cursor = None
+
+    try:
+        anio = int(anio)
+
+        conn = mysql.connection
+        cursor = conn.cursor()
+
+        # Desactivar restricciones FK temporalmente
+        cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+
+        # 1. Eliminar registros de Primer Nivel
+        cursor.execute(
+            "DELETE FROM sis_registros_primer_nivel WHERE anio = %s",
+            (anio,)
+        )
+        registros_eliminados = cursor.rowcount
+
+        # 2. Eliminar registros agregados de Primer Nivel
+        cursor.execute(
+            "DELETE FROM sis_registros_agregados_primer_nivel WHERE anio = %s",
+            (anio,)
+        )
+        agregados_eliminados = cursor.rowcount
+
+        # 3. Eliminar control anual de Primer Nivel
+        cursor.execute(
+            "DELETE FROM sis_control_anual_primer_nivel WHERE anio = %s",
+            (anio,)
+        )
+        control_eliminado = cursor.rowcount
+
+        # Reactivar restricciones FK
+        cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+
+        conn.commit()
+
+        flash(
+            f"Base SIS Primer Nivel del año {anio} eliminada correctamente. "
+            f"Registros: {registros_eliminados}, "
+            f"agregados: {agregados_eliminados}, "
+            f"control anual: {control_eliminado}.",
+            "success"
+        )
+
+    except ValueError:
+        flash("El año seleccionado no es válido.", "danger")
+
+    except Exception as e:
+        if conn is not None:
+            conn.rollback()
+
+        if cursor is not None:
+            try:
+                cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+            except Exception:
+                pass
+
+        flash(
+            f"Error al eliminar la base SIS Primer Nivel del año {anio}: {str(e)}",
+            "danger"
+        )
+
+        print(f"❌ Error eliminando SIS Primer Nivel {anio}: {e}")
+
+    finally:
+        if cursor is not None:
+            cursor.close()
+
+    return redirect(url_for("admin.subir_csv_sis_primer_nivel"))
+
+
+
 
 #*****************************************************************
 #**********  CARGAR AGENDAS **************************************
