@@ -364,6 +364,7 @@ def indicadores():
         "dias_p_gineco",
         "dias_p_pediatria",
         "dias_p_otros",
+        "dias_p_psiquiatria",
         "porcentaje_ocupacion",
         "porcentaje_ocupacion_med_interna",
         "porcentaje_ocupacion_cirugia",
@@ -379,6 +380,7 @@ def indicadores():
         "camas_gineco",
         "camas_pediatria",
         "camas_otros",
+        "camas_psiquiatria",
         "quirofanos",
         "hab_urgencias",
         "hab_observacion",
@@ -431,6 +433,7 @@ def indicadores():
         "dias_p_gineco",
         "dias_p_pediatria",
         "dias_p_otros",
+        "dias_p_psiquiatria",
         "urgencias",
         "calificada",
         "no_calificada",
@@ -750,6 +753,7 @@ def indicadores():
                     SUM(IFNULL(sis.gineco, 0)) AS dias_p_gineco,
                     SUM(IFNULL(sis.pediatria, 0)) AS dias_p_pediatria,
                     SUM(IFNULL(sis.otros, 0)) AS dias_p_otros,
+                    SUM(IFNULL(sis.psiquiatria, 0)) AS dias_p_psiquiatria,
 
                     -- URGENCIAS
                     SUM(IFNULL(urg.total_u, 0)) AS urgencias,
@@ -1154,18 +1158,21 @@ def indicadores():
             camas_pediatria = f(data["camas_pediatria"])
             camas_gineco = f(data["camas_gineco"])
             camas_otros = f(data["camas_otros"])
+            camas_psiquiatria = f(data["camas_psiquiatria"])
 
             dias_est_med = f(data["dias_est_med"])
             dias_est_cir = f(data["dias_est_cir"])
             dias_est_ped = f(data["dias_est_ped"])
             dias_est_gin = f(data["dias_est_gin"])
             dias_est_otr = f(data["dias_est_otros"])
+           
 
             dias_p_med = f(data["dias_p_med_int"])
             dias_p_cir = f(data["dias_p_cirugia"])
             dias_p_ped = f(data["dias_p_pediatria"])
             dias_p_gin = f(data["dias_p_gineco"])
             dias_p_otr = f(data["dias_p_otros"])
+            dias_p_psi = f(data["dias_p_psiquiatria"])
 
             egresos_med = f(data["egre_med_interna"])
             egresos_cir = f(data["egre_cirugia"])
@@ -1185,7 +1192,7 @@ def indicadores():
             camas = f(data["camas_total"])
             camas_pediatria = f(data["camas_pediatria"])
             dias_est_ped = f(data["dias_est_ped"])
-
+            dias_est_psi = f(data["dias_est_psiquiatria"])
           
 
            
@@ -1248,6 +1255,7 @@ def indicadores():
                     f(data["dias_cama_otros"])
                 ),
 
+              
 
                 "prom_dias_estancia": (
                     (f(data["dias_estancia"]) / egresos) if egresos else 0
@@ -1270,8 +1278,7 @@ def indicadores():
                 "prom_estancia_otros":
                     (dias_est_otr / egresos_otr) if egresos_otr else 0,
 
-
-
+              
                 "indice_rotacion": (egresos / camas) if camas else 0,
                 "interv_sustitucion": (
                     (((camas * dias) - f(data["dias_p"])) / egresos) if egresos else 0
