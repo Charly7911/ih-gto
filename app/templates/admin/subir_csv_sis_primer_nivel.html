@@ -308,7 +308,7 @@
                 <option value="2025">2025</option>
                 <option value="2024">2024</option>
                 <option value="2023">2023</option>
-                
+
             </select>
 
             <button type="submit" class="btn-eliminar">
@@ -319,47 +319,131 @@
 </div>
 
 <script>
-    // Script para el control de la barra de progreso al cargar
-    document.getElementById('uploadForm').addEventListener('submit', function () {
+    let intervalConsulta = null;
+
+    // 1. AL CARGAR O REGRESAR A LA PÁGINA: Verificar si hay un proceso en curso
+    document.addEventListener('DOMContentLoaded', function () {
+        verificarProcesoEnCurso();
+    });
+
+    function verificarProcesoEnCurso() {
+        fetch("{{ url_for('admin.estado_carga_sis_primer_nivel') }}")
+            .then(res => res.json())
+            .then(data => {
+                const estatus = data.estatus || "";
+
+                // Si hay un proceso activo (no completado, sin error y no vacío)
+                if (
+                    estatus &&
+                    !estatus.includes('COMPLETADO') &&
+                    !estatus.includes('ERROR') &&
+                    !estatus.includes('Sin cargas')
+                ) {
+                    const btnSubmit = document.getElementById('btnSubmit');
+                    const progressWrapper = document.getElementById('progressWrapper');
+
+                    // Bloquear el botón y mostrar la barra con el porcentaje guardado
+                    btnSubmit.disabled = true;
+                    progressWrapper.style.display = 'block';
+
+                    // Reanudar las peticiones periódicas
+                    iniciarPolling();
+                }
+            })
+            .catch(err => console.error("Error consultando el estado previo:", err));
+    }
+
+    // 2. AL ENVIAR EL FORMULARIO
+    document.getElementById('uploadForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        const form = e.target;
         const btnSubmit = document.getElementById('btnSubmit');
         const progressWrapper = document.getElementById('progressWrapper');
         const progressBar = document.getElementById('progressBar');
         const progressText = document.getElementById('progressText');
         const alertBox = document.getElementById('alertBox');
 
+        const formData = new FormData(form);
+
+        // Estado visual inicial
         btnSubmit.disabled = true;
         alertBox.style.display = 'none';
         progressWrapper.style.display = 'block';
-        progressBar.style.width = '5%';
+        progressBar.style.width = '0%';
         progressBar.style.backgroundColor = '#007BFF';
-        progressText.innerText = 'Enviando archivo al servidor...';
+        progressText.innerText = 'Subiendo archivo al servidor...';
 
-        const interval = setInterval(() => {
+        // Enviar archivo mediante AJAX
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Error al subir el archivo al servidor.');
+                }
+                progressText.innerText = 'Archivo subido. Iniciando procesamiento...';
+
+                // Iniciar la consulta periódica
+                iniciarPolling();
+            })
+            .catch(error => {
+                btnSubmit.disabled = false;
+                progressWrapper.style.display = 'none';
+                alertBox.className = 'alert-box alert-danger';
+                alertBox.innerText = 'Error al enviar el formulario: ' + error.message;
+                alertBox.style.display = 'block';
+            });
+    });
+
+    // 3. FUNCIÓN REUTILIZABLE PARA CONSULTAR EL PROGRESO (Polling)
+    function iniciarPolling() {
+        const btnSubmit = document.getElementById('btnSubmit');
+        const progressWrapper = document.getElementById('progressWrapper');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const alertBox = document.getElementById('alertBox');
+
+        // Limpiar intervalo previo para no duplicar peticiones
+        if (intervalConsulta) {
+            clearInterval(intervalConsulta);
+        }
+
+        intervalConsulta = setInterval(() => {
             fetch("{{ url_for('admin.estado_carga_sis_primer_nivel') }}")
                 .then(res => res.json())
                 .then(data => {
                     const estatus = data.estatus || "Procesando...";
                     progressText.innerText = estatus;
 
+                    // Extraer porcentaje del texto en el backend (Ej: "CARGANDO REGISTROS (45%)")
                     const match = estatus.match(/\((\d+)\%\)/);
                     if (match) {
                         const porcentaje = match[1];
                         progressBar.style.width = `${porcentaje}%`;
                     }
 
+                    // A) Carga Completada
                     if (estatus.includes('COMPLETADO')) {
-                        clearInterval(interval);
+                        clearInterval(intervalConsulta);
                         progressBar.style.width = '100%';
-                        progressBar.style.backgroundColor = '#28a745';
+                        progressBar.style.backgroundColor = '#28a745'; // Verde
                         btnSubmit.disabled = false;
 
                         alertBox.className = 'alert-box alert-success';
-                        alertBox.innerText = '¡El archivo se procesó e insertó con éxito!';
+                        alertBox.innerText = '¡El archivo de Primer Nivel se procesó e insertó con éxito!';
                         alertBox.style.display = 'block';
+
+                        document.getElementById('uploadForm').reset();
                     }
+                    // B) Error en el proceso
                     else if (estatus.includes('ERROR')) {
-                        clearInterval(interval);
-                        progressBar.style.backgroundColor = '#dc3545';
+                        clearInterval(intervalConsulta);
+                        progressBar.style.backgroundColor = '#dc3545'; // Rojo
                         btnSubmit.disabled = false;
 
                         alertBox.className = 'alert-box alert-danger';
@@ -370,10 +454,10 @@
                 .catch(err => {
                     console.error("Error consultando el progreso:", err);
                 });
-        }, 1200);
-    });
+        }, 1000); // Consulta cada segundo
+    }
 
-    // Script para la confirmación de eliminación exclusiva de Primer Nivel
+    // 4. CONFIRMACIÓN PARA ELIMINAR REGISTROS
     function confirmarEliminacionPrimerNivel() {
         const select = document.getElementById("anio_eliminar");
         const anio = select.value;
@@ -395,5 +479,4 @@
         );
     }
 </script>
-
 {% endblock %}
