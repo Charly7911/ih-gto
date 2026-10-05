@@ -17,7 +17,7 @@
         margin-bottom: 20px;
     }
 
-    
+
     .form-container {
         max-width: 500px;
         margin: 0 auto 30px auto;
@@ -133,266 +133,235 @@
 
 <div class="zona-formulario">
 
-```
-<h1>Subir base CSV - Sistema SIS</h1>
+    ```
+    <h1>Subir base CSV - Sistema SIS</h1>
 
 
-<!-- ===================================================== -->
-<!-- MENSAJES DEL SISTEMA -->
-<!-- ===================================================== -->
+    <!-- ===================================================== -->
+    <!-- MENSAJES DEL SISTEMA -->
+    <!-- ===================================================== -->
 
-{% with messages = get_flashed_messages() %}
+    {% with messages = get_flashed_messages() %}
     {% if messages %}
-        <ul>
-            {% for msg in messages %}
-                <li>{{ msg }}</li>
-            {% endfor %}
-        </ul>
+    <ul>
+        {% for msg in messages %}
+        <li>{{ msg }}</li>
+        {% endfor %}
+    </ul>
     {% endif %}
-{% endwith %}
+    {% endwith %}
 
 
-<!-- ===================================================== -->
-<!-- FORMULARIO PARA SUBIR BASE -->
-<!-- ===================================================== -->
+    <!-- ===================================================== -->
+    <!-- FORMULARIO PARA SUBIR BASE -->
+    <!-- ===================================================== -->
 
-<div class="form-container">
+    <div class="form-container">
 
-    <h2>📁 Cargar base SIS</h2>
+        <h2>📁 Cargar base SIS</h2>
 
-    <form method="POST"
-          enctype="multipart/form-data">
+        <form method="POST" enctype="multipart/form-data">
 
-        <input type="hidden"
-               name="csrf_token"
-               value="{{ csrf_token() }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
 
-        <label for="file">
-            Selecciona archivo CSV:
-        </label>
+            <label for="file">
+                Selecciona archivo CSV:
+            </label>
 
-        <input type="file"
-               id="file"
-               name="file"
-               accept=".csv"
-               required>
+            <input type="file" id="file" name="file" accept=".csv" required>
 
 
-        <label for="anio">
-            Año de la información:
-        </label>
+            <label for="anio">
+                Año de la información:
+            </label>
 
-        <input type="number"
-               id="anio"
-               name="anio"
-               min="2015"
-               max="2100"
-               required>
+            <input type="number" id="anio" name="anio" min="2015" max="2100" required>
 
 
-        <label for="modo_carga">
-            Modo de carga:
-        </label>
+            <label for="modo_carga">
+                Modo de carga:
+            </label>
 
-        <select id="modo_carga"
-                name="modo_carga"
-                required>
+            <select id="modo_carga" name="modo_carga" required>
 
-            <option value=""
-                    disabled
-                    selected>
-                Selecciona modo de carga
-            </option>
+                <option value="" disabled selected>
+                    Selecciona modo de carga
+                </option>
 
-            <option value="agregar">
-                Agregar
-            </option>
+                <option value="agregar">
+                    Agregar
+                </option>
 
-            <option value="reemplazar">
-                Reemplazar año
-            </option>
+                <option value="reemplazar">
+                    Reemplazar año
+                </option>
 
-        </select>
+            </select>
 
 
-        <label for="estatus_inicio">
-            Actualización ó Cierre:
-        </label>
+            <label for="estatus_inicio">
+                Actualización ó Cierre:
+            </label>
 
-        <select id="estatus_inicio"
-                name="estatus_inicio"
-                required>
+            <select id="estatus_inicio" name="estatus_inicio" required>
 
-            <option value="Actualizado">
-                Actualizado
-            </option>
+                <option value="Actualizado">
+                    Actualizado
+                </option>
 
-            <option value="Cierre">
-                Cierre
-            </option>
+                <option value="Cierre">
+                    Cierre
+                </option>
 
-        </select>
+            </select>
 
 
-        <label for="fecha_actualizacion">
-            Fecha de actualización:
-        </label>
+            <label for="fecha_actualizacion">
+                Fecha de actualización:
+            </label>
 
-        <input type="date"
-               id="fecha_actualizacion"
-               name="fecha_actualizacion"
-               required>
+            <input type="date" id="fecha_actualizacion" name="fecha_actualizacion" required>
 
 
-        <label for="estatus">
-            Estatus del año:
-        </label>
+            <label for="estatus">
+                Estatus del año:
+            </label>
 
-        <select id="estatus"
-                name="estatus"
-                required>
+            <select id="estatus" name="estatus" required>
 
-            <option value="PRELIMINAR">
-                Preliminar
-            </option>
+                <option value="PRELIMINAR">
+                    Preliminar
+                </option>
 
-            <option value="CONSOLIDADO">
-                Consolidado
-            </option>
+                <option value="CONSOLIDADO">
+                    Consolidado
+                </option>
 
-        </select>
+            </select>
 
 
-        <button type="submit"
-                class="btn-subir">
+            <button type="submit" class="btn-subir">
 
-            ⬆️ Subir y Procesar
+                ⬆️ Subir y Procesar
 
-        </button>
+            </button>
 
-    </form>
-
-</div>
-
-
-<!-- ===================================================== -->
-<!-- FORMULARIO PARA ELIMINAR AÑO -->
-<!-- ===================================================== -->
-
-<div class="eliminar-container">
-
-    <h2>🗑️ Eliminar base SIS</h2>
-
-    <div class="advertencia">
-
-        <strong>⚠️ Atención:</strong>
-
-        Esta opción eliminará todos los registros SIS
-        correspondientes al año seleccionado.
-
-        También se eliminarán los registros agregados
-        y el control anual.
-
-        <br><br>
-
-        <strong>
-            Esta operación no se puede deshacer.
-        </strong>
+        </form>
 
     </div>
 
 
-    <form method="POST"
-          action="{{ url_for('admin.eliminar_csv_sis') }}"
-          onsubmit="return confirmarEliminacion();">
+    <!-- ===================================================== -->
+    <!-- FORMULARIO PARA ELIMINAR AÑO -->
+    <!-- ===================================================== -->
 
-        <input type="hidden"
-               name="csrf_token"
-               value="{{ csrf_token() }}">
+    <div class="eliminar-container">
 
+        <h2>🗑️ Eliminar base SIS</h2>
 
-        <label for="anio_eliminar">
-            Selecciona el año que deseas eliminar:
-        </label>
+        <div class="advertencia">
 
-        <select id="anio_eliminar"
-                name="anio_eliminar"
-                required>
+            <strong>⚠️ Atención:</strong>
 
-            <option value="">
-                -- Selecciona un año --
-            </option>
+            Esta opción eliminará todos los registros SIS
+            correspondientes al año seleccionado.
 
-            <option value="2026">2026</option>
-            <option value="2025">2025</option>
-            <option value="2024">2024</option>
-            <option value="2023">2023</option>
-            <option value="2022">2022</option>
-            <option value="2021">2021</option>
-            <option value="2020">2020</option>
-            <option value="2019">2019</option>
-            <option value="2018">2018</option>
-            <option value="2017">2017</option>
-            <option value="2016">2016</option>
-            <option value="2015">2015</option>
+            También se eliminarán los registros agregados
+            y el control anual.
 
-        </select>
+            <br><br>
+
+            <strong>
+                Esta operación no se puede deshacer.
+            </strong>
+
+        </div>
 
 
-        <button type="submit"
-                class="btn-eliminar">
+        <form method="POST" action="{{ url_for('admin.eliminar_csv_sis') }}" onsubmit="return confirmarEliminacion();">
 
-            🗑️ Eliminar base del año
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-        </button>
 
-    </form>
+            <label for="anio_eliminar">
+                Selecciona el año que deseas eliminar:
+            </label>
 
-</div>
-```
+            <select id="anio_eliminar" name="anio_eliminar" required>
+
+                <option value="">
+                    -- Selecciona un año --
+                </option>
+
+                <option value="2034">2034</option>
+                <option value="2033">2033</option>
+                <option value="2032">2032</option>
+                <option value="2031">2031</option>
+                <option value="2030">2030</option>
+                <option value="2029">2029</option>
+                <option value="2028">2028</option>
+                <option value="2027">2027</option>
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+                <option value="2023">2023</option>
+
+            </select>
+
+
+            <button type="submit" class="btn-eliminar">
+
+                🗑️ Eliminar base del año
+
+            </button>
+
+        </form>
+
+    </div>
+    ```
 
 </div>
 
 <script>
 
-function confirmarEliminacion() {
+    function confirmarEliminacion() {
 
-    const select = document.getElementById("anio_eliminar");
+        const select = document.getElementById("anio_eliminar");
 
-    const anio = select.value;
+        const anio = select.value;
 
-    if (!anio) {
+        if (!anio) {
 
-        alert("Selecciona un año.");
+            alert("Selecciona un año.");
 
-        return false;
+            return false;
+        }
+
+
+        const confirmar = confirm(
+
+            "⚠️ ADVERTENCIA\n\n" +
+
+            "Vas a eliminar TODOS los registros SIS " +
+            "correspondientes al año " + anio + ".\n\n" +
+
+            "Se eliminarán:\n" +
+
+            "• Registros SIS\n" +
+            "• Registros agregados\n" +
+            "• Control anual\n\n" +
+
+            "Esta operación NO se puede deshacer.\n\n" +
+
+            "¿Deseas continuar?"
+
+        );
+
+
+        return confirmar;
+
     }
-
-
-    const confirmar = confirm(
-
-        "⚠️ ADVERTENCIA\n\n" +
-
-        "Vas a eliminar TODOS los registros SIS " +
-        "correspondientes al año " + anio + ".\n\n" +
-
-        "Se eliminarán:\n" +
-
-        "• Registros SIS\n" +
-        "• Registros agregados\n" +
-        "• Control anual\n\n" +
-
-        "Esta operación NO se puede deshacer.\n\n" +
-
-        "¿Deseas continuar?"
-
-    );
-
-
-    return confirmar;
-
-}
 
 </script>
 
