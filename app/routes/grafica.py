@@ -364,7 +364,6 @@ def indicadores():
         "dias_p_gineco",
         "dias_p_pediatria",
         "dias_p_otros",
-        "dias_p_psiquiatria",
         "porcentaje_ocupacion",
         "porcentaje_ocupacion_med_interna",
         "porcentaje_ocupacion_cirugia",
@@ -433,7 +432,6 @@ def indicadores():
         "dias_p_gineco",
         "dias_p_pediatria",
         "dias_p_otros",
-        "dias_p_psiquiatria",
         "urgencias",
         "calificada",
         "no_calificada",
@@ -753,7 +751,7 @@ def indicadores():
                     SUM(IFNULL(sis.gineco, 0)) AS dias_p_gineco,
                     SUM(IFNULL(sis.pediatria, 0)) AS dias_p_pediatria,
                     SUM(IFNULL(sis.otros, 0)) AS dias_p_otros,
-                    SUM(IFNULL(sis.psiquiatria, 0)) AS dias_p_psiquiatria,
+                   
 
                     -- URGENCIAS
                     SUM(IFNULL(urg.total_u, 0)) AS urgencias,
@@ -1172,7 +1170,7 @@ def indicadores():
             dias_p_ped = f(data["dias_p_pediatria"])
             dias_p_gin = f(data["dias_p_gineco"])
             dias_p_otr = f(data["dias_p_otros"])
-            dias_p_psi = f(data["dias_p_psiquiatria"])
+          
 
             egresos_med = f(data["egre_med_interna"])
             egresos_cir = f(data["egre_cirugia"])
