@@ -1156,7 +1156,7 @@ def indicadores():
             camas_pediatria = f(data["camas_pediatria"])
             camas_gineco = f(data["camas_gineco"])
             camas_otros = f(data["camas_otros"])
-            camas_psiquiatria = f(data["camas_psiquiatria"])
+           
 
             dias_est_med = f(data["dias_est_med"])
             dias_est_cir = f(data["dias_est_cir"])
