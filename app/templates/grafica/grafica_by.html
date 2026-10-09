@@ -1190,9 +1190,6 @@
     const radioSeleccionado = document.querySelector('input[name="modoVista"]:checked');
     const modoVistaSeleccionado = radioSeleccionado ? radioSeleccionado.value : "combinada";
 
-    const indicadoresSolicitados = Array.from(indicadoresSeleccionados);
-    const unidadesSolicitadas = Array.from(unidadesSeleccionadas);
-
     const modoVistaAnual = document.getElementById("modoVista")?.value;
     const esVistaAnual = modoVistaAnual === "anual";
     const mesesSeleccionados = obtenerMesesSeleccionados();
@@ -1247,15 +1244,19 @@
     }
 
     // =========================
-    // COMBOS Y FILTRADO DE DATOS
+    // COMBOS Y FILTRADO DE DATOS (CORREGIDO PARA TOTAL GRUPO)
     // =========================
     let datosGrafica = data;
     const acumularPorTipologia = document.getElementById("switchAcumularTipologia")?.checked || false;
 
+    // ✅ Permite "TOTAL GRUPO", "TOTAL GENERAL" y "TOTAL"
     if (unidadesSeleccionadas.size === 0 && !mostrarTodasUnidades) {
-      datosGrafica = data.filter(d =>
-        d.nombre_unidad === "TOTAL GENERAL" || d.nombre_unidad === "TOTAL"
-      );
+      datosGrafica = data.filter(d => {
+        const uUpper = (d.nombre_unidad || "").toUpperCase();
+        return uUpper.includes("TOTAL") || d.clues === "TOTAL";
+      });
+      // Fallback: Si el filtro descartó todo pero data trae registros consolidados, usar data directa
+      if (datosGrafica.length === 0) datosGrafica = data;
     }
 
     if (unidadesSeleccionadas.size === 0 && mostrarTodasUnidades) {
@@ -1271,7 +1272,6 @@
     let combos = [];
 
     if (mostrarTodasUnidades && acumularPorTipologia) {
-      // Modo Acumulado por Tipología
       combos = [
         ...new Set(
           datosGrafica.map((d) => {
@@ -1281,11 +1281,11 @@
         ),
       ];
     } else {
-      // Modo Normal por Unidad
       combos = [
         ...new Set(
           datosGrafica.map((d) => {
-            const u = norm(limpiarNombreUnidad(d.nombre_unidad));
+            // Preservar la clave exacta para grupos o unidades
+            const u = norm(d.nombre_unidad || d.clues || "unidad");
             return `${norm(d.indicador)}|||${d.anio}|||${u}`;
           })
         ),
@@ -1304,7 +1304,6 @@
       const claveTipologia = esModoTipologia ? unidadLimpia.replace("TIPOLOGIA_", "") : null;
 
       if (!esVistaAnual) {
-        // Filtrar registros según sea por Tipología Acumulada o por Unidad individual
         const registros = datosGrafica.filter((d) => {
           const coincideInd = norm(d.indicador) === norm(indicadorNom);
           const coincideAnio = String(d.anio) === String(anioNom);
@@ -1315,11 +1314,10 @@
           if (esModoTipologia) {
             return (d.tipologia || "OTRO").trim().toUpperCase() === claveTipologia;
           } else {
-            return norm(limpiarNombreUnidad(d.nombre_unidad)) === unidadLimpia;
+            return norm(d.nombre_unidad || d.clues) === unidadLimpia;
           }
         });
 
-        // Sumar los valores mes a mes (acumulación)
         const mapaMeses = {};
         registros.forEach((r) => {
           const m = Number(r.mes);
@@ -1344,7 +1342,7 @@
           if (esModoTipologia) {
             return (d.tipologia || "OTRO").trim().toUpperCase() === claveTipologia;
           } else {
-            return norm(limpiarNombreUnidad(d.nombre_unidad)) === unidadLimpia;
+            return norm(d.nombre_unidad || d.clues) === unidadLimpia;
           }
         });
 
@@ -1353,27 +1351,17 @@
       }
 
       function generarColor({ unidad, indicador, anio }) {
-        const soloUnaUnidad = Array.from(unidadesSeleccionadas || []).length === 1;
-
-        if (soloUnaUnidad) {
-          const paleta = [
-            "hsl(0, 70%, 55%)", "hsl(35, 80%, 55%)", "hsl(60, 70%, 45%)",
-            "hsl(120, 55%, 45%)", "hsl(180, 60%, 45%)", "hsl(220, 65%, 55%)",
-            "hsl(270, 60%, 55%)", "hsl(320, 60%, 55%)", "hsl(10, 70%, 60%)",
-            "hsl(90, 55%, 50%)"
-          ];
-          const index = parseInt(anio) % paleta.length;
-          return paleta[index];
-        }
-
-        const key = `${unidad}-${indicador}`;
+        const paleta = [
+          "hsl(217, 91%, 60%)", "hsl(0, 84%, 60%)", "hsl(142, 71%, 45%)",
+          "hsl(38, 92%, 50%)", "hsl(280, 67%, 55%)", "hsl(199, 89%, 48%)"
+        ];
+        const key = `${unidad}-${indicador}-${anio}`;
         let hash = 0;
         for (let i = 0; i < key.length; i++) {
           hash = (hash << 5) - hash + key.charCodeAt(i);
           hash |= 0;
         }
-        const hue = Math.abs(hash) % 360;
-        return `hsl(${hue}, 45%, 55%)`;
+        return paleta[Math.abs(hash) % paleta.length];
       }
 
       const colorBase = generarColor({
@@ -1382,23 +1370,28 @@
         anio: anioNom
       });
 
-      if (valores.every(v => Number(v) === 0)) return [];
+      // Si los datos vienen vacíos o en cero absoluto, evitar renderizar datasets fantasmas
+      if (valores.length === 0) return [];
 
       const estilosLinea = [
-        [], [6, 6], [2, 3], [12, 4, 2, 4], [8, 4], [12, 3, 3, 3, 3, 3], [2, 6], [15, 3, 2, 3, 2, 3]
+        [], [6, 6], [2, 3], [12, 4, 2, 4], [8, 4]
       ];
 
       const listaIndicadores = Array.from(indicadoresSeleccionados);
       const idxIndicador = listaIndicadores.indexOf(indicadorNom);
-      const estiloDash = estilosLinea[idxIndicador % estilosLinea.length];
+      const estiloDash = estilosLinea[Math.max(0, idxIndicador) % estilosLinea.length];
 
-      // Formatear la etiqueta si es Tipología o Unidad
+      // Formatear la etiqueta limpia
       const nombreEtiqueta = esModoTipologia
         ? `ACUMULADO ${claveTipologia}`
-        : nombreUnidad(unidadLimpia);
+        : (unidadLimpia.includes("total") ? "TOTAL GRUPO" : unidadLimpia.toUpperCase());
+
+      const indNombre = typeof obtenerNombreIndicador === "function"
+        ? obtenerNombreIndicador(indicadorNom)
+        : indicadorNom;
 
       const baseDataset = {
-        label: `${nombreEtiqueta} - ${obtenerNombreIndicador(indicadorNom)} (${anioNom})`,
+        label: `${nombreEtiqueta} - ${indNombre} (${anioNom})`,
         unidad: unidadLimpia,
         indicador: indicadorNom,
         anio: anioNom,
@@ -1406,10 +1399,10 @@
         borderColor: colorBase,
         borderDash: estiloDash,
         borderWidth: 2,
-        tension: 0.4,
+        tension: 0.3,
         backgroundColor:
           tipoOriginal === "area"
-            ? colorBase.replace("hsl", "hsla").replace(")", ",0.4)")
+            ? colorBase.replace("hsl", "hsla").replace(")", ",0.3)")
             : colorBase,
         fill: tipoOriginal === "area",
         showLine: tipoOriginal !== "scatter",
@@ -1419,7 +1412,7 @@
 
       if (!mostrarTendencia) return baseDataset;
 
-      const tendencia = calcularTendencia(valores);
+      const tendencia = typeof calcularTendencia === "function" ? calcularTendencia(valores) : [];
 
       return [
         baseDataset,
@@ -1439,7 +1432,7 @@
       ];
     });
 
-    // Configuración de Opciones de Chart.js
+    // Opciones de Chart.js
     const obtenerOpcionesGrafica = () => ({
       responsive: true,
       maintainAspectRatio: false,
@@ -1477,7 +1470,7 @@
     });
 
     // ===================================================
-    // 🚀 RENDERIZADO SEGÚN EL MODO DE VISTA
+    // RENDERIZADO FINAL EN EL CONTENEDOR
     // ===================================================
     const contenedor = document.getElementById("contenedorGraficas");
 
@@ -1486,7 +1479,6 @@
       return;
     }
 
-    // Limpieza de instancias
     if (typeof chart !== "undefined" && chart) {
       chart.destroy();
       chart = null;
@@ -1517,18 +1509,11 @@
         crearLeyendaPersonalizada(chart);
       }
 
-      // ----------------------------------------------------
-      // OPCIÓN 2: VISTA POR INDICADOR (SEPARADA)
-      // ----------------------------------------------------
     } else {
-
-      // Agrupamos los datasets por su propiedad 'indicador'
       const gruposDatasets = {};
 
       datasets.forEach(ds => {
-        // Obtenemos la clave del indicador directamente del dataset
         const indKey = ds.indicador || "general";
-
         if (!gruposDatasets[indKey]) {
           gruposDatasets[indKey] = [];
         }
@@ -1536,7 +1521,7 @@
       });
 
       const listaClaves = Object.keys(gruposDatasets);
-      contenedor.innerHTML = ""; // Limpiamos el contenedor
+      contenedor.innerHTML = "";
 
       listaClaves.forEach((indKey, index) => {
         const subDatasets = gruposDatasets[indKey];
@@ -1577,7 +1562,6 @@
       });
     }
   }
-
 
   // PARTE 3
 
