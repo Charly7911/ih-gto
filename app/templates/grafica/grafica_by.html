@@ -911,7 +911,7 @@
     // FETCH
     // =========================
     fetch("/grafica/api/indicadores?" + params.toString())
-      .then((r) => {
+      .then(async (r) => {
         if (r.redirected) {
           window.location.href = r.url;
           return null;
@@ -920,6 +920,15 @@
           window.location.href = "/login";
           return null;
         }
+
+        // 🚨 CAPTURA EXPLÍCITA DE ERRORES (HTTP 500, 400, etc.)
+        if (!r.ok) {
+          const errorTexto = await r.text();
+          console.error(`❌ ERROR ${r.status} DESDE EL SERVIDOR:`, errorTexto);
+          destruirTodasLasGraficas();
+          return null;
+        }
+
         return r.json();
       })
       .then((data) => {
