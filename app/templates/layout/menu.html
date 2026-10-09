@@ -1403,53 +1403,44 @@
         const unidades = [];
         let elementos = [];
 
-        // 1. Obtener el contenedor padre más cercano partiendo del botón arrastrado
-        const contenedorPadre = event.target.closest('.acordeon-indicadores, .filter-block-acordeon, #sidebar, .popover-unidades, body') || document;
+        // 1. Obtener el contenedor principal partiendo del botón presionado
+        const acordeonPrincipal = event.target.closest('.acordeon-indicadores, .filter-block-acordeon, #sidebar, body') || document;
 
         if (tipoGrupo === 'TODAS') {
-            // Busca cualquier checkbox de unidad en el menú
-            elementos = contenedorPadre.querySelectorAll('input[type="checkbox"].filtro-unidad, .unidad-container input[type="checkbox"], input.filtro-unidad');
+            // Selecciona todas las tarjetas dentro de cualquier bloque de unidades
+            elementos = acordeonPrincipal.querySelectorAll('.check-item, .searchable-item, .unidad-item-grafica, .unidad-container label, .unidad-container div[data-clues]');
         } else {
-            // Busca dentro del sub-acordeón específico del grupo (HG, HC, HE)
-            const subContenedor = event.target.closest('.sub-acordeon') || contenedorPadre.querySelector(`.unidad-container[data-tipo="${tipoGrupo}"]`);
+            // Busca el sub-acordeón específico (HG, HC, HE)
+            const subAcordeon = event.target.closest('details, .sub-acordeon') || acordeonPrincipal.querySelector(`[data-tipo="${tipoGrupo}"]`);
 
-            if (subContenedor) {
-                elementos = subContenedor.querySelectorAll('input[type="checkbox"]');
+            if (subAcordeon) {
+                elementos = subAcordeon.querySelectorAll('.check-item, .searchable-item, .unidad-item-grafica, label, div[data-clues]');
             } else {
-                elementos = contenedorPadre.querySelectorAll(`input[data-tipo="${tipoGrupo}"]`);
+                elementos = acordeonPrincipal.querySelectorAll(`.check-item[data-tipo="${tipoGrupo}"], [data-tipo="${tipoGrupo}"] label`);
             }
         }
 
-        // 2. Fallback global si por algún motivo la búsqueda contextual no encuentra nada
-        if (elementos.length === 0) {
-            elementos = document.querySelectorAll('input[type="checkbox"].filtro-unidad, .unidad-container input[type="checkbox"]');
-        }
+        // 2. Extraer los datos (ID/CLUES y Nombre) de cada tarjeta visual
+        elementos.forEach(el => {
+            // Buscar el valor (ID) de la unidad
+            const inputEl = el.querySelector('input');
+            let val = inputEl ? inputEl.value : (el.getAttribute('data-clues') || el.getAttribute('data-value') || el.dataset.clues);
 
-        // 3. Recorrer los elementos encontrados
-        elementos.forEach(cb => {
-            const val = cb.value;
-            // Ignorar checkboxes de control o sin valor
-            if (!val || val === "on" || cb.id === "checkTodasUnidades" || cb.classList.contains("check-grupo-unidad")) return;
+            // Buscar el nombre visual de la unidad
+            const spanEl = el.querySelector('span');
+            let nombreText = spanEl ? spanEl.innerText.trim() : el.innerText.trim();
 
-            // Extraer texto limpio
-            const parentLabel = cb.closest('label') || cb.parentElement;
-            const spanEl = parentLabel ? parentLabel.querySelector('span') : null;
-            let nombreText = '';
+            // Limpiar el texto en caso de incluir íconos o saltos de línea
+            nombreText = nombreText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
 
-            if (spanEl) {
-                nombreText = spanEl.innerText.trim();
-            } else if (parentLabel) {
-                nombreText = parentLabel.innerText.trim();
-            } else {
-                nombreText = String(val);
-            }
-
-            // Evitar duplicados
-            if (!unidades.some(u => u.value === String(val))) {
-                unidades.push({
-                    value: String(val),
-                    nombre: nombreText
-                });
+            // Si se encontró un valor válido y no es un control de "Marca HC / Seleccionar TODAS"
+            if (val && val !== "on" && !el.innerText.includes("Marca ") && !el.innerText.includes("Seleccionar")) {
+                if (!unidades.some(u => u.value === String(val))) {
+                    unidades.push({
+                        value: String(val),
+                        nombre: nombreText || String(val)
+                    });
+                }
             }
         });
 
