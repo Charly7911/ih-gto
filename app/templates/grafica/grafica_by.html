@@ -939,9 +939,11 @@
 
         window.ultimoDataRecibido = data;
 
+        // Renderizar la gráfica normalmente
         renderGrafica(data);
 
-        if (window.ultimoIndicadorArrastrado) {
+        // ✅ SOLO validar si NO es un grupo acumulado
+        if (window.ultimoIndicadorArrastrado && modoAgrupacion !== "acumulado") {
           validarDatosIndicadorIndividual(
             data,
             window.ultimoIndicadorArrastrado
