@@ -10,7 +10,7 @@
     <!-- =========================================
          MENÚ PRINCIPAL DE NAVEGACIÓN
     ========================================= -->
-    
+
 
     {% if current_user.is_authenticated %}
     <!-- Saludo en la parte SUPERIOR del Sidebar -->
@@ -664,16 +664,50 @@
 
                 <!-- ACORDEÓN: UNIDAD MÉDICA -->
                 <details class="acordeon-indicadores">
-                    <summary class="text-white" style="font-size:11px;font-weight:bold;letter-spacing:.5px;">
-                        <i class="bi bi-chevron-right"></i> 🏥 UNIDAD MÉDICA
+                    <summary class="text-white d-flex justify-content-between align-items-center"
+                        style="font-size:11px;font-weight:bold;letter-spacing:.5px;">
+                        <span><i class="bi bi-chevron-right"></i> 🏥 UNIDAD MÉDICA</span>
                     </summary>
+
+                    <!-- BARRA GLOBAL DE CONTROL (SELECCIONAR / ARRASTRAR TODAS) -->
+                    <div class="p-2 mb-2 bg-dark rounded d-flex justify-content-between align-items-center gap-2">
+                        <label class="text-white mb-0" style="font-size:11px; cursor:pointer;">
+                            <input type="checkbox" id="checkTodasUnidades" onchange="toggleTodasUnidades(this)">
+                            <strong>Seleccionar TODAS</strong>
+                        </label>
+                        <button type="button" class="btn btn-sm btn-outline-info text-white btn-drag-all"
+                            draggable="true" ondragstart="dragGrupoUnidades(event, 'TODAS')"
+                            title="Arrastra para incluir todas las unidades">
+                            <i class="bi bi-grip-vertical"></i> Arrastrar Todas
+                        </button>
+                    </div>
+
                     <div class="filter-block-acordeon">
+
+                        <!-- HOSPITALES GENERALES (HG) -->
                         <details class="sub-acordeon">
-                            <summary><i class="bi bi-hospital"></i> Hospitales Generales (HG)</summary>
+                            <summary class="d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-hospital"></i> Hospitales Generales (HG)</span>
+                            </summary>
+
+                            <!-- Barra de grupo HG -->
+                            <div
+                                class="px-2 py-1 mb-1 d-flex justify-content-between align-items-center bg-secondary bg-opacity-25 rounded">
+                                <label class="mb-0 text-white" style="font-size:10px;">
+                                    <input type="checkbox" class="check-grupo-unidad" data-tipo="HG"
+                                        onchange="toggleGrupoUnidades('HG', this.checked)"> Marca HG
+                                </label>
+                                <span class="badge bg-info text-dark" draggable="true"
+                                    ondragstart="dragGrupoUnidades(event, 'HG')" style="cursor:grab;">
+                                    <i class="bi bi-grip-horizontal"></i> Arrastrar HG
+                                </span>
+                            </div>
+
                             <div id="listaGenerales" class="popover-list-inline custom-scroll unidad-container"
                                 data-tipo="HG">
                                 {% for u in unidades_generales %}
-                                <label class="check-item check-unidad searchable-item">
+                                <label class="check-item check-unidad searchable-item" draggable="true"
+                                    ondragstart="dragUnidadIndividual(event, '{{ u.id if u.id else u }}', '{{ u.nombre if u.nombre else u }}')">
                                     <input type="checkbox" class="filtro-unidad" data-tipo="HG"
                                         value="{{ u.id if u.id else u }}">
                                     <span>{{ u.nombre if u.nombre else u }}</span>
@@ -682,12 +716,30 @@
                             </div>
                         </details>
 
+                        <!-- HOSPITALES COMUNITARIOS (HC) -->
                         <details class="sub-acordeon">
-                            <summary><i class="bi bi-building"></i> Hospitales Comunitarios (HC)</summary>
+                            <summary class="d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-building"></i> Hospitales Comunitarios (HC)</span>
+                            </summary>
+
+                            <!-- Barra de grupo HC -->
+                            <div
+                                class="px-2 py-1 mb-1 d-flex justify-content-between align-items-center bg-secondary bg-opacity-25 rounded">
+                                <label class="mb-0 text-white" style="font-size:10px;">
+                                    <input type="checkbox" class="check-grupo-unidad" data-tipo="HC"
+                                        onchange="toggleGrupoUnidades('HC', this.checked)"> Marca HC
+                                </label>
+                                <span class="badge bg-info text-dark" draggable="true"
+                                    ondragstart="dragGrupoUnidades(event, 'HC')" style="cursor:grab;">
+                                    <i class="bi bi-grip-horizontal"></i> Arrastrar HC
+                                </span>
+                            </div>
+
                             <div id="listaComunitarios" class="popover-list-inline custom-scroll unidad-container"
                                 data-tipo="HC">
                                 {% for u in unidades_comunitarios %}
-                                <label class="check-item check-unidad searchable-item">
+                                <label class="check-item check-unidad searchable-item" draggable="true"
+                                    ondragstart="dragUnidadIndividual(event, '{{ u.id if u.id else u }}', '{{ u.nombre if u.nombre else u }}')">
                                     <input type="checkbox" class="filtro-unidad" data-tipo="HC"
                                         value="{{ u.id if u.id else u }}">
                                     <span>{{ u.nombre if u.nombre else u }}</span>
@@ -696,12 +748,30 @@
                             </div>
                         </details>
 
+                        <!-- HOSPITALES DE ESPECIALIDAD (HE) -->
                         <details class="sub-acordeon">
-                            <summary><i class="bi bi-heart-pulse"></i> Hospitales de Especialidad (HE)</summary>
+                            <summary class="d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-heart-pulse"></i> Hospitales de Especialidad (HE)</span>
+                            </summary>
+
+                            <!-- Barra de grupo HE -->
+                            <div
+                                class="px-2 py-1 mb-1 d-flex justify-content-between align-items-center bg-secondary bg-opacity-25 rounded">
+                                <label class="mb-0 text-white" style="font-size:10px;">
+                                    <input type="checkbox" class="check-grupo-unidad" data-tipo="HE"
+                                        onchange="toggleGrupoUnidades('HE', this.checked)"> Marca HE
+                                </label>
+                                <span class="badge bg-info text-dark" draggable="true"
+                                    ondragstart="dragGrupoUnidades(event, 'HE')" style="cursor:grab;">
+                                    <i class="bi bi-grip-horizontal"></i> Arrastrar HE
+                                </span>
+                            </div>
+
                             <div id="listaEspecialidad" class="popover-list-inline custom-scroll unidad-container"
                                 data-tipo="HE">
                                 {% for u in unidades_especialidad %}
-                                <label class="check-item check-unidad searchable-item">
+                                <label class="check-item check-unidad searchable-item" draggable="true"
+                                    ondragstart="dragUnidadIndividual(event, '{{ u.id if u.id else u }}', '{{ u.nombre if u.nombre else u }}')">
                                     <input type="checkbox" class="filtro-unidad" data-tipo="HE"
                                         value="{{ u.id if u.id else u }}">
                                     <span>{{ u.nombre if u.nombre else u }}</span>
@@ -709,6 +779,7 @@
                                 {% endfor %}
                             </div>
                         </details>
+
                     </div>
                 </details>
 
@@ -2110,6 +2181,54 @@
                 }
             }
         });
+
+        // 1. SE QUEDA IGUAL (Para marcar/desmarcar todos los checkboxes)
+        function toggleTodasUnidades(masterCheckbox) {
+            const checked = masterCheckbox.checked;
+            document.querySelectorAll('.filtro-unidad').forEach(cb => cb.checked = checked);
+            document.querySelectorAll('.check-grupo-unidad').forEach(cb => cb.checked = checked);
+        }
+
+        // 2. SE QUEDA IGUAL (Para marcar/desmarcar checkboxes por categoría HG, HC, HE)
+        function toggleGrupoUnidades(tipo, checked) {
+            document.querySelectorAll(`.filtro-unidad[data-tipo="${tipo}"]`).forEach(cb => {
+                cb.checked = checked;
+            });
+        }
+
+        // 3. REEMPLAZADA (Ajustada a la estructura type/value que usa tu grafica_by.html)
+        function dragUnidadIndividual(event, id, nombre) {
+            const payload = {
+                type: 'unidad',
+                value: String(id),
+                nombre: nombre
+            };
+            event.dataTransfer.setData('application/json', JSON.stringify(payload));
+        }
+
+        // 4. REEMPLAZADA (Ajustada a la estructura type/value para enviar el abanico/grupo)
+        function dragGrupoUnidades(event, tipoGrupo) {
+            let selector = '.filtro-unidad';
+            if (tipoGrupo !== 'TODAS') {
+                selector += `[data-tipo="${tipoGrupo}"]`;
+            }
+
+            const unidades = [];
+            document.querySelectorAll(selector).forEach(cb => {
+                unidades.push({
+                    value: String(cb.value),
+                    nombre: cb.nextElementSibling ? cb.nextElementSibling.innerText.trim() : cb.value
+                });
+            });
+
+            const payload = {
+                type: 'grupo_unidades',
+                grupo: tipoGrupo,
+                items: unidades
+            };
+
+            event.dataTransfer.setData('application/json', JSON.stringify(payload));
+        }
 
     });
 </script>

@@ -612,7 +612,8 @@
     });
 
   }
-  // =========================
+
+// =========================
   // DROP ZONE
   // =========================
   const dropZone = document.getElementById("dropZone");
@@ -644,7 +645,7 @@
       }
 
       // =========================
-      // UNIDADES
+      // UNIDADES (INDIVIDUAL)
       // =========================
       if (data.type === "unidad") {
         if (!unidadesSeleccionadas.has(data.value)) {
@@ -654,7 +655,19 @@
       }
 
       // =========================
-      // INDICADORES
+      // UNIDADES (GRUPO / ABANICO: HG, HC, HE o TODAS)
+      // =========================
+      if (data.type === "grupo_unidades" && Array.isArray(data.items)) {
+        data.items.forEach((item) => {
+          if (!unidadesSeleccionadas.has(item.value)) {
+            unidadesSeleccionadas.add(item.value);
+            addBadge(limpiarNombreUnidad(item.nombre), "unidad", item.value);
+          }
+        });
+      }
+
+      // =========================
+      // INDICADORES (INTACTO)
       // =========================
       if (data.type === "indicador") {
 
@@ -665,16 +678,13 @@
           // Guardamos solamente el último indicador arrastrado
           window.ultimoIndicadorArrastrado = data.value;
 
-
           const el = document.querySelector(
             `.indicador-item[data-ind="${data.value}"]`
           );
 
-
           const texto = el
             ? el.innerText.trim()
             : data.nombre || data.value;
-
 
           addBadge(texto, "indicador", data.value);
 
