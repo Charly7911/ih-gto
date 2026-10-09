@@ -635,6 +635,19 @@ def indicadores():
     # CONFIGURACIÓN BASE DE GROUP BY
     # ==========================================================
 
+    # ==========================================================
+    # PARTE 3: CONFIGURACIÓN BASE DE GROUP BY
+    # ==========================================================
+
+    # 1. Definición segura de agregación y días por mes
+    agg_camas = "AVG" if quiere_anual else "MAX"
+
+    if quiere_anual:
+        expr_dias_mes = "30"
+    else:
+        expr_dias_mes = "DAY(LAST_DAY(CONCAT(e.anio, '-', LPAD(e.mes, 2, '0'), '-01')))"
+
+    # 2. Configuración de GROUP BY según el MODO
     group_by_cols = ["e.anio"]
 
     if modo_agrupacion == "individual" or len(unidades) == 1:
@@ -649,11 +662,7 @@ def indicadores():
         group_by_cols.append("e.mes")
 
     group_by = ",\n".join(group_by_cols)
-
     select_mes = "e.mes," if not quiere_anual else "13 AS mes,"
-
-    # Expresión segura para el cálculo de días del mes en MySQL
-    expr_dias_mes = "DAY(LAST_DAY(CONCAT(e.anio, '-', LPAD(e.mes, 2, '0'), '-01')))"
 
     # ==========================================================
     # KPIS
@@ -684,11 +693,6 @@ def indicadores():
         # QUERY PRINCIPAL
         # ======================================================
 
-        if es_anual:
-            agg_camas = "AVG"
-        else:
-            agg_camas = "MAX"
-        
         query_e = f"""
                 SELECT 
                     e.anio,
@@ -802,7 +806,7 @@ def indicadores():
                     {agg_camas}(IFNULL(sin.camas_pediatria, 0)) AS camas_pediatria,
                     {agg_camas}(IFNULL(sin.camas_otros, 0)) AS camas_otros,
 
-                    -- DÍAS CAMA (CALCULADOS DE FORMA SEGURA POR CADA FILA DE MES)
+                    -- DÍAS CAMA
                     SUM(IFNULL(sin.camas_total,0) * {expr_dias_mes}) AS dias_cama_total,
                     SUM(IFNULL(sin.camas_med_int,0) * {expr_dias_mes}) AS dias_cama_med,
                     SUM(IFNULL(sin.camas_cirugia,0) * {expr_dias_mes}) AS dias_cama_cir,
@@ -883,8 +887,7 @@ def indicadores():
                 FROM egresos_agregado e
 
                 -- JOIN CATALOGO UNIDADES
-                LEFT JOIN catalogo_unidades c
-                ON e.clues = c.clues
+                LEFT JOIN catalogo_unidades c ON e.clues = c.clues
 
                 -- JOIN ABORTOS (GRUPAL POR MES)
                 LEFT JOIN (
@@ -935,64 +938,34 @@ def indicadores():
                         SUM(pediatra_proced_fuera) AS pediatria_fuera,
                         SUM(otros_proced_fuera) AS otros_fuera,
                         SUM(total_proced_fuera) AS total_proced_fuera,
-                        SUM(
-                            IFNULL(med_int_proced_dentro,0) +
-                            IFNULL(med_int_proced_fuera,0)
-                        ) AS total_proced_med_int,
-
-                        SUM(
-                            IFNULL(cirugia_proced_dentro,0) +
-                            IFNULL(cirugia_proced_fuera,0)
-                        ) AS total_proced_cirugia,
-
-                        SUM(
-                            IFNULL(gineco_proced_dentro,0) +
-                            IFNULL(gineco_proced_fuera,0)
-                        ) AS total_proced_gineco,
-
-                        SUM(
-                            IFNULL(pediatra_proced_dentro,0) +
-                            IFNULL(pediatra_proced_fuera,0)
-                        ) AS total_proced_pediatria,
-
-                        SUM(
-                            IFNULL(otros_proced_dentro,0) +
-                            IFNULL(otros_proced_fuera,0)
-                        ) AS total_proced_otros,
-
-                        -- TOTAL GENERAL
-                        SUM(
-                            IFNULL(total_proced_dentro,0) +
-                            IFNULL(total_proced_fuera,0)
-                        ) AS total_proced
+                        SUM(IFNULL(med_int_proced_dentro,0) + IFNULL(med_int_proced_fuera,0)) AS total_proced_med_int,
+                        SUM(IFNULL(cirugia_proced_dentro,0) + IFNULL(cirugia_proced_fuera,0)) AS total_proced_cirugia,
+                        SUM(IFNULL(gineco_proced_dentro,0) + IFNULL(gineco_proced_fuera,0)) AS total_proced_gineco,
+                        SUM(IFNULL(pediatra_proced_dentro,0) + IFNULL(pediatra_proced_fuera,0)) AS total_proced_pediatria,
+                        SUM(IFNULL(otros_proced_dentro,0) + IFNULL(otros_proced_fuera,0)) AS total_proced_otros,
+                        SUM(IFNULL(total_proced_dentro,0) + IFNULL(total_proced_fuera,0)) AS total_proced
                     FROM procedimiento_agregado GROUP BY anio, mes, clues
                 ) p ON e.clues = p.clues AND e.anio = p.anio AND e.mes = p.mes
 
-                -- JOIN SINERHIAS (ANUAL)
+                -- JOIN SINERHIAS (AGRUPADO CORRECTAMENTE)
                 LEFT JOIN (
                     SELECT
-                        anio,
-                        mes,
-                        clues,
-                        total AS camas_total,
-                        quirofanos,
-                        med_int AS camas_med_int,
-                        cirugia AS camas_cirugia,
-                        gineco AS camas_gineco,
-                        pediatria AS camas_pediatria,
-                        otros AS camas_otros
+                        anio, mes, clues,
+                        AVG(IFNULL(total, 0)) AS camas_total,
+                        AVG(IFNULL(quirofanos, 0)) AS quirofanos,
+                        AVG(IFNULL(med_int, 0)) AS camas_med_int,
+                        AVG(IFNULL(cirugia, 0)) AS camas_cirugia,
+                        AVG(IFNULL(gineco, 0)) AS camas_gineco,
+                        AVG(IFNULL(pediatria, 0)) AS camas_pediatria,
+                        AVG(IFNULL(otros, 0)) AS camas_otros
                     FROM sinerhias
-                ) sin
-                ON e.clues = sin.clues
-                AND e.anio = sin.anio
-                AND e.mes = sin.mes
+                    GROUP BY anio, mes, clues
+                ) sin ON e.clues = sin.clues AND e.anio = sin.anio AND e.mes = sin.mes
 
-                -- JOIN CAMAS NO CENSABLES (CORREGIDO CON SUM Y GROUP BY)
+                -- JOIN CAMAS NO CENSABLES (AGRUPADO)
                 LEFT JOIN (
                     SELECT
-                        anio,
-                        mes,
-                        clues,
+                        anio, mes, clues,
                         SUM(IFNULL(hab_urgencias, 0)) AS hab_urgencias,
                         SUM(IFNULL(hab_observacion, 0)) AS hab_observacion,
                         SUM(IFNULL(hab_cuid_int, 0)) AS hab_cuid_int,
@@ -1004,34 +977,22 @@ def indicadores():
                         SUM(IFNULL(hab_uci_adulto, 0)) AS hab_uci_adulto,
                         SUM(IFNULL(hab_uci_ped, 0)) AS hab_uci_ped,
                         SUM(IFNULL(hab_otras_areas, 0)) AS hab_otras_areas,
-
                         SUM(
-                            IFNULL(hab_urgencias, 0) +
-                            IFNULL(hab_observacion, 0) +
-                            IFNULL(hab_cuid_int, 0) +
-                            IFNULL(hab_cirug_amb, 0) +
-                            IFNULL(hab_quemados, 0) +
-                            IFNULL(hab_lab_parto, 0) +
-                            IFNULL(hab_recup_pp, 0) +
-                            IFNULL(hab_recup_pq, 0) +
-                            IFNULL(hab_uci_adulto, 0) +
-                            IFNULL(hab_uci_ped, 0) +
+                            IFNULL(hab_urgencias, 0) + IFNULL(hab_observacion, 0) +
+                            IFNULL(hab_cuid_int, 0) + IFNULL(hab_cirug_amb, 0) +
+                            IFNULL(hab_quemados, 0) + IFNULL(hab_lab_parto, 0) +
+                            IFNULL(hab_recup_pp, 0) + IFNULL(hab_recup_pq, 0) +
+                            IFNULL(hab_uci_adulto, 0) + IFNULL(hab_uci_ped, 0) +
                             IFNULL(hab_otras_areas, 0)
                         ) AS total_no_censables
-
                     FROM camas_no_censables
                     GROUP BY anio, mes, clues
-                ) cnc
-                ON e.clues = cnc.clues
-                AND e.anio = cnc.anio
-                AND e.mes = cnc.mes
+                ) cnc ON e.clues = cnc.clues AND e.anio = cnc.anio AND e.mes = cnc.mes
 
-                -- JOIN EQUIPO MÉDICO (CORREGIDO)
+                -- JOIN EQUIPO MÉDICO (AGRUPADO)
                 LEFT JOIN (
                     SELECT 
-                        anio, 
-                        mes, 
-                        clues,
+                        anio, mes, clues,
                         SUM(IFNULL(arco_c_analogo, 0)) AS arco_c_analogo,
                         SUM(IFNULL(arco_c_digital, 0)) AS arco_c_digital,
                         SUM(IFNULL(bascula_estadimetro, 0)) AS bascula_estadimetro,
@@ -1088,17 +1049,13 @@ def indicadores():
                         SUM(IFNULL(tomografo_64, 0)) AS tomografo_64
                     FROM equipo_medico
                     GROUP BY anio, mes, clues
-                ) em
-                ON e.clues = em.clues
-                AND e.anio = em.anio
-                AND e.mes = em.mes
+                ) em ON e.clues = em.clues AND e.anio = em.anio AND e.mes = em.mes
 
                 {where_e}
 
                 GROUP BY {group_by}
-
                 """
-        
+
         try:
             cur.execute(query_e, params_e)
             rows_e = cur.fetchall()
