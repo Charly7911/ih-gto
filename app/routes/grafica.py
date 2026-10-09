@@ -486,6 +486,8 @@ def indicadores():
         "dias_cama_otros",
     ]
 
+
+    #PARTE 2
     # ==========================================================
     # CAMPOS MAX
     # ==========================================================
@@ -628,16 +630,22 @@ def indicadores():
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     data_acumulada = []
 
+    #PARTE 3
     # ==========================================================
     # CONFIGURACIÓN BASE DE GROUP BY
     # ==========================================================
 
-    group_by_cols = [
-        "e.anio",
-        "e.clues",
-        "e.nombre_unidad",
-        "c.tipologia",
-    ]
+    group_by_cols = ["e.anio"]
+
+    # Evaluamos si la consulta requiere separar o acumular
+    if modo_agrupacion == "individual" or len(unidades) == 1:
+        # Se agregan los campos de la unidad para permitir desglosar y comparar
+        group_by_cols.extend(["e.clues", "e.nombre_unidad", "c.tipologia"])
+        select_unidad = "e.clues, e.nombre_unidad, c.tipologia,"
+    else:
+        # Modo 'acumulado': Se omiten e.clues y e.nombre_unidad del GROUP BY 
+        # para que la base de datos sume todo el grupo en un solo registro
+        select_unidad = "'TOTAL GRUPO' AS clues, 'GRUPO ACUMULADO' AS nombre_unidad, c.tipologia,"
 
     if not quiere_anual:
         group_by_cols.append("e.mes")
@@ -687,10 +695,8 @@ def indicadores():
                 SELECT 
                     e.anio,
                     {select_mes}
-                    e.clues,
-                    e.nombre_unidad,
-                    c.tipologia,
-
+                    {select_unidad}
+                   
                     -- EGRESOS Y NACIMIENTOS (TABLA PRINCIPAL)
                     SUM(e.total_egresos) AS total_egresos,        
                     SUM(e.defunciones) AS egre_defunciones,
@@ -1043,7 +1049,8 @@ def indicadores():
        
         cur.execute(query_e, params_e)
         rows_e = cur.fetchall()    
-       
+
+        #PARTE 4 
         # ==========================================================
         # CAMPOS EQUIPO MEDICO
         # ==========================================================
@@ -1353,7 +1360,8 @@ def indicadores():
     # ==========================================================
     # PARTE 2: INDICADORES DE VISTA
     # ==========================================================
-
+   
+    modo_agrupacion = request.args.get("modo", "individual") # 'acumulado' o 'individual'
     indicadores_ya_calculados = {field.lower() for field in SUM_FIELDS + MAX_FIELDS}
 
    

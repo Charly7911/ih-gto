@@ -613,7 +613,7 @@
 
   }
 
- // =========================
+  // =========================
   // DROP ZONE CON DEPURACIÓN
   // =========================
   const dropZone = document.getElementById("dropZone");
@@ -676,24 +676,30 @@
       // =========================
       // UNIDADES (GRUPO / ABANICO)
       // =========================
+      // =========================
+      // UNIDADES (GRUPO / ABANICO: ACUMULADO)
+      // =========================
       if (data.type === "grupo_unidades" && Array.isArray(data.items)) {
-        console.log(`👉 Procesando grupo con ${data.items.length} unidades:`, data.items);
-        
-        data.items.forEach((item, index) => {
-          console.log(` -> Elemento ${index}:`, item);
-          if (!unidadesSeleccionadas.has(item.value)) {
-            unidadesSeleccionadas.add(item.value);
-            if (typeof addBadge === "function") {
-              const nombreLimpio = typeof limpiarNombreUnidad === "function" ? limpiarNombreUnidad(item.nombre) : item.nombre;
-              addBadge(nombreLimpio, "unidad", item.value);
-              console.log("  ✅ Badge de grupo agregado:", nombreLimpio, item.value);
-            } else {
-              console.error("❌ La función addBadge NO existe en el iterador.");
-            }
-          } else {
-            console.warn("  ⚠️ Unidad omitida por duplicada:", item.value);
-          }
+
+        // 1. Agregar todos los IDs del grupo al Set (para que el backend reciba todas las unidades juntas)
+        data.items.forEach((item) => {
+          unidadesSeleccionadas.add(item.value);
         });
+
+        // 2. Nombre representativo del grupo para el Badge
+        let etiquetaGrupo = "";
+        if (data.grupo === "TODAS") {
+          etiquetaGrupo = "🏥 TODAS LAS UNIDADES (" + data.items.length + ")";
+        } else {
+          etiquetaGrupo = "🏥 GRUPO " + data.grupo + " (" + data.items.length + " Unidades)";
+        }
+
+        // 3. Crear UN SOLO BADGE ACUMULADO para todo el grupo en lugar de uno por cada hospital
+        if (typeof addBadge === "function") {
+          // Usamos la clave del grupo (ej. 'GRUPO_HG' o 'GRUPO_TODAS') como identificador del badge
+          const idGrupo = "GRUPO_" + data.grupo;
+          addBadge(etiquetaGrupo, "grupo_unidad", idGrupo);
+        }
       }
 
       // =========================
@@ -829,6 +835,14 @@
     const esAnual = modoVista === "anual";
 
     const params = new URLSearchParams();
+
+    // =========================
+    // MODO DE AGRUPACIÓN (ACUMULADO VS INDIVIDUAL)
+    // =========================
+    // Verificamos si existe al menos un badge de grupo en la zona de drop
+    const tieneBadgeGrupo = document.querySelector(".badge-grupo-unidad, [data-tipo='grupo_unidad']") !== null;
+    const modoAgrupacion = tieneBadgeGrupo ? "acumulado" : "individual";
+    params.append("modo", modoAgrupacion);
 
     // =========================
     // UNIDADES
