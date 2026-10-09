@@ -575,6 +575,7 @@ def indicadores():
     # PARAMETROS
     # ==========================================================
 
+    # Leer parámetros con soporte fallback
     unidades = (
         request.args.getlist("clues[]")
         or request.args.getlist("unidades[]")
@@ -582,35 +583,31 @@ def indicadores():
     )
 
     anios_raw = request.args.getlist("anios[]") or request.args.getlist("anios")
-    meses_raw = request.args.getlist("meses[]")
+    meses_raw = request.args.getlist("meses[]") or request.args.getlist("meses")
 
     indicadores_solicitados = (
         request.args.getlist("indicadores[]")
         or request.args.getlist("indicadores")
     )
-
     indicadores_solicitados = [i.strip().lower() for i in indicadores_solicitados]
 
     tipologia = request.args.get("tipologia", "TODAS")
+    modo_agrupacion = request.args.get("modo", "acumulado")
 
-    # ==========================================================
-    # NORMALIZAR
-    # ==========================================================
-
+    # Normalizar numéricos
     anios = [int(a) for a in anios_raw if str(a).isdigit()]
     meses = [int(m) for m in meses_raw if str(m).isdigit()]
 
-    quiere_anual = 13 in meses
-    es_anual = quiere_anual
-
+    # Si seleccionan los 12 meses, si viene el mes 13, o si no seleccionan ninguno, es vista ANUAL/ACUMULADA
     meses_validos = [m for m in meses if m != 13]
+    quiere_anual = (13 in meses) or (len(meses_validos) == 12) or (len(meses) == 0)
+    es_anual = quiere_anual
 
     if not meses_validos:
         meses_validos = list(range(1, 13))
 
     meses_calculo = meses_validos
 
-  
     # ==========================================================
     # FLAGS DE EJECUCIÓN
     # ==========================================================
