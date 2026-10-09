@@ -635,8 +635,7 @@ def indicadores():
     # CONFIGURACIÓN BASE DE GROUP BY
     # ==========================================================
 
-    # Validar si es modo acumulado (múltiples unidades consolidadas en 1 sola fila)
-    es_acumulado = modo_agrupacion != "individual" and len(unidades) > 1
+    es_acumulado = (modo_agrupacion != "individual" and len(unidades) > 1)
 
     if es_acumulado:
         group_by_cols = ["e.anio"]
@@ -651,7 +650,6 @@ def indicadores():
     group_by = ",\n".join(group_by_cols)
     select_mes = "e.mes," if not quiere_anual else "13 AS mes,"
 
-    # Expresión segura para la agregación de camas
     agg_camas = "AVG" if quiere_anual else "MAX"
 
     # ==========================================================
@@ -677,6 +675,7 @@ def indicadores():
             where_e += " AND e.mes IN ({})".format(",".join(["%s"] * len(meses_calculo)))
             params_e.extend(meses_calculo)
 
+        # Solo filtramos tipología si NO estamos consolidando todo el grupo
         if tipologia != "TODAS" and not es_acumulado:
             where_e += " AND c.tipologia = %s"
             params_e.append(tipologia)
@@ -881,7 +880,7 @@ def indicadores():
                 -- JOIN CATALOGO UNIDADES
                 LEFT JOIN catalogo_unidades c ON e.clues = c.clues
 
-                -- JOIN ABORTOS (GRUPAL POR MES)
+                -- JOIN ABORTOS
                 LEFT JOIN (
                     SELECT anio, mes, clues,
                         SUM(lui) AS abortos_lui, SUM(ameu) AS abortos_ameu,
@@ -890,7 +889,7 @@ def indicadores():
                     FROM abortos GROUP BY anio, mes, clues
                 ) ab ON e.clues = ab.clues AND e.anio = ab.anio AND e.mes = ab.mes
 
-                -- JOIN SIS (GRUPAL POR MES)
+                -- JOIN SIS
                 LEFT JOIN (
                     SELECT anio, mes, clues,
                         SUM(diasPaciente) AS dias_p, SUM(consultas) AS consultas,
@@ -905,7 +904,7 @@ def indicadores():
                     FROM sis_registros_agregados GROUP BY anio, mes, clues
                 ) sis ON e.clues = sis.clues AND e.anio = sis.anio AND e.mes = sis.mes
 
-                -- JOIN URGENCIAS (GRUPAL POR MES)
+                -- JOIN URGENCIAS
                 LEFT JOIN (
                     SELECT anio, mes_estadistico, clues,
                         SUM(total) AS total_u, SUM(calificada) AS calificada,
@@ -915,7 +914,7 @@ def indicadores():
                     FROM urgencias_agregado GROUP BY anio, mes_estadistico, clues
                 ) urg ON e.clues = urg.clues AND e.anio = urg.anio AND e.mes = urg.mes_estadistico
 
-                -- JOIN PROCEDIMIENTOS (GRUPAL POR MES)
+                -- JOIN PROCEDIMIENTOS
                 LEFT JOIN (
                     SELECT anio, mes, clues,
                         SUM(med_int_proced_dentro) AS med_int_dentro,
@@ -939,7 +938,7 @@ def indicadores():
                     FROM procedimiento_agregado GROUP BY anio, mes, clues
                 ) p ON e.clues = p.clues AND e.anio = p.anio AND e.mes = p.mes
 
-                -- JOIN SINERHIAS (AGRUPADO POR CLUES)
+                -- JOIN SINERHIAS (AGRUPADO)
                 LEFT JOIN (
                     SELECT anio, mes, clues,
                         AVG(IFNULL(total, 0)) AS camas_total,
@@ -952,7 +951,7 @@ def indicadores():
                     FROM sinerhias GROUP BY anio, mes, clues
                 ) sin ON e.clues = sin.clues AND e.anio = sin.anio AND e.mes = sin.mes
 
-                -- JOIN CAMAS NO CENSABLES (AGRUPADO POR CLUES)
+                -- JOIN CAMAS NO CENSABLES (AGRUPADO)
                 LEFT JOIN (
                     SELECT anio, mes, clues,
                         SUM(IFNULL(hab_urgencias, 0)) AS hab_urgencias,
@@ -977,7 +976,7 @@ def indicadores():
                     FROM camas_no_censables GROUP BY anio, mes, clues
                 ) cnc ON e.clues = cnc.clues AND e.anio = cnc.anio AND e.mes = cnc.mes
 
-                -- JOIN EQUIPO MÉDICO (AGRUPADO POR CLUES)
+                -- JOIN EQUIPO MÉDICO (AGRUPADO)
                 LEFT JOIN (
                     SELECT anio, mes, clues,
                         SUM(IFNULL(arco_c_analogo, 0)) AS arco_c_analogo,
@@ -1042,8 +1041,13 @@ def indicadores():
                 GROUP BY {group_by}
                 """
 
-        cur.execute(query_e, params_e)
-        rows_e = cur.fetchall()
+        try:
+            cur.execute(query_e, params_e)
+            rows_e = cur.fetchall()
+        except Exception as err:
+            import traceback
+            traceback.print_exc()
+            return jsonify({"error": str(err), "detalles": "Fallo al ejecutar la consulta en MySQL"}), 500
 
         #PARTE 4
        
