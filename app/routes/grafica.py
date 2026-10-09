@@ -51,7 +51,7 @@ def grafica_home():
 
 
 # ==========================================================
-# FUNCIÓN TOTAL GENERAL
+# FUNCIÓN TOTAL GENERAL (CON LOS 3 CASOS VALIDADOS)
 # ==========================================================
 def generar_total_general(
     data_acumulada,
@@ -63,7 +63,6 @@ def generar_total_general(
     es_descarga_masiva,
     indicadores_solicitados
 ):
-
     RECURSOS_FISICOS = [
         "camas_total", "quirofanos", "camas_med_int", "camas_cirugia",
         "camas_gineco", "camas_pediatria", "camas_otros", "hab_urgencias",
@@ -75,66 +74,64 @@ def generar_total_general(
     if not data_acumulada:
         return []
 
-    # ✅ CORREGIDO: 'for ind in indicadores_solicitados' (Resuelve el error de Pylance)
     indicadores_solic_set = (
         {ind.lower() for ind in indicadores_solicitados}
         if isinstance(indicadores_solicitados, (list, set, tuple)) and indicadores_solicitados
         else set()
     )
 
-    # Identificar unidades
+    recursos_set = {r.lower() for r in RECURSOS_FISICOS}
+    sum_fields_set = {s.lower() for s in SUM_FIELDS}
+
+    # Unidades reales en data (excluyendo totales previos)
     unidades = {
-        r["nombre_unidad"]
+        r.get("nombre_unidad")
         for r in data_acumulada
-        if r["nombre_unidad"] != "TOTAL GENERAL"
+        if r.get("clues") != "TOTAL" and r.get("nombre_unidad") != "TOTAL GENERAL"
     }
 
-    es_anual = any(r["mes"] == 13 for r in data_acumulada)
+    es_anual = any(r.get("mes") == 13 for r in data_acumulada)
 
+    # Si solo hay 1 unidad y es vista anual, no genera fila extra
     if len(unidades) == 1 and es_anual:
         return []
 
     resultados = []
 
     # ==========================================
-    # FUNCION CONSTRUIR BASE (Regla de Recursos Físicos)
+    # AUXILIAR: CONSTRUIR BASE (SUMA SOLO ABSOLUTOS)
     # ==========================================
     def construir_base(registros):
         base = {}
-        recursos_set = {r.lower() for r in RECURSOS_FISICOS}
-        sum_fields_set = {s.lower() for s in SUM_FIELDS}
 
-        # 1. RECURSOS FÍSICOS: Max por Unidad en el rango, luego Suma de Unidades
+        # 1. Recursos Físicos
         recursos_map = defaultdict(lambda: defaultdict(float))
-
         for x in registros:
             indicador = x["indicador"].lower()
-            unidad = x["nombre_unidad"]
-
-            if indicador in recursos_set and unidad != "TOTAL GENERAL":
-                val = float(x["valor"])
-                # Mantiene el máximo de la unidad entre meses
+            unidad = x.get("nombre_unidad", "UNIDAD")
+            if indicador in recursos_set:
+                val = float(x.get("valor") or 0)
                 if val > recursos_map[indicador][unidad]:
                     recursos_map[indicador][unidad] = val
 
         for campo in RECURSOS_FISICOS:
-            campo_lower = campo.lower()
-            base[campo] = sum(recursos_map[campo_lower].values())
+            base[campo] = sum(recursos_map[campo.lower()].values())
 
-        # 2. CAMPOS ACUMULABLES (Suma directa)
+        # 2. Campos Sumables
         for campo in SUM_FIELDS:
+            campo_lower = campo.lower()
             base[campo] = sum(
-                float(x["valor"])
+                float(x.get("valor") or 0)
                 for x in registros
-                if x["indicador"].lower() == campo.lower()
+                if x["indicador"].lower() == campo_lower
             )
 
-        # 3. OTROS CAMPOS EN MAX_FIELDS
+        # 3. Campos Máximos / Varios
         for campo in MAX_FIELDS:
             campo_lower = campo.lower()
             if campo_lower not in recursos_set and campo_lower not in sum_fields_set:
                 base[campo] = sum(
-                    float(x["valor"])
+                    float(x.get("valor") or 0)
                     for x in registros
                     if x["indicador"].lower() == campo_lower
                 )
@@ -142,7 +139,7 @@ def generar_total_general(
         return base
 
     # ==========================================
-    # CASO 1: UNA UNIDAD - MENSUAL
+    # CASO 1: UNA SOLA UNIDAD - MENSUAL (CONSOLIDAR RANGO)
     # ==========================================
     if len(unidades) == 1 and not es_anual:
         anios_presentes = {r["anio"] for r in data_acumulada}
@@ -150,48 +147,31 @@ def generar_total_general(
         for anio in anios_presentes:
             registros_anio = [
                 r for r in data_acumulada
-                if r["anio"] == anio
-                and r["nombre_unidad"] != "TOTAL GENERAL"
-                and r["mes"] != 13
+                if r["anio"] == anio and r.get("clues") != "TOTAL" and r.get("mes") != 13
             ]
 
             if not registros_anio:
                 continue
 
             base = construir_base(registros_anio)
-            meses_en_registro = {r["mes"] for r in registros_anio}
+            meses_en_registro = {int(r["mes"]) for r in registros_anio}
 
-            dias = sum(
-                calendar.monthrange(anio, m)[1]
-                for m in meses_en_registro
-            )
-
+            dias = sum(calendar.monthrange(anio, m)[1] for m in meses_en_registro)
             kpis = calcular_kpis(base, dias)
             dataset = {**base, **kpis}
 
-            nombre_meses = {
-                1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr",
-                5: "May", 6: "Jun", 7: "Jul", 8: "Ago",
-                9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic"
-            }
-
-            min_m = min(meses_en_registro)
-            max_m = max(meses_en_registro)
-
-            texto_mes = (
-                f"{nombre_meses[min_m]} - {nombre_meses[max_m]}"
-                if min_m != max_m
-                else nombre_meses[min_m]
-            )
+            # Nota: Usamos el mes representativo (numérico) para no romper el ordenamiento de Chart.js
+            mes_rep = max(meses_en_registro) if meses_en_registro else 12
 
             for indicador, valor in dataset.items():
                 ind_lower = indicador.lower()
                 if es_descarga_masiva or ind_lower in indicadores_solic_set:
                     resultados.append({
                         "anio": anio,
-                        "mes": texto_mes,
+                        "mes": mes_rep,
                         "clues": "TOTAL",
                         "nombre_unidad": "TOTAL GENERAL",
+                        "tipologia": "TODAS",
                         "indicador": ind_lower,
                         "valor": round(float(valor), 2)
                     })
@@ -199,7 +179,7 @@ def generar_total_general(
         return resultados
 
     # ==========================================
-    # CASO 2: VARIAS UNIDADES - ANUAL
+    # CASO 2: VARIAS UNIDADES - ANUAL (MES 13)
     # ==========================================
     if len(unidades) > 1 and es_anual:
         anios_presentes = {r["anio"] for r in data_acumulada}
@@ -207,16 +187,18 @@ def generar_total_general(
         for anio in anios_presentes:
             registros_anio = [
                 r for r in data_acumulada
-                if r["anio"] == anio
-                and r["nombre_unidad"] != "TOTAL GENERAL"
+                if r["anio"] == anio and r.get("clues") != "TOTAL"
             ]
+
+            if not registros_anio:
+                registros_anio = [r for r in data_acumulada if r["anio"] == anio]
 
             base = construir_base(registros_anio)
 
-            dias = sum(
-                calendar.monthrange(anio, m)[1]
-                for m in meses_validos
-            )
+            if meses_validos:
+                dias = sum(calendar.monthrange(anio, m)[1] for m in meses_validos)
+            else:
+                dias = 365
 
             kpis = calcular_kpis(base, dias)
             dataset = {**base, **kpis}
@@ -228,7 +210,8 @@ def generar_total_general(
                         "anio": anio,
                         "mes": 13,
                         "clues": "TOTAL",
-                        "nombre_unidad": "TOTAL GENERAL",
+                        "nombre_unidad": "TOTAL GRUPO",
+                        "tipologia": "TODAS",
                         "indicador": ind_lower,
                         "valor": round(float(valor), 2)
                     })
@@ -236,13 +219,19 @@ def generar_total_general(
         return resultados
 
     # ==========================================
-    # CASO 3: VARIAS UNIDADES - MENSUAL
+    # CASO 3: VARIAS UNIDADES - MENSUAL (DESGLOSE MES A MES)
     # ==========================================
     grupos = defaultdict(list)
 
     for r in data_acumulada:
-        if r["nombre_unidad"] != "TOTAL GENERAL":
-            grupos[(r["anio"], r["mes"])].append(r)
+        if r.get("clues") != "TOTAL":
+            grupos[(r["anio"], int(r["mes"]))].append(r)
+
+    # Fallback por si data_acumulada venía prefijada con TOTAL
+    if not grupos:
+        for r in data_acumulada:
+            if r.get("mes") != 13:
+                grupos[(r["anio"], int(r["mes"]))].append(r)
 
     for (anio, mes), registros in grupos.items():
         if mes == 13:
@@ -261,7 +250,8 @@ def generar_total_general(
                     "anio": anio,
                     "mes": mes,
                     "clues": "TOTAL",
-                    "nombre_unidad": "TOTAL GENERAL",
+                    "nombre_unidad": "TOTAL GRUPO",
+                    "tipologia": "TODAS",
                     "indicador": ind_lower,
                     "valor": round(float(valor), 2)
                 })
