@@ -645,13 +645,11 @@ def indicadores():
     else:
         # Modo 'acumulado': Se omiten e.clues y e.nombre_unidad del GROUP BY 
         # para que la base de datos sume todo el grupo en un solo registro
-        select_unidad = "'TOTAL GRUPO' AS clues, 'GRUPO ACUMULADO' AS nombre_unidad, c.tipologia,"
+        select_unidad = "'TOTAL' AS clues, 'TOTAL GRUPO' AS nombre_unidad, 'TODAS' AS tipologia,"
 
     if not quiere_anual:
         group_by_cols.append("e.mes")
-
-    # si NO es anual, agregamos mes
-   
+  
 
     group_by = ",\n".join(group_by_cols)
 
