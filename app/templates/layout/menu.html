@@ -1370,6 +1370,56 @@
 
 
 <script>
+
+    // 1. SE QUEDA IGUAL (Para marcar/desmarcar todos los checkboxes)
+    function toggleTodasUnidades(masterCheckbox) {
+        const checked = masterCheckbox.checked;
+        document.querySelectorAll('.filtro-unidad').forEach(cb => cb.checked = checked);
+        document.querySelectorAll('.check-grupo-unidad').forEach(cb => cb.checked = checked);
+    }
+
+    // 2. SE QUEDA IGUAL (Para marcar/desmarcar checkboxes por categoría HG, HC, HE)
+    function toggleGrupoUnidades(tipo, checked) {
+        document.querySelectorAll(`.filtro-unidad[data-tipo="${tipo}"]`).forEach(cb => {
+            cb.checked = checked;
+        });
+    }
+
+    // 3. REEMPLAZADA (Ajustada a la estructura type/value que usa tu grafica_by.html)
+    function dragUnidadIndividual(event, id, nombre) {
+        const payload = {
+            type: 'unidad',
+            value: String(id),
+            nombre: nombre
+        };
+        event.dataTransfer.setData('application/json', JSON.stringify(payload));
+    }
+
+    // 4. REEMPLAZADA (Ajustada a la estructura type/value para enviar el abanico/grupo)
+    function dragGrupoUnidades(event, tipoGrupo) {
+        let selector = '.filtro-unidad';
+        if (tipoGrupo !== 'TODAS') {
+            selector += `[data-tipo="${tipoGrupo}"]`;
+        }
+
+        const unidades = [];
+        document.querySelectorAll(selector).forEach(cb => {
+            unidades.push({
+                value: String(cb.value),
+                nombre: cb.nextElementSibling ? cb.nextElementSibling.innerText.trim() : cb.value
+            });
+        });
+
+        const payload = {
+            type: 'grupo_unidades',
+            grupo: tipoGrupo,
+            items: unidades
+        };
+
+        event.dataTransfer.setData('application/json', JSON.stringify(payload));
+    }
+
+
     const tipo = "{{ tipo }}"; // morbi | morta | urg | urgencias | sis | egresos | ind | indicadores
     const sufijo = tipo ? (tipo.charAt(0).toUpperCase() + tipo.slice(1)) : "";
 
@@ -2182,53 +2232,7 @@
             }
         });
 
-        // 1. SE QUEDA IGUAL (Para marcar/desmarcar todos los checkboxes)
-        function toggleTodasUnidades(masterCheckbox) {
-            const checked = masterCheckbox.checked;
-            document.querySelectorAll('.filtro-unidad').forEach(cb => cb.checked = checked);
-            document.querySelectorAll('.check-grupo-unidad').forEach(cb => cb.checked = checked);
-        }
 
-        // 2. SE QUEDA IGUAL (Para marcar/desmarcar checkboxes por categoría HG, HC, HE)
-        function toggleGrupoUnidades(tipo, checked) {
-            document.querySelectorAll(`.filtro-unidad[data-tipo="${tipo}"]`).forEach(cb => {
-                cb.checked = checked;
-            });
-        }
-
-        // 3. REEMPLAZADA (Ajustada a la estructura type/value que usa tu grafica_by.html)
-        function dragUnidadIndividual(event, id, nombre) {
-            const payload = {
-                type: 'unidad',
-                value: String(id),
-                nombre: nombre
-            };
-            event.dataTransfer.setData('application/json', JSON.stringify(payload));
-        }
-
-        // 4. REEMPLAZADA (Ajustada a la estructura type/value para enviar el abanico/grupo)
-        function dragGrupoUnidades(event, tipoGrupo) {
-            let selector = '.filtro-unidad';
-            if (tipoGrupo !== 'TODAS') {
-                selector += `[data-tipo="${tipoGrupo}"]`;
-            }
-
-            const unidades = [];
-            document.querySelectorAll(selector).forEach(cb => {
-                unidades.push({
-                    value: String(cb.value),
-                    nombre: cb.nextElementSibling ? cb.nextElementSibling.innerText.trim() : cb.value
-                });
-            });
-
-            const payload = {
-                type: 'grupo_unidades',
-                grupo: tipoGrupo,
-                items: unidades
-            };
-
-            event.dataTransfer.setData('application/json', JSON.stringify(payload));
-        }
 
     });
 </script>
