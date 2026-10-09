@@ -794,169 +794,181 @@
     }
   }
 
-  function cargarGrafica() {
 
-    // 1. Si el usuario seleccionó unidades específicas, desactivamos "Mostrar Todas"
-    if (unidadesSeleccionadas.size > 0) {
-      mostrarTodasUnidades = false;
 
-      const swUnidades = document.getElementById("switchUnidades");
-      if (swUnidades) swUnidades.checked = false;
+ function cargarGrafica() {
 
-      const contenedorTipologia = document.getElementById("contenedorTipologia");
-      if (contenedorTipologia) contenedorTipologia.style.display = "none";
+  // 1. Si el usuario seleccionó unidades específicas, desactivamos "Mostrar Todas"
+  if (unidadesSeleccionadas.size > 0) {
+    mostrarTodasUnidades = false;
 
-      const contenedorAcumular = document.getElementById("contenedorAcumularTipologia");
-      if (contenedorAcumular) contenedorAcumular.style.display = "none";
-    }
+    const swUnidades = document.getElementById("switchUnidades");
+    if (swUnidades) swUnidades.checked = false;
 
-    // 🔑 2. DECLARACIÓN PRIMERO: Definimos la variable antes de usarla
-    const puedeMostrarTodas = mostrarTodasUnidades && unidadesSeleccionadas.size === 0;
+    const contenedorTipologia = document.getElementById("contenedorTipologia");
+    if (contenedorTipologia) contenedorTipologia.style.display = "none";
 
-    // 3. VALIDACIONES INICIALES
-    if (!puedeMostrarTodas && unidadesSeleccionadas.size === 0) {
-      destruirTodasLasGraficas();
-      return;
-    }
+    const contenedorAcumular = document.getElementById("contenedorAcumularTipologia");
+    if (contenedorAcumular) contenedorAcumular.style.display = "none";
+  }
 
-    if (indicadoresSeleccionados.size === 0) {
-      destruirTodasLasGraficas();
-      return;
-    }
+  // Detectar si hay un grupo activo (ej. TODAS)
+  const tieneBadgeGrupo = document.querySelector(".badge-grupo-unidad, [data-tipo='grupo_unidad'], [data-tipo='grupo_unidades']") !== null;
+  const hayGrupo = tieneBadgeGrupo || Boolean(window.grupoSeleccionadoActual);
 
-    const aniosChecked = Array.from(
-      document.querySelectorAll(".anio-check:checked")
-    ).map((el) => el.value);
+  // 🔑 2. VALIDACIONES INICIALES
+  const puedeMostrarTodas = mostrarTodasUnidades && unidadesSeleccionadas.size === 0;
 
-    if (aniosChecked.length === 0) {
-      destruirTodasLasGraficas();
-      return;
-    }
+  if (!puedeMostrarTodas && unidadesSeleccionadas.size === 0 && !hayGrupo) {
+    destruirTodasLasGraficas();
+    return;
+  }
 
-    const modoVista = document.getElementById("modoVista").value;
-    const esAnual = modoVista === "anual";
+  if (indicadoresSeleccionados.size === 0) {
+    destruirTodasLasGraficas();
+    return;
+  }
 
-    const params = new URLSearchParams();
+  const aniosChecked = Array.from(
+    document.querySelectorAll(".anio-check:checked")
+  ).map((el) => el.value);
 
-    // =========================
-    // MODO DE AGRUPACIÓN (ACUMULADO VS INDIVIDUAL)
-    // =========================
-    // Verificamos si existe al menos un badge de grupo en la zona de drop
-    const tieneBadgeGrupo = document.querySelector(".badge-grupo-unidad, [data-tipo='grupo_unidad']") !== null;
-    const modoAgrupacion = tieneBadgeGrupo ? "acumulado" : "individual";
-    params.append("modo", modoAgrupacion);
+  if (aniosChecked.length === 0) {
+    destruirTodasLasGraficas();
+    return;
+  }
 
-    // =========================
-    // UNIDADES
-    // =========================
+  const modoVista = document.getElementById("modoVista")?.value;
+  const esAnual = modoVista === "anual";
+
+  const params = new URLSearchParams();
+
+  // =========================
+  // MODO DE AGRUPACIÓN (ACUMULADO VS INDIVIDUAL)
+  // =========================
+  const modoAgrupacion = hayGrupo ? "acumulado" : "individual";
+  params.append("modo", modoAgrupacion);
+
+  // =========================
+  // UNIDADES (EXTRACCIÓN ROBUSTA DE CLUES)
+  // =========================
+  if (hayGrupo && window.grupoSeleccionadoActual && Array.isArray(window.grupoSeleccionadoActual.items)) {
+    // Si viene del grupo (ej. TODAS las 42 unidades)
+    window.grupoSeleccionadoActual.items.forEach((item) => {
+      const val = typeof item === "object" ? item.value : item;
+      if (val) params.append("clues[]", val);
+    });
+  } else {
+    // Si son unidades seleccionadas manualmente
     unidadesSeleccionadas.forEach((u) => {
-      params.append("clues[]", u);
+      const val = typeof u === "object" ? u.value : u;
+      if (val) params.append("clues[]", val);
     });
+  }
 
-    // =========================
-    // TIPOLOGIA
-    // =========================
-    if (mostrarTodasUnidades) {
-      const tipologia =
-        document.querySelector("input[name='tipologia']:checked")?.value || "TODAS";
-      params.append("tipologia", tipologia);
-    }
+  // =========================
+  // TIPOLOGIA
+  // =========================
+  if (mostrarTodasUnidades) {
+    const tipologia =
+      document.querySelector("input[name='tipologia']:checked")?.value || "TODAS";
+    params.append("tipologia", tipologia);
+  }
 
-    // =========================
-    // INDICADORES
-    // =========================
-    indicadoresSeleccionados.forEach((i) => {
-      params.append("indicadores[]", i);
-    });
+  // =========================
+  // INDICADORES
+  // =========================
+  indicadoresSeleccionados.forEach((i) => {
+    params.append("indicadores[]", i);
+  });
 
-    // =========================
-    // AÑOS
-    // =========================
-    aniosChecked.forEach((a) => {
-      params.append("anios[]", a);
-    });
+  // =========================
+  // AÑOS
+  // =========================
+  aniosChecked.forEach((a) => {
+    params.append("anios[]", a);
+  });
 
-    // =========================
-    // MESES
-    // =========================
-    let mesesSeleccionados = obtenerMesesSeleccionados();
+  // =========================
+  // MESES
+  // =========================
+  let mesesSeleccionados = obtenerMesesSeleccionados();
 
-    // Validar si no hay meses seleccionados en vista mensual
-    if (!esAnual && mesesSeleccionados.length === 0) {
-      destruirTodasLasGraficas();
-
-      // Limpiamos el contenedor
-      const contenedor = document.getElementById("contenedorGraficas");
-      if (contenedor) {
-        contenedor.innerHTML = `
+  if (!esAnual && mesesSeleccionados.length === 0) {
+    destruirTodasLasGraficas();
+    const contenedor = document.getElementById("contenedorGraficas");
+    if (contenedor) {
+      contenedor.innerHTML = `
         <div class="grafica-container w-100" style="height: 380px; position: relative; width: 100%;">
           <canvas id="grafica" style="width: 100%; height: 100%;"></canvas>
         </div>
         <div id="leyendaPersonalizada" class="mt-3 w-100"></div>
       `;
-      }
-      return;
     }
-
-    mesesSeleccionados.forEach((m) => {
-      params.append("meses[]", m);
-    });
-
-    // DETONADOR ANUAL
-    if (esAnual) {
-      params.append("meses[]", "13");
-    }
-
-    // =========================
-    // FETCH
-    // =========================
-    fetch("/grafica/api/indicadores?" + params.toString())
-      .then(async (r) => {
-        if (r.redirected) {
-          window.location.href = r.url;
-          return null;
-        }
-        if (r.status === 401) {
-          window.location.href = "/login";
-          return null;
-        }
-
-        // 🚨 CAPTURA EXPLÍCITA DE ERRORES (HTTP 500, 400, etc.)
-        if (!r.ok) {
-          const errorTexto = await r.text();
-          console.error(`❌ ERROR ${r.status} DESDE EL SERVIDOR:`, errorTexto);
-          destruirTodasLasGraficas();
-          return null;
-        }
-
-        return r.json();
-      })
-      .then((data) => {
-        console.log("📊 RESPUESTA DE LA API INDICADORES:", data);
-        if (!data || data.length === 0) {
-          console.warn("⚠️ La API devolvió un arreglo vacío []");
-          destruirTodasLasGraficas();
-          return;
-        }
-
-        window.ultimoDataRecibido = data;
-
-        // Renderizar la gráfica normalmente
-        renderGrafica(data);
-
-        // ✅ SOLO validar si NO es un grupo acumulado
-        if (window.ultimoIndicadorArrastrado && modoAgrupacion !== "acumulado") {
-          validarDatosIndicadorIndividual(
-            data,
-            window.ultimoIndicadorArrastrado
-          );
-          restaurarEstadosBadges();
-        }
-      })
-      .catch((err) => {
-        console.error("Error al cargar gráfica:", err);
-      });
+    return;
   }
+
+  mesesSeleccionados.forEach((m) => {
+    params.append("meses[]", m);
+  });
+
+  if (esAnual) {
+    params.append("meses[]", "13");
+  }
+
+  // Imprimir URL completa enviada a la API para depuración
+  console.log("🔗 URL SOLICITADA A LA API:", "/grafica/api/indicadores?" + params.toString());
+
+  // =========================
+  // FETCH
+  // =========================
+  fetch("/grafica/api/indicadores?" + params.toString())
+    .then(async (r) => {
+      if (r.redirected) {
+        window.location.href = r.url;
+        return null;
+      }
+      if (r.status === 401) {
+        window.location.href = "/login";
+        return null;
+      }
+
+      if (!r.ok) {
+        const errorTexto = await r.text();
+        console.error(`❌ ERROR ${r.status} DESDE EL SERVIDOR:`, errorTexto);
+        destruirTodasLasGraficas();
+        return null;
+      }
+
+      return r.json();
+    })
+    .then((data) => {
+      console.log("📊 RESPUESTA DE LA API INDICADORES:", data);
+      if (!data || data.length === 0) {
+        console.warn("⚠️ La API devolvió un arreglo vacío []");
+        destruirTodasLasGraficas();
+        return;
+      }
+
+      window.ultimoDataRecibido = data;
+
+      // Renderizar la gráfica normalmente
+      renderGrafica(data);
+
+      // SOLO validar si NO es un grupo acumulado
+      if (window.ultimoIndicadorArrastrado && modoAgrupacion !== "acumulado") {
+        validarDatosIndicadorIndividual(
+          data,
+          window.ultimoIndicadorArrastrado
+        );
+        restaurarEstadosBadges();
+      }
+    })
+    .catch((err) => {
+      console.error("Error al cargar gráfica:", err);
+    });
+}
+
 
 
   function validarDatosIndicadorIndividual(data, indicadorId) {
