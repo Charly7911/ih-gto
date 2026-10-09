@@ -1375,14 +1375,16 @@
     // FUNCIONES GLOBALES PARA SELECCIÓN Y ARRASTRE DE UNIDADES
     // (Deben ir FUERA de DOMContentLoaded)
     // ======================================================
+
     window.toggleTodasUnidades = function (masterCheckbox) {
         const checked = masterCheckbox.checked;
-        document.querySelectorAll('.filtro-unidad').forEach(cb => cb.checked = checked);
+        document.querySelectorAll('.filtro-unidad, .unidad-container input[type="checkbox"]').forEach(cb => cb.checked = checked);
         document.querySelectorAll('.check-grupo-unidad').forEach(cb => cb.checked = checked);
     };
 
     window.toggleGrupoUnidades = function (tipo, checked) {
-        document.querySelectorAll(`.filtro-unidad[data-tipo="${tipo}"]`).forEach(cb => {
+        const selector = `.filtro-unidad[data-tipo="${tipo}"], .unidad-container[data-tipo="${tipo}"] input[type="checkbox"]`;
+        document.querySelectorAll(selector).forEach(cb => {
             cb.checked = checked;
         });
     };
@@ -1399,23 +1401,49 @@
     };
 
     window.dragGrupoUnidades = function (event, tipoGrupo) {
-        let selector = '.filtro-unidad';
-        if (tipoGrupo !== 'TODAS') {
-            selector += `[data-tipo="${tipoGrupo}"]`;
+        const unidades = [];
+        let elementos = [];
+
+        if (tipoGrupo === 'TODAS') {
+            // Busca todos los checkboxes de las 3 listas o que tengan la clase filtro-unidad
+            elementos = document.querySelectorAll('.filtro-unidad, .unidad-container input[type="checkbox"]');
+        } else {
+            // Busca dentro del contenedor específico (HG, HC, HE) por el atributo data-tipo
+            const contenedor = document.querySelector(`.unidad-container[data-tipo="${tipoGrupo}"]`);
+            if (contenedor) {
+                elementos = contenedor.querySelectorAll('input[type="checkbox"]');
+            } else {
+                elementos = document.querySelectorAll(`.filtro-unidad[data-tipo="${tipoGrupo}"]`);
+            }
         }
 
-        const unidades = [];
-        document.querySelectorAll(selector).forEach(cb => {
-            // Obtenemos el texto del span hermano o del label padre si es necesario
-            const spanText = cb.nextElementSibling ? cb.nextElementSibling.innerText.trim() : '';
-            const parentText = cb.parentElement ? cb.parentElement.innerText.trim() : '';
-            const nombreText = spanText || parentText || cb.value;
+        elementos.forEach(cb => {
+            const val = cb.value;
+            if (!val || val === "on") return;
 
-            unidades.push({
-                value: String(cb.value),
-                nombre: nombreText
-            });
+            // Extrae el texto del span hermano o del label
+            const parentLabel = cb.closest('label') || cb.parentElement;
+            const spanEl = parentLabel ? parentLabel.querySelector('span') : null;
+            let nombreText = '';
+
+            if (spanEl) {
+                nombreText = spanEl.innerText.trim();
+            } else if (parentLabel) {
+                nombreText = parentLabel.innerText.trim();
+            } else {
+                nombreText = String(val);
+            }
+
+            // Evitamos meter duplicados si coinciden selectores
+            if (!unidades.some(u => u.value === String(val))) {
+                unidades.push({
+                    value: String(val),
+                    nombre: nombreText
+                });
+            }
         });
+
+        console.log(`📦 Unidades encontradas para [${tipoGrupo}]:`, unidades.length, unidades);
 
         const payload = {
             type: 'grupo_unidades',
@@ -1424,7 +1452,6 @@
         };
 
         const payloadString = JSON.stringify(payload);
-        // Guardamos en ambas claves para máxima compatibilidad entre navegadores
         event.dataTransfer.setData('application/json', payloadString);
         event.dataTransfer.setData('text', payloadString);
     };
