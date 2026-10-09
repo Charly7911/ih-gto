@@ -600,7 +600,7 @@ def indicadores():
 
     # Si seleccionan los 12 meses, si viene el mes 13, o si no seleccionan ninguno, es vista ANUAL/ACUMULADA
     meses_validos = [m for m in meses if m != 13]
-    quiere_anual = (13 in meses) or (len(meses_validos) == 12) or (len(meses) == 0)
+    quiere_anual = (13 in meses) or (len(meses) == 0)
     es_anual = quiere_anual
 
     if not meses_validos:
