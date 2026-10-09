@@ -643,12 +643,13 @@ def indicadores():
         group_by_cols.extend(["e.clues", "e.nombre_unidad", "c.tipologia"])
         select_unidad = "e.clues, e.nombre_unidad, c.tipologia,"
     else:
-        # Modo 'acumulado': Omitimos e.clues del GROUP BY.
-        # Usamos literales fijos con alias claros para evitar violaciones de ONLY_FULL_GROUP_BY
+        # Modo 'acumulado': Se omiten e.clues y e.nombre_unidad del GROUP BY 
+        # para que la base de datos sume todo el grupo en un solo registro
         select_unidad = "'TOTAL' AS clues, 'TOTAL GRUPO' AS nombre_unidad, 'TODAS' AS tipologia,"
 
     if not quiere_anual:
         group_by_cols.append("e.mes")
+  
 
     group_by = ",\n".join(group_by_cols)
 
@@ -734,7 +735,7 @@ def indicadores():
                     SUM(IFNULL(ab.abortos_no_especificado, 0)) AS abortos_no_especificado,
                     SUM(IFNULL(ab.abortos_total, 0)) AS abortos_total,
 
-                    -- SIS (SERVICIOS DE SALUD)
+                   -- SIS (SERVICIOS DE SALUD)
                     SUM(IFNULL(sis.dias_p, 0)) AS dias_p,
                     SUM(IFNULL(sis.consultas, 0)) AS consultas,
                     SUM(IFNULL(sis.especialidad, 0)) AS especialidad,
@@ -753,6 +754,7 @@ def indicadores():
                     SUM(IFNULL(sis.gineco, 0)) AS dias_p_gineco,
                     SUM(IFNULL(sis.pediatria, 0)) AS dias_p_pediatria,
                     SUM(IFNULL(sis.otros, 0)) AS dias_p_otros,
+                   
 
                     -- URGENCIAS
                     SUM(IFNULL(urg.total_u, 0)) AS urgencias,
@@ -801,7 +803,9 @@ def indicadores():
                     {agg_camas}(IFNULL(sin.camas_pediatria, 0)) AS camas_pediatria,
                     {agg_camas}(IFNULL(sin.camas_otros, 0)) AS camas_otros,
 
+                   
                     -- DÍAS CAMA
+
                     SUM(IFNULL(sin.camas_total,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_total,
                     SUM(IFNULL(sin.camas_med_int,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_med,
                     SUM(IFNULL(sin.camas_cirugia,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_cir,
@@ -879,6 +883,7 @@ def indicadores():
                     {agg_camas}(IFNULL(em.tomografo_32, 0)) AS tomografo_32,
                     {agg_camas}(IFNULL(em.tomografo_64, 0)) AS tomografo_64
 
+
                 FROM egresos_agregado e
 
                 -- JOIN CATALOGO UNIDADES
@@ -894,7 +899,9 @@ def indicadores():
                     FROM abortos GROUP BY anio, mes, clues
                 ) ab ON e.clues = ab.clues AND e.anio = ab.anio AND e.mes = ab.mes
 
-                -- JOIN SIS (SERVICIOS DE SALUD)
+                
+
+                -- JOIN SIS (GRUPAL POR MES)
                 LEFT JOIN (
                     SELECT anio, mes, clues,
                         SUM(diasPaciente) AS dias_p, SUM(consultas) AS consultas,
@@ -968,7 +975,7 @@ def indicadores():
                 ) p ON e.clues = p.clues AND e.anio = p.anio AND e.mes = p.mes
 
                 -- JOIN SINERHIAS (ANUAL)
-                LEFT JOIN (
+               LEFT JOIN (
                     SELECT
                         anio,
                         mes,
@@ -985,6 +992,8 @@ def indicadores():
                 ON e.clues = sin.clues
                 AND e.anio = sin.anio
                 AND e.mes = sin.mes
+
+               
 
                 -- JOIN CAMAS NO CENSABLES
                 LEFT JOIN (
@@ -1035,15 +1044,9 @@ def indicadores():
                 GROUP BY {group_by}
 
                 """
-        
-        try:
-            cur.execute(query_e, params_e)
-            rows_e = cur.fetchall()
-        except Exception as err:
-            print("❌ ERROR EXPLICITO EN QUERY SQL:", str(err))
-            import traceback
-            traceback.print_exc()
-            return jsonify({"error": str(err), "query": query_e}), 500
+       
+        cur.execute(query_e, params_e)
+        rows_e = cur.fetchall()    
 
         #PARTE 4 
         # ==========================================================
