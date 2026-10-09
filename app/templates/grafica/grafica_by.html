@@ -932,7 +932,9 @@
         return r.json();
       })
       .then((data) => {
+        console.log("📊 RESPUESTA DE LA API INDICADORES:", data);
         if (!data || data.length === 0) {
+          console.warn("⚠️ La API devolvió un arreglo vacío []");
           destruirTodasLasGraficas();
           return;
         }
