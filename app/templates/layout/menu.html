@@ -1371,32 +1371,34 @@
 
 <script>
 
-  // ======================================================
+    // ======================================================
     // FUNCIONES GLOBALES PARA SELECCIÓN Y ARRASTRE DE UNIDADES
     // (Deben ir FUERA de DOMContentLoaded)
     // ======================================================
-    window.toggleTodasUnidades = function(masterCheckbox) {
+    window.toggleTodasUnidades = function (masterCheckbox) {
         const checked = masterCheckbox.checked;
         document.querySelectorAll('.filtro-unidad').forEach(cb => cb.checked = checked);
         document.querySelectorAll('.check-grupo-unidad').forEach(cb => cb.checked = checked);
     };
 
-    window.toggleGrupoUnidades = function(tipo, checked) {
+    window.toggleGrupoUnidades = function (tipo, checked) {
         document.querySelectorAll(`.filtro-unidad[data-tipo="${tipo}"]`).forEach(cb => {
             cb.checked = checked;
         });
     };
 
-    window.dragUnidadIndividual = function(event, id, nombre) {
+    window.dragUnidadIndividual = function (event, id, nombre) {
         const payload = {
             type: 'unidad',
             value: String(id),
             nombre: nombre
         };
-        event.dataTransfer.setData('application/json', JSON.stringify(payload));
+        const payloadString = JSON.stringify(payload);
+        event.dataTransfer.setData('application/json', payloadString);
+        event.dataTransfer.setData('text', payloadString);
     };
 
-    window.dragGrupoUnidades = function(event, tipoGrupo) {
+    window.dragGrupoUnidades = function (event, tipoGrupo) {
         let selector = '.filtro-unidad';
         if (tipoGrupo !== 'TODAS') {
             selector += `[data-tipo="${tipoGrupo}"]`;
@@ -1404,9 +1406,14 @@
 
         const unidades = [];
         document.querySelectorAll(selector).forEach(cb => {
+            // Obtenemos el texto del span hermano o del label padre si es necesario
+            const spanText = cb.nextElementSibling ? cb.nextElementSibling.innerText.trim() : '';
+            const parentText = cb.parentElement ? cb.parentElement.innerText.trim() : '';
+            const nombreText = spanText || parentText || cb.value;
+
             unidades.push({
                 value: String(cb.value),
-                nombre: cb.nextElementSibling ? cb.nextElementSibling.innerText.trim() : cb.value
+                nombre: nombreText
             });
         });
 
@@ -1416,7 +1423,10 @@
             items: unidades
         };
 
-        event.dataTransfer.setData('application/json', JSON.stringify(payload));
+        const payloadString = JSON.stringify(payload);
+        // Guardamos en ambas claves para máxima compatibilidad entre navegadores
+        event.dataTransfer.setData('application/json', payloadString);
+        event.dataTransfer.setData('text', payloadString);
     };
 
 
