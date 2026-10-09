@@ -637,23 +637,23 @@ def indicadores():
 
     group_by_cols = ["e.anio"]
 
-    # Evaluamos si la consulta requiere separar o acumular
     if modo_agrupacion == "individual" or len(unidades) == 1:
-        # Se agregan los campos de la unidad para permitir desglosar y comparar
+        # Modo individual: se desglosa por unidad
         group_by_cols.extend(["e.clues", "e.nombre_unidad", "c.tipologia"])
         select_unidad = "e.clues, e.nombre_unidad, c.tipologia,"
     else:
-        # Modo 'acumulado': Se omiten e.clues y e.nombre_unidad del GROUP BY 
-        # para que la base de datos sume todo el grupo en un solo registro
+        # Modo acumulado: literales fijos para consolidar en 1 sola fila
         select_unidad = "'TOTAL' AS clues, 'TOTAL GRUPO' AS nombre_unidad, 'TODAS' AS tipologia,"
 
     if not quiere_anual:
         group_by_cols.append("e.mes")
-  
 
     group_by = ",\n".join(group_by_cols)
 
     select_mes = "e.mes," if not quiere_anual else "13 AS mes,"
+
+    # Expresión segura para el cálculo de días del mes en MySQL
+    expr_dias_mes = "DAY(LAST_DAY(CONCAT(e.anio, '-', LPAD(e.mes, 2, '0'), '-01')))"
 
     # ==========================================================
     # KPIS
@@ -735,7 +735,7 @@ def indicadores():
                     SUM(IFNULL(ab.abortos_no_especificado, 0)) AS abortos_no_especificado,
                     SUM(IFNULL(ab.abortos_total, 0)) AS abortos_total,
 
-                   -- SIS (SERVICIOS DE SALUD)
+                    -- SIS (SERVICIOS DE SALUD)
                     SUM(IFNULL(sis.dias_p, 0)) AS dias_p,
                     SUM(IFNULL(sis.consultas, 0)) AS consultas,
                     SUM(IFNULL(sis.especialidad, 0)) AS especialidad,
@@ -754,7 +754,6 @@ def indicadores():
                     SUM(IFNULL(sis.gineco, 0)) AS dias_p_gineco,
                     SUM(IFNULL(sis.pediatria, 0)) AS dias_p_pediatria,
                     SUM(IFNULL(sis.otros, 0)) AS dias_p_otros,
-                   
 
                     -- URGENCIAS
                     SUM(IFNULL(urg.total_u, 0)) AS urgencias,
@@ -803,15 +802,13 @@ def indicadores():
                     {agg_camas}(IFNULL(sin.camas_pediatria, 0)) AS camas_pediatria,
                     {agg_camas}(IFNULL(sin.camas_otros, 0)) AS camas_otros,
 
-                   
-                    -- DÍAS CAMA
-
-                    SUM(IFNULL(sin.camas_total,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_total,
-                    SUM(IFNULL(sin.camas_med_int,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_med,
-                    SUM(IFNULL(sin.camas_cirugia,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_cir,
-                    SUM(IFNULL(sin.camas_gineco,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_gin,
-                    SUM(IFNULL(sin.camas_pediatria,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_ped,
-                    SUM(IFNULL(sin.camas_otros,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_otros,
+                    -- DÍAS CAMA (CALCULADOS DE FORMA SEGURA POR CADA FILA DE MES)
+                    SUM(IFNULL(sin.camas_total,0) * {expr_dias_mes}) AS dias_cama_total,
+                    SUM(IFNULL(sin.camas_med_int,0) * {expr_dias_mes}) AS dias_cama_med,
+                    SUM(IFNULL(sin.camas_cirugia,0) * {expr_dias_mes}) AS dias_cama_cir,
+                    SUM(IFNULL(sin.camas_gineco,0) * {expr_dias_mes}) AS dias_cama_gin,
+                    SUM(IFNULL(sin.camas_pediatria,0) * {expr_dias_mes}) AS dias_cama_ped,
+                    SUM(IFNULL(sin.camas_otros,0) * {expr_dias_mes}) AS dias_cama_otros,
 
                     -- CAMAS NO CENSABLES
                     {agg_camas}(IFNULL(cnc.hab_urgencias, 0)) AS hab_urgencias,
@@ -883,7 +880,6 @@ def indicadores():
                     {agg_camas}(IFNULL(em.tomografo_32, 0)) AS tomografo_32,
                     {agg_camas}(IFNULL(em.tomografo_64, 0)) AS tomografo_64
 
-
                 FROM egresos_agregado e
 
                 -- JOIN CATALOGO UNIDADES
@@ -899,9 +895,7 @@ def indicadores():
                     FROM abortos GROUP BY anio, mes, clues
                 ) ab ON e.clues = ab.clues AND e.anio = ab.anio AND e.mes = ab.mes
 
-                
-
-                -- JOIN SIS (GRUPAL POR MES)
+                -- JOIN SIS (SERVICIOS DE SALUD)
                 LEFT JOIN (
                     SELECT anio, mes, clues,
                         SUM(diasPaciente) AS dias_p, SUM(consultas) AS consultas,
@@ -975,7 +969,7 @@ def indicadores():
                 ) p ON e.clues = p.clues AND e.anio = p.anio AND e.mes = p.mes
 
                 -- JOIN SINERHIAS (ANUAL)
-               LEFT JOIN (
+                LEFT JOIN (
                     SELECT
                         anio,
                         mes,
@@ -992,8 +986,6 @@ def indicadores():
                 ON e.clues = sin.clues
                 AND e.anio = sin.anio
                 AND e.mes = sin.mes
-
-               
 
                 -- JOIN CAMAS NO CENSABLES
                 LEFT JOIN (
@@ -1044,9 +1036,14 @@ def indicadores():
                 GROUP BY {group_by}
 
                 """
-       
-        cur.execute(query_e, params_e)
-        rows_e = cur.fetchall()    
+        
+        try:
+            cur.execute(query_e, params_e)
+            rows_e = cur.fetchall()
+        except Exception as err:
+            import traceback
+            traceback.print_exc()
+            return jsonify({"error": str(err), "detalles": "Error en consulta MySQL"}), 500
 
         #PARTE 4 
         # ==========================================================
