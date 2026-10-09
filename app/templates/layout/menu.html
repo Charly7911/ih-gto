@@ -1370,7 +1370,6 @@
 
 
 <script>
-
     // ======================================================
     // FUNCIONES GLOBALES PARA SELECCIÓN Y ARRASTRE DE UNIDADES
     // (Deben ir FUERA de DOMContentLoaded)
@@ -1404,24 +1403,35 @@
         const unidades = [];
         let elementos = [];
 
+        // 1. Obtener el contenedor padre más cercano partiendo del botón arrastrado
+        const contenedorPadre = event.target.closest('.acordeon-indicadores, .filter-block-acordeon, #sidebar, .popover-unidades, body') || document;
+
         if (tipoGrupo === 'TODAS') {
-            // Busca todos los checkboxes de las 3 listas o que tengan la clase filtro-unidad
-            elementos = document.querySelectorAll('.filtro-unidad, .unidad-container input[type="checkbox"]');
+            // Busca cualquier checkbox de unidad en el menú
+            elementos = contenedorPadre.querySelectorAll('input[type="checkbox"].filtro-unidad, .unidad-container input[type="checkbox"], input.filtro-unidad');
         } else {
-            // Busca dentro del contenedor específico (HG, HC, HE) por el atributo data-tipo
-            const contenedor = document.querySelector(`.unidad-container[data-tipo="${tipoGrupo}"]`);
-            if (contenedor) {
-                elementos = contenedor.querySelectorAll('input[type="checkbox"]');
+            // Busca dentro del sub-acordeón específico del grupo (HG, HC, HE)
+            const subContenedor = event.target.closest('.sub-acordeon') || contenedorPadre.querySelector(`.unidad-container[data-tipo="${tipoGrupo}"]`);
+
+            if (subContenedor) {
+                elementos = subContenedor.querySelectorAll('input[type="checkbox"]');
             } else {
-                elementos = document.querySelectorAll(`.filtro-unidad[data-tipo="${tipoGrupo}"]`);
+                elementos = contenedorPadre.querySelectorAll(`input[data-tipo="${tipoGrupo}"]`);
             }
         }
 
+        // 2. Fallback global si por algún motivo la búsqueda contextual no encuentra nada
+        if (elementos.length === 0) {
+            elementos = document.querySelectorAll('input[type="checkbox"].filtro-unidad, .unidad-container input[type="checkbox"]');
+        }
+
+        // 3. Recorrer los elementos encontrados
         elementos.forEach(cb => {
             const val = cb.value;
-            if (!val || val === "on") return;
+            // Ignorar checkboxes de control o sin valor
+            if (!val || val === "on" || cb.id === "checkTodasUnidades" || cb.classList.contains("check-grupo-unidad")) return;
 
-            // Extrae el texto del span hermano o del label
+            // Extraer texto limpio
             const parentLabel = cb.closest('label') || cb.parentElement;
             const spanEl = parentLabel ? parentLabel.querySelector('span') : null;
             let nombreText = '';
@@ -1434,7 +1444,7 @@
                 nombreText = String(val);
             }
 
-            // Evitamos meter duplicados si coinciden selectores
+            // Evitar duplicados
             if (!unidades.some(u => u.value === String(val))) {
                 unidades.push({
                     value: String(val),
