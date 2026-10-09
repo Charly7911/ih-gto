@@ -613,8 +613,8 @@
 
   }
 
-  // =========================
-  // DROP ZONE
+ // =========================
+  // DROP ZONE CON DEPURACIÓN
   // =========================
   const dropZone = document.getElementById("dropZone");
 
@@ -636,19 +636,21 @@
       e.preventDefault();
       dropZone.classList.remove("drag-over");
 
-      // Intenta obtener primero application/json y si viene vacío lee "text"
       let raw = e.dataTransfer.getData("application/json") || e.dataTransfer.getData("text");
 
+      console.log("👉 1. DATOS RECIBIDOS RAW:", raw);
+
       if (!raw) {
-        console.warn("No se recibieron datos en el evento drop.");
+        console.error("❌ No se recibieron datos en el evento drop.");
         return;
       }
 
       let data;
       try {
         data = JSON.parse(raw);
+        console.log("👉 2. JSON PARSEADO CORRECTAMENTE:", data);
       } catch (err) {
-        console.error("JSON inválido recibido:", raw);
+        console.error("❌ Error al parsear JSON:", err, raw);
         return;
       }
 
@@ -656,20 +658,40 @@
       // UNIDADES (INDIVIDUAL)
       // =========================
       if (data.type === "unidad") {
+        console.log("👉 Procesando unidad individual:", data.value);
         if (!unidadesSeleccionadas.has(data.value)) {
           unidadesSeleccionadas.add(data.value);
-          addBadge(limpiarNombreUnidad(data.nombre), "unidad", data.value);
+          if (typeof addBadge === "function") {
+            const nombreLimpio = typeof limpiarNombreUnidad === "function" ? limpiarNombreUnidad(data.nombre) : data.nombre;
+            addBadge(nombreLimpio, "unidad", data.value);
+            console.log("✅ Badge individual agregado:", nombreLimpio);
+          } else {
+            console.error("❌ La función addBadge NO existe o no está en alcance.");
+          }
+        } else {
+          console.warn("⚠️ La unidad ya existía en unidadesSeleccionadas:", data.value);
         }
       }
 
       // =========================
-      // UNIDADES (GRUPO / ABANICO: HG, HC, HE o TODAS)
+      // UNIDADES (GRUPO / ABANICO)
       // =========================
       if (data.type === "grupo_unidades" && Array.isArray(data.items)) {
-        data.items.forEach((item) => {
+        console.log(`👉 Procesando grupo con ${data.items.length} unidades:`, data.items);
+        
+        data.items.forEach((item, index) => {
+          console.log(` -> Elemento ${index}:`, item);
           if (!unidadesSeleccionadas.has(item.value)) {
             unidadesSeleccionadas.add(item.value);
-            addBadge(limpiarNombreUnidad(item.nombre), "unidad", item.value);
+            if (typeof addBadge === "function") {
+              const nombreLimpio = typeof limpiarNombreUnidad === "function" ? limpiarNombreUnidad(item.nombre) : item.nombre;
+              addBadge(nombreLimpio, "unidad", item.value);
+              console.log("  ✅ Badge de grupo agregado:", nombreLimpio, item.value);
+            } else {
+              console.error("❌ La función addBadge NO existe en el iterador.");
+            }
+          } else {
+            console.warn("  ⚠️ Unidad omitida por duplicada:", item.value);
           }
         });
       }
@@ -680,22 +702,17 @@
       if (data.type === "indicador") {
         if (!indicadoresSeleccionados.has(data.value)) {
           indicadoresSeleccionados.add(data.value);
-
           window.ultimoIndicadorArrastrado = data.value;
 
-          const el = document.querySelector(
-            `.indicador-item[data-ind="${data.value}"]`
-          );
+          const el = document.querySelector(`.indicador-item[data-ind="${data.value}"]`);
+          const texto = el ? el.innerText.trim() : (data.nombre || data.value);
 
-          const texto = el
-            ? el.innerText.trim()
-            : data.nombre || data.value;
-
-          addBadge(texto, "indicador", data.value);
+          if (typeof addBadge === "function") {
+            addBadge(texto, "indicador", data.value);
+          }
         }
       }
 
-      // Cargar/actualizar la gráfica
       if (typeof cargarGrafica === "function") {
         cargarGrafica();
       }
