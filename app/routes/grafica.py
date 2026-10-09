@@ -1228,10 +1228,10 @@ def indicadores():
 
                 # Mortalidad
                 "mortalidad_cruda": (
-                    (f(data.get("egre_defunciones")) * 100 / egresos) if egresos > 0 else 0
+                    (f(data.get("egre_defunciones")) * 1000 / egresos) if egresos > 0 else 0
                 ),
                 "mortalidad_ajustada": (
-                    (f(data.get("egre_defunciones_48h")) * 100 / f(data.get("total_egresos_48h")))
+                    (f(data.get("egre_defunciones_48h")) * 1000 / f(data.get("total_egresos_48h")))
                     if f(data.get("total_egresos_48h")) > 0
                     else 0
                 ),
