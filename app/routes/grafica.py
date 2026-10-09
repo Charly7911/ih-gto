@@ -1045,8 +1045,14 @@ def indicadores():
 
                 """
        
-        cur.execute(query_e, params_e)
-        rows_e = cur.fetchall()    
+        try:
+            cur.execute(query_e, params_e)
+            rows_e = cur.fetchall()
+        except Exception as err:
+            print("❌ ERROR EXPLICITO EN QUERY SQL:", str(err))
+            import traceback
+            traceback.print_exc()
+            return jsonify({"error": str(err), "query": query_e}), 500
 
         #PARTE 4 
         # ==========================================================
