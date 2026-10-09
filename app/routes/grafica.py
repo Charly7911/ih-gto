@@ -630,31 +630,35 @@ def indicadores():
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     data_acumulada = []
 
-    #PARTE 3
+    # PARTE 3
     # ==========================================================
     # CONFIGURACIÓN BASE DE GROUP BY
     # ==========================================================
 
-    group_by_cols = [
-        "e.anio",
-        "e.clues",
-        "e.nombre_unidad",
-        "c.tipologia",
-    ]
+    # Validar si es modo acumulado (múltiples unidades consolidadas en 1 sola fila)
+    es_acumulado = modo_agrupacion != "individual" and len(unidades) > 1
+
+    if es_acumulado:
+        group_by_cols = ["e.anio"]
+        select_unidad = "'TOTAL' AS clues, 'TOTAL GRUPO' AS nombre_unidad, 'TODAS' AS tipologia,"
+    else:
+        group_by_cols = ["e.anio", "e.clues", "e.nombre_unidad", "c.tipologia"]
+        select_unidad = "e.clues, e.nombre_unidad, c.tipologia,"
 
     if not quiere_anual:
         group_by_cols.append("e.mes")
 
-    # si NO es anual, agregamos mes
-   
-
     group_by = ",\n".join(group_by_cols)
-
     select_mes = "e.mes," if not quiere_anual else "13 AS mes,"
+
+    # Expresión segura para la agregación de camas
+    agg_camas = "AVG" if quiere_anual else "MAX"
 
     # ==========================================================
     # KPIS
     # ==========================================================
+
+    rows_e = []
 
     if quiere_kpis:
 
@@ -673,7 +677,7 @@ def indicadores():
             where_e += " AND e.mes IN ({})".format(",".join(["%s"] * len(meses_calculo)))
             params_e.extend(meses_calculo)
 
-        if tipologia != "TODAS":
+        if tipologia != "TODAS" and not es_acumulado:
             where_e += " AND c.tipologia = %s"
             params_e.append(tipologia)
 
@@ -681,18 +685,11 @@ def indicadores():
         # QUERY PRINCIPAL
         # ======================================================
 
-        if es_anual:
-            agg_camas = "AVG"
-        else:
-            agg_camas = "MAX"
-        
         query_e = f"""
                 SELECT 
                     e.anio,
                     {select_mes}
-                    e.clues,
-                    e.nombre_unidad,
-                    c.tipologia,
+                    {select_unidad}
 
                     -- EGRESOS Y NACIMIENTOS (TABLA PRINCIPAL)
                     SUM(e.total_egresos) AS total_egresos,        
@@ -734,7 +731,7 @@ def indicadores():
                     SUM(IFNULL(ab.abortos_no_especificado, 0)) AS abortos_no_especificado,
                     SUM(IFNULL(ab.abortos_total, 0)) AS abortos_total,
 
-                   -- SIS (SERVICIOS DE SALUD)
+                    -- SIS (SERVICIOS DE SALUD)
                     SUM(IFNULL(sis.dias_p, 0)) AS dias_p,
                     SUM(IFNULL(sis.consultas, 0)) AS consultas,
                     SUM(IFNULL(sis.especialidad, 0)) AS especialidad,
@@ -753,7 +750,6 @@ def indicadores():
                     SUM(IFNULL(sis.gineco, 0)) AS dias_p_gineco,
                     SUM(IFNULL(sis.pediatria, 0)) AS dias_p_pediatria,
                     SUM(IFNULL(sis.otros, 0)) AS dias_p_otros,
-                   
 
                     -- URGENCIAS
                     SUM(IFNULL(urg.total_u, 0)) AS urgencias,
@@ -802,9 +798,7 @@ def indicadores():
                     {agg_camas}(IFNULL(sin.camas_pediatria, 0)) AS camas_pediatria,
                     {agg_camas}(IFNULL(sin.camas_otros, 0)) AS camas_otros,
 
-                   
                     -- DÍAS CAMA
-
                     SUM(IFNULL(sin.camas_total,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_total,
                     SUM(IFNULL(sin.camas_med_int,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_med,
                     SUM(IFNULL(sin.camas_cirugia,0) * DAY(LAST_DAY(CONCAT(e.anio,'-',LPAD(e.mes,2,'0'),'-01')))) AS dias_cama_cir,
@@ -882,12 +876,10 @@ def indicadores():
                     {agg_camas}(IFNULL(em.tomografo_32, 0)) AS tomografo_32,
                     {agg_camas}(IFNULL(em.tomografo_64, 0)) AS tomografo_64
 
-
                 FROM egresos_agregado e
 
                 -- JOIN CATALOGO UNIDADES
-                LEFT JOIN catalogo_unidades c
-                ON e.clues = c.clues
+                LEFT JOIN catalogo_unidades c ON e.clues = c.clues
 
                 -- JOIN ABORTOS (GRUPAL POR MES)
                 LEFT JOIN (
@@ -897,8 +889,6 @@ def indicadores():
                         SUM(total) AS abortos_total
                     FROM abortos GROUP BY anio, mes, clues
                 ) ab ON e.clues = ab.clues AND e.anio = ab.anio AND e.mes = ab.mes
-
-                
 
                 -- JOIN SIS (GRUPAL POR MES)
                 LEFT JOIN (
@@ -940,112 +930,120 @@ def indicadores():
                         SUM(pediatra_proced_fuera) AS pediatria_fuera,
                         SUM(otros_proced_fuera) AS otros_fuera,
                         SUM(total_proced_fuera) AS total_proced_fuera,
-                        SUM(
-                            IFNULL(med_int_proced_dentro,0) +
-                            IFNULL(med_int_proced_fuera,0)
-                        ) AS total_proced_med_int,
-
-                        SUM(
-                            IFNULL(cirugia_proced_dentro,0) +
-                            IFNULL(cirugia_proced_fuera,0)
-                        ) AS total_proced_cirugia,
-
-                        SUM(
-                            IFNULL(gineco_proced_dentro,0) +
-                            IFNULL(gineco_proced_fuera,0)
-                        ) AS total_proced_gineco,
-
-                        SUM(
-                            IFNULL(pediatra_proced_dentro,0) +
-                            IFNULL(pediatra_proced_fuera,0)
-                        ) AS total_proced_pediatria,
-
-                        SUM(
-                            IFNULL(otros_proced_dentro,0) +
-                            IFNULL(otros_proced_fuera,0)
-                        ) AS total_proced_otros,
-
-                        -- TOTAL GENERAL
-                        SUM(
-                            IFNULL(total_proced_dentro,0) +
-                            IFNULL(total_proced_fuera,0)
-                        ) AS total_proced
+                        SUM(IFNULL(med_int_proced_dentro,0) + IFNULL(med_int_proced_fuera,0)) AS total_proced_med_int,
+                        SUM(IFNULL(cirugia_proced_dentro,0) + IFNULL(cirugia_proced_fuera,0)) AS total_proced_cirugia,
+                        SUM(IFNULL(gineco_proced_dentro,0) + IFNULL(gineco_proced_fuera,0)) AS total_proced_gineco,
+                        SUM(IFNULL(pediatra_proced_dentro,0) + IFNULL(pediatra_proced_fuera,0)) AS total_proced_pediatria,
+                        SUM(IFNULL(otros_proced_dentro,0) + IFNULL(otros_proced_fuera,0)) AS total_proced_otros,
+                        SUM(IFNULL(total_proced_dentro,0) + IFNULL(total_proced_fuera,0)) AS total_proced
                     FROM procedimiento_agregado GROUP BY anio, mes, clues
                 ) p ON e.clues = p.clues AND e.anio = p.anio AND e.mes = p.mes
 
-                -- JOIN SINERHIAS (ANUAL)
-               LEFT JOIN (
-                    SELECT
-                        anio,
-                        mes,
-                        clues,
-                        total AS camas_total,
-                        quirofanos,
-                        med_int AS camas_med_int,
-                        cirugia AS camas_cirugia,
-                        gineco AS camas_gineco,
-                        pediatria AS camas_pediatria,
-                        otros AS camas_otros
-                    FROM sinerhias
-                ) sin
-                ON e.clues = sin.clues
-                AND e.anio = sin.anio
-                AND e.mes = sin.mes
-
-               
-
-                -- JOIN CAMAS NO CENSABLES
+                -- JOIN SINERHIAS (AGRUPADO POR CLUES)
                 LEFT JOIN (
-                    SELECT
-                        anio,
-                        mes,
-                        clues,
-                        hab_urgencias,
-                        hab_observacion,
-                        hab_cuid_int,
-                        hab_cirug_amb,
-                        hab_quemados,
-                        hab_lab_parto,
-                        hab_recup_pp,
-                        hab_recup_pq,
-                        hab_uci_adulto,
-                        hab_uci_ped,
-                        hab_otras_areas,
+                    SELECT anio, mes, clues,
+                        AVG(IFNULL(total, 0)) AS camas_total,
+                        AVG(IFNULL(quirofanos, 0)) AS quirofanos,
+                        AVG(IFNULL(med_int, 0)) AS camas_med_int,
+                        AVG(IFNULL(cirugia, 0)) AS camas_cirugia,
+                        AVG(IFNULL(gineco, 0)) AS camas_gineco,
+                        AVG(IFNULL(pediatria, 0)) AS camas_pediatria,
+                        AVG(IFNULL(otros, 0)) AS camas_otros
+                    FROM sinerhias GROUP BY anio, mes, clues
+                ) sin ON e.clues = sin.clues AND e.anio = sin.anio AND e.mes = sin.mes
 
-                        (
-                            IFNULL(hab_urgencias,0)+
-                            IFNULL(hab_observacion,0)+
-                            IFNULL(hab_cuid_int,0)+
-                            IFNULL(hab_cirug_amb,0)+
-                            IFNULL(hab_quemados,0)+
-                            IFNULL(hab_lab_parto,0)+
-                            IFNULL(hab_recup_pp,0)+
-                            IFNULL(hab_recup_pq,0)+
-                            IFNULL(hab_uci_adulto,0)+
-                            IFNULL(hab_uci_ped,0)+
-                            IFNULL(hab_otras_areas,0)
+                -- JOIN CAMAS NO CENSABLES (AGRUPADO POR CLUES)
+                LEFT JOIN (
+                    SELECT anio, mes, clues,
+                        SUM(IFNULL(hab_urgencias, 0)) AS hab_urgencias,
+                        SUM(IFNULL(hab_observacion, 0)) AS hab_observacion,
+                        SUM(IFNULL(hab_cuid_int, 0)) AS hab_cuid_int,
+                        SUM(IFNULL(hab_cirug_amb, 0)) AS hab_cirug_amb,
+                        SUM(IFNULL(hab_quemados, 0)) AS hab_quemados,
+                        SUM(IFNULL(hab_lab_parto, 0)) AS hab_lab_parto,
+                        SUM(IFNULL(hab_recup_pp, 0)) AS hab_recup_pp,
+                        SUM(IFNULL(hab_recup_pq, 0)) AS hab_recup_pq,
+                        SUM(IFNULL(hab_uci_adulto, 0)) AS hab_uci_adulto,
+                        SUM(IFNULL(hab_uci_ped, 0)) AS hab_uci_ped,
+                        SUM(IFNULL(hab_otras_areas, 0)) AS hab_otras_areas,
+                        SUM(
+                            IFNULL(hab_urgencias, 0) + IFNULL(hab_observacion, 0) +
+                            IFNULL(hab_cuid_int, 0) + IFNULL(hab_cirug_amb, 0) +
+                            IFNULL(hab_quemados, 0) + IFNULL(hab_lab_parto, 0) +
+                            IFNULL(hab_recup_pp, 0) + IFNULL(hab_recup_pq, 0) +
+                            IFNULL(hab_uci_adulto, 0) + IFNULL(hab_uci_ped, 0) +
+                            IFNULL(hab_otras_areas, 0)
                         ) AS total_no_censables
+                    FROM camas_no_censables GROUP BY anio, mes, clues
+                ) cnc ON e.clues = cnc.clues AND e.anio = cnc.anio AND e.mes = cnc.mes
 
-                    FROM camas_no_censables
-                ) cnc
-                ON e.clues = cnc.clues
-                AND e.anio = cnc.anio
-                AND e.mes = cnc.mes
-
-                -- JOIN EQUIPO MÉDICO
-                LEFT JOIN equipo_medico em
-                ON e.clues = em.clues
-                AND e.anio = em.anio
-                AND e.mes = em.mes
+                -- JOIN EQUIPO MÉDICO (AGRUPADO POR CLUES)
+                LEFT JOIN (
+                    SELECT anio, mes, clues,
+                        SUM(IFNULL(arco_c_analogo, 0)) AS arco_c_analogo,
+                        SUM(IFNULL(arco_c_digital, 0)) AS arco_c_digital,
+                        SUM(IFNULL(bascula_estadimetro, 0)) AS bascula_estadimetro,
+                        SUM(IFNULL(bascula_bebe, 0)) AS bascula_bebe,
+                        SUM(IFNULL(camilla_radiotransp, 0)) AS camilla_radiotransp,
+                        SUM(IFNULL(cardiotocografo, 0)) AS cardiotocografo,
+                        SUM(IFNULL(carro_rojo_reanim, 0)) AS carro_rojo_reanim,
+                        SUM(IFNULL(cuna_calor_rad, 0)) AS cuna_calor_rad,
+                        SUM(IFNULL(cuna_calor_rad_foto, 0)) AS cuna_calor_rad_foto,
+                        SUM(IFNULL(defibrilador_monit, 0)) AS defibrilador_monit,
+                        SUM(IFNULL(ecocardiografo, 0)) AS ecocardiografo,
+                        SUM(IFNULL(electrocardiografo, 0)) AS electrocardiografo,
+                        SUM(IFNULL(estuche_diag, 0)) AS estuche_diag,
+                        SUM(IFNULL(incubadora_fototer, 0)) AS incubadora_fototer,
+                        SUM(IFNULL(incubadora_trasl, 0)) AS incubadora_trasl,
+                        SUM(IFNULL(incubadora_cuidados, 0)) AS incubadora_cuidados,
+                        SUM(IFNULL(lampara_quirurgica_doble, 0)) AS lampara_quirurgica_doble,
+                        SUM(IFNULL(lampara_quir_port, 0)) AS lampara_quir_port,
+                        SUM(IFNULL(lampara_quir_senc, 0)) AS lampara_quir_senc,
+                        SUM(IFNULL(mesa_quir_obs, 0)) AS mesa_quir_obs,
+                        SUM(IFNULL(mesa_exploracion, 0)) AS mesa_exploracion,
+                        SUM(IFNULL(mesa_quir_gral, 0)) AS mesa_quir_gral,
+                        SUM(IFNULL(microscopio_rutina, 0)) AS microscopio_rutina,
+                        SUM(IFNULL(monitor_radiacion, 0)) AS monitor_radiacion,
+                        SUM(IFNULL(monitor_signos_vit_avanz, 0)) AS monitor_signos_vit_avanz,
+                        SUM(IFNULL(monitor_signos_neo, 0)) AS monitor_signos_neo,
+                        SUM(IFNULL(monitor_signos_bas, 0)) AS monitor_signos_bas,
+                        SUM(IFNULL(monitor_traslado, 0)) AS monitor_traslado,
+                        SUM(IFNULL(monitor_signos_int, 0)) AS monitor_signos_int,
+                        SUM(IFNULL(monitor_signos_vit_neona, 0)) AS monitor_signos_vit_neona,
+                        SUM(IFNULL(monitor_anestesia, 0)) AS monitor_anestesia,
+                        SUM(IFNULL(negatoscopio, 0)) AS negatoscopio,
+                        SUM(IFNULL(refrige_lab, 0)) AS refrige_lab,
+                        SUM(IFNULL(sierra_yesos, 0)) AS sierra_yesos,
+                        SUM(IFNULL(ultrasonido_diag, 0)) AS ultrasonido_diag,
+                        SUM(IFNULL(unidad_anestesia_bas, 0)) AS unidad_anestesia_bas,
+                        SUM(IFNULL(ultrasonido_terap, 0)) AS ultrasonido_terap,
+                        SUM(IFNULL(unidad_dental, 0)) AS unidad_dental,
+                        SUM(IFNULL(unidad_rx_analogo, 0)) AS unidad_rx_analogo,
+                        SUM(IFNULL(unidad_rx_dental, 0)) AS unidad_rx_dental,
+                        SUM(IFNULL(unidad_rx_digital, 0)) AS unidad_rx_digital,
+                        SUM(IFNULL(unidad_rx_port_ana, 0)) AS unidad_rx_port_ana,
+                        SUM(IFNULL(unidad_rx_port_dig, 0)) AS unidad_rx_port_dig,
+                        SUM(IFNULL(fluoroscopio_dig, 0)) AS fluoroscopio_dig,
+                        SUM(IFNULL(fluoroscopio_dig_analog, 0)) AS fluoroscopio_dig_analog,
+                        SUM(IFNULL(mastografo_digital, 0)) AS mastografo_digital,
+                        SUM(IFNULL(mastografo_estereo, 0)) AS mastografo_estereo,
+                        SUM(IFNULL(mastografo_estereo_tomosin, 0)) AS mastografo_estereo_tomosin,
+                        SUM(IFNULL(microscopio_cirugia, 0)) AS microscopio_cirugia,
+                        SUM(IFNULL(resonancia_mag, 0)) AS resonancia_mag,
+                        SUM(IFNULL(tomografo_128, 0)) AS tomografo_128,
+                        SUM(IFNULL(tomografo_16, 0)) AS tomografo_16,
+                        SUM(IFNULL(tomografo_32, 0)) AS tomografo_32,
+                        SUM(IFNULL(tomografo_64, 0)) AS tomografo_64
+                    FROM equipo_medico GROUP BY anio, mes, clues
+                ) em ON e.clues = em.clues AND e.anio = em.anio AND e.mes = em.mes
 
                 {where_e}
 
                 GROUP BY {group_by}
-
                 """
-       
+
         cur.execute(query_e, params_e)
-        rows_e = cur.fetchall()    
+        rows_e = cur.fetchall()
 
         #PARTE 4
        
