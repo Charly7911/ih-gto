@@ -1400,49 +1400,51 @@
     };
 
     window.dragGrupoUnidades = function (event, tipoGrupo) {
-        const unidades = [];
-        let elementos = [];
+        let unidades = [];
 
-        // 1. Obtener el contenedor principal partiendo del botón presionado
-        const acordeonPrincipal = event.target.closest('.acordeon-indicadores, .filter-block-acordeon, #sidebar, body') || document;
-
-        if (tipoGrupo === 'TODAS') {
-            // Selecciona todas las tarjetas dentro de cualquier bloque de unidades
-            elementos = acordeonPrincipal.querySelectorAll('.check-item, .searchable-item, .unidad-item-grafica, .unidad-container label, .unidad-container div[data-clues]');
-        } else {
-            // Busca el sub-acordeón específico (HG, HC, HE)
-            const subAcordeon = event.target.closest('details, .sub-acordeon') || acordeonPrincipal.querySelector(`[data-tipo="${tipoGrupo}"]`);
-
-            if (subAcordeon) {
-                elementos = subAcordeon.querySelectorAll('.check-item, .searchable-item, .unidad-item-grafica, label, div[data-clues]');
-            } else {
-                elementos = acordeonPrincipal.querySelectorAll(`.check-item[data-tipo="${tipoGrupo}"], [data-tipo="${tipoGrupo}"] label`);
-            }
+        // 1. SI ES 'TODAS' Y TENEMOS LA VARIABLE DEL SERVIDOR: Respuesta instantánea (0ms)
+        if (tipoGrupo === 'TODAS' && window.CATALOGO_UNIDADES_SERVIDO && window.CATALOGO_UNIDADES_SERVIDO.length > 0) {
+            unidades = window.CATALOGO_UNIDADES_SERVIDO.map(u => ({
+                value: String(u.clues),
+                nombre: u.nombre_unidad
+            }));
         }
 
-        // 2. Extraer los datos (ID/CLUES y Nombre) de cada tarjeta visual
-        elementos.forEach(el => {
-            // Buscar el valor (ID) de la unidad
-            const inputEl = el.querySelector('input');
-            let val = inputEl ? inputEl.value : (el.getAttribute('data-clues') || el.getAttribute('data-value') || el.dataset.clues);
+        // 2. SI NO SE OBTUVIERON (O ES HG, HC, HE): Buscar en el DOM
+        if (unidades.length === 0) {
+            let elementos = [];
+            const acordeonPrincipal = event.target.closest('.acordeon-indicadores, .filter-block-acordeon, #sidebar, body') || document;
 
-            // Buscar el nombre visual de la unidad
-            const spanEl = el.querySelector('span');
-            let nombreText = spanEl ? spanEl.innerText.trim() : el.innerText.trim();
+            if (tipoGrupo === 'TODAS') {
+                elementos = acordeonPrincipal.querySelectorAll('.check-item, .searchable-item, .unidad-item-grafica, .unidad-container label, .unidad-container div[data-clues]');
+            } else {
+                const subAcordeon = event.target.closest('details, .sub-acordeon') || acordeonPrincipal.querySelector(`[data-tipo="${tipoGrupo}"]`);
 
-            // Limpiar el texto en caso de incluir íconos o saltos de línea
-            nombreText = nombreText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-
-            // Si se encontró un valor válido y no es un control de "Marca HC / Seleccionar TODAS"
-            if (val && val !== "on" && !el.innerText.includes("Marca ") && !el.innerText.includes("Seleccionar")) {
-                if (!unidades.some(u => u.value === String(val))) {
-                    unidades.push({
-                        value: String(val),
-                        nombre: nombreText || String(val)
-                    });
+                if (subAcordeon) {
+                    elementos = subAcordeon.querySelectorAll('.check-item, .searchable-item, .unidad-item-grafica, label, div[data-clues]');
+                } else {
+                    elementos = acordeonPrincipal.querySelectorAll(`.check-item[data-tipo="${tipoGrupo}"], [data-tipo="${tipoGrupo}"] label`);
                 }
             }
-        });
+
+            elementos.forEach(el => {
+                const inputEl = el.querySelector('input');
+                let val = inputEl ? inputEl.value : (el.getAttribute('data-clues') || el.getAttribute('data-value') || el.dataset.clues);
+
+                const spanEl = el.querySelector('span');
+                let nombreText = spanEl ? spanEl.innerText.trim() : el.innerText.trim();
+                nombreText = nombreText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+
+                if (val && val !== "on" && !el.innerText.includes("Marca ") && !el.innerText.includes("Seleccionar")) {
+                    if (!unidades.some(u => u.value === String(val))) {
+                        unidades.push({
+                            value: String(val),
+                            nombre: nombreText || String(val)
+                        });
+                    }
+                }
+            });
+        }
 
         console.log(`📦 Unidades encontradas para [${tipoGrupo}]:`, unidades.length, unidades);
 

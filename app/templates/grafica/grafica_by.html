@@ -175,6 +175,8 @@
 
 
 <script>
+
+  window.CATALOGO_UNIDADES_SERVIDO = JSON.parse('{{ unidades | tojson | safe }}');
   let chart = null;
 
   let unidadesSeleccionadas = new Set();
