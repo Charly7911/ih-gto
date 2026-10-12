@@ -548,12 +548,12 @@ def indicadores():
     )
 
     # 🔑 Recolección de CLUES desde los subgrupos multigrupo
-    if not unidades and grupos_solicitados:
-        for g in grupos_solicitados:
-            g_upper = g.upper()
-            clues_sub = request.args.getlist(f"grupo_{g_upper}_clues[]")
-            unidades.extend(clues_sub)
-        unidades = list(set(unidades)) # Deduplicar
+    for key in request.args.keys():
+        if key.startswith("grupo_") and key.endswith("_clues[]"):
+            unidades.extend(request.args.getlist(key))
+
+    # Deduplicar la lista de CLUES
+    unidades = list(set([u for u in unidades if u]))
 
     anios_raw = request.args.getlist("anios[]") or request.args.getlist("anios")
     meses_raw = request.args.getlist("meses[]") or request.args.getlist("meses")
