@@ -1482,9 +1482,32 @@ def indicadores():
     )
 
     # ==========================================================
-    # TOTAL GENERAL (SOLO SI HAY MÁS DE 1 UNIDAD)
+    # TOTAL GENERAL Y FILTRADO SEGÚN MODO DE AGRUPACIÓN
     # ==========================================================
-    if len(unidades) > 1 or modo_agrupacion == "acumulado":
+    if modo_agrupacion == "acumulado":
+        # 🔑 MODO GRUPO (TODAS / HG / HC / HE):
+        # Si la lista contiene tanto registros de unidades individuales como de TOTAL GENERAL,
+        # dejamos ÚNICAMENTE los registros del TOTAL GENERAL para evitar duplas en la gráfica.
+        totales_existentes = [r for r in data_acumulada if r.get("clues") == "TOTAL" or r.get("nombre_unidad") in ["TOTAL GENERAL", "TOTAL GRUPO"]]
+        
+        if totales_existentes:
+            data_acumulada = totales_existentes
+        else:
+            # Si SQL devolvió sólo unidades individuales, calculamos el total una sola vez y REEMPLAZAMOS data_acumulada
+            data_acumulada = generar_total_general(
+                data_acumulada=data_acumulada,
+                meses_validos=meses_validos,
+                SUM_FIELDS=SUM_FIELDS,
+                MAX_FIELDS=MAX_FIELDS,
+                indicadores_max=indicadores_max,
+                calcular_kpis=calcular_kpis,
+                es_descarga_masiva=es_descarga_masiva,
+                indicadores_solicitados=indicadores_solicitados,
+            )
+            
+    elif len(unidades) > 1:
+        # 🏥 MODO INDIVIDUAL MULTI-UNIDAD:
+        # Mantiene cada hospital en la gráfica y le pega la fila del TOTAL GENERAL
         totales = generar_total_general(
             data_acumulada=data_acumulada,
             meses_validos=meses_validos,
