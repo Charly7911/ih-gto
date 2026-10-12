@@ -665,106 +665,114 @@
                 <!-- ACORDEÓN: UNIDAD MÉDICA -->
                 <details class="acordeon-indicadores">
                     <summary class="text-white d-flex justify-content-between align-items-center"
-                        style="font-size:11px;font-weight:bold;letter-spacing:.5px;">
+                        style="font-size:11px; font-weight:bold; letter-spacing:.5px;">
                         <span><i class="bi bi-chevron-right"></i> 🏥 UNIDAD MÉDICA</span>
                     </summary>
 
-                    <!-- BARRA GLOBAL DE CONTROL (SOLO ARRASTRAR TODAS) -->
-                    <div class="p-2 mb-2 bg-dark rounded d-flex justify-content-between align-items-center gap-2">
-                        
-                        <button type="button" class="btn btn-sm btn-info text-dark fw-bold btn-drag-all"
+                    <!-- BOTÓN ANCHO COMPLETO: ARRASTRAR TODAS -->
+                    <div class="mb-2 mt-2">
+                        <button type="button"
+                            class="btn btn-sm btn-info text-dark fw-bold w-100 d-flex align-items-center justify-content-center gap-2 p-2 shadow-sm"
                             draggable="true" ondragstart="dragGrupoUnidades(event, 'TODAS')"
-                            title="Arrastra para incluir las 42 unidades">
-                            <i class="bi bi-grip-vertical"></i> Arrastrar TODAS
+                            style="cursor:grab; font-size:11px;"
+                            title="Mantén presionado y arrastra al área de graficado">
+                            <i class="bi bi-grip-vertical fs-6"></i>
+                            <span>Arrastrar TODAS las Unidades</span>
                         </button>
                     </div>
 
                     <div class="filter-block-acordeon">
 
                         <!-- HOSPITALES GENERALES (HG) -->
-                        <details class="sub-acordeon">
+                        <details class="sub-acordeon mb-1">
                             <summary class="d-flex justify-content-between align-items-center">
                                 <span><i class="bi bi-hospital"></i> Hospitales Generales (HG)</span>
                             </summary>
 
-                            <!-- Barra de grupo HG -->
-                            <div
-                                class="px-2 py-1 mb-1 d-flex justify-content-between align-items-center bg-secondary bg-opacity-25 rounded">
-                                <span class="text-white-50" style="font-size:10px;">Consolidado HG</span>
-                                <span class="badge bg-info text-dark" draggable="true"
-                                    ondragstart="dragGrupoUnidades(event, 'HG')" style="cursor:grab;">
-                                    <i class="bi bi-grip-horizontal"></i> Arrastrar Grupo HG
-                                </span>
-                            </div>
+                            <div class="p-1">
+                                <!-- Botón de grupo a lo ancho -->
+                                <button type="button"
+                                    class="btn btn-sm btn-outline-info text-white w-100 d-flex align-items-center justify-content-center gap-2 mb-2"
+                                    draggable="true" ondragstart="dragGrupoUnidades(event, 'HG')"
+                                    style="cursor:grab; font-size:10px;" title="Arrastrar grupo completo HG">
+                                    <i class="bi bi-grip-horizontal"></i>
+                                    <span>Arrastrar Grupo Hospitales Generales</span>
+                                </button>
 
-                            <div id="listaGenerales" class="popover-list-inline custom-scroll unidad-container"
-                                data-tipo="HG">
-                                {% for u in unidades_generales %}
-                                <div class="item-unidad-drag searchable-item p-1 mb-1 rounded text-white-50 d-flex align-items-center gap-2"
-                                    draggable="true" style="cursor:grab; font-size:11px;"
-                                    ondragstart="dragUnidadIndividual(event, '{{ u.id if u.id else u }}', '{{ u.nombre if u.nombre else u }}')">
-                                    <i class="bi bi-grip-vertical text-muted"></i>
-                                    <span>{{ u.nombre if u.nombre else u }}</span>
+                                <div id="listaGenerales" class="popover-list-inline custom-scroll unidad-container"
+                                    data-tipo="HG">
+                                    {% for u in unidades_generales %}
+                                    <div class="item-unidad-drag searchable-item p-1 mb-1 rounded text-white-50 d-flex align-items-center gap-2 w-100"
+                                        draggable="true"
+                                        style="cursor:grab; font-size:11px; background-color: rgba(255,255,255,0.05);"
+                                        ondragstart="dragUnidadIndividual(event, '{{ u.id if u.id else u }}', '{{ u.nombre if u.nombre else u }}')">
+                                        <i class="bi bi-grip-vertical text-muted"></i>
+                                        <span>{{ u.nombre if u.nombre else u }}</span>
+                                    </div>
+                                    {% endfor %}
                                 </div>
-                                {% endfor %}
                             </div>
                         </details>
 
                         <!-- HOSPITALES COMUNITARIOS (HC) -->
-                        <details class="sub-acordeon">
+                        <details class="sub-acordeon mb-1">
                             <summary class="d-flex justify-content-between align-items-center">
                                 <span><i class="bi bi-building"></i> Hospitales Comunitarios (HC)</span>
                             </summary>
 
-                            <!-- Barra de grupo HC -->
-                            <div
-                                class="px-2 py-1 mb-1 d-flex justify-content-between align-items-center bg-secondary bg-opacity-25 rounded">
-                                <span class="text-white-50" style="font-size:10px;">Consolidado HC</span>
-                                <span class="badge bg-info text-dark" draggable="true"
-                                    ondragstart="dragGrupoUnidades(event, 'HC')" style="cursor:grab;">
-                                    <i class="bi bi-grip-horizontal"></i> Arrastrar Grupo HC
-                                </span>
-                            </div>
+                            <div class="p-1">
+                                <!-- Botón de grupo a lo ancho -->
+                                <button type="button"
+                                    class="btn btn-sm btn-outline-info text-white w-100 d-flex align-items-center justify-content-center gap-2 mb-2"
+                                    draggable="true" ondragstart="dragGrupoUnidades(event, 'HC')"
+                                    style="cursor:grab; font-size:10px;" title="Arrastrar grupo completo HC">
+                                    <i class="bi bi-grip-horizontal"></i>
+                                    <span>Arrastrar Grupo Hospitales Comunitarios</span>
+                                </button>
 
-                            <div id="listaComunitarios" class="popover-list-inline custom-scroll unidad-container"
-                                data-tipo="HC">
-                                {% for u in unidades_comunitarios %}
-                                <div class="item-unidad-drag searchable-item p-1 mb-1 rounded text-white-50 d-flex align-items-center gap-2"
-                                    draggable="true" style="cursor:grab; font-size:11px;"
-                                    ondragstart="dragUnidadIndividual(event, '{{ u.id if u.id else u }}', '{{ u.nombre if u.nombre else u }}')">
-                                    <i class="bi bi-grip-vertical text-muted"></i>
-                                    <span>{{ u.nombre if u.nombre else u }}</span>
+                                <div id="listaComunitarios" class="popover-list-inline custom-scroll unidad-container"
+                                    data-tipo="HC">
+                                    {% for u in unidades_comunitarios %}
+                                    <div class="item-unidad-drag searchable-item p-1 mb-1 rounded text-white-50 d-flex align-items-center gap-2 w-100"
+                                        draggable="true"
+                                        style="cursor:grab; font-size:11px; background-color: rgba(255,255,255,0.05);"
+                                        ondragstart="dragUnidadIndividual(event, '{{ u.id if u.id else u }}', '{{ u.nombre if u.nombre else u }}')">
+                                        <i class="bi bi-grip-vertical text-muted"></i>
+                                        <span>{{ u.nombre if u.nombre else u }}</span>
+                                    </div>
+                                    {% endfor %}
                                 </div>
-                                {% endfor %}
                             </div>
                         </details>
 
                         <!-- HOSPITALES DE ESPECIALIDAD (HE) -->
-                        <details class="sub-acordeon">
+                        <details class="sub-acordeon mb-1">
                             <summary class="d-flex justify-content-between align-items-center">
                                 <span><i class="bi bi-heart-pulse"></i> Hospitales de Especialidad (HE)</span>
                             </summary>
 
-                            <!-- Barra de grupo HE -->
-                            <div
-                                class="px-2 py-1 mb-1 d-flex justify-content-between align-items-center bg-secondary bg-opacity-25 rounded">
-                                <span class="text-white-50" style="font-size:10px;">Consolidado HE</span>
-                                <span class="badge bg-info text-dark" draggable="true"
-                                    ondragstart="dragGrupoUnidades(event, 'HE')" style="cursor:grab;">
-                                    <i class="bi bi-grip-horizontal"></i> Arrastrar Grupo HE
-                                </span>
-                            </div>
+                            <div class="p-1">
+                                <!-- Botón de grupo a lo ancho -->
+                                <button type="button"
+                                    class="btn btn-sm btn-outline-info text-white w-100 d-flex align-items-center justify-content-center gap-2 mb-2"
+                                    draggable="true" ondragstart="dragGrupoUnidades(event, 'HE')"
+                                    style="cursor:grab; font-size:10px;" title="Arrastrar grupo completo HE">
+                                    <i class="bi bi-grip-horizontal"></i>
+                                    <span>Arrastrar Grupo Especialidades</span>
+                                </button>
 
-                            <div id="listaEspecialidad" class="popover-list-inline custom-scroll unidad-container"
-                                data-tipo="HE">
-                                {% for u in unidades_especialidad %}
-                                <div class="item-unidad-drag searchable-item p-1 mb-1 rounded text-white-50 d-flex align-items-center gap-2"
-                                    draggable="true" style="cursor:grab; font-size:11px;"
-                                    ondragstart="dragUnidadIndividual(event, '{{ u.id if u.id else u }}', '{{ u.nombre if u.nombre else u }}')">
-                                    <i class="bi bi-grip-vertical text-muted"></i>
-                                    <span>{{ u.nombre if u.nombre else u }}</span>
+                                <div id="listaEspecialidad" class="popover-list-inline custom-scroll unidad-container"
+                                    data-tipo="HE">
+                                    {% for u in unidades_especialidad %}
+                                    <div class="item-unidad-drag searchable-item p-1 mb-1 rounded text-white-50 d-flex align-items-center gap-2 w-100"
+                                        draggable="true"
+                                        style="cursor:grab; font-size:11px; background-color: rgba(255,255,255,0.05);"
+                                        ondragstart="dragUnidadIndividual(event, '{{ u.id if u.id else u }}', '{{ u.nombre if u.nombre else u }}')">
+                                        <i class="bi bi-grip-vertical text-muted"></i>
+                                        <span>{{ u.nombre if u.nombre else u }}</span>
+                                    </div>
+                                    {% endfor %}
                                 </div>
-                                {% endfor %}
                             </div>
                         </details>
 
