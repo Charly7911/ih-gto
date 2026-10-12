@@ -1798,23 +1798,12 @@
     btn.style.borderColor = "#ffc107";
     btn.style.color = "#000";
 
-
     const modoVista = document.getElementById("modoVista").value;
     const esAnual = modoVista === "anual";
 
     const mesesLabels = [
-      "Ene",
-      "Feb",
-      "Mar",
-      "Abr",
-      "May",
-      "Jun",
-      "Jul",
-      "Ago",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dic",
+      "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+      "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"
     ];
 
     // =========================
@@ -1822,24 +1811,15 @@
     // =========================
     let mesesSeleccionados = obtenerMesesSeleccionados();
 
-    const esVistaAnual = document.getElementById("modoVista").value === "anual";
-
-    // 🔑 Si no hay meses y no estamos en vista anual, destruimos TODAS las instancias de gráficas
-    if (!esVistaAnual && mesesSeleccionados.length === 0) {
-
-      // 1. Destruir gráfica principal (Combinada)
+    if (!esAnual && mesesSeleccionados.length === 0) {
       if (typeof chart !== "undefined" && chart) {
         chart.destroy();
         chart = null;
       }
-
-      // 2. Destruir subgráficas (Vista por Indicador)
       if (typeof instanciasCharts !== "undefined" && Array.isArray(instanciasCharts)) {
         instanciasCharts.forEach((c) => c && c.destroy());
         instanciasCharts = [];
       }
-
-      // 3. Limpiar visualmente el contenedor
       const contenedor = document.getElementById("contenedorGraficas");
       if (contenedor) {
         contenedor.innerHTML = `
@@ -1849,11 +1829,16 @@
         <div id="leyendaPersonalizada" class="mt-3 w-100"></div>
       `;
       }
-
-      return; // Interrumpimos la ejecución de la API
+      resetBotonExcel();
+      return;
     }
 
     const params = new URLSearchParams();
+
+    // 🔑 1. FORZAR MODO INDIVIDUAL Y BANDERAS DE DESCARGA
+    // Esto garantiza que la API devuelva las 42 unidades sin colapsar por grupos
+    params.append("modo", "individual");
+    params.append("descarga", "true");
 
     // =========================
     // AÑOS
@@ -2048,24 +2033,24 @@
     // UNIDADES
     // =========================
     const unidadesSeleccion =
-      typeof unidadesSeleccionadas !== "undefined" &&
-        unidadesSeleccionadas.size > 0
+      typeof unidadesSeleccionadas !== "undefined" && unidadesSeleccionadas.size > 0
         ? Array.from(unidadesSeleccionadas)
         : typeof todasUnidades !== "undefined"
-          ? todasUnidades.map((u) => u.clues)
+          ? todasUnidades.map((u) => u.clues || u.id || u)
           : [];
 
-    unidadesSeleccion.forEach((u) => params.append("clues[]", u));
+    unidadesSeleccion.forEach((u) => {
+      const val = typeof u === "object" ? u.clues || u.value || u.id : u;
+      if (val) params.append("clues[]", val);
+    });
 
     // =========================
     // INDICADORES SELECCIONADOS
     // =========================
     const indicadoresSeleccion =
-      typeof indicadoresSeleccionados !== "undefined" &&
-        indicadoresSeleccionados.size > 0
+      typeof indicadoresSeleccionados !== "undefined" && indicadoresSeleccionados.size > 0
         ? Array.from(indicadoresSeleccionados)
         : [];
-
 
     indicadoresSeleccion.forEach((i) => {
       params.append("indicadores[]", i);
@@ -2074,7 +2059,7 @@
     // =========================
     // MESES 🔥 FIX CRÍTICO
     // =========================
-    if (mesesSeleccionados.length === 0) {
+    if (mesesSeleccionados.length === 0 && !esAnual) {
       alert("Selecciona al menos un mes.");
       resetBotonExcel();
       return;
@@ -2093,14 +2078,13 @@
     // =========================
     let dataTotal = [];
 
-
     try {
+      console.log("🔗 SOLICITANDO EXCEL MASIVO:", "/grafica/api/indicadores?" + params.toString());
       const res = await fetch("/grafica/api/indicadores?" + params.toString());
       dataTotal = await res.json();
 
-
       if (!dataTotal.length) {
-        alert("No hay datos.");
+        alert("No hay datos para descargar.");
         resetBotonExcel();
         return;
       }
@@ -2112,63 +2096,35 @@
     }
 
     // =========================
-    // COLUMNAS DISPONIBLES EN DATOS
+    // FILTRADO Y MATRIZ EXCEL
     // =========================
-
     const columnasSet = new Set();
-
     dataTotal.forEach((d) => {
-      if (d.indicador) {
-        columnasSet.add(d.indicador.trim());
-      }
+      if (d.indicador) columnasSet.add(d.indicador.trim());
     });
 
-
-    // =========================
-    // COLUMNAS PARA EXCEL
-    // =========================
     const columnas = [];
-
-
-    // Indicadores hospitalarios normales
     columnasDeseadas.forEach((c) => {
-      if (columnasSet.has(c)) {
-        columnas.push(c);
-      }
+      if (columnasSet.has(c)) columnas.push(c);
     });
 
-
-    // Equipo médico solamente si fue seleccionado
     columnasEquipo.forEach((c) => {
-
-      if (
-        columnasSet.has(c) &&
-        indicadoresSeleccion.includes(c)
-      ) {
+      if (columnasSet.has(c) && indicadoresSeleccion.includes(c)) {
         columnas.push(c);
       }
-
     });
 
-
-    // const columnas = columnasDeseadas.filter((c) => columnasSet.has(c));
-
-    // =========================
-    // FILTRADO FINAL
-    // =========================
     const filas = dataTotal.filter((d) => {
       const mes = parseInt(d.mes);
-      return esAnual
-        ? mes === 13
-        : mesesSeleccionados.map(Number).includes(mes);
+      return esAnual ? mes === 13 : mesesSeleccionados.map(Number).includes(mes);
     });
 
-    // =========================
-    // MATRIZ
-    // =========================
     const matriz = {};
 
     filas.forEach((d) => {
+      // Ignorar filas residuales de 'TOTAL GRUPO' en caso de que vinieran en el array
+      if (d.clues && d.clues.startsWith("GRUPO_")) return;
+
       const unidad = d.nombre_unidad || "SIN UNIDAD";
       const anio = d.anio;
       const mesNum = parseInt(d.mes);
@@ -2179,11 +2135,9 @@
           : mesesLabels[mesNum - 1];
 
       const clues = d.clues || "";
-
       const key = `${unidad}|${anio}|${mesTexto}`;
 
       if (!matriz[key]) {
-
         matriz[key] = {
           clues: clues,
           unidad,
@@ -2191,15 +2145,8 @@
           mes: mesTexto,
           valores: {}
         };
-
-      }
-      else {
-
-        // si encontramos una CLUES válida reemplaza la vacía
-        if (!matriz[key].clues && clues) {
-          matriz[key].clues = clues;
-        }
-
+      } else if (!matriz[key].clues && clues) {
+        matriz[key].clues = clues;
       }
 
       const indicador = d.indicador.trim();
