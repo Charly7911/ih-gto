@@ -821,7 +821,7 @@
 
   function cargarGrafica() {
 
-    // 1. Si hay selecciones directas en el mapa, ajustar visibilidad de toggles secundarios
+    // 1. Si el usuario seleccionó unidades específicas, desactivar switches secundarios
     if (unidadesSeleccionadas.size > 0) {
       mostrarTodasUnidades = false;
 
@@ -835,12 +835,13 @@
       if (contenedorAcumular) contenedorAcumular.style.display = "none";
     }
 
-    // 🔑 2. DETECTAR TODOS LOS GRUPOS PRESENTES EN EL DROPZONE
+    // 🔑 2. DETECTAR BADGES DE GRUPO ACTIVOS EN EL DROPZONE
     const badgesGrupos = Array.from(
       document.querySelectorAll(".badge-grupo-unidad, [data-tipo='grupo_unidad'], [data-tipo='grupo_unidades']")
     );
 
-    const hayGrupos = badgesGrupos.length > 0 || Boolean(window.grupoSeleccionadoActual);
+    // Evaluamos estrictamente si existen badges de grupo presentes en pantalla
+    const hayGrupos = badgesGrupos.length > 0;
 
     // 🔑 3. VALIDACIONES INICIALES
     const puedeMostrarTodas = mostrarTodasUnidades && unidadesSeleccionadas.size === 0;
@@ -870,32 +871,49 @@
     const params = new URLSearchParams();
 
     // =========================
-    // MODO DE AGRUPACIÓN Y GRUPOS MÚLTIPLES
+    // MODO DE AGRUPACIÓN Y MULTIGRUPO
     // =========================
     if (hayGrupos) {
       params.append("modo", "acumulado");
 
-      // Extraemos la lista de los IDs de los grupos insertados (ej: TODAS, HG, HC, HE)
+      // Recorremos CADA badge de grupo presente en la zona de dropzone
       badgesGrupos.forEach((badge) => {
-        const valGrupo = badge.dataset.value || badge.dataset.id || badge.getAttribute("value");
-        if (valGrupo) {
-          // Limpiamos prefijos si existen para enviar el identificador puro (ej: 'HG', 'TODAS')
-          const idLimpio = valGrupo.replace("GRUPO_", "");
-          params.append("grupos[]", idLimpio);
+        const idRaw = badge.dataset.value || badge.dataset.id || badge.getAttribute("data-value") || "";
+        const idGrupo = idRaw.replace("GRUPO_", "").toUpperCase();
+
+        // Mapeamos las CLUES correspondientes según el grupo arrastrado
+        let cluesGrupo = [];
+        if (idGrupo === "TODAS") {
+          cluesGrupo = (typeof todasUnidades !== "undefined" ? todasUnidades : []).map(u => u.clues || u.id || u);
+        } else if (idGrupo === "HG") {
+          cluesGrupo = (typeof unidades_generales !== "undefined" ? unidades_generales : []).map(u => u.clues || u.id || u);
+        } else if (idGrupo === "HC") {
+          cluesGrupo = (typeof unidades_comunitarios !== "undefined" ? unidades_comunitarios : []).map(u => u.clues || u.id || u);
+        } else if (idGrupo === "HE") {
+          cluesGrupo = (typeof unidades_especialidad !== "undefined" ? unidades_especialidad : []).map(u => u.clues || u.id || u);
         }
+
+        // Si las variables de arrays globales estaban vacías, obtenemos las CLUES leyendo directamente el DOM
+        if (cluesGrupo.length === 0) {
+          const contenedorDom = document.querySelector(`.unidad-container[data-tipo='${idGrupo}']`);
+          if (contenedorDom) {
+            const itemsDom = contenedorDom.querySelectorAll("[data-clues], [data-value], .item-unidad-drag");
+            itemsDom.forEach(item => {
+              const c = item.dataset.clues || item.dataset.value;
+              if (c) cluesGrupo.push(c);
+            });
+          }
+        }
+
+        // Enviamos el par Grupo -> CLUES asociadas
+        cluesGrupo.forEach(clues => {
+          params.append(`grupo_${idGrupo}_clues[]`, clues);
+        });
+        params.append("grupos[]", idGrupo);
       });
 
-      // Si además window.grupoSeleccionadoActual tiene items específicos cargados, enviamos sus CLUES
-      if (window.grupoSeleccionadoActual && Array.isArray(window.grupoSeleccionadoActual.items)) {
-        window.grupoSeleccionadoActual.items.forEach((item) => {
-          const val = typeof item === "object" ? item.value : item;
-          if (val) params.append("clues[]", val);
-        });
-      }
     } else {
       params.append("modo", "individual");
-
-      // Enviar selección de unidades individuales
       unidadesSeleccionadas.forEach((u) => {
         const val = typeof u === "object" ? u.value : u;
         if (val) params.append("clues[]", val);
