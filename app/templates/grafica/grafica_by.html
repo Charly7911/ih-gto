@@ -738,28 +738,41 @@
     span.dataset.value = value;
     span.dataset.sinDatos = "false";
 
-    // 🎨 ESTILOS ESPECÍFICOS SEGÚN EL TIPO DE BADGE
+    // ==========================================================
+    // 🎨 PALETA DE COLORES Y CONTRASTE POR TIPO DE ELEMENTO
+    // ==========================================================
+    let estiloFondoTexto = "";
+    let icono = "";
+
     if (tipo === "grupo_unidad") {
-      span.classList.add("badge-grupo-unidad");
-      // Forzamos la letra negra y fondo claro visible directamente en el elemento
-      span.style.cssText = "background-color: #e2e8f0 !important; color: #000000 !important; font-weight: 600; border: 1px solid #cbd5e1 !important; padding: 5px 10px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; margin-bottom: 6px;";
-    } else if (tipo === "indicador" && indicadoresSinDatos.has(value)) {
-      span.classList.add("indicador-sin-datos");
+      // 🏥 GRUPO (TODAS/42 UNIDADES): Fondo claro (#f1f5f9) con LETRA NEGRA (#0f172a)
+      estiloFondoTexto = "background-color: #f1f5f9 !important; color: #0f172a !important; border: 1px solid #cbd5e1 !important;";
+      icono = '<i class="bi bi-collection-fill me-1" style="color: #0f172a !important;"></i>';
+
+    } else if (tipo === "unidad") {
+      // 🏥 UNIDAD INDIVIDUAL: Fondo azul suave con LETRA OSCURA (#1e293b)
+      estiloFondoTexto = "background-color: #e0f2fe !important; color: #0369a1 !important; border: 1px solid #bae6fd !important;";
+      icono = '<i class="bi bi-hospital me-1" style="color: #0369a1 !important;"></i>';
+
+    } else if (tipo === "indicador") {
+      // 📊 INDICADOR: Fondo azul oscuro/institucional con LETRA BLANCA (#ffffff)
+      if (indicadoresSinDatos.has(value)) {
+        span.classList.add("indicador-sin-datos");
+        estiloFondoTexto = "background-color: #fef2f2 !important; color: #dc2626 !important; border: 1px solid #fecaca !important;";
+      } else {
+        estiloFondoTexto = "background-color: #1e40af !important; color: #ffffff !important; border: 1px solid #1e3a8a !important;";
+      }
+      icono = '<i class="bi bi-graph-up me-1" style="color: inherit;"></i>';
     }
 
-    // 🏥 SELECCIÓN DE ICONO
-    let icono = '<i class="bi bi-graph-up me-1"></i>';
-    if (tipo === "unidad") {
-      icono = '<i class="bi bi-hospital me-1"></i>';
-    } else if (tipo === "grupo_unidad") {
-      icono = '<i class="bi bi-collection-fill me-1" style="color: #000000 !important;"></i>';
-    }
+    // Aplicar estilos generales de contenedor
+    span.style.cssText = `${estiloFondoTexto} font-weight: 600; padding: 5px 10px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; margin-bottom: 6px; font-size: 13px;`;
 
-    // HTML DEL BADGE CON COLOR NEGRO EXPLÍCITO EN EL TEXTO
+    // HTML del badge con herencia de color para que el texto NO se pierda
     span.innerHTML = `
     ${icono}
-    <span style="color: #000000 !important;">${texto}</span>
-    <span class="close-btn" style="color: #000000 !important; font-weight: bold; margin-left: 6px; cursor: pointer;">&times;</span>
+    <span style="color: inherit !important;">${texto}</span>
+    <span class="close-btn" style="color: inherit !important; font-weight: bold; margin-left: 6px; cursor: pointer; opacity: 0.8;">&times;</span>
   `;
 
     // ❌ EVENTO DE ELIMINACIÓN DEL BADGE
@@ -767,7 +780,7 @@
       if (tipo === "unidad") {
         unidadesSeleccionadas.delete(value);
       } else if (tipo === "grupo_unidad") {
-        // Si se borra el grupo (ej. TODAS), limpiamos el Set de las 42 unidades
+        // Si se borra el grupo (ej. TODAS), limpiamos las 42 unidades
         unidadesSeleccionadas.clear();
         if (window.grupoSeleccionadoActual) {
           window.grupoSeleccionadoActual = null;
