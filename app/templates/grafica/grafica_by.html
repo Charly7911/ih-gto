@@ -819,11 +819,11 @@
   }
 
 
-function cargarGrafica() {
+  function cargarGrafica() {
 
     // 1. Si el usuario seleccionó unidades específicas, desactivar switches secundarios
-    if (typeof unidadesSeleccionadas !== "undefined" && unidadesSeleccionadas.size > 0) {
-      if (typeof mostrarTodasUnidades !== "undefined") mostrarTodasUnidades = false;
+    if (unidadesSeleccionadas.size > 0) {
+      mostrarTodasUnidades = false;
 
       const swUnidades = document.getElementById("switchUnidades");
       if (swUnidades) swUnidades.checked = false;
@@ -840,17 +840,18 @@ function cargarGrafica() {
       document.querySelectorAll(".badge-grupo-unidad, [data-tipo='grupo_unidad'], [data-tipo='grupo_unidades']")
     );
 
+    // Evaluamos estrictamente si existen badges de grupo presentes en pantalla
     const hayGrupos = badgesGrupos.length > 0;
 
     // 🔑 3. VALIDACIONES INICIALES
-    const puedeMostrarTodas = (typeof mostrarTodasUnidades !== "undefined" && mostrarTodasUnidades) && unidadesSeleccionadas.size === 0;
+    const puedeMostrarTodas = mostrarTodasUnidades && unidadesSeleccionadas.size === 0;
 
     if (!puedeMostrarTodas && unidadesSeleccionadas.size === 0 && !hayGrupos) {
       destruirTodasLasGraficas();
       return;
     }
 
-    if (typeof indicadoresSeleccionados === "undefined" || indicadoresSeleccionados.size === 0) {
+    if (indicadoresSeleccionados.size === 0) {
       destruirTodasLasGraficas();
       return;
     }
@@ -875,46 +876,36 @@ function cargarGrafica() {
     if (hayGrupos) {
       params.append("modo", "acumulado");
 
+      // Recorremos CADA badge de grupo presente en la zona de dropzone
       badgesGrupos.forEach((badge) => {
         const idRaw = badge.dataset.value || badge.dataset.id || badge.getAttribute("data-value") || "";
-        const idGrupo = idRaw.replace("GRUPO_", "").trim().toUpperCase();
+        const idGrupo = idRaw.replace("GRUPO_", "").toUpperCase();
 
+        // Mapeamos las CLUES correspondientes según el grupo arrastrado
         let cluesGrupo = [];
-
-        // A) Mapeo desde colecciones globales JS
         if (idGrupo === "TODAS") {
-          cluesGrupo = (typeof todasUnidades !== "undefined" ? todasUnidades : []).map(u => typeof u === 'object' ? (u.clues || u.value || u.id) : u);
+          cluesGrupo = (typeof todasUnidades !== "undefined" ? todasUnidades : []).map(u => u.clues || u.id || u);
         } else if (idGrupo === "HG") {
-          cluesGrupo = (typeof unidades_generales !== "undefined" ? unidades_generales : []).map(u => typeof u === 'object' ? (u.clues || u.value || u.id) : u);
+          cluesGrupo = (typeof unidades_generales !== "undefined" ? unidades_generales : []).map(u => u.clues || u.id || u);
         } else if (idGrupo === "HC") {
-          cluesGrupo = (typeof unidades_comunitarios !== "undefined" ? unidades_comunitarios : []).map(u => typeof u === 'object' ? (u.clues || u.value || u.id) : u);
+          cluesGrupo = (typeof unidades_comunitarios !== "undefined" ? unidades_comunitarios : []).map(u => u.clues || u.id || u);
         } else if (idGrupo === "HE") {
-          cluesGrupo = (typeof unidades_especialidad !== "undefined" ? unidades_especialidad : []).map(u => typeof u === 'object' ? (u.clues || u.value || u.id) : u);
+          cluesGrupo = (typeof unidades_especialidad !== "undefined" ? unidades_especialidad : []).map(u => u.clues || u.id || u);
         }
 
-        // B) Fallback: Si la variable global estaba vacía, leemos los atributos directamente del DOM
-        if (!cluesGrupo || cluesGrupo.length === 0) {
-          // Intentamos leer de los items contenidos en la tarjeta del DOM
-          const itemsDom = document.querySelectorAll(`[data-grupo='${idGrupo}'] [data-clues], .item-unidad-${idGrupo.toLowerCase()}`);
-          itemsDom.forEach(item => {
-            const c = item.dataset.clues || item.dataset.value;
-            if (c) cluesGrupo.push(c);
-          });
-        }
-
-        // C) Fallback adicional si el badge almacena la lista de CLUES incrustada en JSON/Dataset
-        if ((!cluesGrupo || cluesGrupo.length === 0) && badge.dataset.clues) {
-          try {
-            cluesGrupo = JSON.parse(badge.dataset.clues);
-          } catch(e) {
-            cluesGrupo = badge.dataset.clues.split(",");
+        // Si las variables de arrays globales estaban vacías, obtenemos las CLUES leyendo directamente el DOM
+        if (cluesGrupo.length === 0) {
+          const contenedorDom = document.querySelector(`.unidad-container[data-tipo='${idGrupo}']`);
+          if (contenedorDom) {
+            const itemsDom = contenedorDom.querySelectorAll("[data-clues], [data-value], .item-unidad-drag");
+            itemsDom.forEach(item => {
+              const c = item.dataset.clues || item.dataset.value;
+              if (c) cluesGrupo.push(c);
+            });
           }
         }
 
-        // Limpiar elementos falsos o nulos
-        cluesGrupo = Array.from(new Set(cluesGrupo.filter(c => c)));
-
-        // Inyectamos las CLUES y el identificador de grupo a la URL
+        // Enviamos el par Grupo -> CLUES asociadas
         cluesGrupo.forEach(clues => {
           params.append(`grupo_${idGrupo}_clues[]`, clues);
         });
@@ -924,7 +915,7 @@ function cargarGrafica() {
     } else {
       params.append("modo", "individual");
       unidadesSeleccionadas.forEach((u) => {
-        const val = typeof u === "object" ? (u.value || u.clues || u.id) : u;
+        const val = typeof u === "object" ? u.value : u;
         if (val) params.append("clues[]", val);
       });
     }
@@ -932,7 +923,7 @@ function cargarGrafica() {
     // =========================
     // TIPOLOGIA
     // =========================
-    if (mostrarTodasUnidades && !hayGrupos) {
+    if (mostrarTodasUnidades) {
       const tipologia =
         document.querySelector("input[name='tipologia']:checked")?.value || "TODAS";
       params.append("tipologia", tipologia);
@@ -955,7 +946,7 @@ function cargarGrafica() {
     // =========================
     // MESES (DESGLOSE MENSUAL VS ANUAL)
     // =========================
-    let mesesSeleccionados = typeof obtenerMesesSeleccionados === "function" ? obtenerMesesSeleccionados() : [];
+    let mesesSeleccionados = obtenerMesesSeleccionados();
 
     if (esAnual) {
       params.append("meses[]", "13");
@@ -1006,26 +997,20 @@ function cargarGrafica() {
         window.ultimoDataRecibido = data;
 
         // Renderizar la gráfica con los datasets diferenciados por cada grupo
-        if (typeof renderGrafica === "function") {
-          renderGrafica(data);
-        }
+        renderGrafica(data);
 
         if (window.ultimoIndicadorArrastrado && !hayGrupos) {
-          if (typeof validarDatosIndicadorIndividual === "function") {
-            validarDatosIndicadorIndividual(
-              data,
-              window.ultimoIndicadorArrastrado
-            );
-          }
-          if (typeof restaurarEstadosBadges === "function") {
-            restaurarEstadosBadges();
-          }
+          validarDatosIndicadorIndividual(
+            data,
+            window.ultimoIndicadorArrastrado
+          );
+          restaurarEstadosBadges();
         }
       })
       .catch((err) => {
         console.error("Error al cargar gráfica:", err);
       });
-}
+  }
 
 
   function validarDatosIndicadorIndividual(data, indicadorId) {
