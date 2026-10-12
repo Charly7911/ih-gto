@@ -50,7 +50,9 @@ def grafica_home():
     )
 
 
-
+# ==========================================================
+# FUNCIÓN TOTAL GENERAL (CON LOS 3 CASOS VALIDADOS)
+# ==========================================================
 # ==========================================================
 # FUNCIÓN TOTAL GENERAL (SIN DUPLICACIÓN DE DATOS)
 # ==========================================================
@@ -1482,13 +1484,46 @@ def indicadores():
     # ==========================================================
     # TOTAL GENERAL Y FILTRADO SEGÚN MODO DE AGRUPACIÓN (MULTIGRUPO)
     # ==========================================================
-    
-    # 🔑 SI ES DESCARGA MASIVA (EXCEL): Ignoramos los grupos y devolvemos TODAS las unidades individuales desglosadas
-    if es_descarga_masiva:
-        # Si no hay unidades filtradas manualmente, mantenemos toda la data sin agrupar
-        if len(unidades) > 1 or not unidades:
-            totales = generar_total_general(
-                data_acumulada=data_acumulada,
+    if modo_agrupacion == "acumulado":
+        # 🔑 1. OBTENER LISTA DE GRUPOS SOLICITADOS EN LA URL
+        grupos_solicitados = request.args.getlist("grupos[]")
+        
+        # Diccionario de nombres legibles para la leyenda de Chart.js
+        etiquetas_grupos = {
+            "TODAS": "TODAS LAS UNIDADES (42)",
+            "HG": "Hospitales Generales (HG)",
+            "HC": "Hospitales Comunitarios (HC)",
+            "HE": "Hospitales de Especialidad (HE)"
+        }
+
+        # Si no se recibió la lista explícita de grupos, usamos las tipologías presentes en la data
+        if not grupos_solicitados:
+            grupos_solicitados = list({r.get("tipologia", "TODAS") for r in data_acumulada})
+
+        data_multigrupo = []
+
+        # 🔑 2. PROCESAR Y SEGMENTAR CADA GRUPO INDEPENDIENTEMENTE
+        for id_grupo in grupos_solicitados:
+            id_grupo_upper = id_grupo.upper()
+            
+            # Obtener las CLUES asociadas a este grupo desde los parámetros
+            clues_grupo = set(request.args.getlist(f"grupo_{id_grupo_upper}_clues[]"))
+
+            # Filtrar los registros pertenecientes a este grupo
+            if clues_grupo:
+                data_subgrupo = [r for r in data_acumulada if r.get("clues") in clues_grupo]
+            elif id_grupo_upper == "TODAS":
+                data_subgrupo = [r for r in data_acumulada if r.get("clues") != "TOTAL"]
+            else:
+                data_subgrupo = [r for r in data_acumulada if r.get("tipologia") == id_grupo_upper]
+
+            # Si el filtro resulta vacío, usamos data_acumulada como fallback
+            if not data_subgrupo:
+                data_subgrupo = data_acumulada
+
+            # Generar el total exclusivo para este grupo
+            totales_grupo = generar_total_general(
+                data_acumulada=data_subgrupo,
                 meses_validos=meses_validos,
                 SUM_FIELDS=SUM_FIELDS,
                 MAX_FIELDS=MAX_FIELDS,
@@ -1497,50 +1532,8 @@ def indicadores():
                 es_descarga_masiva=es_descarga_masiva,
                 indicadores_solicitados=indicadores_solicitados,
             )
-            if totales:
-                data_acumulada.extend(totales)
 
-    # 📊 SI ES PARA LA GRÁFICA EN PANTALLA Y HAY MODO ACUMULADO/GRUPOS
-    elif modo_agrupacion == "acumulado":
-        grupos_solicitados = request.args.getlist("grupos[]")
-        
-        etiquetas_grupos = {
-            "TODAS": "TODAS LAS UNIDADES (42)",
-            "HG": "Hospitales Generales (HG)",
-            "HC": "Hospitales Comunitarios (HC)",
-            "HE": "Hospitales de Especialidad (HE)"
-        }
-
-        if not grupos_solicitados:
-            grupos_solicitados = list({r.get("tipologia", "TODAS") for r in data_acumulada})
-
-        data_multigrupo = []
-
-        for id_grupo in grupos_solicitados:
-            id_grupo_upper = id_grupo.upper()
-            clues_grupo = set(request.args.getlist(f"grupo_{id_grupo_upper}_clues[]"))
-
-            if clues_grupo:
-                data_subgrupo = [r for r in data_acumulada if r.get("clues") in clues_grupo]
-            elif id_grupo_upper == "TODAS":
-                data_subgrupo = [r for r in data_acumulada if r.get("clues") != "TOTAL"]
-            else:
-                data_subgrupo = [r for r in data_acumulada if r.get("tipologia") == id_grupo_upper]
-
-            if not data_subgrupo:
-                data_subgrupo = data_acumulada
-
-            totales_grupo = generar_total_general(
-                data_acumulada=data_subgrupo,
-                meses_validos=meses_validos,
-                SUM_FIELDS=SUM_FIELDS,
-                MAX_FIELDS=MAX_FIELDS,
-                indicadores_max=indicadores_max,
-                calcular_kpis=calcular_kpis,
-                es_descarga_masiva=False,
-                indicadores_solicitados=indicadores_solicitados,
-            )
-
+            # 🔑 3. ASIGNAR NOMBRE ÚNICO A CADA GRUPO PARA SEPARAR LÍNEAS EN CHART.JS
             nombre_etiqueta = etiquetas_grupos.get(id_grupo_upper, f"GRUPO {id_grupo_upper}")
             for t in totales_grupo:
                 t["nombre_unidad"] = nombre_etiqueta
@@ -1550,7 +1543,8 @@ def indicadores():
         data_acumulada = data_multigrupo
 
     elif len(unidades) > 1:
-        # Modo individual normal
+        # 🏥 MODO INDIVIDUAL MULTI-UNIDAD:
+        # Mantiene cada hospital en la gráfica y le pega la fila del TOTAL GENERAL
         totales = generar_total_general(
             data_acumulada=data_acumulada,
             meses_validos=meses_validos,
@@ -1558,7 +1552,7 @@ def indicadores():
             MAX_FIELDS=MAX_FIELDS,
             indicadores_max=indicadores_max,
             calcular_kpis=calcular_kpis,
-            es_descarga_masiva=False,
+            es_descarga_masiva=es_descarga_masiva,
             indicadores_solicitados=indicadores_solicitados,
         )
         if totales:
@@ -1569,6 +1563,7 @@ def indicadores():
     # ==========================================================
     cur.close()
 
+    # Ordenamiento defensivo previniendo valores None
     data_acumulada.sort(
         key=lambda x: (
             x.get("anio") or 0,
