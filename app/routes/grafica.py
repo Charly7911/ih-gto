@@ -1450,11 +1450,28 @@ def indicadores():
     # ==========================================================
     # TOTAL GENERAL Y FILTRADO SEGÚN MODO DE AGRUPACIÓN (MULTIGRUPO)
     # ==========================================================
-    if modo_agrupacion == "acumulado":
-        # 🔑 1. OBTENER LISTA DE GRUPOS SOLICITADOS EN LA URL
-        grupos_solicitados = request.args.getlist("grupos[]")
+    
+    # 🔑 1. CASO DESCARGA MASIVA (EXCEL): Mantener desagregado si es descarga masiva global
+    if es_descarga_masiva and modo_agrupacion != "acumulado":
+        if len(unidades) > 1 or not unidades:
+            totales = generar_total_general(
+                data_acumulada=data_acumulada,
+                meses_validos=meses_validos,
+                SUM_FIELDS=SUM_FIELDS,
+                MAX_FIELDS=MAX_FIELDS,
+                indicadores_max=indicadores_max,
+                calcular_kpis=calcular_kpis,
+                es_descarga_masiva=True,
+                indicadores_solicitados=indicadores_solicitados,
+            )
+            if totales:
+                data_acumulada.extend(totales)
+
+    # 🔑 2. MODO ACUMULADO / MULTIGRUPO PARA GRÁFICAS
+    elif modo_agrupacion == "acumulado":
+        # Obtener lista de grupos solicitados en la URL (fallback a 'grupos')
+        grupos_solicitados = request.args.getlist("grupos[]") or request.args.getlist("grupos")
         
-        # Diccionario de nombres legibles para la leyenda de Chart.js
         etiquetas_grupos = {
             "TODAS": "TODAS LAS UNIDADES (42)",
             "HG": "Hospitales Generales (HG)",
@@ -1462,32 +1479,39 @@ def indicadores():
             "HE": "Hospitales de Especialidad (HE)"
         }
 
-        # Si no se recibió la lista explícita de grupos, usamos las tipologías presentes en la data
+        # Si no se especificó un grupo explícito, asumimos TODAS
         if not grupos_solicitados:
-            grupos_solicitados = list({r.get("tipologia", "TODAS") for r in data_acumulada})
+            grupos_solicitados = ["TODAS"]
 
         data_multigrupo = []
 
-        # 🔑 2. PROCESAR Y SEGMENTAR CADA GRUPO INDEPENDIENTEMENTE
+        # Recorremos y procesamos cada grupo arrastrado a la interfaz
         for id_grupo in grupos_solicitados:
-            id_grupo_upper = id_grupo.upper()
+            id_grupo_upper = str(id_grupo).strip().upper()
             
-            # Obtener las CLUES asociadas a este grupo desde los parámetros
-            clues_grupo = set(request.args.getlist(f"grupo_{id_grupo_upper}_clues[]"))
+            # Extraer las CLUES correspondientes a este grupo desde los parámetros
+            clues_req = request.args.getlist(f"grupo_{id_grupo_upper}_clues[]")
+            clues_grupo = set(str(c).strip() for c in clues_req if c)
 
-            # Filtrar los registros pertenecientes a este grupo
+            # 📌 FILTRADO ROBUSTO DEL SUBGRUPO
             if clues_grupo:
-                data_subgrupo = [r for r in data_acumulada if r.get("clues") in clues_grupo]
+                data_subgrupo = [
+                    r for r in data_acumulada 
+                    if str(r.get("clues", "")).strip() in clues_grupo
+                ]
             elif id_grupo_upper == "TODAS":
-                data_subgrupo = [r for r in data_acumulada if r.get("clues") != "TOTAL"]
+                data_subgrupo = list(data_acumulada)
             else:
-                data_subgrupo = [r for r in data_acumulada if r.get("tipologia") == id_grupo_upper]
+                data_subgrupo = [
+                    r for r in data_acumulada 
+                    if str(r.get("tipologia", "")).strip().upper() == id_grupo_upper
+                ]
 
-            # Si el filtro resulta vacío, usamos data_acumulada como fallback
-            if not data_subgrupo:
-                data_subgrupo = data_acumulada
+            # Respaldar datos si el subgrupo quedó vacío por descalce de filtros
+            if not data_subgrupo and data_acumulada:
+                data_subgrupo = list(data_acumulada)
 
-            # Generar el total exclusivo para este grupo
+            # 📌 CALCULAR KPIS Y TOTALES PARA ESTE GRUPO ESPECÍFICO
             totales_grupo = generar_total_general(
                 data_acumulada=data_subgrupo,
                 meses_validos=meses_validos,
@@ -1495,11 +1519,11 @@ def indicadores():
                 MAX_FIELDS=MAX_FIELDS,
                 indicadores_max=indicadores_max,
                 calcular_kpis=calcular_kpis,
-                es_descarga_masiva=es_descarga_masiva,
+                es_descarga_masiva=False, # 🔑 Importante: False para que devuelva la consolidación del grupo
                 indicadores_solicitados=indicadores_solicitados,
             )
 
-            # 🔑 3. ASIGNAR NOMBRE ÚNICO A CADA GRUPO PARA SEPARAR LÍNEAS EN CHART.JS
+            # Reasignar el nombre de la unidad para etiquetar las líneas independientemente en Chart.js
             nombre_etiqueta = etiquetas_grupos.get(id_grupo_upper, f"GRUPO {id_grupo_upper}")
             for t in totales_grupo:
                 t["nombre_unidad"] = nombre_etiqueta
@@ -1508,9 +1532,8 @@ def indicadores():
 
         data_acumulada = data_multigrupo
 
+    # 🔑 3. MODO INDIVIDUAL MULTI-UNIDAD NORMAL
     elif len(unidades) > 1:
-        # 🏥 MODO INDIVIDUAL MULTI-UNIDAD:
-        # Mantiene cada hospital en la gráfica y le pega la fila del TOTAL GENERAL
         totales = generar_total_general(
             data_acumulada=data_acumulada,
             meses_validos=meses_validos,
@@ -1518,7 +1541,7 @@ def indicadores():
             MAX_FIELDS=MAX_FIELDS,
             indicadores_max=indicadores_max,
             calcular_kpis=calcular_kpis,
-            es_descarga_masiva=es_descarga_masiva,
+            es_descarga_masiva=False,
             indicadores_solicitados=indicadores_solicitados,
         )
         if totales:

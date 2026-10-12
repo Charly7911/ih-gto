@@ -1234,7 +1234,7 @@
 
 
 
-  function renderGrafica(data) {
+ function renderGrafica(data) {
     // 🛡️ Guardacostas para data
     if (!data && window.ultimoDataRecibido) {
       data = window.ultimoDataRecibido;
@@ -1251,9 +1251,9 @@
     const mesesSeleccionados = obtenerMesesSeleccionados();
 
     const sw = document.getElementById("switchUnidades");
-    if (sw && unidadesSeleccionadas.size > 0) {
+    if (sw && typeof unidadesSeleccionadas !== "undefined" && unidadesSeleccionadas.size > 0) {
       sw.checked = false;
-      mostrarTodasUnidades = false;
+      if (typeof mostrarTodasUnidades !== "undefined") mostrarTodasUnidades = false;
     }
 
     const norm = (s) =>
@@ -1300,27 +1300,20 @@
     }
 
     // =========================
-    // COMBOS Y FILTRADO DE DATOS (CORREGIDO PARA TOTAL GRUPO)
+    // FILTRADO ROBUSTO DE DATOS
     // =========================
     let datosGrafica = data;
     const acumularPorTipologia = document.getElementById("switchAcumularTipologia")?.checked || false;
 
-    // ✅ Permite "TOTAL GRUPO", "TOTAL GENERAL" y "TOTAL"
-    if (unidadesSeleccionadas.size === 0 && !mostrarTodasUnidades) {
-      datosGrafica = data.filter(d => {
-        const uUpper = (d.nombre_unidad || "").toUpperCase();
-        return uUpper.includes("TOTAL") || d.clues === "TOTAL";
-      });
-      // Fallback: Si el filtro descartó todo pero data trae registros consolidados, usar data directa
-      if (datosGrafica.length === 0) datosGrafica = data;
-    }
-
-    if (unidadesSeleccionadas.size === 0 && mostrarTodasUnidades) {
-      datosGrafica = data;
-      if (tipologiaSeleccionada !== "TODAS") {
-        datosGrafica = datosGrafica.filter(d =>
-          (d.tipologia || "").trim().toUpperCase() === tipologiaSeleccionada.trim().toUpperCase()
-        );
+    // 🔑 Si no hay unidades individuales explícitas, aceptamos cualquier dato que devuelva la API
+    if (typeof unidadesSeleccionadas !== "undefined" && unidadesSeleccionadas.size === 0) {
+      if (typeof mostrarTodasUnidades !== "undefined" && !mostrarTodasUnidades) {
+        datosGrafica = data.filter(d => {
+          const uUpper = (d.nombre_unidad || "").toUpperCase();
+          const cluesUpper = (d.clues || "").toUpperCase();
+          return uUpper.includes("TOTAL") || uUpper.includes("GRUPO") || cluesUpper.includes("TOTAL") || cluesUpper.includes("GRUPO");
+        });
+        if (datosGrafica.length === 0) datosGrafica = data;
       }
     }
 
@@ -1340,7 +1333,6 @@
       combos = [
         ...new Set(
           datosGrafica.map((d) => {
-            // Preservar la clave exacta para grupos o unidades
             const u = norm(d.nombre_unidad || d.clues || "unidad");
             return `${norm(d.indicador)}|||${d.anio}|||${u}`;
           })
@@ -1426,26 +1418,27 @@
         anio: anioNom
       });
 
-      // Si los datos vienen vacíos o en cero absoluto, evitar renderizar datasets fantasmas
       if (valores.length === 0) return [];
 
       const estilosLinea = [
         [], [6, 6], [2, 3], [12, 4, 2, 4], [8, 4]
       ];
 
-      const listaIndicadores = Array.from(indicadoresSeleccionados);
+      const listaIndicadores = typeof indicadoresSeleccionados !== "undefined" ? Array.from(indicadoresSeleccionados) : [];
       const idxIndicador = listaIndicadores.indexOf(indicadorNom);
       const estiloDash = estilosLinea[Math.max(0, idxIndicador) % estilosLinea.length];
 
-      // Formatear la etiqueta limpia
+      // Formatear etiqueta limpia
+      const regEjemplo = datosGrafica.find(d => norm(d.nombre_unidad || d.clues) === unidadLimpia);
       const nombreEtiqueta = esModoTipologia
         ? `ACUMULADO ${claveTipologia}`
-        : (unidadLimpia.includes("total") ? "TOTAL GRUPO" : unidadLimpia.toUpperCase());
+        : (regEjemplo ? regEjemplo.nombre_unidad : unidadLimpia.toUpperCase());
 
       const indNombre = typeof obtenerNombreIndicador === "function"
         ? obtenerNombreIndicador(indicadorNom)
         : indicadorNom;
 
+      // 🔑 SINTAXIS DE DATASET CORREGIDA
       const baseDataset = {
         label: `${nombreEtiqueta} - ${indNombre} (${anioNom})`,
         unidad: unidadLimpia,
@@ -1539,8 +1532,8 @@
       chart.destroy();
       chart = null;
     }
-    if (Array.isArray(instanciasCharts)) {
-      instanciasCharts.forEach(c => c.destroy());
+    if (typeof instanciasCharts !== "undefined" && Array.isArray(instanciasCharts)) {
+      instanciasCharts.forEach(c => c && c.destroy());
       instanciasCharts = [];
     }
 
@@ -1608,7 +1601,7 @@
           options: obtenerOpcionesGrafica()
         });
 
-        if (Array.isArray(instanciasCharts)) {
+        if (typeof instanciasCharts !== "undefined" && Array.isArray(instanciasCharts)) {
           instanciasCharts.push(subChart);
         }
 
@@ -1617,7 +1610,7 @@
         }
       });
     }
-  }
+}
 
   // PARTE 3
 
