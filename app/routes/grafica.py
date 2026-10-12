@@ -501,12 +501,23 @@ def indicadores():
     # PARAMETROS
     # ==========================================================
 
+    
+
     # Leer parámetros con soporte fallback
     unidades = (
         request.args.getlist("clues[]")
         or request.args.getlist("unidades[]")
         or request.args.getlist("clues")
     )
+
+    # 🔑 RECOLECCIÓN DE CLUES DE GRUPOS (HG, HC, HE, TODAS):
+    # Si viene vacía 'unidades', extraemos todas las CLUES enviadas en los arreglos 'grupo_X_clues[]'
+    for key in request.args.keys():
+        if key.startswith("grupo_") and key.endswith("_clues[]"):
+            unidades.extend(request.args.getlist(key))
+
+    # Deduplicar
+    unidades = list(set([u for u in unidades if u]))
 
     anios_raw = request.args.getlist("anios[]") or request.args.getlist("anios")
     meses_raw = request.args.getlist("meses[]") or request.args.getlist("meses")
@@ -524,7 +535,6 @@ def indicadores():
     anios = [int(a) for a in anios_raw if str(a).isdigit()]
     meses = [int(m) for m in meses_raw if str(m).isdigit()]
 
-    # Si seleccionan los 12 meses, si viene el mes 13, o si no seleccionan ninguno, es vista ANUAL/ACUMULADA
     meses_validos = [m for m in meses if m != 13]
     quiere_anual = (13 in meses) or (len(meses) == 0)
     es_anual = quiere_anual
@@ -558,14 +568,11 @@ def indicadores():
     # CONFIGURACIÓN BASE DE GROUP BY
     # ==========================================================
 
-    es_acumulado = (modo_agrupacion != "individual" and len(unidades) > 1)
-
-    if es_acumulado:
-        group_by_cols = ["e.anio"]
-        select_unidad = "'TOTAL' AS clues, 'TOTAL GRUPO' AS nombre_unidad, 'TODAS' AS tipologia,"
-    else:
-        group_by_cols = ["e.anio", "e.clues", "e.nombre_unidad", "c.tipologia"]
-        select_unidad = "e.clues, e.nombre_unidad, c.tipologia,"
+    # 🔑 Para que Python pueda agrupar por cada subgrupo, la consulta SQL siempre 
+    # debe traer el desglose por CLUES. De esa forma 'generar_total_general'
+    # suma los absolutos y calcula la mortalidad/ocupación exacta por grupo.
+    group_by_cols = ["e.anio", "e.clues", "e.nombre_unidad", "c.tipologia"]
+    select_unidad = "e.clues, e.nombre_unidad, c.tipologia,"
 
     if not quiere_anual:
         group_by_cols.append("e.mes")
@@ -598,8 +605,8 @@ def indicadores():
             where_e += " AND e.mes IN ({})".format(",".join(["%s"] * len(meses_calculo)))
             params_e.extend(meses_calculo)
 
-        # Solo filtramos tipología si NO estamos consolidando todo el grupo
-        if tipologia != "TODAS" and not es_acumulado:
+        # Solo filtramos tipología si no hay unidades específicas enviadas
+        if tipologia != "TODAS" and not unidades:
             where_e += " AND c.tipologia = %s"
             params_e.append(tipologia)
 
