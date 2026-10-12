@@ -821,7 +821,7 @@
 
   function cargarGrafica() {
 
-    // 1. Si el usuario seleccionó unidades específicas, desactivamos "Mostrar Todas"
+    // 1. Si hay selecciones directas en el mapa, ajustar visibilidad de toggles secundarios
     if (unidadesSeleccionadas.size > 0) {
       mostrarTodasUnidades = false;
 
@@ -835,14 +835,17 @@
       if (contenedorAcumular) contenedorAcumular.style.display = "none";
     }
 
-    // Detectar si hay un badge o bandera de grupo activo (ej. TODAS / 42 unidades)
-    const tieneBadgeGrupo = document.querySelector(".badge-grupo-unidad, [data-tipo='grupo_unidad'], [data-tipo='grupo_unidades']") !== null;
-    const hayGrupo = tieneBadgeGrupo || Boolean(window.grupoSeleccionadoActual);
+    // 🔑 2. DETECTAR TODOS LOS GRUPOS PRESENTES EN EL DROPZONE
+    const badgesGrupos = Array.from(
+      document.querySelectorAll(".badge-grupo-unidad, [data-tipo='grupo_unidad'], [data-tipo='grupo_unidades']")
+    );
 
-    // 🔑 2. VALIDACIONES INICIALES
+    const hayGrupos = badgesGrupos.length > 0 || Boolean(window.grupoSeleccionadoActual);
+
+    // 🔑 3. VALIDACIONES INICIALES
     const puedeMostrarTodas = mostrarTodasUnidades && unidadesSeleccionadas.size === 0;
 
-    if (!puedeMostrarTodas && unidadesSeleccionadas.size === 0 && !hayGrupo) {
+    if (!puedeMostrarTodas && unidadesSeleccionadas.size === 0 && !hayGrupos) {
       destruirTodasLasGraficas();
       return;
     }
@@ -867,22 +870,32 @@
     const params = new URLSearchParams();
 
     // =========================
-    // MODO DE AGRUPACIÓN (ACUMULADO VS INDIVIDUAL)
+    // MODO DE AGRUPACIÓN Y GRUPOS MÚLTIPLES
     // =========================
-    const modoAgrupacion = hayGrupo ? "acumulado" : "individual";
-    params.append("modo", modoAgrupacion);
+    if (hayGrupos) {
+      params.append("modo", "acumulado");
 
-    // =========================
-    // UNIDADES (EXTRAER CLUES DE FORMA SEGURA)
-    // =========================
-    if (hayGrupo && window.grupoSeleccionadoActual && Array.isArray(window.grupoSeleccionadoActual.items)) {
-      // Caso A: Si viene desde la selección de Grupo (las 42 CLUES)
-      window.grupoSeleccionadoActual.items.forEach((item) => {
-        const val = typeof item === "object" ? item.value : item;
-        if (val) params.append("clues[]", val);
+      // Extraemos la lista de los IDs de los grupos insertados (ej: TODAS, HG, HC, HE)
+      badgesGrupos.forEach((badge) => {
+        const valGrupo = badge.dataset.value || badge.dataset.id || badge.getAttribute("value");
+        if (valGrupo) {
+          // Limpiamos prefijos si existen para enviar el identificador puro (ej: 'HG', 'TODAS')
+          const idLimpio = valGrupo.replace("GRUPO_", "");
+          params.append("grupos[]", idLimpio);
+        }
       });
+
+      // Si además window.grupoSeleccionadoActual tiene items específicos cargados, enviamos sus CLUES
+      if (window.grupoSeleccionadoActual && Array.isArray(window.grupoSeleccionadoActual.items)) {
+        window.grupoSeleccionadoActual.items.forEach((item) => {
+          const val = typeof item === "object" ? item.value : item;
+          if (val) params.append("clues[]", val);
+        });
+      }
     } else {
-      // Caso B: Si provienen de la selección manual en Set/Array
+      params.append("modo", "individual");
+
+      // Enviar selección de unidades individuales
       unidadesSeleccionadas.forEach((u) => {
         const val = typeof u === "object" ? u.value : u;
         if (val) params.append("clues[]", val);
@@ -917,11 +930,9 @@
     // =========================
     let mesesSeleccionados = obtenerMesesSeleccionados();
 
-    // Si es Vista Anual, solicitamos únicamente la marca del Mes 13
     if (esAnual) {
       params.append("meses[]", "13");
     } else {
-      // Si es Vista Mensual pero el usuario no marcó casillas, por defecto van los 12 meses
       if (mesesSeleccionados.length === 0) {
         mesesSeleccionados = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
       }
@@ -931,7 +942,7 @@
       });
     }
 
-    console.log("🔗 URL SOLICITADA A LA API:", "/grafica/api/indicadores?" + params.toString());
+    console.log("🔗 URL SOLICITADA A LA API MULTIGRUPO:", "/grafica/api/indicadores?" + params.toString());
 
     // =========================
     // PETICIÓN HTTP (FETCH)
@@ -967,11 +978,10 @@
 
         window.ultimoDataRecibido = data;
 
-        // Renderizar la gráfica con los datos recibidos
+        // Renderizar la gráfica con los datasets diferenciados por cada grupo
         renderGrafica(data);
 
-        // Omitir validación individual si estamos en modo de grupo acumulado
-        if (window.ultimoIndicadorArrastrado && modoAgrupacion !== "acumulado") {
+        if (window.ultimoIndicadorArrastrado && !hayGrupos) {
           validarDatosIndicadorIndividual(
             data,
             window.ultimoIndicadorArrastrado
