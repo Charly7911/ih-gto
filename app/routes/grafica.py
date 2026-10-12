@@ -536,24 +536,15 @@ def indicadores():
 
    
     # ==========================================================
-    # 1. PARÁMETROS Y RECOLECCIÓN DE CLUES
+    # PARAMETROS
     # ==========================================================
-    grupos_solicitados = request.args.getlist("grupos[]") or request.args.getlist("grupos")
-    
-    # 🔑 Recolectar CLUES directas
+
+    # Leer parámetros con soporte fallback
     unidades = (
         request.args.getlist("clues[]")
         or request.args.getlist("unidades[]")
         or request.args.getlist("clues")
     )
-
-    # 🔑 Recolectar CLUES enviadas en grupo_X_clues[]
-    for key in request.args.keys():
-        if key.startswith("grupo_") and key.endswith("_clues[]"):
-            unidades.extend(request.args.getlist(key))
-
-    # Limpiar y deduplicar CLUES
-    unidades = list(set([u for u in unidades if u]))
 
     anios_raw = request.args.getlist("anios[]") or request.args.getlist("anios")
     meses_raw = request.args.getlist("meses[]") or request.args.getlist("meses")
@@ -567,9 +558,11 @@ def indicadores():
     tipologia = request.args.get("tipologia", "TODAS")
     modo_agrupacion = request.args.get("modo", "acumulado")
 
+    # Normalizar numéricos
     anios = [int(a) for a in anios_raw if str(a).isdigit()]
     meses = [int(m) for m in meses_raw if str(m).isdigit()]
 
+    # Si seleccionan los 12 meses, si viene el mes 13, o si no seleccionan ninguno, es vista ANUAL/ACUMULADA
     meses_validos = [m for m in meses if m != 13]
     quiere_anual = (13 in meses) or (len(meses) == 0)
     es_anual = quiere_anual
@@ -580,8 +573,9 @@ def indicadores():
     meses_calculo = meses_validos
 
     # ==========================================================
-    # 2. FLAGS Y CONFIGURACIÓN DE GROUP BY
+    # FLAGS DE EJECUCIÓN
     # ==========================================================
+
     es_descarga_masiva = len(indicadores_solicitados) == 0
 
     quiere_kpis = es_descarga_masiva or any(
@@ -590,9 +584,26 @@ def indicadores():
         for i in indicadores_solicitados
     )
 
-    # 🔑 Mantenemos el desglose por hospital en SQL para que Python calcule los KPIs reales
-    group_by_cols = ["e.anio", "e.clues", "e.nombre_unidad", "c.tipologia"]
-    select_unidad = "e.clues, e.nombre_unidad, c.tipologia,"
+    quiere_vistas = es_descarga_masiva or any(
+        i not in kpis_calculados for i in indicadores_solicitados
+    )
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    data_acumulada = []
+
+    # PARTE 3
+    # ==========================================================
+    # CONFIGURACIÓN BASE DE GROUP BY
+    # ==========================================================
+
+    es_acumulado = (modo_agrupacion == "acumulado") or (len(grupos_solicitados) > 0) or (len(unidades) > 1 and modo_agrupacion != "individual")
+
+    if es_acumulado:
+        group_by_cols = ["e.anio"]
+        select_unidad = "'TOTAL' AS clues, 'TOTAL GRUPO' AS nombre_unidad, 'TODAS' AS tipologia,"
+    else:
+        group_by_cols = ["e.anio", "e.clues", "e.nombre_unidad", "c.tipologia"]
+        select_unidad = "e.clues, e.nombre_unidad, c.tipologia,"
 
     if not quiere_anual:
         group_by_cols.append("e.mes")
@@ -600,24 +611,22 @@ def indicadores():
     group_by = ",\n".join(group_by_cols)
     select_mes = "e.mes," if not quiere_anual else "13 AS mes,"
 
+    agg_camas = "AVG" if quiere_anual else "MAX"
+
     # ==========================================================
-    # 3. CONSULTA SQL DE KPIS (SIN FILTROS CONTRADICTORIOS)
+    # KPIS
     # ==========================================================
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    data_acumulada = []
+
+    rows_e = []
 
     if quiere_kpis:
+
         where_e = "WHERE 1=1"
         params_e = []
 
-        # 🔑 Si ya enviamos una lista explícita de CLUES (de TODAS, HG, HC o HE),
-        # filtramos SOLAMENTE por CLUES y no por la columna tipologia.
         if unidades:
             where_e += " AND e.clues IN ({})".format(",".join(["%s"] * len(unidades)))
             params_e.extend(unidades)
-        elif tipologia != "TODAS":
-            where_e += " AND c.tipologia = %s"
-            params_e.append(tipologia)
 
         if anios:
             where_e += " AND e.anio IN ({})".format(",".join(["%s"] * len(anios)))
@@ -626,6 +635,11 @@ def indicadores():
         if meses_calculo:
             where_e += " AND e.mes IN ({})".format(",".join(["%s"] * len(meses_calculo)))
             params_e.extend(meses_calculo)
+
+        # Solo filtramos tipología si NO estamos consolidando todo el grupo
+        if tipologia != "TODAS" and not es_acumulado:
+            where_e += " AND c.tipologia = %s"
+            params_e.append(tipologia)
 
         # ======================================================
         # QUERY PRINCIPAL
@@ -1437,12 +1451,11 @@ def indicadores():
     )
 
     # ==========================================================
-    # TOTAL GENERAL Y FILTRADO SEGÚN MODO DE AGRUPACIÓN (MULTIGRUPO)
+    # TOTAL GENERAL Y FILTRADO SEGÚN MODO DE AGRUPACIÓN
     # ==========================================================
     
-    # 🔑 SI ES DESCARGA MASIVA (EXCEL): Ignoramos los grupos y devolvemos TODAS las unidades individuales desglosadas
+    # 🔑 1. DESCARGA MASIVA (EXCEL): Retorna las unidades individuales desglosadas
     if es_descarga_masiva:
-        # Si no hay unidades filtradas manualmente, mantenemos toda la data sin agrupar
         if len(unidades) > 1 or not unidades:
             totales = generar_total_general(
                 data_acumulada=data_acumulada,
@@ -1457,9 +1470,9 @@ def indicadores():
             if totales:
                 data_acumulada.extend(totales)
 
-    # 📊 SI ES PARA LA GRÁFICA EN PANTALLA Y HAY MODO ACUMULADO/GRUPOS
+    # 🔑 2. MODO ACUMULADO / MULTIGRUPO PARA GRÁFICAS
     elif modo_agrupacion == "acumulado":
-        grupos_solicitados = request.args.getlist("grupos[]")
+        grupos_solicitados = request.args.getlist("grupos[]") or request.args.getlist("grupos")
         
         etiquetas_grupos = {
             "TODAS": "TODAS LAS UNIDADES (42)",
@@ -1469,24 +1482,39 @@ def indicadores():
         }
 
         if not grupos_solicitados:
-            grupos_solicitados = list({r.get("tipologia", "TODAS") for r in data_acumulada})
+            grupos_solicitados = ["TODAS"]
 
         data_multigrupo = []
 
         for id_grupo in grupos_solicitados:
             id_grupo_upper = id_grupo.upper()
-            clues_grupo = set(request.args.getlist(f"grupo_{id_grupo_upper}_clues[]"))
+            
+            # Obtener las CLUES asociadas enviadas por la URL
+            lista_clues_req = request.args.getlist(f"grupo_{id_grupo_upper}_clues[]")
+            clues_grupo = set(str(c).strip() for c in lista_clues_req if c)
 
+            # 📌 FILTRADO ROBUSTO DE SUBGRUPO:
             if clues_grupo:
-                data_subgrupo = [r for r in data_acumulada if r.get("clues") in clues_grupo]
-            elif id_grupo_upper == "TODAS":
-                data_subgrupo = [r for r in data_acumulada if r.get("clues") != "TOTAL"]
+                # Si vinieron CLUES explícitas del grupo, filtramos por ellas
+                data_subgrupo = [
+                    r for r in data_acumulada 
+                    if str(r.get("clues", "")).strip() in clues_grupo
+                ]
             else:
-                data_subgrupo = [r for r in data_acumulada if r.get("tipologia") == id_grupo_upper]
+                # Si no vinieron CLUES específicas, filtramos por tipología
+                if id_grupo_upper == "TODAS":
+                    data_subgrupo = list(data_acumulada)
+                else:
+                    data_subgrupo = [
+                        r for r in data_acumulada 
+                        if str(r.get("tipologia", "")).upper() == id_grupo_upper
+                    ]
 
-            if not data_subgrupo:
-                data_subgrupo = data_acumulada
+            # Si el filtro no encontró nada pero hay datos acumulados base, los usamos como respaldo
+            if not data_subgrupo and data_acumulada:
+                data_subgrupo = list(data_acumulada)
 
+            # 📌 CÁLCULO DE TOTALES Y KPIS
             totales_grupo = generar_total_general(
                 data_acumulada=data_subgrupo,
                 meses_validos=meses_validos,
@@ -1498,6 +1526,7 @@ def indicadores():
                 indicadores_solicitados=indicadores_solicitados,
             )
 
+            # Asignar la etiqueta correspondiente para separar las líneas en Chart.js
             nombre_etiqueta = etiquetas_grupos.get(id_grupo_upper, f"GRUPO {id_grupo_upper}")
             for t in totales_grupo:
                 t["nombre_unidad"] = nombre_etiqueta
@@ -1506,8 +1535,8 @@ def indicadores():
 
         data_acumulada = data_multigrupo
 
+    # 🔑 3. MODO INDIVIDUAL MULTI-UNIDAD
     elif len(unidades) > 1:
-        # Modo individual normal
         totales = generar_total_general(
             data_acumulada=data_acumulada,
             meses_validos=meses_validos,
