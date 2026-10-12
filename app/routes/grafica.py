@@ -1,3 +1,5 @@
+import math
+
 import MySQLdb
 from flask import Blueprint, request, jsonify, render_template
 from flask_login import login_required, current_user
@@ -83,178 +85,112 @@ def generar_total_general(
     recursos_set = {r.lower() for r in RECURSOS_FISICOS}
     sum_fields_set = {s.lower() for s in SUM_FIELDS}
 
-    # Unidades reales en data (excluyendo totales previos)
-    unidades = {
-        r.get("nombre_unidad")
-        for r in data_acumulada
-        if r.get("clues") != "TOTAL" and r.get("nombre_unidad") != "TOTAL GENERAL"
-    }
+    # 1. Filtramos para usar SOLO registros individuales reales
+    data_limpia = [
+        r for r in data_acumulada 
+        if r.get("clues") != "TOTAL" and r.get("nombre_unidad") not in ["TOTAL GENERAL", "TOTAL GRUPO"]
+    ]
 
-    es_anual = any(r.get("mes") == 13 for r in data_acumulada)
-
-    # Si solo hay 1 unidad y es vista anual, no genera fila extra
-    if len(unidades) == 1 and es_anual:
-        return []
+    # Si por alguna razón toda la data venía ya rotulada como TOTAL, la usamos directamente
+    if not data_limpia:
+        data_limpia = data_acumulada
 
     resultados = []
 
     # ==========================================
-    # AUXILIAR: CONSTRUIR BASE (SUMA SOLO ABSOLUTOS)
+    # AUXILIAR: CONSTRUIR BASE (SUMA REAL DE ABSOLUTOS DE TODAS LAS CLUES)
     # ==========================================
     def construir_base(registros):
-        base = {}
+        base = defaultdict(float)
 
-        # 1. Recursos Físicos
-        recursos_map = defaultdict(lambda: defaultdict(float))
+        # A) Deduplicar exactamente por (anio, mes, clues, indicador)
+        vistos = set()
+        registros_unicos = []
         for x in registros:
-            indicador = x["indicador"].lower()
+            clave = (x.get("anio"), x.get("mes"), x.get("clues"), str(x.get("indicador", "")).lower())
+            if clave not in vistos:
+                vistos.add(clave)
+                registros_unicos.append(x)
+
+        # B) Sumar absolutos entre todas las CLUES del subgrupo
+        recursos_map = defaultdict(lambda: defaultdict(float))
+
+        for x in registros_unicos:
+            ind_lower = str(x.get("indicador", "")).lower()
             unidad = x.get("nombre_unidad", "UNIDAD")
-            if indicador in recursos_set:
-                val = float(x.get("valor") or 0)
-                if val > recursos_map[indicador][unidad]:
-                    recursos_map[indicador][unidad] = val
+            val = float(x.get("valor") or 0)
 
+            if ind_lower in recursos_set:
+                # Recursos físicos: máximo mensual por hospital del grupo
+                if val > recursos_map[ind_lower][unidad]:
+                    recursos_map[ind_lower][unidad] = val
+            else:
+                # 🔑 TODOS los absolutos del grupo SE SUMAN
+                base[ind_lower] += val
+
+        # Asignar recursos físicos consolidados
         for campo in RECURSOS_FISICOS:
-            base[campo] = sum(recursos_map[campo.lower()].values())
-
-        # 2. Campos Sumables
-        for campo in SUM_FIELDS:
             campo_lower = campo.lower()
-            base[campo] = sum(
-                float(x.get("valor") or 0)
-                for x in registros
-                if x["indicador"].lower() == campo_lower
-            )
-
-        # 3. Campos Máximos / Varios
-        for campo in MAX_FIELDS:
-            campo_lower = campo.lower()
-            if campo_lower not in recursos_set and campo_lower not in sum_fields_set:
-                base[campo] = sum(
-                    float(x.get("valor") or 0)
-                    for x in registros
-                    if x["indicador"].lower() == campo_lower
-                )
+            base[campo_lower] = sum(recursos_map[campo_lower].values())
 
         return base
 
-    # ==========================================
-    # CASO 1: UNA SOLA UNIDAD - MENSUAL (CONSOLIDAR RANGO)
-    # ==========================================
-    if len(unidades) == 1 and not es_anual:
-        anios_presentes = {r["anio"] for r in data_acumulada}
-
-        for anio in anios_presentes:
-            registros_anio = [
-                r for r in data_acumulada
-                if r["anio"] == anio and r.get("clues") != "TOTAL" and r.get("mes") != 13
-            ]
-
-            if not registros_anio:
-                continue
-
-            base = construir_base(registros_anio)
-            meses_en_registro = {int(r["mes"]) for r in registros_anio}
-
-            dias = sum(calendar.monthrange(anio, m)[1] for m in meses_en_registro)
-            kpis = calcular_kpis(base, dias)
-            dataset = {**base, **kpis}
-
-            # Nota: Usamos el mes representativo (numérico) para no romper el ordenamiento de Chart.js
-            mes_rep = max(meses_en_registro) if meses_en_registro else 12
-
-            for indicador, valor in dataset.items():
-                ind_lower = indicador.lower()
-                if es_descarga_masiva or ind_lower in indicadores_solic_set:
-                    resultados.append({
-                        "anio": anio,
-                        "mes": mes_rep,
-                        "clues": "TOTAL",
-                        "nombre_unidad": "TOTAL GENERAL",
-                        "tipologia": "TODAS",
-                        "indicador": ind_lower,
-                        "valor": round(float(valor), 2)
-                    })
-
-        return resultados
-
-    # ==========================================
-    # CASO 2: VARIAS UNIDADES - ANUAL (MES 13)
-    # ==========================================
-    if len(unidades) > 1 and es_anual:
-        anios_presentes = {r["anio"] for r in data_acumulada}
-
-        for anio in anios_presentes:
-            registros_anio = [
-                r for r in data_acumulada
-                if r["anio"] == anio and r.get("clues") != "TOTAL"
-            ]
-
-            if not registros_anio:
-                registros_anio = [r for r in data_acumulada if r["anio"] == anio]
-
-            base = construir_base(registros_anio)
-
-            if meses_validos:
-                dias = sum(calendar.monthrange(anio, m)[1] for m in meses_validos)
-            else:
-                dias = 365
-
-            kpis = calcular_kpis(base, dias)
-            dataset = {**base, **kpis}
-
-            for indicador, valor in dataset.items():
-                ind_lower = indicador.lower()
-                if es_descarga_masiva or ind_lower in indicadores_solic_set:
-                    resultados.append({
-                        "anio": anio,
-                        "mes": 13,
-                        "clues": "TOTAL",
-                        "nombre_unidad": "TOTAL GRUPO",
-                        "tipologia": "TODAS",
-                        "indicador": ind_lower,
-                        "valor": round(float(valor), 2)
-                    })
-
-        return resultados
-
-    # ==========================================
-    # CASO 3: VARIAS UNIDADES - MENSUAL (DESGLOSE MES A MES)
-    # ==========================================
-    grupos = defaultdict(list)
-
-    for r in data_acumulada:
-        if r.get("clues") != "TOTAL":
-            grupos[(r["anio"], int(r["mes"]))].append(r)
-
-    # Fallback por si data_acumulada venía prefijada con TOTAL
-    if not grupos:
-        for r in data_acumulada:
-            if r.get("mes") != 13:
-                grupos[(r["anio"], int(r["mes"]))].append(r)
-
-    for (anio, mes), registros in grupos.items():
-        if mes == 13:
-            continue
-
-        base = construir_base(registros)
-        dias = calendar.monthrange(anio, mes)[1]
-
-        kpis = calcular_kpis(base, dias)
-        dataset = {**base, **kpis}
-
+    # Auxiliar para empaquetar
+    def empaquetar(dataset, anio, mes):
+        filas = []
         for indicador, valor in dataset.items():
-            ind_lower = indicador.lower()
+            ind_lower = str(indicador).lower()
             if es_descarga_masiva or ind_lower in indicadores_solic_set:
-                resultados.append({
+                try:
+                    val_float = float(valor or 0)
+                    if math.isnan(val_float) or math.isinf(val_float):
+                        val_float = 0.0
+                except (ValueError, TypeError):
+                    val_float = 0.0
+
+                filas.append({
                     "anio": anio,
                     "mes": mes,
                     "clues": "TOTAL",
                     "nombre_unidad": "TOTAL GRUPO",
                     "tipologia": "TODAS",
                     "indicador": ind_lower,
-                    "valor": round(float(valor), 2)
+                    "valor": round(val_float, 2)
                 })
+        return filas
+
+    # ==========================================
+    # PROCESAMIENTO CONSOLIDADO POR (AÑO, MES)
+    # ==========================================
+    es_anual = any(r.get("mes") == 13 for r in data_limpia)
+
+    if es_anual:
+        # Modo Anual (Mes 13)
+        anios_presentes = {r["anio"] for r in data_limpia}
+        for anio in anios_presentes:
+            registros_anio = [r for r in data_limpia if r["anio"] == anio]
+            base = construir_base(registros_anio)
+            dias = sum(calendar.monthrange(anio, m)[1] for m in meses_validos) if meses_validos else 365
+            
+            # Cálculo de KPIs sobre la suma total del grupo
+            kpis = calcular_kpis(base, dias)
+            dataset = {**base, **kpis}
+            resultados.extend(empaquetar(dataset, anio, 13))
+    else:
+        # Modo Mensual (Desglose mes a mes)
+        grupos = defaultdict(list)
+        for r in data_limpia:
+            if r.get("mes") != 13:
+                grupos[(r["anio"], int(r["mes"]))].append(r)
+
+        for (anio, mes), registros in grupos.items():
+            base = construir_base(registros)
+            dias = calendar.monthrange(anio, mes)[1]
+
+            # Cálculo de KPIs sobre la suma total del grupo
+            kpis = calcular_kpis(base, dias)
+            dataset = {**base, **kpis}
+            resultados.extend(empaquetar(dataset, anio, mes))
 
     return resultados
 
