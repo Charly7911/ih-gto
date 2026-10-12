@@ -536,9 +536,10 @@ def indicadores():
 
    
     # ==========================================================
-    # PARAMETROS
+    # PARÁMETROS
     # ==========================================================
     grupos_solicitados = request.args.getlist("grupos[]") or request.args.getlist("grupos")
+    
     # Leer parámetros con soporte fallback
     unidades = (
         request.args.getlist("clues[]")
@@ -546,6 +547,7 @@ def indicadores():
         or request.args.getlist("clues")
     )
 
+    # 🔑 Recolección de CLUES desde los subgrupos multigrupo
     if not unidades and grupos_solicitados:
         for g in grupos_solicitados:
             g_upper = g.upper()
@@ -569,7 +571,6 @@ def indicadores():
     anios = [int(a) for a in anios_raw if str(a).isdigit()]
     meses = [int(m) for m in meses_raw if str(m).isdigit()]
 
-    # Si seleccionan los 12 meses, si viene el mes 13, o si no seleccionan ninguno, es vista ANUAL/ACUMULADA
     meses_validos = [m for m in meses if m != 13]
     quiere_anual = (13 in meses) or (len(meses) == 0)
     es_anual = quiere_anual
@@ -598,17 +599,22 @@ def indicadores():
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     data_acumulada = []
 
-    # PARTE 3
     # ==========================================================
-    # CONFIGURACIÓN BASE DE GROUP BY
+    # PARTE 3: CONFIGURACIÓN BASE DE GROUP BY (AJUSTE MULTIGRUPO)
     # ==========================================================
 
-    es_acumulado = (modo_agrupacion == "acumulado") or (len(grupos_solicitados) > 0) or (len(unidades) > 1 and modo_agrupacion != "individual")
+    # 🔑 SI HAY MÁS DE UN GRUPO SOLICITADO:
+    # La consulta SQL debe traer las unidades desglosadas para que la función 
+    # 'generar_total_general' pueda calcular los KPIs reales de cada grupo por separado.
+    hay_multigrupo = len(grupos_solicitados) > 1
+
+    es_acumulado = (modo_agrupacion == "acumulado" and not hay_multigrupo) or (len(unidades) > 1 and modo_agrupacion != "individual" and not hay_multigrupo)
 
     if es_acumulado:
         group_by_cols = ["e.anio"]
         select_unidad = "'TOTAL' AS clues, 'TOTAL GRUPO' AS nombre_unidad, 'TODAS' AS tipologia,"
     else:
+        # En multigrupo o modo individual traemos las columnas por unidad
         group_by_cols = ["e.anio", "e.clues", "e.nombre_unidad", "c.tipologia"]
         select_unidad = "e.clues, e.nombre_unidad, c.tipologia,"
 
@@ -643,7 +649,6 @@ def indicadores():
             where_e += " AND e.mes IN ({})".format(",".join(["%s"] * len(meses_calculo)))
             params_e.extend(meses_calculo)
 
-        # Solo filtramos tipología si NO estamos consolidando todo el grupo
         if tipologia != "TODAS" and not es_acumulado:
             where_e += " AND c.tipologia = %s"
             params_e.append(tipologia)
