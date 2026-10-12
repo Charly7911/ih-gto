@@ -671,7 +671,7 @@
 
                     <!-- BARRA GLOBAL DE CONTROL (SELECCIONAR / ARRASTRAR TODAS) -->
                     <div class="p-2 mb-2 bg-dark rounded d-flex justify-content-between align-items-center gap-2">
-                        <label class="text-black mb-0" style="font-size:11px; cursor:pointer;">
+                        <label class="text-white mb-0" style="font-size:11px; cursor:pointer;">
                             <input type="checkbox" id="checkTodasUnidades" onchange="toggleTodasUnidades(this)">
                             <strong>Seleccionar TODAS</strong>
                         </label>
@@ -693,7 +693,7 @@
                             <!-- Barra de grupo HG -->
                             <div
                                 class="px-2 py-1 mb-1 d-flex justify-content-between align-items-center bg-secondary bg-opacity-25 rounded">
-                                <label class="mb-0 text-black" style="font-size:10px;">
+                                <label class="mb-0 text-white" style="font-size:10px;">
                                     <input type="checkbox" class="check-grupo-unidad" data-tipo="HG"
                                         onchange="toggleGrupoUnidades('HG', this.checked)"> Marca HG
                                 </label>
@@ -725,7 +725,7 @@
                             <!-- Barra de grupo HC -->
                             <div
                                 class="px-2 py-1 mb-1 d-flex justify-content-between align-items-center bg-secondary bg-opacity-25 rounded">
-                                <label class="mb-0 text-black" style="font-size:10px;">
+                                <label class="mb-0 text-white" style="font-size:10px;">
                                     <input type="checkbox" class="check-grupo-unidad" data-tipo="HC"
                                         onchange="toggleGrupoUnidades('HC', this.checked)"> Marca HC
                                 </label>
@@ -757,7 +757,7 @@
                             <!-- Barra de grupo HE -->
                             <div
                                 class="px-2 py-1 mb-1 d-flex justify-content-between align-items-center bg-secondary bg-opacity-25 rounded">
-                                <label class="mb-0 text-black" style="font-size:10px;">
+                                <label class="mb-0 text-white" style="font-size:10px;">
                                     <input type="checkbox" class="check-grupo-unidad" data-tipo="HE"
                                         onchange="toggleGrupoUnidades('HE', this.checked)"> Marca HE
                                 </label>
@@ -1370,94 +1370,94 @@
 
 
 <script>
-    // ======================================================
-    // FUNCIONES GLOBALES PARA SELECCIÓN Y ARRASTRE DE UNIDADES
-    // (Deben ir FUERA de DOMContentLoaded)
-    // ======================================================
+   // ======================================================
+// FUNCIONES GLOBALES PARA SELECCIÓN Y ARRASTRE DE UNIDADES
+// (Deben ir FUERA de DOMContentLoaded)
+// ======================================================
 
-    window.toggleTodasUnidades = function (masterCheckbox) {
-        const checked = masterCheckbox.checked;
-        document.querySelectorAll('.filtro-unidad, .unidad-container input[type="checkbox"]').forEach(cb => cb.checked = checked);
-        document.querySelectorAll('.check-grupo-unidad').forEach(cb => cb.checked = checked);
+window.toggleTodasUnidades = function (masterCheckbox) {
+    const checked = masterCheckbox.checked;
+    document.querySelectorAll('.filtro-unidad, .unidad-container input[type="checkbox"]').forEach(cb => cb.checked = checked);
+    document.querySelectorAll('.check-grupo-unidad').forEach(cb => cb.checked = checked);
+};
+
+window.toggleGrupoUnidades = function (tipo, checked) {
+    const selector = `.filtro-unidad[data-tipo="${tipo}"], .unidad-container[data-tipo="${tipo}"] input[type="checkbox"]`;
+    document.querySelectorAll(selector).forEach(cb => {
+        cb.checked = checked;
+    });
+};
+
+window.dragUnidadIndividual = function (event, id, nombre) {
+    const payload = {
+        type: 'unidad',
+        value: String(id),
+        nombre: nombre
     };
+    const payloadString = JSON.stringify(payload);
+    event.dataTransfer.setData('application/json', payloadString);
+    event.dataTransfer.setData('text', payloadString);
+};
 
-    window.toggleGrupoUnidades = function (tipo, checked) {
-        const selector = `.filtro-unidad[data-tipo="${tipo}"], .unidad-container[data-tipo="${tipo}"] input[type="checkbox"]`;
-        document.querySelectorAll(selector).forEach(cb => {
-            cb.checked = checked;
-        });
-    };
+window.dragGrupoUnidades = function (event, tipoGrupo) {
+    let unidades = [];
 
-    window.dragUnidadIndividual = function (event, id, nombre) {
-        const payload = {
-            type: 'unidad',
-            value: String(id),
-            nombre: nombre
-        };
-        const payloadString = JSON.stringify(payload);
-        event.dataTransfer.setData('application/json', payloadString);
-        event.dataTransfer.setData('text', payloadString);
-    };
+    // 1. SI ES 'TODAS' Y TENEMOS LA VARIABLE DEL SERVIDOR: Respuesta instantánea (0ms)
+    if (tipoGrupo === 'TODAS' && window.CATALOGO_UNIDADES_SERVIDO && window.CATALOGO_UNIDADES_SERVIDO.length > 0) {
+        unidades = window.CATALOGO_UNIDADES_SERVIDO.map(u => ({
+            value: String(u.clues),
+            nombre: u.nombre_unidad
+        }));
+    }
 
-    window.dragGrupoUnidades = function (event, tipoGrupo) {
-        let unidades = [];
+    // 2. SI NO SE OBTUVIERON (O ES HG, HC, HE): Buscar en el DOM
+    if (unidades.length === 0) {
+        let elementos = [];
+        const acordeonPrincipal = event.target.closest('.acordeon-indicadores, .filter-block-acordeon, #sidebar, body') || document;
 
-        // 1. SI ES 'TODAS' Y TENEMOS LA VARIABLE DEL SERVIDOR: Respuesta instantánea (0ms)
-        if (tipoGrupo === 'TODAS' && window.CATALOGO_UNIDADES_SERVIDO && window.CATALOGO_UNIDADES_SERVIDO.length > 0) {
-            unidades = window.CATALOGO_UNIDADES_SERVIDO.map(u => ({
-                value: String(u.clues),
-                nombre: u.nombre_unidad
-            }));
+        if (tipoGrupo === 'TODAS') {
+            elementos = acordeonPrincipal.querySelectorAll('.check-item, .searchable-item, .unidad-item-grafica, .unidad-container label, .unidad-container div[data-clues]');
+        } else {
+            const subAcordeon = event.target.closest('details, .sub-acordeon') || acordeonPrincipal.querySelector(`[data-tipo="${tipoGrupo}"]`);
+
+            if (subAcordeon) {
+                elementos = subAcordeon.querySelectorAll('.check-item, .searchable-item, .unidad-item-grafica, label, div[data-clues]');
+            } else {
+                elementos = acordeonPrincipal.querySelectorAll(`.check-item[data-tipo="${tipoGrupo}"], [data-tipo="${tipoGrupo}"] label`);
+            }
         }
 
-        // 2. SI NO SE OBTUVIERON (O ES HG, HC, HE): Buscar en el DOM
-        if (unidades.length === 0) {
-            let elementos = [];
-            const acordeonPrincipal = event.target.closest('.acordeon-indicadores, .filter-block-acordeon, #sidebar, body') || document;
+        elementos.forEach(el => {
+            const inputEl = el.querySelector('input');
+            let val = inputEl ? inputEl.value : (el.getAttribute('data-clues') || el.getAttribute('data-value') || el.dataset.clues);
 
-            if (tipoGrupo === 'TODAS') {
-                elementos = acordeonPrincipal.querySelectorAll('.check-item, .searchable-item, .unidad-item-grafica, .unidad-container label, .unidad-container div[data-clues]');
-            } else {
-                const subAcordeon = event.target.closest('details, .sub-acordeon') || acordeonPrincipal.querySelector(`[data-tipo="${tipoGrupo}"]`);
+            const spanEl = el.querySelector('span');
+            let nombreText = spanEl ? spanEl.innerText.trim() : el.innerText.trim();
+            nombreText = nombreText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
 
-                if (subAcordeon) {
-                    elementos = subAcordeon.querySelectorAll('.check-item, .searchable-item, .unidad-item-grafica, label, div[data-clues]');
-                } else {
-                    elementos = acordeonPrincipal.querySelectorAll(`.check-item[data-tipo="${tipoGrupo}"], [data-tipo="${tipoGrupo}"] label`);
+            if (val && val !== "on" && !el.innerText.includes("Marca ") && !el.innerText.includes("Seleccionar")) {
+                if (!unidades.some(u => u.value === String(val))) {
+                    unidades.push({
+                        value: String(val),
+                        nombre: nombreText || String(val)
+                    });
                 }
             }
+        });
+    }
 
-            elementos.forEach(el => {
-                const inputEl = el.querySelector('input');
-                let val = inputEl ? inputEl.value : (el.getAttribute('data-clues') || el.getAttribute('data-value') || el.dataset.clues);
+    console.log(`📦 Unidades encontradas para [${tipoGrupo}]:`, unidades.length, unidades);
 
-                const spanEl = el.querySelector('span');
-                let nombreText = spanEl ? spanEl.innerText.trim() : el.innerText.trim();
-                nombreText = nombreText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-
-                if (val && val !== "on" && !el.innerText.includes("Marca ") && !el.innerText.includes("Seleccionar")) {
-                    if (!unidades.some(u => u.value === String(val))) {
-                        unidades.push({
-                            value: String(val),
-                            nombre: nombreText || String(val)
-                        });
-                    }
-                }
-            });
-        }
-
-        console.log(`📦 Unidades encontradas para [${tipoGrupo}]:`, unidades.length, unidades);
-
-        const payload = {
-            type: 'grupo_unidades',
-            grupo: tipoGrupo,
-            items: unidades
-        };
-
-        const payloadString = JSON.stringify(payload);
-        event.dataTransfer.setData('application/json', payloadString);
-        event.dataTransfer.setData('text', payloadString);
+    const payload = {
+        type: 'grupo_unidades',
+        grupo: tipoGrupo,
+        items: unidades
     };
+
+    const payloadString = JSON.stringify(payload);
+    event.dataTransfer.setData('application/json', payloadString);
+    event.dataTransfer.setData('text', payloadString);
+};
 
 
     const tipo = "{{ tipo }}"; // morbi | morta | urg | urgencias | sis | egresos | ind | indicadores

@@ -676,9 +676,6 @@
       }
 
       // =========================
-      // UNIDADES (GRUPO / ABANICO)
-      // =========================
-      // =========================
       // UNIDADES (GRUPO / ABANICO: ACUMULADO)
       // =========================
       if (data.type === "grupo_unidades" && Array.isArray(data.items)) {
@@ -741,29 +738,43 @@
     span.dataset.value = value;
     span.dataset.sinDatos = "false";
 
-    if (
-      tipo === "indicador" &&
-      indicadoresSinDatos.has(value)
-    ) {
+    // 🎨 ESTILOS ESPECÍFICOS SEGÚN EL TIPO DE BADGE
+    if (tipo === "grupo_unidad") {
+      span.classList.add("badge-grupo-unidad");
+      // Forzamos la letra negra y fondo claro visible directamente en el elemento
+      span.style.cssText = "background-color: #e2e8f0 !important; color: #000000 !important; font-weight: 600; border: 1px solid #cbd5e1 !important; padding: 5px 10px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; margin-bottom: 6px;";
+    } else if (tipo === "indicador" && indicadoresSinDatos.has(value)) {
       span.classList.add("indicador-sin-datos");
     }
 
+    // 🏥 SELECCIÓN DE ICONO
+    let icono = '<i class="bi bi-graph-up me-1"></i>';
+    if (tipo === "unidad") {
+      icono = '<i class="bi bi-hospital me-1"></i>';
+    } else if (tipo === "grupo_unidad") {
+      icono = '<i class="bi bi-collection-fill me-1" style="color: #000000 !important;"></i>';
+    }
 
-
-    const icono =
-      tipo === "unidad"
-        ? '<i class="bi bi-hospital me-1"></i>'
-        : '<i class="bi bi-graph-up me-1"></i>';
-
+    // HTML DEL BADGE CON COLOR NEGRO EXPLÍCITO EN EL TEXTO
     span.innerHTML = `
     ${icono}
-    <span>${texto}</span>
-    <span class="close-btn">&times;</span>
+    <span style="color: #000000 !important;">${texto}</span>
+    <span class="close-btn" style="color: #000000 !important; font-weight: bold; margin-left: 6px; cursor: pointer;">&times;</span>
   `;
 
+    // ❌ EVENTO DE ELIMINACIÓN DEL BADGE
     span.querySelector(".close-btn").onclick = () => {
-      if (tipo === "unidad") unidadesSeleccionadas.delete(value);
-      if (tipo === "indicador") indicadoresSeleccionados.delete(value);
+      if (tipo === "unidad") {
+        unidadesSeleccionadas.delete(value);
+      } else if (tipo === "grupo_unidad") {
+        // Si se borra el grupo (ej. TODAS), limpiamos el Set de las 42 unidades
+        unidadesSeleccionadas.clear();
+        if (window.grupoSeleccionadoActual) {
+          window.grupoSeleccionadoActual = null;
+        }
+      } else if (tipo === "indicador") {
+        indicadoresSeleccionados.delete(value);
+      }
 
       span.remove();
 
@@ -1056,6 +1067,8 @@
     });
 
   }
+
+
 
   function crearLeyendaPersonalizada(chart) {
     const contenedor = document.getElementById("leyendaPersonalizada");
