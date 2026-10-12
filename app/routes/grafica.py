@@ -538,13 +538,20 @@ def indicadores():
     # ==========================================================
     # PARAMETROS
     # ==========================================================
-
+    grupos_solicitados = request.args.getlist("grupos[]") or request.args.getlist("grupos")
     # Leer parámetros con soporte fallback
     unidades = (
         request.args.getlist("clues[]")
         or request.args.getlist("unidades[]")
         or request.args.getlist("clues")
     )
+
+    if not unidades and grupos_solicitados:
+        for g in grupos_solicitados:
+            g_upper = g.upper()
+            clues_sub = request.args.getlist(f"grupo_{g_upper}_clues[]")
+            unidades.extend(clues_sub)
+        unidades = list(set(unidades)) # Deduplicar
 
     anios_raw = request.args.getlist("anios[]") or request.args.getlist("anios")
     meses_raw = request.args.getlist("meses[]") or request.args.getlist("meses")
@@ -596,7 +603,7 @@ def indicadores():
     # CONFIGURACIÓN BASE DE GROUP BY
     # ==========================================================
 
-    es_acumulado = (modo_agrupacion != "individual" and len(unidades) > 1)
+    es_acumulado = (modo_agrupacion == "acumulado") or (len(grupos_solicitados) > 0) or (len(unidades) > 1 and modo_agrupacion != "individual")
 
     if es_acumulado:
         group_by_cols = ["e.anio"]
