@@ -536,23 +536,23 @@ def indicadores():
 
    
     # ==========================================================
-    # PARÁMETROS
+    # 1. PARÁMETROS Y RECOLECCIÓN DE CLUES
     # ==========================================================
     grupos_solicitados = request.args.getlist("grupos[]") or request.args.getlist("grupos")
     
-    # Leer parámetros con soporte fallback
+    # 🔑 Recolectar CLUES directas
     unidades = (
         request.args.getlist("clues[]")
         or request.args.getlist("unidades[]")
         or request.args.getlist("clues")
     )
 
-    # 🔑 Recolección de CLUES desde los subgrupos multigrupo
+    # 🔑 Recolectar CLUES enviadas en grupo_X_clues[]
     for key in request.args.keys():
         if key.startswith("grupo_") and key.endswith("_clues[]"):
             unidades.extend(request.args.getlist(key))
 
-    # Deduplicar la lista de CLUES
+    # Limpiar y deduplicar CLUES
     unidades = list(set([u for u in unidades if u]))
 
     anios_raw = request.args.getlist("anios[]") or request.args.getlist("anios")
@@ -567,7 +567,6 @@ def indicadores():
     tipologia = request.args.get("tipologia", "TODAS")
     modo_agrupacion = request.args.get("modo", "acumulado")
 
-    # Normalizar numéricos
     anios = [int(a) for a in anios_raw if str(a).isdigit()]
     meses = [int(m) for m in meses_raw if str(m).isdigit()]
 
@@ -581,9 +580,8 @@ def indicadores():
     meses_calculo = meses_validos
 
     # ==========================================================
-    # FLAGS DE EJECUCIÓN
+    # 2. FLAGS Y CONFIGURACIÓN DE GROUP BY
     # ==========================================================
-
     es_descarga_masiva = len(indicadores_solicitados) == 0
 
     quiere_kpis = es_descarga_masiva or any(
@@ -592,31 +590,9 @@ def indicadores():
         for i in indicadores_solicitados
     )
 
-    quiere_vistas = es_descarga_masiva or any(
-        i not in kpis_calculados for i in indicadores_solicitados
-    )
-
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    data_acumulada = []
-
-    # ==========================================================
-    # PARTE 3: CONFIGURACIÓN BASE DE GROUP BY (AJUSTE MULTIGRUPO)
-    # ==========================================================
-
-    # 🔑 SI HAY MÁS DE UN GRUPO SOLICITADO:
-    # La consulta SQL debe traer las unidades desglosadas para que la función 
-    # 'generar_total_general' pueda calcular los KPIs reales de cada grupo por separado.
-    hay_multigrupo = len(grupos_solicitados) > 1
-
-    es_acumulado = (modo_agrupacion == "acumulado" and not hay_multigrupo) or (len(unidades) > 1 and modo_agrupacion != "individual" and not hay_multigrupo)
-
-    if es_acumulado:
-        group_by_cols = ["e.anio"]
-        select_unidad = "'TOTAL' AS clues, 'TOTAL GRUPO' AS nombre_unidad, 'TODAS' AS tipologia,"
-    else:
-        # En multigrupo o modo individual traemos las columnas por unidad
-        group_by_cols = ["e.anio", "e.clues", "e.nombre_unidad", "c.tipologia"]
-        select_unidad = "e.clues, e.nombre_unidad, c.tipologia,"
+    # 🔑 Mantenemos el desglose por hospital en SQL para que Python calcule los KPIs reales
+    group_by_cols = ["e.anio", "e.clues", "e.nombre_unidad", "c.tipologia"]
+    select_unidad = "e.clues, e.nombre_unidad, c.tipologia,"
 
     if not quiere_anual:
         group_by_cols.append("e.mes")
@@ -624,22 +600,24 @@ def indicadores():
     group_by = ",\n".join(group_by_cols)
     select_mes = "e.mes," if not quiere_anual else "13 AS mes,"
 
-    agg_camas = "AVG" if quiere_anual else "MAX"
-
     # ==========================================================
-    # KPIS
+    # 3. CONSULTA SQL DE KPIS (SIN FILTROS CONTRADICTORIOS)
     # ==========================================================
-
-    rows_e = []
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    data_acumulada = []
 
     if quiere_kpis:
-
         where_e = "WHERE 1=1"
         params_e = []
 
+        # 🔑 Si ya enviamos una lista explícita de CLUES (de TODAS, HG, HC o HE),
+        # filtramos SOLAMENTE por CLUES y no por la columna tipologia.
         if unidades:
             where_e += " AND e.clues IN ({})".format(",".join(["%s"] * len(unidades)))
             params_e.extend(unidades)
+        elif tipologia != "TODAS":
+            where_e += " AND c.tipologia = %s"
+            params_e.append(tipologia)
 
         if anios:
             where_e += " AND e.anio IN ({})".format(",".join(["%s"] * len(anios)))
@@ -648,10 +626,6 @@ def indicadores():
         if meses_calculo:
             where_e += " AND e.mes IN ({})".format(",".join(["%s"] * len(meses_calculo)))
             params_e.extend(meses_calculo)
-
-        if tipologia != "TODAS" and not es_acumulado:
-            where_e += " AND c.tipologia = %s"
-            params_e.append(tipologia)
 
         # ======================================================
         # QUERY PRINCIPAL
