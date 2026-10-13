@@ -605,10 +605,49 @@ def indicadores():
             where_e += " AND e.mes IN ({})".format(",".join(["%s"] * len(meses_calculo)))
             params_e.extend(meses_calculo)
 
-        # Solo filtramos tipología si no hay unidades específicas enviadas
         if tipologia != "TODAS" and not unidades:
             where_e += " AND c.tipologia = %s"
             params_e.append(tipologia)
+
+        # 🔑 AQUÍ VA EL BLOQUE NUEVO:
+        # MAPEO DE KPIS A SUS ABSOLUTOS REQUERIDOS EN SQL
+        MAPA_SQL_DEPENDENCIAS = {
+            "mortalidad_cruda": ["egre_defunciones", "total_egresos"],
+            "mortalidad_ajustada": ["egre_defunciones_48h", "total_egresos"],
+            "porcentaje_ocupacion": ["dias_p_med_int", "dias_p_cirugia", "dias_p_gineco", "dias_p_pediatria", "dias_p_otros", "camas_censables_total", "camas_total"],
+            "porcentaje_ocupacion_med_interna": ["dias_p_med_int", "camas_med_int"],
+            "porcentaje_ocupacion_cirugia": ["dias_p_cirugia", "camas_cirugia"],
+            "porcentaje_ocupacion_pediatria": ["dias_p_pediatria", "camas_pediatria"],
+            "porcentaje_ocupacion_gineco": ["dias_p_gineco", "camas_gineco"],
+            "porcentaje_ocupacion_otros": ["dias_p_otros", "camas_otros"],
+            "prom_dias_estancia": ["total_egresos", "dias_p_med_int", "dias_p_cirugia", "dias_p_gineco", "dias_p_pediatria", "dias_p_otros"],
+            "prom_estancia_med_int": ["egre_med_interna", "dias_p_med_int"],
+            "prom_estancia_cirugia": ["egre_cirugia", "dias_p_cirugia"],
+            "prom_estancia_pediatria": ["egre_pediatria", "dias_p_pediatria"],
+            "prom_estancia_gineco": ["egre_gineco", "dias_p_gineco"],
+            "prom_estancia_otros": ["egre_otros", "dias_p_otros"],
+            "consultas_por_dia": ["total_consultas", "consultas"],
+            "especialidad_por_dia": ["consultas_especialidad", "especialidad"],
+            "urgencias_por_dia": ["total_urgencias", "urgencias"],
+            "nacimientos_por_dia": ["nacimientos_totales", "total_nacimientos", "partos_totales"],
+            "prom_inter_diarias_qx": ["intervenciones_qx", "total_proced_dentro", "quirofanos"],
+            "porcentaje_calificada": ["urgencias_calificadas", "calificada", "total_urgencias", "urgencias"],
+            "porcentaje_cesareas": ["cesareas_totales", "nac_cesarea", "partos_totales", "nacimientos_totales"],
+            "porcentaje_apeo": ["apeo_aceptantes", "apeo", "eventos_obstetricos", "partos_totales", "nacimientos_totales"],
+            "indice_rotacion": ["total_egresos", "camas_censables_total", "camas_total"],
+            "interv_sustitucion": ["camas_censables_total", "camas_total", "total_egresos", "dias_p_med_int", "dias_p_cirugia", "dias_p_gineco", "dias_p_pediatria", "dias_p_otros"]
+        }
+
+        indicadores_para_sql = set(indicadores_solicitados)
+        for ind in indicadores_solicitados:
+            ind_clean = str(ind).lower().strip()
+            if ind_clean in MAPA_SQL_DEPENDENCIAS:
+                indicadores_para_sql.update(MAPA_SQL_DEPENDENCIAS[ind_clean])
+
+        # 🔑 USAR 'indicadores_para_sql' EN LUGAR DE 'indicadores_solicitados' EN LA CONSULTA SQL
+        if indicadores_para_sql and not es_descarga_masiva:
+            where_e += " AND e.indicador IN ({})".format(",".join(["%s"] * len(indicadores_para_sql)))
+            params_e.extend(list(indicadores_para_sql))
 
         # ======================================================
         # QUERY PRINCIPAL
