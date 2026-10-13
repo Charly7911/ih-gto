@@ -1385,33 +1385,42 @@
           if (esModoTipologia) {
             return str(d.tipologia || "OTRO").trim().toUpperCase() === claveTipologia;
           } else {
-            // 🔑 MATCH FLEXIBLE: Compara por nombre_unidad, clues o coincidencia de grupo
+            // 🔑 MATCH EXACTO DE UNIDAD O TOTAL CONSOLIDADO
             const entReg = norm(d.nombre_unidad || d.clues);
             const cluesReg = norm(d.clues);
-            return (
-              entReg === unidadLimpia ||
-              cluesReg === unidadLimpia ||
-              (unidadLimpia.includes("total") && (entReg.includes("total") || cluesReg.includes("total"))) ||
-              (unidadLimpia.includes("todas") && entReg.includes("todas"))
-            );
+
+            if (unidadLimpia === "total_grupo" || unidadLimpia.includes("total")) {
+              return cluesReg === "total" || entReg === "total_grupo" || entReg.includes("total");
+            }
+
+            return entReg === unidadLimpia || cluesReg === unidadLimpia;
           }
         });
 
-        // Agrupamiento seguro por mes
+        // Agrupamiento por mes
         const mapaMeses = {};
         const conteoMeses = {};
 
         registros.forEach((r) => {
           const m = Number(r.mes);
           const val = Number(r.valor || 0);
-          mapaMeses[m] = (mapaMeses[m] || 0) + val;
-          conteoMeses[m] = (conteoMeses[m] || 0) + 1;
+
+          // 🔑 Si es un registro consolidado (TOTAL GRUPO), asignamos el valor directo sin acumular
+          if (r.clues === "TOTAL" || norm(r.nombre_unidad) === "total_grupo") {
+            mapaMeses[m] = val;
+            conteoMeses[m] = 1;
+          } else {
+            mapaMeses[m] = (mapaMeses[m] || 0) + val;
+            conteoMeses[m] = (conteoMeses[m] || 0) + 1;
+          }
         });
 
-        // Si es una tasa/promedio y vinieron múltiples filas para el mismo mes, sacamos el promedio
+        // 🔑 SOLO promediar si vinieron múltiples unidades INDIVIDUALES (no para el TOTAL CONSOLIDADO)
         if (esIndicadorRazon(indicadorNom)) {
           Object.keys(mapaMeses).forEach((m) => {
-            if (conteoMeses[m] > 1) {
+            const esFilaConsolidada = registros.some(r => Number(r.mes) === Number(m) && (r.clues === "TOTAL" || norm(r.nombre_unidad) === "total_grupo"));
+
+            if (!esFilaConsolidada && conteoMeses[m] > 1) {
               mapaMeses[m] = mapaMeses[m] / conteoMeses[m];
             }
           });
