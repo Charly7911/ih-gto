@@ -1311,7 +1311,8 @@
       str(d.clues).startsWith("GRUPO_") ||
       str(d.nombre_unidad).toUpperCase().includes("GRUPO") ||
       str(d.nombre_unidad).toUpperCase().includes("HOSPITALES") ||
-      str(d.nombre_unidad).toUpperCase().includes("TODAS LAS UNIDADES")
+      str(d.nombre_unidad).toUpperCase().includes("TODAS LAS UNIDADES") ||
+      str(d.clues).toUpperCase() === "TOTAL"
     );
 
     // 🔑 Si vienen grupos, filtramos las filas consolidadas sin descuidar "TOTAL"
@@ -1321,13 +1322,13 @@
         str(d.nombre_unidad).toUpperCase().includes("GRUPO") ||
         str(d.nombre_unidad).toUpperCase().includes("HOSPITALES") ||
         str(d.nombre_unidad).toUpperCase().includes("TODAS LAS UNIDADES") ||
-        d.clues === "TOTAL"
+        str(d.clues).toUpperCase() === "TOTAL"
       );
       if (datosGrafica.length === 0) datosGrafica = data;
     } else if (typeof unidadesSeleccionadas !== "undefined" && unidadesSeleccionadas.size === 0 && !mostrarTodasUnidades) {
       datosGrafica = data.filter(d => {
         const uUpper = str(d.nombre_unidad).toUpperCase();
-        return uUpper.includes("TOTAL") || d.clues === "TOTAL";
+        return uUpper.includes("TOTAL") || str(d.clues).toUpperCase() === "TOTAL";
       });
       if (datosGrafica.length === 0) datosGrafica = data;
     }
@@ -1359,7 +1360,7 @@
 
     const mostrarTendencia = document.getElementById("switchTendencia")?.checked || false;
 
-    // Listado de indicadores porcentuales/calculados que no deben sumarse linealmente
+    // Listado de indicadores porcentuales/calculados
     const esIndicadorRazon = (ind) => {
       const i = norm(ind);
       return i.includes("mortalidad") || i.includes("porcentaje") || i.includes("prom") || i.includes("indice") || i.includes("interv");
@@ -1385,46 +1386,39 @@
           if (esModoTipologia) {
             return str(d.tipologia || "OTRO").trim().toUpperCase() === claveTipologia;
           } else {
-            // 🔑 MATCH EXACTO DE UNIDAD O TOTAL CONSOLIDADO
             const entReg = norm(d.nombre_unidad || d.clues);
             const cluesReg = norm(d.clues);
 
-            if (unidadLimpia === "total_grupo" || unidadLimpia.includes("total")) {
-              return cluesReg === "total" || entReg === "total_grupo" || entReg.includes("total");
+            if (unidadLimpia.includes("total") || unidadLimpia.includes("grupo")) {
+              return cluesReg === "total" || entReg.includes("total") || entReg.includes("grupo");
             }
 
             return entReg === unidadLimpia || cluesReg === unidadLimpia;
           }
         });
 
-        // Agrupamiento por mes
+        // 🔑 AGRUPAMIENTO POR MES SIN PROMEDIAR LA TASA CALCULADA POR EL BACKEND
         const mapaMeses = {};
-        const conteoMeses = {};
 
         registros.forEach((r) => {
           const m = Number(r.mes);
           const val = Number(r.valor || 0);
+          const cluesReg = str(r.clues).toUpperCase();
+          const nombreReg = norm(r.nombre_unidad);
 
-          // 🔑 Si es un registro consolidado (TOTAL GRUPO), asignamos el valor directo sin acumular
-          if (r.clues === "TOTAL" || norm(r.nombre_unidad) === "total_grupo") {
+          const esConsolidado =
+            cluesReg === "TOTAL" ||
+            nombreReg.includes("total") ||
+            nombreReg.includes("grupo") ||
+            nombreReg.includes("todas");
+
+          if (esConsolidado) {
+            // Asignación directa del valor ponderado enviado por el backend
             mapaMeses[m] = val;
-            conteoMeses[m] = 1;
-          } else {
-            mapaMeses[m] = (mapaMeses[m] || 0) + val;
-            conteoMeses[m] = (conteoMeses[m] || 0) + 1;
+          } else if (!(m in mapaMeses)) {
+            mapaMeses[m] = val;
           }
         });
-
-        // 🔑 SOLO promediar si vinieron múltiples unidades INDIVIDUALES (no para el TOTAL CONSOLIDADO)
-        if (esIndicadorRazon(indicadorNom)) {
-          Object.keys(mapaMeses).forEach((m) => {
-            const esFilaConsolidada = registros.some(r => Number(r.mes) === Number(m) && (r.clues === "TOTAL" || norm(r.nombre_unidad) === "total_grupo"));
-
-            if (!esFilaConsolidada && conteoMeses[m] > 1) {
-              mapaMeses[m] = mapaMeses[m] / conteoMeses[m];
-            }
-          });
-        }
 
         const mesesBase =
           mesesSeleccionados.length > 0
@@ -1456,7 +1450,11 @@
 
         let totalAnual = 0;
         if (registros.length > 0) {
-          if (esIndicadorRazon(indicadorNom)) {
+          // Se busca directamente la fila consolidada si existe
+          const regConsolidado = registros.find(r => str(r.clues).toUpperCase() === "TOTAL" || norm(r.nombre_unidad).includes("total"));
+          if (regConsolidado) {
+            totalAnual = Number(regConsolidado.valor || 0);
+          } else if (esIndicadorRazon(indicadorNom)) {
             totalAnual = registros.reduce((acc, r) => acc + Number(r.valor || 0), 0) / registros.length;
           } else {
             totalAnual = registros.reduce((acc, r) => acc + Number(r.valor || 0), 0);
@@ -1506,7 +1504,7 @@
         : indicadorNom;
 
       const baseDataset = {
-        label: `${nombreEtiqueta} - ${indNombre} (${anioNom})`,
+        label: `${nombreEtiqueta}\n${indNombre} (${anioNom})`,
         unidad: unidadLimpia,
         indicador: indicadorNom,
         anio: anioNom,
@@ -1648,14 +1646,14 @@
         const cardDiv = document.createElement("div");
         cardDiv.className = "tarjeta-subgrafica mb-4 p-3 border rounded bg-white shadow-sm w-100";
         cardDiv.innerHTML = `
-          <h6 class="fw-bold text-primary mb-3 border-bottom pb-2" style="font-size: 13px; text-transform: uppercase;">
-            📊 Indicador: ${nombreInd}
-          </h6>
-          <div style="height: 280px; position: relative;" class="w-100">
-            <canvas id="grafica_sub_${index}"></canvas>
-          </div>
-          <div id="leyenda_sub_${index}" class="mt-3"></div>
-        `;
+        <h6 class="fw-bold text-primary mb-3 border-bottom pb-2" style="font-size: 13px; text-transform: uppercase;">
+          📊 Indicador: ${nombreInd}
+        </h6>
+        <div style="height: 280px; position: relative;" class="w-100">
+          <canvas id="grafica_sub_${index}"></canvas>
+        </div>
+        <div id="leyenda_sub_${index}" class="mt-3"></div>
+      `;
         contenedor.appendChild(cardDiv);
 
         const canvasSub = document.getElementById(`grafica_sub_${index}`);
