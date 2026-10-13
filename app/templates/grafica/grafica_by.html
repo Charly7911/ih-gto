@@ -1300,46 +1300,29 @@
       etiquetasX = mesesBase.map((m) => mesesLabels[m - 1]);
     }
 
-    // =========================
-    // FILTRADO ROBUSTO DE DATOS PARA GRUPOS
-    // =========================
-    // =========================================================
-    // FILTRADO DE ALTA PRECISIÓN: AISLAR EXCLUSIVAMENTE "TOTAL GRUPO"
+      // =========================================================
+    // FILTRADO ROBUSTO DE DATOS PARA GRUPOS (DESCARDA HOSPITALES INDIVIDUALES)
     // =========================================================
     let datosGrafica = data;
 
-    // 1. Verificar si la respuesta trae la fila consolidada real del Backend
-    const registrosTotales = data.filter(d =>
+    // 1. Filtrar filas consolidadas reales del Backend ("TOTAL GRUPO", "TOTAL", "GRUPO_...")
+    const registrosTotales = data.filter((d) =>
       str(d.clues).toUpperCase() === "TOTAL" ||
+      str(d.clues).startsWith("GRUPO_") ||
       str(d.nombre_unidad).toUpperCase() === "TOTAL GRUPO" ||
-      str(d.nombre_unidad).toUpperCase() === "TOTAL GENERAL"
+      str(d.nombre_unidad).toUpperCase() === "TOTAL GENERAL" ||
+      str(d.nombre_unidad).toUpperCase().includes("TODAS LAS UNIDADES")
     );
 
-    // 2. Si existen filas consolidadas, DESCHAMOS los 42 hospitales individuales para que NO contaminen la gráfica
+    // 2. Si existen consolidados, aislar solo esas filas para evitar la contaminación con hospitales individuales
     if (registrosTotales.length > 0) {
       datosGrafica = registrosTotales;
     } else if (typeof unidadesSeleccionadas !== "undefined" && unidadesSeleccionadas.size === 0 && !mostrarTodasUnidades) {
-      datosGrafica = data.filter(d => str(d.nombre_unidad).toUpperCase().includes("TOTAL") || str(d.clues).toUpperCase() === "TOTAL");
+      datosGrafica = data.filter((d) => str(d.nombre_unidad).toUpperCase().includes("TOTAL") || str(d.clues).toUpperCase() === "TOTAL");
+      if (datosGrafica.length === 0) datosGrafica = data;
     }
-    console.log("DATOS FILTRADOS PARA DIBUJAR:", datosGrafica);
 
-    // 🔑 Si vienen grupos, filtramos las filas consolidadas sin descuidar "TOTAL"
-    if (hayGruposEnData) {
-      datosGrafica = data.filter(d =>
-        str(d.clues).startsWith("GRUPO_") ||
-        str(d.nombre_unidad).toUpperCase().includes("GRUPO") ||
-        str(d.nombre_unidad).toUpperCase().includes("HOSPITALES") ||
-        str(d.nombre_unidad).toUpperCase().includes("TODAS LAS UNIDADES") ||
-        str(d.clues).toUpperCase() === "TOTAL"
-      );
-      if (datosGrafica.length === 0) datosGrafica = data;
-    } else if (typeof unidadesSeleccionadas !== "undefined" && unidadesSeleccionadas.size === 0 && !mostrarTodasUnidades) {
-      datosGrafica = data.filter(d => {
-        const uUpper = str(d.nombre_unidad).toUpperCase();
-        return uUpper.includes("TOTAL") || str(d.clues).toUpperCase() === "TOTAL";
-      });
-      if (datosGrafica.length === 0) datosGrafica = data;
-    }
+    console.log("DATOS FILTRADOS PARA DIBUJAR:", datosGrafica);
 
     // =========================
     // GENERACIÓN DE COMBOS (UNIFICA GRUPOS)
