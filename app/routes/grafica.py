@@ -58,6 +58,9 @@ def grafica_home():
 def generar_total_general(
     data_acumulada,
     meses_validos,
+    SUM_FIELDS,
+    MAX_FIELDS,
+    indicadores_max,
     calcular_kpis,
     es_descarga_masiva,
     indicadores_solicitados
@@ -1421,6 +1424,9 @@ def indicadores():
         totales = generar_total_general(
             data_acumulada=data_acumulada,
             meses_validos=meses_validos,
+            SUM_FIELDS=SUM_FIELDS,
+            MAX_FIELDS=MAX_FIELDS,
+            indicadores_max=indicadores_max,
             calcular_kpis=calcular_kpis,
             es_descarga_masiva=es_descarga_masiva,
             indicadores_solicitados=indicadores_solicitados,
