@@ -77,51 +77,52 @@ def generar_total_general(
         return []
 
     indicadores_solic_set = (
-        {str(ind).lower().strip() for ind in indicadores_solicitados}
+        {ind.lower() for ind in indicadores_solicitados}
         if isinstance(indicadores_solicitados, (list, set, tuple)) and indicadores_solicitados
         else set()
     )
 
     recursos_set = {r.lower() for r in RECURSOS_FISICOS}
+    sum_fields_set = {s.lower() for s in SUM_FIELDS}
 
-    # 1. Filtrar únicamente registros individuales reales
+    # 1. Filtramos para usar SOLO registros individuales reales
     data_limpia = [
         r for r in data_acumulada 
-        if r.get("clues") not in ["TOTAL"] and r.get("nombre_unidad") not in ["TOTAL GENERAL", "TOTAL GRUPO"]
-        and not str(r.get("clues", "")).startswith("GRUPO_")
+        if r.get("clues") != "TOTAL" and r.get("nombre_unidad") not in ["TOTAL GENERAL", "TOTAL GRUPO"]
     ]
 
+    # Si por alguna razón toda la data venía ya rotulada como TOTAL, la usamos directamente
     if not data_limpia:
-        data_limpia = list(data_acumulada)
+        data_limpia = data_acumulada
 
-    def es_indicador_tasa(ind):
-        i = str(ind).lower()
-        return any(k in i for k in ["mortalidad", "porcentaje", "prom", "indice", "interv_sustitucion"])
+    resultados = []
 
     # ==========================================
-    # AUXILIAR: CONSTRUIR BASE CON PONDERACIÓN REAL
+    # AUXILIAR: CONSTRUIR BASE (SUMA REAL DE ABSOLUTOS DE TODAS LAS CLUES)
     # ==========================================
     def construir_base(registros):
-        base_absolutos = defaultdict(float)
-        valores_directos = defaultdict(list)
+        base = defaultdict(float)
+        vistos = set()
+        registros_unicos = []
+
+        # A) Deduplicar registros
+        for x in registros:
+            clave = (x.get("anio"), x.get("mes"), x.get("clues"), str(x.get("indicador", "")).lower())
+            if clave not in vistos:
+                vistos.add(clave)
+                registros_unicos.append(x)
+
         recursos_map = defaultdict(lambda: defaultdict(float))
 
-        for x in registros:
-            unidad = x.get("nombre_unidad", x.get("clues", "UNIDAD"))
-            ind_reg = str(x.get("indicador", "")).lower().strip()
-            
-            try:
-                val_reg = float(x.get("valor") or 0)
-            except (ValueError, TypeError):
-                val_reg = 0.0
+        # B) Acumular absolutos
+        for x in registros_unicos:
+            unidad = x.get("nombre_unidad", "UNIDAD")
 
-            if ind_reg:
-                valores_directos[ind_reg].append(val_reg)
-
-            # Acumular TODAS las columnas numéricas que sean absolutos
+            # 1. SI EL REGISTRO VIENE EN FORMATO OBJETO (e_kpis: {"egre_defunciones": 5, "total_egresos": 100})
             for col_nombre, col_valor in x.items():
                 col_lower = str(col_nombre).lower().strip()
 
+                # Ignorar campos administrativos / metadatos
                 if col_lower in ["anio", "mes", "clues", "nombre_unidad", "tipologia", "indicador", "valor"]:
                     continue
 
@@ -134,20 +135,35 @@ def generar_total_general(
                     if val_num > recursos_map[col_lower][unidad]:
                         recursos_map[col_lower][unidad] = val_num
                 else:
-                    base_absolutos[col_lower] += val_num
+                    base[col_lower] += val_num
 
-        # Asignar recursos físicos/camas (Máximo por hospital)
+            # 2. SI EL REGISTRO VIENE EN FORMATO CLAVE-VALOR (vw_indicadores_unificados: indicador="defunciones", valor=5)
+            ind_lower = str(x.get("indicador", "")).lower().strip()
+            if ind_lower and ind_lower not in ["none", ""]:
+                try:
+                    val_num = float(x.get("valor") or 0)
+                except (ValueError, TypeError):
+                    val_num = 0.0
+
+                if ind_lower in recursos_set:
+                    if val_num > recursos_map[ind_lower][unidad]:
+                        recursos_map[ind_lower][unidad] = val_num
+                else:
+                    base[ind_lower] += val_num
+
+        # C) Asignar recursos físicos consolidados (Camas / Quirófanos)
         for campo in RECURSOS_FISICOS:
             campo_lower = str(campo).lower()
             if campo_lower in recursos_map:
-                base_absolutos[campo_lower] = sum(recursos_map[campo_lower].values())
+                base[campo_lower] = sum(recursos_map[campo_lower].values())
 
-        return base_absolutos, valores_directos
+        return base
 
+    # Auxiliar para empaquetar
     def empaquetar(dataset, anio, mes):
         filas = []
         for indicador, valor in dataset.items():
-            ind_lower = str(indicador).lower().strip()
+            ind_lower = str(indicador).lower()
             if es_descarga_masiva or ind_lower in indicadores_solic_set:
                 try:
                     val_float = float(valor or 0)
@@ -170,69 +186,38 @@ def generar_total_general(
     # ==========================================
     # PROCESAMIENTO CONSOLIDADO POR (AÑO, MES)
     # ==========================================
-    resultados = []
     es_anual = any(r.get("mes") == 13 for r in data_limpia)
 
     if es_anual:
-        anios_presentes = {r["anio"] for r in data_limpia if "anio" in r}
+        # Modo Anual (Mes 13)
+        anios_presentes = {r["anio"] for r in data_limpia}
         for anio in anios_presentes:
-            registros_anio = [r for r in data_limpia if r.get("anio") == anio]
-            base_abs, val_dir = construir_base(registros_anio)
+            registros_anio = [r for r in data_limpia if r["anio"] == anio]
+            base = construir_base(registros_anio)
             dias = sum(calendar.monthrange(anio, m)[1] for m in meses_validos) if meses_validos else 365
             
-            dataset = dict(base_abs)
-            if callable(calcular_kpis):
-                kpis = calcular_kpis(base_abs, dias)
-                dataset.update(kpis)
-
-            # Fallback a promedio simple ÚNICAMENTE si no existían valores absolutos en los registros
-            for ind_req in indicadores_solic_set:
-                val_calc = dataset.get(ind_req)
-                
-                # 🔑 Si el indicador es una tasa y no hay denominador absoluto, se usa el promedio
-                tiene_absolutos = any(k in base_abs and base_abs[k] > 0 for k in ["total_egresos", "egresos", "urgencias", "nacimientos_totales", "partos_totales"])
-                
-                if (val_calc is None or (math.isclose(val_calc, 0.0, abs_tol=1e-9) and not tiene_absolutos)) and ind_req in val_dir:
-                    vals = val_dir[ind_req]
-                    if es_indicador_tasa(ind_req):
-                        positivos = [v for v in vals if not math.isclose(v, 0.0, abs_tol=1e-9) and v > 0]
-                        dataset[ind_req] = (sum(positivos) / len(positivos)) if positivos else (sum(vals) / len(vals) if vals else 0.0)
-                    else:
-                        dataset[ind_req] = sum(vals)
-
+            # Cálculo de KPIs sobre la suma total del grupo
+            kpis = calcular_kpis(base, dias)
+            dataset = {**base, **kpis}
             resultados.extend(empaquetar(dataset, anio, 13))
     else:
+        # Modo Mensual (Desglose mes a mes)
         grupos = defaultdict(list)
         for r in data_limpia:
-            if r.get("mes") != 13 and r.get("anio") and r.get("mes"):
+            if r.get("mes") != 13:
                 grupos[(r["anio"], int(r["mes"]))].append(r)
 
         for (anio, mes), registros in grupos.items():
-            base_abs, val_dir = construir_base(registros)
-            dias = calendar.monthrange(anio, mes)[1] if (anio and anio > 0) else 30
+            base = construir_base(registros)
+            dias = calendar.monthrange(anio, mes)[1]
 
-            dataset = dict(base_abs)
-            if callable(calcular_kpis):
-                kpis = calcular_kpis(base_abs, dias)
-                dataset.update(kpis)
-
-            # Fallback a promedio simple ÚNICAMENTE si no existían valores absolutos en los registros
-            for ind_req in indicadores_solic_set:
-                val_calc = dataset.get(ind_req)
-                
-                tiene_absolutos = any(k in base_abs and base_abs[k] > 0 for k in ["total_egresos", "egresos", "urgencias", "nacimientos_totales", "partos_totales"])
-
-                if (val_calc is None or (math.isclose(val_calc, 0.0, abs_tol=1e-9) and not tiene_absolutos)) and ind_req in val_dir:
-                    vals = val_dir[ind_req]
-                    if es_indicador_tasa(ind_req):
-                        positivos = [v for v in vals if not math.isclose(v, 0.0, abs_tol=1e-9) and v > 0]
-                        dataset[ind_req] = (sum(positivos) / len(positivos)) if positivos else (sum(vals) / len(vals) if vals else 0.0)
-                    else:
-                        dataset[ind_req] = sum(vals)
-
+            # Cálculo de KPIs sobre la suma total del grupo
+            kpis = calcular_kpis(base, dias)
+            dataset = {**base, **kpis}
             resultados.extend(empaquetar(dataset, anio, mes))
 
     return resultados
+
 
 
 
@@ -1105,40 +1090,39 @@ def indicadores():
 
              
         # ==========================================================
-        # FUNCIONES ROBUSTAS (SIN KEYERROR Y CON PONDERACIÓN REAL)
+        # FUNCIONES ROBUSTAS (SIN KEYERROR)
         # ==========================================================
         def f(value):
             if value is None:
                 return 0.0
             try:
-                v = float(value)
-                return 0.0 if (math.isnan(v) or math.isinf(v)) else v
+                return float(value)
             except (ValueError, TypeError):
                 return 0.0
 
         def calcular_ocupacion(dias_paciente, dias_cama):
             dp = f(dias_paciente)
             dc = f(dias_cama)
-            return (dp / dc) * 100.0 if dc > 0 else 0.0
+            return (dp / dc) * 100 if dc > 0 else 0.0
 
         def calcular_kpis(data, dias):
-            # Mapeo flexible de alias para asegurar que lea los absolutos reales
-            egresos = f(data.get("total_egresos")) or f(data.get("egresos"))
-            camas = f(data.get("camas_total")) or f(data.get("camas_censables_total"))
+            # Usar .get() para evitar KeyError si la columna no existe en 'data'
+            egresos = f(data.get("total_egresos"))
+            camas = f(data.get("camas_total"))
             quirofanos = f(data.get("quirofanos"))
             
-            nacimientos = f(data.get("total_nacimientos")) or f(data.get("nacimientos_totales"))
+            nacimientos = f(data.get("total_nacimientos"))
             abortos = f(data.get("abortos"))
             eventos = nacimientos + abortos
 
             adolescente_apeo = f(data.get("adolescente_apeo"))
             eventos_obstetricos_adolescentes = f(data.get("eventos_obstetricos_adolescentes"))
 
-            dias_est_med = f(data.get("dias_est_med")) or f(data.get("dias_p_med_int"))
-            dias_est_cir = f(data.get("dias_est_cir")) or f(data.get("dias_p_cirugia"))
-            dias_est_ped = f(data.get("dias_est_ped")) or f(data.get("dias_p_pediatria"))
-            dias_est_gin = f(data.get("dias_est_gin")) or f(data.get("dias_p_gineco"))
-            dias_est_otr = f(data.get("dias_est_otros")) or f(data.get("dias_p_otros"))
+            dias_est_med = f(data.get("dias_est_med"))
+            dias_est_cir = f(data.get("dias_est_cir"))
+            dias_est_ped = f(data.get("dias_est_ped"))
+            dias_est_gin = f(data.get("dias_est_gin"))
+            dias_est_otr = f(data.get("dias_est_otros"))
 
             egresos_med = f(data.get("egre_med_interna"))
             egresos_cir = f(data.get("egre_cirugia"))
@@ -1150,45 +1134,48 @@ def indicadores():
 
             return {
                 # KPIs Operativos
-                "consultas_por_dia": (f(data.get("consultas")) or f(data.get("total_consultas"))) / dias_val if dias_val > 0 else 0,
-                "especialidad_por_dia": (f(data.get("especialidad")) or f(data.get("consultas_especialidad"))) / dias_val if dias_val > 0 else 0,
-                "urgencias_por_dia": (f(data.get("urgencias")) or f(data.get("total_urgencias"))) / dias_val if dias_val > 0 else 0,
+                "consultas_por_dia": f(data.get("consultas")) / dias_val if dias_val else 0,
+                "especialidad_por_dia": f(data.get("especialidad")) / dias_val if dias_val else 0,
+                "urgencias_por_dia": f(data.get("urgencias")) / dias_val if dias_val else 0,
                 "porcentaje_calificada": (
-                    (f(data.get("calificada")) / f(data.get("urgencias")) * 100.0)
-                    if f(data.get("urgencias")) > 0 else 0
+                    (f(data.get("calificada")) / f(data.get("urgencias")) * 100)
+                    if f(data.get("urgencias")) > 0
+                    else 0
                 ),
-                "nacimientos_por_dia": nacimientos / dias_val if dias_val > 0 else 0,
+                "nacimientos_por_dia": nacimientos / dias_val if dias_val else 0,
                 "porcentaje_cesareas": (
-                    (f(data.get("nac_cesarea")) / nacimientos * 100.0) if nacimientos > 0 else 0
+                    (f(data.get("nac_cesarea")) / nacimientos * 100) if nacimientos > 0 else 0
                 ),
                 "prom_inter_diarias_qx": (
                     round(f(data.get("total_proced_dentro")) / (quirofanos * dias_val), 2)
-                    if quirofanos > 0 and dias_val > 0 else 0
+                    if quirofanos > 0 and dias_val > 0
+                    else 0
                 ),
-                "porcentaje_apeo": (f(data.get("apeo")) / eventos * 100.0) if eventos > 0 else 0,
+                "porcentaje_apeo": (f(data.get("apeo")) / eventos * 100) if eventos > 0 else 0,
                 "porcentaje_adolescente_apeo": (
-                    (adolescente_apeo * 100.0) / eventos_obstetricos_adolescentes
-                    if eventos_obstetricos_adolescentes > 0 else 0
+                    (adolescente_apeo * 100) / eventos_obstetricos_adolescentes
+                    if eventos_obstetricos_adolescentes > 0
+                    else 0
                 ),
 
                 # Ocupación
                 "porcentaje_ocupacion": calcular_ocupacion(
-                    data.get("dias_p"), data.get("dias_cama_total") or (camas * dias_val)
+                    data.get("dias_p"), data.get("dias_cama_total")
                 ),
                 "porcentaje_ocupacion_med_interna": calcular_ocupacion(
-                    dias_est_med, data.get("dias_cama_med") or (f(data.get("camas_med_int")) * dias_val)
+                    data.get("dias_p_med_int"), data.get("dias_cama_med")
                 ),
                 "porcentaje_ocupacion_cirugia": calcular_ocupacion(
-                    dias_est_cir, data.get("dias_cama_cir") or (f(data.get("camas_cirugia")) * dias_val)
+                    data.get("dias_p_cirugia"), data.get("dias_cama_cir")
                 ),
                 "porcentaje_ocupacion_pediatria": calcular_ocupacion(
-                    dias_est_ped, data.get("dias_cama_ped") or (f(data.get("camas_pediatria")) * dias_val)
+                    data.get("dias_p_pediatria"), data.get("dias_cama_ped")
                 ),
                 "porcentaje_ocupacion_gineco": calcular_ocupacion(
-                    dias_est_gin, data.get("dias_cama_gin") or (f(data.get("camas_gineco")) * dias_val)
+                    data.get("dias_p_gineco"), data.get("dias_cama_gin")
                 ),
                 "porcentaje_ocupacion_otros": calcular_ocupacion(
-                    dias_est_otr, data.get("dias_cama_otros") or (f(data.get("camas_otros")) * dias_val)
+                    data.get("dias_p_otros"), data.get("dias_cama_otros")
                 ),
 
                 # Estancia y Rotación
@@ -1206,13 +1193,14 @@ def indicadores():
                     (((camas * dias_val) - f(data.get("dias_p"))) / egresos) if egresos > 0 else 0
                 ),
 
-                # Mortalidad (🔑 CORREGIDO MULTIPLICADOR A 100.0)
+                # Mortalidad
                 "mortalidad_cruda": (
-                    (f(data.get("egre_defunciones")) * 1000.0 / egresos) if egresos > 0 else 0.0
+                    (f(data.get("egre_defunciones")) * 1000 / egresos) if egresos > 0 else 0
                 ),
                 "mortalidad_ajustada": (
-                    (f(data.get("egre_defunciones_48h")) * 100.0 / f(data.get("total_egresos_48h")))
-                    if f(data.get("total_egresos_48h")) > 0 else 0.0
+                    (f(data.get("egre_defunciones_48h")) * 1000 / f(data.get("total_egresos_48h")))
+                    if f(data.get("total_egresos_48h")) > 0
+                    else 0
                 ),
             }
         
@@ -1222,30 +1210,42 @@ def indicadores():
         # ==========================================================      
 
         for r in rows_e:
+
             anio = int(r["anio"])
             mes = int(r["mes"]) if r.get("mes") else 13
             unidad = r.get("nombre_unidad", "TOTAL GENERAL")
             clues_val = r.get("clues", "TOTAL")
+            
 
-            # 🔑 Extrae dinámicamente TODAS las columnas de la fila sin depender únicamente de SUM_FIELDS
             base = {
-                str(k).lower().strip(): f(v)
-                for k, v in r.items()
-                if k not in ["anio", "mes", "clues", "nombre_unidad", "tipologia", "indicador", "valor"]
+                field: float(r.get(field) or 0)
+                for field in SUM_FIELDS + MAX_FIELDS
             }
+
 
             if mes != 13:
                 dias = calendar.monthrange(anio, mes)[1]
             else:
-                dias = sum(calendar.monthrange(anio, m)[1] for m in meses_validos) if meses_validos else 365
+                if meses_validos:
+                    dias = sum(
+                        calendar.monthrange(anio, m)[1]
+                        for m in meses_validos
+                    )
+                else:
+                    dias = 365
+
+           
 
             kpis = calcular_kpis(base, dias)
+
             dataset = {**base, **kpis}
 
             for indicador, valor in dataset.items():
-                indicador_norm = str(indicador).lower().strip()
+
+                indicador_norm = indicador.lower()
 
                 if es_descarga_masiva or indicador_norm in indicadores_solicitados:
+
                     data_acumulada.append({
                         "anio": anio,
                         "mes": mes,
@@ -1253,7 +1253,7 @@ def indicadores():
                         "nombre_unidad": unidad,
                         "tipologia": r.get("tipologia", "TODAS"),
                         "indicador": indicador_norm,
-                        "valor": round(float(valor or 0), 2),
+                        "valor": round(float(valor), 2),
                     })
     
 
