@@ -102,36 +102,60 @@ def generar_total_general(
     # ==========================================
     def construir_base(registros):
         base = defaultdict(float)
-
-        # A) Deduplicar exactamente por (anio, mes, clues, indicador)
         vistos = set()
         registros_unicos = []
+
+        # A) Deduplicar registros
         for x in registros:
             clave = (x.get("anio"), x.get("mes"), x.get("clues"), str(x.get("indicador", "")).lower())
             if clave not in vistos:
                 vistos.add(clave)
                 registros_unicos.append(x)
 
-        # B) Sumar absolutos entre todas las CLUES del subgrupo
         recursos_map = defaultdict(lambda: defaultdict(float))
 
+        # B) Acumular absolutos
         for x in registros_unicos:
-            ind_lower = str(x.get("indicador", "")).lower()
             unidad = x.get("nombre_unidad", "UNIDAD")
-            val = float(x.get("valor") or 0)
 
-            if ind_lower in recursos_set:
-                # Recursos físicos: máximo mensual por hospital del grupo
-                if val > recursos_map[ind_lower][unidad]:
-                    recursos_map[ind_lower][unidad] = val
-            else:
-                # 🔑 TODOS los absolutos del grupo SE SUMAN
-                base[ind_lower] += val
+            # 1. SI EL REGISTRO VIENE EN FORMATO OBJETO (e_kpis: {"egre_defunciones": 5, "total_egresos": 100})
+            for col_nombre, col_valor in x.items():
+                col_lower = str(col_nombre).lower().strip()
 
-        # Asignar recursos físicos consolidados
+                # Ignorar campos administrativos / metadatos
+                if col_lower in ["anio", "mes", "clues", "nombre_unidad", "tipologia", "indicador", "valor"]:
+                    continue
+
+                try:
+                    val_num = float(col_valor or 0)
+                except (ValueError, TypeError):
+                    continue
+
+                if col_lower in recursos_set:
+                    if val_num > recursos_map[col_lower][unidad]:
+                        recursos_map[col_lower][unidad] = val_num
+                else:
+                    base[col_lower] += val_num
+
+            # 2. SI EL REGISTRO VIENE EN FORMATO CLAVE-VALOR (vw_indicadores_unificados: indicador="defunciones", valor=5)
+            ind_lower = str(x.get("indicador", "")).lower().strip()
+            if ind_lower and ind_lower not in ["none", ""]:
+                try:
+                    val_num = float(x.get("valor") or 0)
+                except (ValueError, TypeError):
+                    val_num = 0.0
+
+                if ind_lower in recursos_set:
+                    if val_num > recursos_map[ind_lower][unidad]:
+                        recursos_map[ind_lower][unidad] = val_num
+                else:
+                    base[ind_lower] += val_num
+
+        # C) Asignar recursos físicos consolidados (Camas / Quirófanos)
         for campo in RECURSOS_FISICOS:
-            campo_lower = campo.lower()
-            base[campo_lower] = sum(recursos_map[campo_lower].values())
+            campo_lower = str(campo).lower()
+            if campo_lower in recursos_map:
+                base[campo_lower] = sum(recursos_map[campo_lower].values())
 
         return base
 
@@ -605,49 +629,10 @@ def indicadores():
             where_e += " AND e.mes IN ({})".format(",".join(["%s"] * len(meses_calculo)))
             params_e.extend(meses_calculo)
 
+        # Solo filtramos tipología si no hay unidades específicas enviadas
         if tipologia != "TODAS" and not unidades:
             where_e += " AND c.tipologia = %s"
             params_e.append(tipologia)
-
-        # 🔑 AQUÍ VA EL BLOQUE NUEVO:
-        # MAPEO DE KPIS A SUS ABSOLUTOS REQUERIDOS EN SQL
-        MAPA_SQL_DEPENDENCIAS = {
-            "mortalidad_cruda": ["egre_defunciones", "total_egresos"],
-            "mortalidad_ajustada": ["egre_defunciones_48h", "total_egresos"],
-            "porcentaje_ocupacion": ["dias_p_med_int", "dias_p_cirugia", "dias_p_gineco", "dias_p_pediatria", "dias_p_otros", "camas_censables_total", "camas_total"],
-            "porcentaje_ocupacion_med_interna": ["dias_p_med_int", "camas_med_int"],
-            "porcentaje_ocupacion_cirugia": ["dias_p_cirugia", "camas_cirugia"],
-            "porcentaje_ocupacion_pediatria": ["dias_p_pediatria", "camas_pediatria"],
-            "porcentaje_ocupacion_gineco": ["dias_p_gineco", "camas_gineco"],
-            "porcentaje_ocupacion_otros": ["dias_p_otros", "camas_otros"],
-            "prom_dias_estancia": ["total_egresos", "dias_p_med_int", "dias_p_cirugia", "dias_p_gineco", "dias_p_pediatria", "dias_p_otros"],
-            "prom_estancia_med_int": ["egre_med_interna", "dias_p_med_int"],
-            "prom_estancia_cirugia": ["egre_cirugia", "dias_p_cirugia"],
-            "prom_estancia_pediatria": ["egre_pediatria", "dias_p_pediatria"],
-            "prom_estancia_gineco": ["egre_gineco", "dias_p_gineco"],
-            "prom_estancia_otros": ["egre_otros", "dias_p_otros"],
-            "consultas_por_dia": ["total_consultas", "consultas"],
-            "especialidad_por_dia": ["consultas_especialidad", "especialidad"],
-            "urgencias_por_dia": ["total_urgencias", "urgencias"],
-            "nacimientos_por_dia": ["nacimientos_totales", "total_nacimientos", "partos_totales"],
-            "prom_inter_diarias_qx": ["intervenciones_qx", "total_proced_dentro", "quirofanos"],
-            "porcentaje_calificada": ["urgencias_calificadas", "calificada", "total_urgencias", "urgencias"],
-            "porcentaje_cesareas": ["cesareas_totales", "nac_cesarea", "partos_totales", "nacimientos_totales"],
-            "porcentaje_apeo": ["apeo_aceptantes", "apeo", "eventos_obstetricos", "partos_totales", "nacimientos_totales"],
-            "indice_rotacion": ["total_egresos", "camas_censables_total", "camas_total"],
-            "interv_sustitucion": ["camas_censables_total", "camas_total", "total_egresos", "dias_p_med_int", "dias_p_cirugia", "dias_p_gineco", "dias_p_pediatria", "dias_p_otros"]
-        }
-
-        indicadores_para_sql = set(indicadores_solicitados)
-        for ind in indicadores_solicitados:
-            ind_clean = str(ind).lower().strip()
-            if ind_clean in MAPA_SQL_DEPENDENCIAS:
-                indicadores_para_sql.update(MAPA_SQL_DEPENDENCIAS[ind_clean])
-
-        # 🔑 USAR 'indicadores_para_sql' EN LUGAR DE 'indicadores_solicitados' EN LA CONSULTA SQL
-        if indicadores_para_sql and not es_descarga_masiva:
-            where_e += " AND e.indicador IN ({})".format(",".join(["%s"] * len(indicadores_para_sql)))
-            params_e.extend(list(indicadores_para_sql))
 
         # ======================================================
         # QUERY PRINCIPAL
@@ -1407,10 +1392,7 @@ def indicadores():
                     }
                 )
 
-
     
-
-            
 
     # PARTE 6
     # ==========================================================
