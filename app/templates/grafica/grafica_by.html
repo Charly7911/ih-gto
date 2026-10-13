@@ -1303,17 +1303,25 @@
     // =========================
     // FILTRADO ROBUSTO DE DATOS PARA GRUPOS
     // =========================
+    // =========================================================
+    // FILTRADO DE ALTA PRECISIÓN: AISLAR EXCLUSIVAMENTE "TOTAL GRUPO"
+    // =========================================================
     let datosGrafica = data;
-    const acumularPorTipologia = document.getElementById("switchAcumularTipologia")?.checked || false;
 
-    // Detectar si la respuesta trae datos consolidados de grupos
-    const hayGruposEnData = data.some(d =>
-      str(d.clues).startsWith("GRUPO_") ||
-      str(d.nombre_unidad).toUpperCase().includes("GRUPO") ||
-      str(d.nombre_unidad).toUpperCase().includes("HOSPITALES") ||
-      str(d.nombre_unidad).toUpperCase().includes("TODAS LAS UNIDADES") ||
-      str(d.clues).toUpperCase() === "TOTAL"
+    // 1. Verificar si la respuesta trae la fila consolidada real del Backend
+    const registrosTotales = data.filter(d =>
+      str(d.clues).toUpperCase() === "TOTAL" ||
+      str(d.nombre_unidad).toUpperCase() === "TOTAL GRUPO" ||
+      str(d.nombre_unidad).toUpperCase() === "TOTAL GENERAL"
     );
+
+    // 2. Si existen filas consolidadas, DESCHAMOS los 42 hospitales individuales para que NO contaminen la gráfica
+    if (registrosTotales.length > 0) {
+      datosGrafica = registrosTotales;
+    } else if (typeof unidadesSeleccionadas !== "undefined" && unidadesSeleccionadas.size === 0 && !mostrarTodasUnidades) {
+      datosGrafica = data.filter(d => str(d.nombre_unidad).toUpperCase().includes("TOTAL") || str(d.clues).toUpperCase() === "TOTAL");
+    }
+    console.log("DATOS FILTRADOS PARA DIBUJAR:", datosGrafica);
 
     // 🔑 Si vienen grupos, filtramos las filas consolidadas sin descuidar "TOTAL"
     if (hayGruposEnData) {
