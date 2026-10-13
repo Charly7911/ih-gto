@@ -1297,13 +1297,26 @@ def indicadores():
             params_v.extend(anios)
 
         if not es_descarga_masiva:
+            # Mapeo de dependencias de absolutos necesarios para calcular KPIs en la gráfica
+            DEPENDENCIAS_KPIS = {
+                "mortalidad_cruda": ["egre_defunciones", "total_egresos", "egresos"],
+                "mortalidad_ajustada": ["egre_defunciones_48h", "total_egresos_48h"],
+                "porcentaje_ocupacion": ["dias_p", "dias_cama_total", "camas_total"],
+                "prom_dias_estancia": ["dias_estancia", "total_egresos", "egresos"],
+                "porcentaje_cesareas": ["nac_cesarea", "total_nacimientos", "nacimientos_totales"],
+            }
 
-            solicitados_v = [
-                i
-                for i in indicadores_solicitados
-                if i.lower() not in indicadores_ya_calculados
-                and i not in kpis_calculados
-            ]
+            solicitados_v = []
+            for i in indicadores_solicitados:
+                i_low = i.lower().strip()
+                if i_low not in indicadores_ya_calculados and i not in kpis_calculados:
+                    solicitados_v.append(i)
+                    # 🔑 Si se pide un indicador calculado, incluir también sus absolutos origen
+                    if i_low in DEPENDENCIAS_KPIS:
+                        solicitados_v.extend(DEPENDENCIAS_KPIS[i_low])
+
+            # Eliminar duplicados manteniendo el orden
+            solicitados_v = list(dict.fromkeys(solicitados_v))
 
             if solicitados_v:
                 query_v += " AND v.indicador IN ({})".format(
