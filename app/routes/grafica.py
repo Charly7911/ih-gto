@@ -84,7 +84,7 @@ def generar_total_general(
 
     recursos_set = {r.lower() for r in RECURSOS_FISICOS}
 
-    # 1. Filtramos registros individuales reales
+    # 1. Filtrar únicamente registros individuales reales (excluir consolidados previos)
     data_limpia = [
         r for r in data_acumulada 
         if r.get("clues") not in ["TOTAL"] and r.get("nombre_unidad") not in ["TOTAL GENERAL", "TOTAL GRUPO"]
@@ -94,13 +94,12 @@ def generar_total_general(
     if not data_limpia:
         data_limpia = list(data_acumulada)
 
-    # Listado de indicadores tipo tasa/promedio/porcentaje que no deben sumarse linealmente
     def es_indicador_tasa(ind):
         i = str(ind).lower()
         return any(k in i for k in ["mortalidad", "porcentaje", "prom", "indice", "interv_sustitucion"])
 
     # ==========================================
-    # AUXILIAR: CONSTRUIR BASE Y PROMEDIOS
+    # AUXILIAR: CONSTRUIR BASE CON PONDERACIÓN REAL
     # ==========================================
     def construir_base(registros):
         base_absolutos = defaultdict(float)
@@ -110,12 +109,16 @@ def generar_total_general(
         for x in registros:
             unidad = x.get("nombre_unidad", x.get("clues", "UNIDAD"))
             ind_reg = str(x.get("indicador", "")).lower().strip()
-            val_reg = float(x.get("valor") or 0)
+            
+            try:
+                val_reg = float(x.get("valor") or 0)
+            except (ValueError, TypeError):
+                val_reg = 0.0
 
             if ind_reg:
                 valores_directos[ind_reg].append(val_reg)
 
-            # Extraer campos absolutos si vienen como columnas de la fila (e_kpis)
+            # Acumular TODAS las columnas de absolutos presentes en el registro (de e_kpis)
             for col_nombre, col_valor in x.items():
                 col_lower = str(col_nombre).lower().strip()
 
@@ -131,9 +134,10 @@ def generar_total_general(
                     if val_num > recursos_map[col_lower][unidad]:
                         recursos_map[col_lower][unidad] = val_num
                 else:
+                    # Sumatoria absoluta exacta del grupo
                     base_absolutos[col_lower] += val_num
 
-        # Asignar recursos físicos consolidados (Camas / Quirófanos)
+        # Asignar recursos físicos/camas (Máximo por hospital)
         for campo in RECURSOS_FISICOS:
             campo_lower = str(campo).lower()
             if campo_lower in recursos_map:
@@ -141,7 +145,6 @@ def generar_total_general(
 
         return base_absolutos, valores_directos
 
-    # Auxiliar para empaquetar resultados
     def empaquetar(dataset, anio, mes):
         filas = []
         for indicador, valor in dataset.items():
@@ -178,19 +181,19 @@ def generar_total_general(
             base_abs, val_dir = construir_base(registros_anio)
             dias = sum(calendar.monthrange(anio, m)[1] for m in meses_validos) if meses_validos else 365
             
-            # Recálculo de KPIs
+            # 🔑 CÁLCULO PONDERADO EXACTO DE KPIS
             dataset = dict(base_abs)
             if callable(calcular_kpis):
                 kpis = calcular_kpis(base_abs, dias)
                 dataset.update(kpis)
 
-            # Fallback para indicadores calculados/porcentuales sin absolutos
+            # Fallback solo si los absolutos no estaban disponibles en la BD
             for ind_req in indicadores_solic_set:
-                val_calc = dataset.get(ind_req, 0.0)
-                if (val_calc == 0.0 or val_calc is None) and ind_req in val_dir:
+                val_calc = dataset.get(ind_req)
+                if (val_calc is None or math.isclose(val_calc, 0.0, abs_tol=1e-9)) and ind_req in val_dir:
                     vals = val_dir[ind_req]
                     if es_indicador_tasa(ind_req):
-                        positivos = [v for v in vals if v > 0]
+                        positivos = [v for v in vals if not math.isclose(v, 0.0, abs_tol=1e-9) and v > 0]
                         dataset[ind_req] = (sum(positivos) / len(positivos)) if positivos else (sum(vals) / len(vals) if vals else 0.0)
                     else:
                         dataset[ind_req] = sum(vals)
@@ -206,19 +209,19 @@ def generar_total_general(
             base_abs, val_dir = construir_base(registros)
             dias = calendar.monthrange(anio, mes)[1] if (anio and anio > 0) else 30
 
-            # Recálculo de KPIs
+            # 🔑 CÁLCULO PONDERADO EXACTO DE KPIS
             dataset = dict(base_abs)
             if callable(calcular_kpis):
                 kpis = calcular_kpis(base_abs, dias)
                 dataset.update(kpis)
 
-            # Fallback para indicadores calculados/porcentuales sin absolutos
+            # Fallback solo si los absolutos no estaban disponibles en la BD
             for ind_req in indicadores_solic_set:
-                val_calc = dataset.get(ind_req, 0.0)
-                if (val_calc == 0.0 or val_calc is None) and ind_req in val_dir:
+                val_calc = dataset.get(ind_req)
+                if (val_calc is None or math.isclose(val_calc, 0.0, abs_tol=1e-9)) and ind_req in val_dir:
                     vals = val_dir[ind_req]
                     if es_indicador_tasa(ind_req):
-                        positivos = [v for v in vals if v > 0]
+                        positivos = [v for v in vals if not math.isclose(v, 0.0, abs_tol=1e-9) and v > 0]
                         dataset[ind_req] = (sum(positivos) / len(positivos)) if positivos else (sum(vals) / len(vals) if vals else 0.0)
                     else:
                         dataset[ind_req] = sum(vals)
