@@ -84,7 +84,7 @@ def generar_total_general(
 
     recursos_set = {r.lower() for r in RECURSOS_FISICOS}
 
-    # 1. Filtrar únicamente registros individuales reales (excluir consolidados previos)
+    # 1. Filtrar únicamente registros individuales reales
     data_limpia = [
         r for r in data_acumulada 
         if r.get("clues") not in ["TOTAL"] and r.get("nombre_unidad") not in ["TOTAL GENERAL", "TOTAL GRUPO"]
@@ -118,7 +118,7 @@ def generar_total_general(
             if ind_reg:
                 valores_directos[ind_reg].append(val_reg)
 
-            # Acumular TODAS las columnas de absolutos presentes en el registro (de e_kpis)
+            # Acumular TODAS las columnas numéricas que sean absolutos
             for col_nombre, col_valor in x.items():
                 col_lower = str(col_nombre).lower().strip()
 
@@ -134,7 +134,6 @@ def generar_total_general(
                     if val_num > recursos_map[col_lower][unidad]:
                         recursos_map[col_lower][unidad] = val_num
                 else:
-                    # Sumatoria absoluta exacta del grupo
                     base_absolutos[col_lower] += val_num
 
         # Asignar recursos físicos/camas (Máximo por hospital)
@@ -181,16 +180,19 @@ def generar_total_general(
             base_abs, val_dir = construir_base(registros_anio)
             dias = sum(calendar.monthrange(anio, m)[1] for m in meses_validos) if meses_validos else 365
             
-            # 🔑 CÁLCULO PONDERADO EXACTO DE KPIS
             dataset = dict(base_abs)
             if callable(calcular_kpis):
                 kpis = calcular_kpis(base_abs, dias)
                 dataset.update(kpis)
 
-            # Fallback solo si los absolutos no estaban disponibles en la BD
+            # Fallback a promedio simple ÚNICAMENTE si no existían valores absolutos en los registros
             for ind_req in indicadores_solic_set:
                 val_calc = dataset.get(ind_req)
-                if (val_calc is None or math.isclose(val_calc, 0.0, abs_tol=1e-9)) and ind_req in val_dir:
+                
+                # 🔑 Si el indicador es una tasa y no hay denominador absoluto, se usa el promedio
+                tiene_absolutos = any(k in base_abs and base_abs[k] > 0 for k in ["total_egresos", "egresos", "urgencias", "nacimientos_totales", "partos_totales"])
+                
+                if (val_calc is None or (math.isclose(val_calc, 0.0, abs_tol=1e-9) and not tiene_absolutos)) and ind_req in val_dir:
                     vals = val_dir[ind_req]
                     if es_indicador_tasa(ind_req):
                         positivos = [v for v in vals if not math.isclose(v, 0.0, abs_tol=1e-9) and v > 0]
@@ -209,16 +211,18 @@ def generar_total_general(
             base_abs, val_dir = construir_base(registros)
             dias = calendar.monthrange(anio, mes)[1] if (anio and anio > 0) else 30
 
-            # 🔑 CÁLCULO PONDERADO EXACTO DE KPIS
             dataset = dict(base_abs)
             if callable(calcular_kpis):
                 kpis = calcular_kpis(base_abs, dias)
                 dataset.update(kpis)
 
-            # Fallback solo si los absolutos no estaban disponibles en la BD
+            # Fallback a promedio simple ÚNICAMENTE si no existían valores absolutos en los registros
             for ind_req in indicadores_solic_set:
                 val_calc = dataset.get(ind_req)
-                if (val_calc is None or math.isclose(val_calc, 0.0, abs_tol=1e-9)) and ind_req in val_dir:
+                
+                tiene_absolutos = any(k in base_abs and base_abs[k] > 0 for k in ["total_egresos", "egresos", "urgencias", "nacimientos_totales", "partos_totales"])
+
+                if (val_calc is None or (math.isclose(val_calc, 0.0, abs_tol=1e-9) and not tiene_absolutos)) and ind_req in val_dir:
                     vals = val_dir[ind_req]
                     if es_indicador_tasa(ind_req):
                         positivos = [v for v in vals if not math.isclose(v, 0.0, abs_tol=1e-9) and v > 0]
@@ -1204,7 +1208,7 @@ def indicadores():
 
                 # Mortalidad (🔑 CORREGIDO MULTIPLICADOR A 100.0)
                 "mortalidad_cruda": (
-                    (f(data.get("egre_defunciones")) * 100.0 / egresos) if egresos > 0 else 0.0
+                    (f(data.get("egre_defunciones")) * 1000.0 / egresos) if egresos > 0 else 0.0
                 ),
                 "mortalidad_ajustada": (
                     (f(data.get("egre_defunciones_48h")) * 100.0 / f(data.get("total_egresos_48h")))
