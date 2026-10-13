@@ -65,6 +65,8 @@ def generar_total_general(
     es_descarga_masiva,
     indicadores_solicitados
 ):
+
+    print("MUESTRA DE DATOS RECIBIDOS EN BACKEND:", data_acumulada[:2])
     RECURSOS_FISICOS = [
         "camas_total", "quirofanos", "camas_med_int", "camas_cirugia",
         "camas_gineco", "camas_pediatria", "camas_otros", "hab_urgencias",
