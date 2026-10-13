@@ -1101,39 +1101,40 @@ def indicadores():
 
              
         # ==========================================================
-        # FUNCIONES ROBUSTAS (SIN KEYERROR)
+        # FUNCIONES ROBUSTAS (SIN KEYERROR Y CON PONDERACIÓN REAL)
         # ==========================================================
         def f(value):
             if value is None:
                 return 0.0
             try:
-                return float(value)
+                v = float(value)
+                return 0.0 if (math.isnan(v) or math.isinf(v)) else v
             except (ValueError, TypeError):
                 return 0.0
 
         def calcular_ocupacion(dias_paciente, dias_cama):
             dp = f(dias_paciente)
             dc = f(dias_cama)
-            return (dp / dc) * 100 if dc > 0 else 0.0
+            return (dp / dc) * 100.0 if dc > 0 else 0.0
 
         def calcular_kpis(data, dias):
-            # Usar .get() para evitar KeyError si la columna no existe en 'data'
-            egresos = f(data.get("total_egresos"))
-            camas = f(data.get("camas_total"))
+            # Mapeo flexible de alias para asegurar que lea los absolutos reales
+            egresos = f(data.get("total_egresos")) or f(data.get("egresos"))
+            camas = f(data.get("camas_total")) or f(data.get("camas_censables_total"))
             quirofanos = f(data.get("quirofanos"))
             
-            nacimientos = f(data.get("total_nacimientos"))
+            nacimientos = f(data.get("total_nacimientos")) or f(data.get("nacimientos_totales"))
             abortos = f(data.get("abortos"))
             eventos = nacimientos + abortos
 
             adolescente_apeo = f(data.get("adolescente_apeo"))
             eventos_obstetricos_adolescentes = f(data.get("eventos_obstetricos_adolescentes"))
 
-            dias_est_med = f(data.get("dias_est_med"))
-            dias_est_cir = f(data.get("dias_est_cir"))
-            dias_est_ped = f(data.get("dias_est_ped"))
-            dias_est_gin = f(data.get("dias_est_gin"))
-            dias_est_otr = f(data.get("dias_est_otros"))
+            dias_est_med = f(data.get("dias_est_med")) or f(data.get("dias_p_med_int"))
+            dias_est_cir = f(data.get("dias_est_cir")) or f(data.get("dias_p_cirugia"))
+            dias_est_ped = f(data.get("dias_est_ped")) or f(data.get("dias_p_pediatria"))
+            dias_est_gin = f(data.get("dias_est_gin")) or f(data.get("dias_p_gineco"))
+            dias_est_otr = f(data.get("dias_est_otros")) or f(data.get("dias_p_otros"))
 
             egresos_med = f(data.get("egre_med_interna"))
             egresos_cir = f(data.get("egre_cirugia"))
@@ -1145,48 +1146,45 @@ def indicadores():
 
             return {
                 # KPIs Operativos
-                "consultas_por_dia": f(data.get("consultas")) / dias_val if dias_val else 0,
-                "especialidad_por_dia": f(data.get("especialidad")) / dias_val if dias_val else 0,
-                "urgencias_por_dia": f(data.get("urgencias")) / dias_val if dias_val else 0,
+                "consultas_por_dia": (f(data.get("consultas")) or f(data.get("total_consultas"))) / dias_val if dias_val > 0 else 0,
+                "especialidad_por_dia": (f(data.get("especialidad")) or f(data.get("consultas_especialidad"))) / dias_val if dias_val > 0 else 0,
+                "urgencias_por_dia": (f(data.get("urgencias")) or f(data.get("total_urgencias"))) / dias_val if dias_val > 0 else 0,
                 "porcentaje_calificada": (
-                    (f(data.get("calificada")) / f(data.get("urgencias")) * 100)
-                    if f(data.get("urgencias")) > 0
-                    else 0
+                    (f(data.get("calificada")) / f(data.get("urgencias")) * 100.0)
+                    if f(data.get("urgencias")) > 0 else 0
                 ),
-                "nacimientos_por_dia": nacimientos / dias_val if dias_val else 0,
+                "nacimientos_por_dia": nacimientos / dias_val if dias_val > 0 else 0,
                 "porcentaje_cesareas": (
-                    (f(data.get("nac_cesarea")) / nacimientos * 100) if nacimientos > 0 else 0
+                    (f(data.get("nac_cesarea")) / nacimientos * 100.0) if nacimientos > 0 else 0
                 ),
                 "prom_inter_diarias_qx": (
                     round(f(data.get("total_proced_dentro")) / (quirofanos * dias_val), 2)
-                    if quirofanos > 0 and dias_val > 0
-                    else 0
+                    if quirofanos > 0 and dias_val > 0 else 0
                 ),
-                "porcentaje_apeo": (f(data.get("apeo")) / eventos * 100) if eventos > 0 else 0,
+                "porcentaje_apeo": (f(data.get("apeo")) / eventos * 100.0) if eventos > 0 else 0,
                 "porcentaje_adolescente_apeo": (
-                    (adolescente_apeo * 100) / eventos_obstetricos_adolescentes
-                    if eventos_obstetricos_adolescentes > 0
-                    else 0
+                    (adolescente_apeo * 100.0) / eventos_obstetricos_adolescentes
+                    if eventos_obstetricos_adolescentes > 0 else 0
                 ),
 
                 # Ocupación
                 "porcentaje_ocupacion": calcular_ocupacion(
-                    data.get("dias_p"), data.get("dias_cama_total")
+                    data.get("dias_p"), data.get("dias_cama_total") or (camas * dias_val)
                 ),
                 "porcentaje_ocupacion_med_interna": calcular_ocupacion(
-                    data.get("dias_p_med_int"), data.get("dias_cama_med")
+                    dias_est_med, data.get("dias_cama_med") or (f(data.get("camas_med_int")) * dias_val)
                 ),
                 "porcentaje_ocupacion_cirugia": calcular_ocupacion(
-                    data.get("dias_p_cirugia"), data.get("dias_cama_cir")
+                    dias_est_cir, data.get("dias_cama_cir") or (f(data.get("camas_cirugia")) * dias_val)
                 ),
                 "porcentaje_ocupacion_pediatria": calcular_ocupacion(
-                    data.get("dias_p_pediatria"), data.get("dias_cama_ped")
+                    dias_est_ped, data.get("dias_cama_ped") or (f(data.get("camas_pediatria")) * dias_val)
                 ),
                 "porcentaje_ocupacion_gineco": calcular_ocupacion(
-                    data.get("dias_p_gineco"), data.get("dias_cama_gin")
+                    dias_est_gin, data.get("dias_cama_gin") or (f(data.get("camas_gineco")) * dias_val)
                 ),
                 "porcentaje_ocupacion_otros": calcular_ocupacion(
-                    data.get("dias_p_otros"), data.get("dias_cama_otros")
+                    dias_est_otr, data.get("dias_cama_otros") or (f(data.get("camas_otros")) * dias_val)
                 ),
 
                 # Estancia y Rotación
@@ -1204,14 +1202,13 @@ def indicadores():
                     (((camas * dias_val) - f(data.get("dias_p"))) / egresos) if egresos > 0 else 0
                 ),
 
-                # Mortalidad
+                # Mortalidad (🔑 CORREGIDO MULTIPLICADOR A 100.0)
                 "mortalidad_cruda": (
-                    (f(data.get("egre_defunciones")) * 100 / egresos) if egresos > 0 else 0
+                    (f(data.get("egre_defunciones")) * 100.0 / egresos) if egresos > 0 else 0.0
                 ),
                 "mortalidad_ajustada": (
-                    (f(data.get("egre_defunciones_48h")) * 100 / f(data.get("total_egresos_48h")))
-                    if f(data.get("total_egresos_48h")) > 0
-                    else 0
+                    (f(data.get("egre_defunciones_48h")) * 100.0 / f(data.get("total_egresos_48h")))
+                    if f(data.get("total_egresos_48h")) > 0 else 0.0
                 ),
             }
         
@@ -1221,42 +1218,30 @@ def indicadores():
         # ==========================================================      
 
         for r in rows_e:
-
             anio = int(r["anio"])
             mes = int(r["mes"]) if r.get("mes") else 13
             unidad = r.get("nombre_unidad", "TOTAL GENERAL")
             clues_val = r.get("clues", "TOTAL")
-            
 
+            # 🔑 Extrae dinámicamente TODAS las columnas de la fila sin depender únicamente de SUM_FIELDS
             base = {
-                field: float(r.get(field) or 0)
-                for field in SUM_FIELDS + MAX_FIELDS
+                str(k).lower().strip(): f(v)
+                for k, v in r.items()
+                if k not in ["anio", "mes", "clues", "nombre_unidad", "tipologia", "indicador", "valor"]
             }
-
 
             if mes != 13:
                 dias = calendar.monthrange(anio, mes)[1]
             else:
-                if meses_validos:
-                    dias = sum(
-                        calendar.monthrange(anio, m)[1]
-                        for m in meses_validos
-                    )
-                else:
-                    dias = 365
-
-           
+                dias = sum(calendar.monthrange(anio, m)[1] for m in meses_validos) if meses_validos else 365
 
             kpis = calcular_kpis(base, dias)
-
             dataset = {**base, **kpis}
 
             for indicador, valor in dataset.items():
-
-                indicador_norm = indicador.lower()
+                indicador_norm = str(indicador).lower().strip()
 
                 if es_descarga_masiva or indicador_norm in indicadores_solicitados:
-
                     data_acumulada.append({
                         "anio": anio,
                         "mes": mes,
@@ -1264,7 +1249,7 @@ def indicadores():
                         "nombre_unidad": unidad,
                         "tipologia": r.get("tipologia", "TODAS"),
                         "indicador": indicador_norm,
-                        "valor": round(float(valor), 2),
+                        "valor": round(float(valor or 0), 2),
                     })
     
 
