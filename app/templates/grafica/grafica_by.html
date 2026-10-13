@@ -1234,7 +1234,7 @@
 
 
 
- function renderGrafica(data) {
+  function renderGrafica(data) {
     // 🛡️ Guardacostas para data
     if (!data && window.ultimoDataRecibido) {
       data = window.ultimoDataRecibido;
@@ -1307,29 +1307,29 @@
     const acumularPorTipologia = document.getElementById("switchAcumularTipologia")?.checked || false;
 
     // Detectar si la respuesta trae datos consolidados de grupos
-    const hayGruposEnData = data.some(d => 
-        str(d.clues).startsWith("GRUPO_") || 
-        str(d.nombre_unidad).toUpperCase().includes("GRUPO") ||
-        str(d.nombre_unidad).toUpperCase().includes("HOSPITALES") ||
-        str(d.nombre_unidad).toUpperCase().includes("TODAS LAS UNIDADES")
+    const hayGruposEnData = data.some(d =>
+      str(d.clues).startsWith("GRUPO_") ||
+      str(d.nombre_unidad).toUpperCase().includes("GRUPO") ||
+      str(d.nombre_unidad).toUpperCase().includes("HOSPITALES") ||
+      str(d.nombre_unidad).toUpperCase().includes("TODAS LAS UNIDADES")
     );
 
-    // 🔑 Si vienen grupos, filtramos EXCLUSIVAMENTE las filas consolidadas
+    // 🔑 Si vienen grupos, filtramos las filas consolidadas sin descuidar "TOTAL"
     if (hayGruposEnData) {
-        datosGrafica = data.filter(d => 
-            str(d.clues).startsWith("GRUPO_") ||
-            str(d.nombre_unidad).toUpperCase().includes("GRUPO") ||
-            str(d.nombre_unidad).toUpperCase().includes("HOSPITALES") ||
-            str(d.nombre_unidad).toUpperCase().includes("TODAS LAS UNIDADES") ||
-            d.clues === "TOTAL"
-        );
-        if (datosGrafica.length === 0) datosGrafica = data;
+      datosGrafica = data.filter(d =>
+        str(d.clues).startsWith("GRUPO_") ||
+        str(d.nombre_unidad).toUpperCase().includes("GRUPO") ||
+        str(d.nombre_unidad).toUpperCase().includes("HOSPITALES") ||
+        str(d.nombre_unidad).toUpperCase().includes("TODAS LAS UNIDADES") ||
+        d.clues === "TOTAL"
+      );
+      if (datosGrafica.length === 0) datosGrafica = data;
     } else if (typeof unidadesSeleccionadas !== "undefined" && unidadesSeleccionadas.size === 0 && !mostrarTodasUnidades) {
-        datosGrafica = data.filter(d => {
-            const uUpper = str(d.nombre_unidad).toUpperCase();
-            return uUpper.includes("TOTAL") || d.clues === "TOTAL";
-        });
-        if (datosGrafica.length === 0) datosGrafica = data;
+      datosGrafica = data.filter(d => {
+        const uUpper = str(d.nombre_unidad).toUpperCase();
+        return uUpper.includes("TOTAL") || d.clues === "TOTAL";
+      });
+      if (datosGrafica.length === 0) datosGrafica = data;
     }
 
     // =========================
@@ -1350,7 +1350,6 @@
       combos = [
         ...new Set(
           datosGrafica.map((d) => {
-            // Se usa el nombre del grupo/unidad para forzar un solo dataset por entidad
             const etiquetaEntidad = d.nombre_unidad || d.clues || "unidad";
             return `${norm(d.indicador)}|||${d.anio}|||${norm(etiquetaEntidad)}`;
           })
@@ -1359,6 +1358,12 @@
     }
 
     const mostrarTendencia = document.getElementById("switchTendencia")?.checked || false;
+
+    // Listado de indicadores porcentuales/calculados que no deben sumarse linealmente
+    const esIndicadorRazon = (ind) => {
+      const i = norm(ind);
+      return i.includes("mortalidad") || i.includes("porcentaje") || i.includes("prom") || i.includes("indice") || i.includes("interv");
+    };
 
     // =========================
     // DATASETS (CONSTRUCCIÓN DE LÍNEAS)
@@ -1380,16 +1385,37 @@
           if (esModoTipologia) {
             return str(d.tipologia || "OTRO").trim().toUpperCase() === claveTipologia;
           } else {
-            const entidadRegistro = norm(d.nombre_unidad || d.clues);
-            return entidadRegistro === unidadLimpia;
+            // 🔑 MATCH FLEXIBLE: Compara por nombre_unidad, clues o coincidencia de grupo
+            const entReg = norm(d.nombre_unidad || d.clues);
+            const cluesReg = norm(d.clues);
+            return (
+              entReg === unidadLimpia ||
+              cluesReg === unidadLimpia ||
+              (unidadLimpia.includes("total") && (entReg.includes("total") || cluesReg.includes("total"))) ||
+              (unidadLimpia.includes("todas") && entReg.includes("todas"))
+            );
           }
         });
 
+        // Agrupamiento seguro por mes
         const mapaMeses = {};
+        const conteoMeses = {};
+
         registros.forEach((r) => {
           const m = Number(r.mes);
-          mapaMeses[m] = (mapaMeses[m] || 0) + Number(r.valor || 0);
+          const val = Number(r.valor || 0);
+          mapaMeses[m] = (mapaMeses[m] || 0) + val;
+          conteoMeses[m] = (conteoMeses[m] || 0) + 1;
         });
+
+        // Si es una tasa/promedio y vinieron múltiples filas para el mismo mes, sacamos el promedio
+        if (esIndicadorRazon(indicadorNom)) {
+          Object.keys(mapaMeses).forEach((m) => {
+            if (conteoMeses[m] > 1) {
+              mapaMeses[m] = mapaMeses[m] / conteoMeses[m];
+            }
+          });
+        }
 
         const mesesBase =
           mesesSeleccionados.length > 0
@@ -1409,12 +1435,24 @@
           if (esModoTipologia) {
             return str(d.tipologia || "OTRO").trim().toUpperCase() === claveTipologia;
           } else {
-            const entidadRegistro = norm(d.nombre_unidad || d.clues);
-            return entidadRegistro === unidadLimpia;
+            const entReg = norm(d.nombre_unidad || d.clues);
+            const cluesReg = norm(d.clues);
+            return (
+              entReg === unidadLimpia ||
+              cluesReg === unidadLimpia ||
+              (unidadLimpia.includes("total") && (entReg.includes("total") || cluesReg.includes("total")))
+            );
           }
         });
 
-        const totalAnual = registros.reduce((acc, r) => acc + Number(r.valor || 0), 0);
+        let totalAnual = 0;
+        if (registros.length > 0) {
+          if (esIndicadorRazon(indicadorNom)) {
+            totalAnual = registros.reduce((acc, r) => acc + Number(r.valor || 0), 0) / registros.length;
+          } else {
+            totalAnual = registros.reduce((acc, r) => acc + Number(r.valor || 0), 0);
+          }
+        }
         valores = [totalAnual];
       }
 
@@ -1458,7 +1496,6 @@
         ? obtenerNombreIndicador(indicadorNom)
         : indicadorNom;
 
-      // 🔑 SINTAXIS DE DATASET CORREGIDA (SIN ERRORES DE SINTAXIS)
       const baseDataset = {
         label: `${nombreEtiqueta} - ${indNombre} (${anioNom})`,
         unidad: unidadLimpia,
@@ -1630,7 +1667,7 @@
         }
       });
     }
-}
+  }
 
   // PARTE 3
 
