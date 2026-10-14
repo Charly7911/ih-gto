@@ -1401,11 +1401,19 @@
           }
         });
 
+        const mesesConDatos = datosGrafica
+          .map(d => Number(d.mes))
+          .filter(m => m >= 1 && m <= 12);
+
+        const ultimoMesReportado = mesesConDatos.length > 0 ? Math.max(...mesesConDatos) : 12;
+
         const mesesBase =
           mesesSeleccionados.length > 0
             ? mesesSeleccionados
-            : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+            : Array.from({ length: ultimoMesReportado }, (_, i) => i + 1);
 
+        // Mapear etiquetas y valores basándose únicamente en ese rango real
+        etiquetasX = mesesBase.map((m) => mesesLabels[m - 1]);
         valores = mesesBase.map((m) => mapaMeses[m] || 0);
       } else {
         // Vista Anual (mes 13)
