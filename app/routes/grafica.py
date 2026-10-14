@@ -1359,11 +1359,12 @@ def indicadores():
 
             # --- ESTANCIA Y ROTACIÓN ---
             "prom_dias_estancia": ["dias_estancia", "total_egresos"],
-            "prom_estancia_med_interna": ["dias_est_med", "egre_med_interna", "med_interna"],
-            "prom_estancia_cirugia": ["dias_est_cir", "egre_cirugia", "cirugia"],
-            "prom_estancia_pediatria": ["dias_est_ped", "egre_pediatria", "pediatria"],
-            "prom_estancia_gineco": ["dias_est_gin", "egre_gineco", "ginecobstetricia"],
-            "prom_estancia_otros": ["dias_est_otros", "dias_est_otr", "egre_otros", "otros"],
+            "prom_estancia_med_interna": ["dias_est_med", "dias_estancia_med_interna", "egre_med_interna", "med_interna", "egresos_med"],
+            "prom_estancia_cirugia": ["dias_est_cir", "dias_estancia_cirugia", "egre_cirugia", "cirugia", "egresos_cir"],
+            "prom_estancia_pediatria": ["dias_est_ped", "dias_estancia_pediatria", "egre_pediatria", "pediatria", "egresos_ped"],
+            "prom_estancia_gineco": ["dias_est_gin", "dias_estancia_ginecobstetricia", "egre_gineco", "ginecobstetricia", "egresos_gin"],
+            "prom_estancia_otros": ["dias_est_otros", "dias_est_otr", "dias_estancia_otros", "egre_otros", "otros", "egresos_otr"],
+            
             "indice_rotacion": ["total_egresos", "camas_total"],
             "interv_sustitucion": ["camas_total", "dias_p", "total_egresos"],
 
