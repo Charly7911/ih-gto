@@ -406,6 +406,23 @@
   }
 
 
+  function sincronizarMesesUIConDatos(data) {
+    if (!Array.isArray(data) || data.length === 0) return;
+
+    // 1. Extraer el número de mes más alto que contenga datos reales (> 0)
+    const mesesConDatos = data
+      .filter((d) => Number(d.valor || 0) > 0 && Number(d.mes) >= 1 && Number(d.mes) <= 12)
+      .map((d) => Number(d.mes));
+
+    const limiteMesDetectado = mesesConDatos.length > 0 ? Math.max(...mesesConDatos) : 12;
+
+    // 2. Volver a renderizar los badges de meses usando solo el límite activo
+    if (typeof window.renderizarMesesGrafica === "function") {
+      window.renderizarMesesGrafica(limiteMesDetectado);
+    }
+  }
+
+
   // =========================
   // DRAG INDICADORES
   // =========================
@@ -819,7 +836,7 @@
   }
 
 
- function cargarGrafica() {
+  function cargarGrafica() {
 
     // 1. Si hay selecciones directas en el mapa, ajustar visibilidad de toggles secundarios
     if (unidadesSeleccionadas.size > 0) {
@@ -996,7 +1013,10 @@
 
         window.ultimoDataRecibido = data;
 
-        // Renderizar la gráfica con los datasets procesados
+        // 🔑 1. Limitar los botones de la interfaz a los meses cargados (ej. 1 a 8 para Ene-Ago)
+        sincronizarMesesUIConDatos(data);
+
+        // 🔑 2. Dibujar la gráfica
         renderGrafica(data);
 
         if (window.ultimoIndicadorArrastrado && !hayGrupos) {
@@ -1010,7 +1030,7 @@
       .catch((err) => {
         console.error("Error al cargar gráfica:", err);
       });
-}
+  }
 
 
   function validarDatosIndicadorIndividual(data, indicadorId) {
@@ -2235,6 +2255,8 @@
   // Formatear los meses para la descarga
 
   function formatearRangoMeses(mesesSeleccionados, mesesLabels) {
+
+
     const meses = [...mesesSeleccionados].map(Number).sort((a, b) => a - b);
 
     if (meses.length === 0) return "";
