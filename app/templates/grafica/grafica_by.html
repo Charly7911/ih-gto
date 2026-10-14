@@ -406,21 +406,46 @@
   }
 
 
-  function sincronizarMesesUIConDatos(data) {
-    if (!Array.isArray(data) || data.length === 0) return;
+ function sincronizarMesesUIConDatos(data) {
+  if (!Array.isArray(data) || data.length === 0) return;
 
-    // 1. Extraer el número de mes más alto que contenga datos reales (> 0)
-    const mesesConDatos = data
-      .filter((d) => Number(d.valor || 0) > 0 && Number(d.mes) >= 1 && Number(d.mes) <= 12)
-      .map((d) => Number(d.mes));
+  // Lista de indicadores estáticos (equipo médico) que siempre tienen valor en los 12 meses
+  const equipoMedicoSet = new Set([
+    "arco_c_analogo", "arco_c_digital", "bascula_estadimetro", "bascula_bebe",
+    "camilla_radiotransp", "cardiotocografo", "carro_rojo_reanim", "cuna_calor_rad",
+    "cuna_calor_rad_foto", "defibrilador_monit", "ecocardiografo", "electrocardiografo",
+    "estuche_diag", "incubadora_fototer", "incubadora_trasl", "incubadora_cuidados",
+    "lampara_quirurgica_doble", "lampara_quir_port", "lampara_quir_senc", "mesa_quir_obs",
+    "mesa_exploracion", "mesa_quir_gral", "microscopio_rutina", "monitor_radiacion",
+    "monitor_signos_vit_avanz", "monitor_signos_neo", "monitor_signos_bas", "monitor_traslado",
+    "monitor_signos_int", "monitor_signos_vit_neona", "monitor_anestesia", "negatoscopio",
+    "refrige_lab", "sierra_yesos", "ultrasonido_diag", "unidad_anestesia_bas",
+    "ultrasonido_terap", "unidad_dental", "unidad_rx_analogo", "unidad_rx_dental",
+    "unidad_rx_digital", "unidad_rx_port_ana", "unidad_rx_port_dig", "fluoroscopio_dig",
+    "fluoroscopio_dig_analog", "mastografo_digital", "mastografo_estereo",
+    "mastografo_estereo_tomosin", "microscopio_cirugia", "resonancia_mag",
+    "tomografo_128", "tomografo_16", "tomografo_32", "tomografo_64"
+  ]);
 
-    const limiteMesDetectado = mesesConDatos.length > 0 ? Math.max(...mesesConDatos) : 12;
+  // 1. Intentar filtrar solo los registros de indicadores DINÁMICOS (operativos/mensuales)
+  const datosDinamicos = data.filter((d) => !equipoMedicoSet.has((d.indicador || "").toLowerCase()));
 
-    // 2. Volver a renderizar los badges de meses usando solo el límite activo
-    if (typeof window.renderizarMesesGrafica === "function") {
-      window.renderizarMesesGrafica(limiteMesDetectado);
-    }
+  // 2. Si hay datos dinámicos, usamos esos para calcular el mes activo real (ej. 8 para Agosto)
+  // Si SOLO hay equipo médico graficado, buscamos el mes activo de la variable global o fallback a 12
+  const registrosParaCalculo = datosDinamicos.length > 0 ? datosDinamicos : data;
+
+  // 3. Extraer el mes máximo
+  const mesesConDatos = registrosParaCalculo
+    .filter((d) => Number(d.valor || 0) > 0 && Number(d.mes) >= 1 && Number(d.mes) <= 12)
+    .map((d) => Number(d.mes));
+
+  const limiteMesDetectado = mesesConDatos.length > 0 ? Math.max(...mesesConDatos) : 12;
+
+  // 4. Renderizar la barra de botones de meses con el límite correcto
+  if (typeof window.renderizarMesesGrafica === "function") {
+    window.renderizarMesesGrafica(limiteMesDetectado);
   }
+}
 
 
   // =========================
