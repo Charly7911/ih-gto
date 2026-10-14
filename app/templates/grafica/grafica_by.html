@@ -406,64 +406,64 @@
   }
 
 
- function sincronizarMesesUIConDatos(data) {
-  if (!Array.isArray(data) || data.length === 0) return;
+  function sincronizarMesesUIConDatos(data) {
+    if (!Array.isArray(data) || data.length === 0) return;
 
-  // Set de indicadores estáticos de equipo médico
-  const equipoMedicoSet = new Set([
-    "arco_c_analogo", "arco_c_digital", "bascula_estadimetro", "bascula_bebe",
-    "camilla_radiotransp", "cardiotocografo", "carro_rojo_reanim", "cuna_calor_rad",
-    "cuna_calor_rad_foto", "defibrilador_monit", "ecocardiografo", "electrocardiografo",
-    "estuche_diag", "incubadora_fototer", "incubadora_trasl", "incubadora_cuidados",
-    "lampara_quirurgica_doble", "lampara_quir_port", "lampara_quir_senc", "mesa_quir_obs",
-    "mesa_exploracion", "mesa_quir_gral", "microscopio_rutina", "monitor_radiacion",
-    "monitor_signos_vit_avanz", "monitor_signos_neo", "monitor_signos_bas", "monitor_traslado",
-    "monitor_signos_int", "monitor_signos_vit_neona", "monitor_anestesia", "negatoscopio",
-    "refrige_lab", "sierra_yesos", "ultrasonido_diag", "unidad_anestesia_bas",
-    "ultrasonido_terap", "unidad_dental", "unidad_rx_analogo", "unidad_rx_dental",
-    "unidad_rx_digital", "unidad_rx_port_ana", "unidad_rx_port_dig", "fluoroscopio_dig",
-    "fluoroscopio_dig_analog", "mastografo_digital", "mastografo_estereo",
-    "mastografo_estereo_tomosin", "microscopio_cirugia", "resonancia_mag",
-    "tomografo_128", "tomografo_16", "tomografo_32", "tomografo_64"
-  ]);
+    // Set de indicadores estáticos de equipo médico
+    const equipoMedicoSet = new Set([
+      "arco_c_analogo", "arco_c_digital", "bascula_estadimetro", "bascula_bebe",
+      "camilla_radiotransp", "cardiotocografo", "carro_rojo_reanim", "cuna_calor_rad",
+      "cuna_calor_rad_foto", "defibrilador_monit", "ecocardiografo", "electrocardiografo",
+      "estuche_diag", "incubadora_fototer", "incubadora_trasl", "incubadora_cuidados",
+      "lampara_quirurgica_doble", "lampara_quir_port", "lampara_quir_senc", "mesa_quir_obs",
+      "mesa_exploracion", "mesa_quir_gral", "microscopio_rutina", "monitor_radiacion",
+      "monitor_signos_vit_avanz", "monitor_signos_neo", "monitor_signos_bas", "monitor_traslado",
+      "monitor_signos_int", "monitor_signos_vit_neona", "monitor_anestesia", "negatoscopio",
+      "refrige_lab", "sierra_yesos", "ultrasonido_diag", "unidad_anestesia_bas",
+      "ultrasonido_terap", "unidad_dental", "unidad_rx_analogo", "unidad_rx_dental",
+      "unidad_rx_digital", "unidad_rx_port_ana", "unidad_rx_port_dig", "fluoroscopio_dig",
+      "fluoroscopio_dig_analog", "mastografo_digital", "mastografo_estereo",
+      "mastografo_estereo_tomosin", "microscopio_cirugia", "resonancia_mag",
+      "tomografo_128", "tomografo_16", "tomografo_32", "tomografo_64"
+    ]);
 
-  // 1. Filtrar únicamente los datos dinámicos/operativos
-  const datosDinamicos = data.filter(
-    (d) => !equipoMedicoSet.has((d.indicador || "").toLowerCase())
-  );
+    // 1. Filtrar únicamente los datos dinámicos/operativos
+    const datosDinamicos = data.filter(
+      (d) => !equipoMedicoSet.has((d.indicador || "").toLowerCase())
+    );
 
-  let limiteMesDetectado = null;
+    let limiteMesDetectado = null;
 
-  if (datosDinamicos.length > 0) {
-    // 2. Si hay indicadores dinámicos, calculamos el mes máximo real (ej. 8 para Agosto)
-    const mesesConDatos = datosDinamicos
-      .filter((d) => Number(d.valor || 0) > 0 && Number(d.mes) >= 1 && Number(d.mes) <= 12)
-      .map((d) => Number(d.mes));
+    if (datosDinamicos.length > 0) {
+      // 2. Si hay indicadores dinámicos, calculamos el mes máximo real (ej. 8 para Agosto)
+      const mesesConDatos = datosDinamicos
+        .filter((d) => Number(d.valor || 0) > 0 && Number(d.mes) >= 1 && Number(d.mes) <= 12)
+        .map((d) => Number(d.mes));
 
-    if (mesesConDatos.length > 0) {
-      limiteMesDetectado = Math.max(...mesesConDatos);
-      // Guardamos este límite en memoria para cuando solo se consulte equipo médico
-      window.ultimoLimiteMesDetectado = limiteMesDetectado;
+      if (mesesConDatos.length > 0) {
+        limiteMesDetectado = Math.max(...mesesConDatos);
+        // Guardamos este límite en memoria para cuando solo se consulte equipo médico
+        window.ultimoLimiteMesDetectado = limiteMesDetectado;
+      }
+    }
+
+    // 3. Si SOLO se cargó Equipo Médico (datosDinamicos está vacío):
+    if (!limiteMesDetectado) {
+      // a) Usamos el último límite dinámico guardado en la sesión
+      if (window.ultimoLimiteMesDetectado) {
+        limiteMesDetectado = window.ultimoLimiteMesDetectado;
+      } else {
+        // b) O leemos cuántos meses están visibles actualmente en el DOM
+        const checksVisibles = document.querySelectorAll(".mes-check");
+        limiteMesDetectado = checksVisibles.length > 0 ? checksVisibles.length : 8; // Default defensivo (ej. 8 para el año en curso)
+      }
+    }
+
+    // 4. Renderizar los badges de meses en la interfaz con el límite dinámico correcto
+    if (typeof window.renderizarMesesGrafica === "function") {
+      window.renderizarMesesGrafica(limiteMesDetectado);
     }
   }
-
-  // 3. Si SOLO se cargó Equipo Médico (datosDinamicos está vacío):
-  if (!limiteMesDetectado) {
-    // a) Usamos el último límite dinámico guardado en la sesión
-    if (window.ultimoLimiteMesDetectado) {
-      limiteMesDetectado = window.ultimoLimiteMesDetectado;
-    } else {
-      // b) O leemos cuántos meses están visibles actualmente en el DOM
-      const checksVisibles = document.querySelectorAll(".mes-check");
-      limiteMesDetectado = checksVisibles.length > 0 ? checksVisibles.length : 8; // Default defensivo (ej. 8 para el año en curso)
-    }
-  }
-
-  // 4. Renderizar los badges de meses en la interfaz con el límite dinámico correcto
-  if (typeof window.renderizarMesesGrafica === "function") {
-    window.renderizarMesesGrafica(limiteMesDetectado);
-  }
-}
 
   // =========================
   // DRAG INDICADORES
@@ -2978,10 +2978,13 @@
     avisosMostrados.clear();
     alertasMostradas.clear();
     indicadoresSinDatos.clear();
+
+    // 🔑 REINICIO DE ESTADOS Y MEMORIA GLOBAL DE MESES
     window.ultimoIndicadorArrastrado = null;
     window.ultimoDataRecibido = null;
+    window.grupoSeleccionadoActual = null;
+    window.ultimoLimiteMesDetectado = null; // 👈 Borra el último límite detectado para evitar arrastrar cortes anteriores
 
-    // 🔑 REINICIO DE ESTADOS GLOBALES (Esto corrige el problema):
     mostrarTodasUnidades = false;
     tipologiaSeleccionada = "TODAS";
 
@@ -3007,7 +3010,7 @@
       instanciasCharts = [];
     }
 
-    // 3.1 Restructurar el contenedor
+    // 3.1 Restructurar el contenedor y limpiar leyenda
     const contenedor = document.getElementById("contenedorGraficas");
     if (contenedor) {
       contenedor.style.width = "100%";
@@ -3025,10 +3028,14 @@
       check.checked = index === 0;
     });
 
-    // 4.1 Reset meses (todos seleccionados)
-    document.querySelectorAll(".mes-check").forEach((check) => {
-      check.checked = true;
-    });
+    // 🔑 4.1 Reset total de la barra de meses (Reconstruye de 1 a 12 en el DOM)
+    if (typeof window.renderizarMesesGrafica === "function") {
+      window.renderizarMesesGrafica(12);
+    } else {
+      document.querySelectorAll(".mes-check").forEach((check) => {
+        check.checked = true;
+      });
+    }
 
     // 5. Reset switches visuales
     const swEtiquetas = document.getElementById("switchEtiquetas");
@@ -3069,7 +3076,7 @@
     const summary = document.getElementById("selection-summary");
     if (summary) summary.innerHTML = "";
 
-    // 7. Recarga limpia
+    // 7. Recarga limpia (al estar vacíos los sets, destruirá gráficas y dejará el lienzo en blanco)
     if (typeof cargarGrafica === "function") {
       cargarGrafica();
     }

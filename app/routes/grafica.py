@@ -1534,10 +1534,7 @@ def indicadores():
             if m == 7:
                 hospitales_julio.add(d.get("clues"))
 
-    print("🧪 [B - DATA ACUMULADA] TOTAL EGRESOS POR MES:", dict(sorted(sumas_acum_mes.items())))
-    print(f"🧪 [B - DATA ACUMULADA] HOSPITALES UNICOS EN JULIO: {len(hospitales_julio)} / 42")
-
-    
+     
 
     if quiere_vistas:
 
