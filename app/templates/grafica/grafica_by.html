@@ -1502,6 +1502,7 @@
         showLine: tipoOriginal !== "scatter",
         pointRadius: tipoOriginal === "scatter" ? 6 : 4,
         pointBackgroundColor: "#fff",
+        order:2
       };
 
       if (!mostrarTendencia) return baseDataset;
@@ -1518,9 +1519,10 @@
           data: tendencia,
           type: "line",
           borderColor: "#e74c3c",
-          borderWidth: 2,
+          borderWidth: 3,
           pointRadius: 0,
           tension: 0,
+          order: 1,
           fill: false,
         },
       ];
