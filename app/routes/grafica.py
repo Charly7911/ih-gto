@@ -52,8 +52,9 @@ def grafica_home():
     )
 
 
+
 # ==========================================================
-# FUNCIÓN TOTAL GENERAL (CON LOS 3 CASOS VALIDADOS)
+# FUNCIÓN TOTAL GENERAL (SIN DUPLICACIÓN DE DATOS)
 # ==========================================================
 def generar_total_general(
     data_acumulada,
@@ -65,8 +66,6 @@ def generar_total_general(
     es_descarga_masiva,
     indicadores_solicitados
 ):
-
-    print("MUESTRA DE DATOS RECIBIDOS EN BACKEND:", data_acumulada[:2])
     RECURSOS_FISICOS = [
         "camas_total", "quirofanos", "camas_med_int", "camas_cirugia",
         "camas_gineco", "camas_pediatria", "camas_otros", "hab_urgencias",
@@ -79,148 +78,229 @@ def generar_total_general(
         return []
 
     indicadores_solic_set = (
-        {str(ind).lower().strip() for ind in indicadores_solicitados}
+        {ind.lower() for ind in indicadores_solicitados}
         if isinstance(indicadores_solicitados, (list, set, tuple)) and indicadores_solicitados
         else set()
     )
 
     recursos_set = {r.lower() for r in RECURSOS_FISICOS}
+    sum_fields_set = {s.lower() for s in SUM_FIELDS}
 
-    # 1. Filtramos para usar SOLO registros individuales reales
-    data_limpia = [
+    # 🔑 1. DEPURACIÓN DE REGISTROS: Extraer sólo unidades individuales para evitar doble suma
+    registros_individuales = [
         r for r in data_acumulada 
         if r.get("clues") != "TOTAL" and r.get("nombre_unidad") not in ["TOTAL GENERAL", "TOTAL GRUPO"]
         and not str(r.get("clues", "")).startswith("GRUPO_")
     ]
 
-    if not data_limpia:
-        data_limpia = list(data_acumulada)
+    data_limpia = registros_individuales if registros_individuales else data_acumulada
+
+    unidades = {
+        r.get("nombre_unidad")
+        for r in data_limpia
+        if r.get("clues") != "TOTAL"
+    }
+
+    es_anual = any(r.get("mes") == 13 for r in data_limpia)
+
+    if len(unidades) == 1 and es_anual:
+        return []
 
     resultados = []
 
     # ==========================================
-    # AUXILIAR: CONSTRUIR BASE ROBUSTA
+    # AUXILIAR: CONSTRUIR BASE (ROBUSTA Y DEDUPLICADA)
     # ==========================================
     def construir_base(registros):
         base = defaultdict(float)
         recursos_map = defaultdict(lambda: defaultdict(float))
-        conteo_indicador = defaultdict(int)
 
+        # 🧪 PRINT C: REVISAR REGISTROS QUE LLEGAN A CONSTRUIR BASE POR MES
+        if registros:
+            mes_actual = registros[0].get("mes")
+            unidades_in = set(r.get("clues") for r in registros)
+            egresos_in = [r for r in registros if str(r.get("indicador")).lower() == "total_egresos"]
+            suma_egr = sum(float(r.get("valor") or 0) for r in egresos_in)
+            print(f"🧪 [C - CONSTRUIR BASE] MES {mes_actual}: {len(unidades_in)} unidades recibidas | Suma total_egresos: {suma_egr}")
+
+        # 🔑 Deduplicar registros por (anio, mes, clues, indicador)
+        vistos = set()
+        registros_unicos = []
         for x in registros:
-            unidad = x.get("nombre_unidad", x.get("clues", "UNIDAD"))
-            ind_lower = str(x.get("indicador", "")).lower().strip()
+            clave = (x.get("anio"), x.get("mes"), x.get("clues"), str(x.get("indicador", "")).lower())
+            if clave not in vistos:
+                vistos.add(clave)
+                registros_unicos.append(x)
 
-            # A) Guardar el valor directo del indicador (útil si viene de la vista unificada)
-            if ind_lower and ind_lower not in ["none", ""]:
-                try:
-                    val_directo = float(x.get("valor") or 0)
-                except (ValueError, TypeError):
-                    val_directo = 0.0
+        # 1. Recursos Físicos (Máximo por unidad entre meses, luego suma)
+        recursos_map = defaultdict(lambda: defaultdict(float))
+        for x in registros_unicos:
+            indicador = str(x.get("indicador", "")).lower()
+            unidad = x.get("nombre_unidad", "UNIDAD")
+            
+            # Buscar en el campo 'indicador' o en las llaves del diccionario
+            if indicador in recursos_set:
+                val = float(x.get("valor") or 0)
+                if val > recursos_map[indicador][unidad]:
+                    recursos_map[indicador][unidad] = val
 
-                if ind_lower in recursos_set:
-                    if val_directo > recursos_map[ind_lower][unidad]:
-                        recursos_map[ind_lower][unidad] = val_directo
-                else:
-                    base[ind_lower] += val_directo
-                    conteo_indicador[ind_lower] += 1
-
-            # B) 🔑 EXTRAER TODAS LAS COLUMNAS FÍSICAS DE ABSOLUTOS (e_kpis)
             for col_nombre, col_valor in x.items():
                 col_lower = str(col_nombre).lower().strip()
-
-                if col_lower in ["anio", "mes", "clues", "nombre_unidad", "tipologia", "indicador", "valor"]:
-                    continue
-
-                try:
-                    val_num = float(col_valor or 0)
-                except (ValueError, TypeError):
-                    continue
-
                 if col_lower in recursos_set:
-                    if val_num > recursos_map[col_lower][unidad]:
-                        recursos_map[col_lower][unidad] = val_num
-                else:
-                    base[col_lower] += val_num
+                    try:
+                        val_num = float(col_valor or 0)
+                        if val_num > recursos_map[col_lower][unidad]:
+                            recursos_map[col_lower][unidad] = val_num
+                    except (ValueError, TypeError):
+                        continue
 
-        # Asignar recursos físicos consolidados
         for campo in RECURSOS_FISICOS:
             campo_lower = campo.lower()
-            if campo_lower in recursos_map:
-                base[campo_lower] = sum(recursos_map[campo_lower].values())
+            base[campo_lower] = sum(recursos_map[campo_lower].values())
 
-        return base, conteo_indicador
+        # 2. Campos Sumables (Extrae tanto de la propiedad 'indicador' como de las llaves físicas)
+        for campo in SUM_FIELDS:
+            campo_lower = campo.lower()
+            suma_campo = 0.0
 
-    # Auxiliar para empaquetar respuesta final
-    def empaquetar(dataset, anio, mes):
-        filas = []
+            for x in registros_unicos:
+                # Opción A: Si viene como fila vertical (indicador == 'total_egresos')
+                if str(x.get("indicador", "")).lower() == campo_lower:
+                    suma_campo += float(x.get("valor") or 0)
+                # Opción B: Si viene como columna horizontal/atributo ('total_egresos': 323)
+                elif campo_lower in x:
+                    try:
+                        suma_campo += float(x.get(campo_lower) or 0)
+                    except (ValueError, TypeError):
+                        pass
+
+            base[campo_lower] = suma_campo
+
+        # 3. Campos Máximos
+        for campo in MAX_FIELDS:
+            campo_lower = campo.lower()
+            if campo_lower not in recursos_set and campo_lower not in sum_fields_set:
+                valores = []
+                for x in registros_unicos:
+                    if str(x.get("indicador", "")).lower() == campo_lower:
+                        valores.append(float(x.get("valor") or 0))
+                    elif campo_lower in x:
+                        try:
+                            valores.append(float(x.get(campo_lower) or 0))
+                        except (ValueError, TypeError):
+                            pass
+                base[campo_lower] = max(valores) if valores else 0.0
+
+        return base
+
+    # ==========================================
+    # CASO 1: UNA SOLA UNIDAD - MENSUAL
+    # ==========================================
+    if len(unidades) == 1 and not es_anual:
+        anios_presentes = {r["anio"] for r in data_limpia if "anio" in r}
+
+        for anio in anios_presentes:
+            registros_anio = [
+                r for r in data_limpia
+                if r.get("anio") == anio and r.get("mes") != 13
+            ]
+
+            if not registros_anio:
+                continue
+
+            base = construir_base(registros_anio)
+            meses_en_registro = {int(r["mes"]) for r in registros_anio if r.get("mes") is not None}
+
+            dias = sum(calendar.monthrange(anio, m)[1] for m in meses_en_registro) if meses_en_registro else 30
+            
+            dataset = dict(base)
+            if callable(calcular_kpis):
+                kpis = calcular_kpis(base, dias)
+                dataset.update(kpis)
+
+            mes_rep = max(meses_en_registro) if meses_en_registro else 12
+
+            for indicador, valor in dataset.items():
+                ind_lower = str(indicador).lower()
+                if es_descarga_masiva or ind_lower in indicadores_solic_set:
+                    resultados.append({
+                        "anio": anio,
+                        "mes": mes_rep,
+                        "clues": "TOTAL",
+                        "nombre_unidad": "TOTAL GENERAL",
+                        "tipologia": "TODAS",
+                        "indicador": ind_lower,
+                        "valor": round(float(valor or 0), 2)
+                    })
+
+        return resultados
+
+    # ==========================================
+    # CASO 2: VARIAS UNIDADES - ANUAL (MES 13)
+    # ==========================================
+    if len(unidades) > 1 and es_anual:
+        anios_presentes = {r["anio"] for r in data_limpia if "anio" in r}
+
+        for anio in anios_presentes:
+            registros_anio = [r for r in data_limpia if r.get("anio") == anio]
+
+            base = construir_base(registros_anio)
+
+            if meses_validos:
+                dias = sum(calendar.monthrange(anio, m)[1] for m in meses_validos)
+            else:
+                dias = 365
+
+            dataset = dict(base)
+            if callable(calcular_kpis):
+                kpis = calcular_kpis(base, dias)
+                dataset.update(kpis)
+
+            for indicador, valor in dataset.items():
+                ind_lower = str(indicador).lower()
+                if es_descarga_masiva or ind_lower in indicadores_solic_set:
+                    resultados.append({
+                        "anio": anio,
+                        "mes": 13,
+                        "clues": "TOTAL",
+                        "nombre_unidad": "TOTAL GRUPO",
+                        "tipologia": "TODAS",
+                        "indicador": ind_lower,
+                        "valor": round(float(valor or 0), 2)
+                    })
+
+        return resultados
+
+    # ==========================================
+    # CASO 3: VARIAS UNIDADES - MENSUAL (DESGLOSE MES A MES)
+    # ==========================================
+    grupos = defaultdict(list)
+
+    for r in data_limpia:
+        if r.get("mes") is not None and r.get("mes") != 13 and r.get("anio"):
+            grupos[(r["anio"], int(r["mes"]))].append(r)
+
+    for (anio, mes), registros in grupos.items():
+        base = construir_base(registros)
+        dias = calendar.monthrange(anio, mes)[1] if (anio and anio > 0) else 30
+
+        dataset = dict(base)
+        if callable(calcular_kpis):
+            kpis = calcular_kpis(base, dias)
+            dataset.update(kpis)
+
         for indicador, valor in dataset.items():
-            ind_lower = str(indicador).lower().strip()
+            ind_lower = str(indicador).lower()
             if es_descarga_masiva or ind_lower in indicadores_solic_set:
-                try:
-                    val_float = float(valor or 0)
-                    if math.isnan(val_float) or math.isinf(val_float):
-                        val_float = 0.0
-                except (ValueError, TypeError):
-                    val_float = 0.0
-
-                filas.append({
+                resultados.append({
                     "anio": anio,
                     "mes": mes,
                     "clues": "TOTAL",
                     "nombre_unidad": "TOTAL GRUPO",
                     "tipologia": "TODAS",
                     "indicador": ind_lower,
-                    "valor": round(val_float, 2)
+                    "valor": round(float(valor or 0), 2)
                 })
-        return filas
-
-    # ==========================================
-    # PROCESAMIENTO CONSOLIDADO POR (AÑO, MES)
-    # ==========================================
-    es_anual = any(r.get("mes") == 13 for r in data_limpia)
-
-    if es_anual:
-        anios_presentes = {r["anio"] for r in data_limpia if "anio" in r}
-        for anio in anios_presentes:
-            registros_anio = [r for r in data_limpia if r.get("anio") == anio]
-            base, conteos = construir_base(registros_anio)
-            dias = sum(calendar.monthrange(anio, m)[1] for m in meses_validos) if meses_validos else 365
-            
-            # Recálculo de KPIs sobre las variables de volumen
-            dataset = dict(base)
-            if callable(calcular_kpis):
-                kpis = calcular_kpis(base, dias)
-                
-                # 🔑 Si el recálculo dio > 0, usamos la tasa ponderada exacta.
-                # Si dio 0 (porque no venían columnas absolutas), preservamos o promediamos el valor directo.
-                for k, v in kpis.items():
-                    if not math.isclose(float(v or 0), 0.0, abs_tol=1e-9):
-                        dataset[k] = v
-                    elif k in base and conteos[k] > 0:
-                        dataset[k] = base[k] / conteos[k]
-
-            resultados.extend(empaquetar(dataset, anio, 13))
-    else:
-        grupos = defaultdict(list)
-        for r in data_limpia:
-            if r.get("mes") is not None and r.get("mes") != 13 and r.get("anio"):
-                grupos[(r["anio"], int(r["mes"]))].append(r)
-
-        for (anio, mes), registros in grupos.items():
-            base, conteos = construir_base(registros)
-            dias = calendar.monthrange(anio, mes)[1] if (anio and anio > 0) else 30
-
-            dataset = dict(base)
-            if callable(calcular_kpis):
-                kpis = calcular_kpis(base, dias)
-                
-                for k, v in kpis.items():
-                    if not math.isclose(float(v or 0), 0.0, abs_tol=1e-9):
-                        dataset[k] = v
-                    elif k in base and conteos[k] > 0:
-                        dataset[k] = base[k] / conteos[k]
-
-            resultados.extend(empaquetar(dataset, anio, mes))
 
     return resultados
 
@@ -1004,6 +1084,14 @@ def indicadores():
         try:
             cur.execute(query_e, params_e)
             rows_e = cur.fetchall()
+            sumas_sql_mes = {}
+            for r in rows_e:
+                m = int(r.get("mes") or 13)
+                sumas_sql_mes[m] = sumas_sql_mes.get(m, 0) + float(r.get("total_egresos") or 0)
+            print("🧪 [A - SQL PURO] EGRESOS TOTALES POR MES DESDE MYSQL:", dict(sorted(sumas_sql_mes.items())))
+            print("🧪 [A - SQL PURO] CANTIDAD DE HOSPITALES RECIBIDOS EN SQL:", len(set(r.get("clues") for r in rows_e)))
+
+
         except Exception as err:
             import traceback
             traceback.print_exc()
@@ -1091,10 +1179,7 @@ def indicadores():
             "hab_uci_ped",
             "hab_urgencias",
             }
-
-       
-
-             
+    
         # ==========================================================
         # FUNCIONES ROBUSTAS (SIN KEYERROR)
         # ==========================================================
@@ -1246,11 +1331,56 @@ def indicadores():
 
             dataset = {**base, **kpis}
 
+  
+        # 🔑 Mapeo de KPIs a sus insumos absolutos requeridos para ponderación
+        DEPENDENCIAS_KPIS = {
+            "mortalidad_cruda": ["egre_defunciones", "total_egresos"],
+            "mortalidad_ajustada": ["egre_defunciones_48h", "total_egresos_48h"],
+            "porcentaje_ocupacion": ["dias_p", "dias_cama_total"],
+            "prom_dias_estancia": ["dias_estancia", "total_egresos"],
+            "porcentaje_cesareas": ["nac_cesarea", "total_nacimientos"],
+        }
+
+        # Identificar qué absolutos necesitamos preservar en data_acumulada
+        insumos_necesarios = set()
+        for ind_req in indicadores_solicitados:
+            ind_req_low = str(ind_req).lower().strip()
+            if ind_req_low in DEPENDENCIAS_KPIS:
+                insumos_necesarios.update(DEPENDENCIAS_KPIS[ind_req_low])
+
+        for r in rows_e:
+
+            anio = int(r["anio"])
+            mes = int(r["mes"]) if r.get("mes") else 13
+            unidad = r.get("nombre_unidad", "TOTAL GENERAL")
+            clues_val = r.get("clues", "TOTAL")
+
+            base = {
+                field: float(r.get(field) or 0)
+                for field in SUM_FIELDS + MAX_FIELDS
+            }
+
+            if mes != 13:
+                dias = calendar.monthrange(anio, mes)[1]
+            else:
+                if meses_validos:
+                    dias = sum(
+                        calendar.monthrange(anio, m)[1]
+                        for m in meses_validos
+                    )
+                else:
+                    dias = 365
+
+            kpis = calcular_kpis(base, dias)
+
+            dataset = {**base, **kpis}
+
             for indicador, valor in dataset.items():
 
                 indicador_norm = indicador.lower()
 
-                if es_descarga_masiva or indicador_norm in indicadores_solicitados:
+                # 🔑 PERMITIR EL INDICADOR SOLICITADO Y SUS INSUMOS ORIGEN
+                if es_descarga_masiva or indicador_norm in indicadores_solicitados or indicador_norm in insumos_necesarios:
 
                     data_acumulada.append({
                         "anio": anio,
@@ -1264,6 +1394,19 @@ def indicadores():
     
 
     indicadores_ya_calculados = {field.lower() for field in SUM_FIELDS + MAX_FIELDS}
+
+    # 🧪 PRINT B: REVISAR DATA ACUMULADA DESPUÉS DEL RECORRIDO DE ROWS
+    sumas_acum_mes = {}
+    hospitales_julio = set()
+    for d in data_acumulada:
+        if d.get("indicador") == "total_egresos":
+            m = int(d.get("mes") or 13)
+            sumas_acum_mes[m] = sumas_acum_mes.get(m, 0) + float(d.get("valor") or 0)
+            if m == 7:
+                hospitales_julio.add(d.get("clues"))
+
+    print("🧪 [B - DATA ACUMULADA] TOTAL EGRESOS POR MES:", dict(sorted(sumas_acum_mes.items())))
+    print(f"🧪 [B - DATA ACUMULADA] HOSPITALES UNICOS EN JULIO: {len(hospitales_julio)} / 42")
 
    
 
@@ -1312,6 +1455,9 @@ def indicadores():
                     ",".join(["%s"] * len(solicitados_v))
                 )
                 params_v.extend(solicitados_v)
+
+        print("🔍 1. QUERY SQL GENERADA:", query_v)
+        print("🔍 1. PARÁMETROS SQL ENVIADOS:", params_v)
 
         cur.execute(query_v, params_v)
         rows_v = cur.fetchall()
@@ -1446,9 +1592,69 @@ def indicadores():
     )
 
     # ==========================================================
-    # TOTAL GENERAL (SOLO SI HAY MÁS DE 1 UNIDAD)
+    # TOTAL GENERAL Y FILTRADO SEGÚN MODO DE AGRUPACIÓN (MULTIGRUPO)
     # ==========================================================
-    if len(unidades) > 1 or modo_agrupacion == "acumulado":
+    if modo_agrupacion == "acumulado":
+        # 🔑 1. OBTENER LISTA DE GRUPOS SOLICITADOS EN LA URL
+        grupos_solicitados = request.args.getlist("grupos[]")
+        
+        # Diccionario de nombres legibles para la leyenda de Chart.js
+        etiquetas_grupos = {
+            "TODAS": "TODAS LAS UNIDADES (42)",
+            "HG": "Hospitales Generales (HG)",
+            "HC": "Hospitales Comunitarios (HC)",
+            "HE": "Hospitales de Especialidad (HE)"
+        }
+
+        # Si no se recibió la lista explícita de grupos, usamos las tipologías presentes en la data
+        if not grupos_solicitados:
+            grupos_solicitados = list({r.get("tipologia", "TODAS") for r in data_acumulada})
+
+        data_multigrupo = []
+
+        # 🔑 2. PROCESAR Y SEGMENTAR CADA GRUPO INDEPENDIENTEMENTE
+        for id_grupo in grupos_solicitados:
+            id_grupo_upper = id_grupo.upper()
+            
+            # Obtener las CLUES asociadas a este grupo desde los parámetros
+            clues_grupo = set(request.args.getlist(f"grupo_{id_grupo_upper}_clues[]"))
+
+            # Filtrar los registros pertenecientes a este grupo
+            if clues_grupo:
+                data_subgrupo = [r for r in data_acumulada if r.get("clues") in clues_grupo]
+            elif id_grupo_upper == "TODAS":
+                data_subgrupo = [r for r in data_acumulada if r.get("clues") != "TOTAL"]
+            else:
+                data_subgrupo = [r for r in data_acumulada if r.get("tipologia") == id_grupo_upper]
+
+            # Si el filtro resulta vacío, usamos data_acumulada como fallback
+            if not data_subgrupo:
+                data_subgrupo = data_acumulada
+
+            # Generar el total exclusivo para este grupo
+            totales_grupo = generar_total_general(
+                data_acumulada=data_subgrupo,
+                meses_validos=meses_validos,
+                SUM_FIELDS=SUM_FIELDS,
+                MAX_FIELDS=MAX_FIELDS,
+                indicadores_max=indicadores_max,
+                calcular_kpis=calcular_kpis,
+                es_descarga_masiva=es_descarga_masiva,
+                indicadores_solicitados=indicadores_solicitados,
+            )
+
+            # 🔑 3. ASIGNAR NOMBRE ÚNICO A CADA GRUPO PARA SEPARAR LÍNEAS EN CHART.JS
+            nombre_etiqueta = etiquetas_grupos.get(id_grupo_upper, f"GRUPO {id_grupo_upper}")
+            for t in totales_grupo:
+                t["nombre_unidad"] = nombre_etiqueta
+                t["clues"] = f"GRUPO_{id_grupo_upper}"
+                data_multigrupo.append(t)
+
+        data_acumulada = data_multigrupo
+
+    elif len(unidades) > 1:
+        # 🏥 MODO INDIVIDUAL MULTI-UNIDAD:
+        # Mantiene cada hospital en la gráfica y le pega la fila del TOTAL GENERAL
         totales = generar_total_general(
             data_acumulada=data_acumulada,
             meses_validos=meses_validos,

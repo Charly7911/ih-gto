@@ -821,7 +821,7 @@
 
   function cargarGrafica() {
 
-    // 1. Si el usuario seleccionó unidades específicas, desactivar switches secundarios
+    // 1. Si hay selecciones directas en el mapa, ajustar visibilidad de toggles secundarios
     if (unidadesSeleccionadas.size > 0) {
       mostrarTodasUnidades = false;
 
@@ -835,13 +835,12 @@
       if (contenedorAcumular) contenedorAcumular.style.display = "none";
     }
 
-    // 🔑 2. DETECTAR BADGES DE GRUPO ACTIVOS EN EL DROPZONE
+    // 🔑 2. DETECTAR TODOS LOS GRUPOS PRESENTES EN EL DROPZONE / SELECCIÓN
     const badgesGrupos = Array.from(
       document.querySelectorAll(".badge-grupo-unidad, [data-tipo='grupo_unidad'], [data-tipo='grupo_unidades']")
     );
 
-    // Evaluamos estrictamente si existen badges de grupo presentes en pantalla
-    const hayGrupos = badgesGrupos.length > 0;
+    const hayGrupos = badgesGrupos.length > 0 || Boolean(window.grupoSeleccionadoActual);
 
     // 🔑 3. VALIDACIONES INICIALES
     const puedeMostrarTodas = mostrarTodasUnidades && unidadesSeleccionadas.size === 0;
@@ -870,50 +869,52 @@
 
     const params = new URLSearchParams();
 
-    // =========================
-    // MODO DE AGRUPACIÓN Y MULTIGRUPO
-    // =========================
+    // =========================================================
+    // MODO DE AGRUPACIÓN Y CONSTRUCCIÓN EXACTA DE PARÁMETROS
+    // =========================================================
     if (hayGrupos) {
       params.append("modo", "acumulado");
 
-      // Recorremos CADA badge de grupo presente en la zona de dropzone
       badgesGrupos.forEach((badge) => {
-        const idRaw = badge.dataset.value || badge.dataset.id || badge.getAttribute("data-value") || "";
-        const idGrupo = idRaw.replace("GRUPO_", "").toUpperCase();
+        const valGrupo = badge.dataset.value || badge.dataset.id || badge.getAttribute("value");
+        if (valGrupo) {
+          const idLimpio = valGrupo.replace("GRUPO_", "").toUpperCase().trim();
+          params.append("grupos[]", idLimpio);
 
-        // Mapeamos las CLUES correspondientes según el grupo arrastrado
-        let cluesGrupo = [];
-        if (idGrupo === "TODAS") {
-          cluesGrupo = (typeof todasUnidades !== "undefined" ? todasUnidades : []).map(u => u.clues || u.id || u);
-        } else if (idGrupo === "HG") {
-          cluesGrupo = (typeof unidades_generales !== "undefined" ? unidades_generales : []).map(u => u.clues || u.id || u);
-        } else if (idGrupo === "HC") {
-          cluesGrupo = (typeof unidades_comunitarios !== "undefined" ? unidades_comunitarios : []).map(u => u.clues || u.id || u);
-        } else if (idGrupo === "HE") {
-          cluesGrupo = (typeof unidades_especialidad !== "undefined" ? unidades_especialidad : []).map(u => u.clues || u.id || u);
-        }
-
-        // Si las variables de arrays globales estaban vacías, obtenemos las CLUES leyendo directamente el DOM
-        if (cluesGrupo.length === 0) {
-          const contenedorDom = document.querySelector(`.unidad-container[data-tipo='${idGrupo}']`);
-          if (contenedorDom) {
-            const itemsDom = contenedorDom.querySelectorAll("[data-clues], [data-value], .item-unidad-drag");
-            itemsDom.forEach(item => {
-              const c = item.dataset.clues || item.dataset.value;
-              if (c) cluesGrupo.push(c);
-            });
+          // 🔑 ENVIAR LAS CLUES ESPECÍFICAS DE CADA GRUPO SI EXISTEN EN EL ELEMENTO
+          if (badge.dataset.clues) {
+            try {
+              const cluesArr = JSON.parse(badge.dataset.clues);
+              if (Array.isArray(cluesArr)) {
+                cluesArr.forEach((c) => params.append(`grupo_${idLimpio}_clues[]`, c));
+              }
+            } catch (e) {
+              params.append(`grupo_${idLimpio}_clues[]`, badge.dataset.clues);
+            }
           }
         }
-
-        // Enviamos el par Grupo -> CLUES asociadas
-        cluesGrupo.forEach(clues => {
-          params.append(`grupo_${idGrupo}_clues[]`, clues);
-        });
-        params.append("grupos[]", idGrupo);
       });
 
+      // 🔑 SI SE SELECCIONÓ UN GRUPO COMPLETO CON ARREGLO DE CLUES
+      if (window.grupoSeleccionadoActual && Array.isArray(window.grupoSeleccionadoActual.items)) {
+        const idGrupoActual = (window.grupoSeleccionadoActual.id || "TODAS").replace("GRUPO_", "").toUpperCase().trim();
+
+        if (!badgesGrupos.some(b => (b.dataset.value || "").includes(idGrupoActual))) {
+          params.append("grupos[]", idGrupoActual);
+        }
+
+        window.grupoSeleccionadoActual.items.forEach((item) => {
+          const val = typeof item === "object" ? item.value : item;
+          if (val) {
+            params.append(`grupo_${idGrupoActual}_clues[]`, val);
+            params.append("clues[]", val);
+          }
+        });
+      }
     } else {
       params.append("modo", "individual");
+
+      // Enviar selección de unidades individuales
       unidadesSeleccionadas.forEach((u) => {
         const val = typeof u === "object" ? u.value : u;
         if (val) params.append("clues[]", val);
@@ -996,7 +997,7 @@
 
         window.ultimoDataRecibido = data;
 
-        // Renderizar la gráfica con los datasets diferenciados por cada grupo
+        // Renderizar la gráfica con los datasets procesados
         renderGrafica(data);
 
         if (window.ultimoIndicadorArrastrado && !hayGrupos) {
@@ -1300,7 +1301,7 @@
       etiquetasX = mesesBase.map((m) => mesesLabels[m - 1]);
     }
 
-      // =========================================================
+    // =========================================================
     // FILTRADO ROBUSTO DE DATOS PARA GRUPOS (DESCARDA HOSPITALES INDIVIDUALES)
     // =========================================================
     let datosGrafica = data;
@@ -1380,33 +1381,21 @@
             const entReg = norm(d.nombre_unidad || d.clues);
             const cluesReg = norm(d.clues);
 
-            if (unidadLimpia.includes("total") || unidadLimpia.includes("grupo")) {
-              return cluesReg === "total" || entReg.includes("total") || entReg.includes("grupo");
-            }
-
+            // 🔑 MATCH EXACTO POR CLUES O NOMBRE DE UNIDAD PARA EVITAR MEZCLAR GRUPOS
             return entReg === unidadLimpia || cluesReg === unidadLimpia;
           }
         });
 
-        // 🔑 AGRUPAMIENTO POR MES SIN PROMEDIAR LA TASA CALCULADA POR EL BACKEND
+        // 🔑 ASIGNACIÓN DIRECTA Y PUNTUAL POR MES DE LA SERIE CORRESPONDIENTE
         const mapaMeses = {};
 
         registros.forEach((r) => {
           const m = Number(r.mes);
           const val = Number(r.valor || 0);
-          const cluesReg = str(r.clues).toUpperCase();
-          const nombreReg = norm(r.nombre_unidad);
 
-          const esConsolidado =
-            cluesReg === "TOTAL" ||
-            nombreReg.includes("total") ||
-            nombreReg.includes("grupo") ||
-            nombreReg.includes("todas");
-
-          if (esConsolidado) {
-            // Asignación directa del valor ponderado enviado por el backend
-            mapaMeses[m] = val;
-          } else if (!(m in mapaMeses)) {
+          // Si existen múltiples entradas para la misma unidad/grupo en un mismo mes,
+          // priorizamos la entrada que provenga explícitamente del objeto acumulado (TOTAL / GRUPO)
+          if (!(m in mapaMeses) || str(r.clues).toUpperCase().startsWith("GRUPO_") || str(r.clues).toUpperCase() === "TOTAL") {
             mapaMeses[m] = val;
           }
         });
