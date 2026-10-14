@@ -1332,9 +1332,24 @@ def indicadores():
 
   
         # 🔑 Mapeo de KPIs a sus insumos absolutos requeridos para ponderación
+       # 🔑 MAPEO COMPLETO Y CORREGIDO DE KPIS A SUS INSUMOS ABSOLUTOS
         DEPENDENCIAS_KPIS = {
-            "mortalidad_cruda": ["egre_defunciones", "total_egresos"],
-            "mortalidad_ajustada": ["egre_defunciones_48h", "total_egresos_48h"],
+            # --- PRODUCTIVIDAD DIARIA ---
+            "consultas_por_dia": ["consultas"],
+            "especialidad_por_dia": ["especialidad"],
+            "urgencias_por_dia": ["urgencias", "total_u"],
+            "nacimientos_por_dia": ["total_nacimientos", "nacimientos"],
+
+            # --- APEO Y SALUD MATERNA ---
+            "porcentaje_apeo": ["apeo", "total_apeo", "eventos_obstetricos", "total_nacimientos", "nacimientos", "abortos"],
+            "porcentaje_adolescente_apeo": ["adolescente_apeo", "eventos_obstetricos_adolescentes"],
+            "porcentaje_cesareas": ["nac_cesarea", "total_nacimientos", "nacimientos"],
+
+            # --- MORTALIDAD ---
+            "mortalidad_cruda": ["egre_defunciones", "defunciones", "total_egresos"],
+            "mortalidad_ajustada": ["egre_defunciones_48h", "defunciones_48h", "total_egresos_48h", "egresos_48h"],
+
+            # --- OCUPACIÓN ---
             "porcentaje_ocupacion": ["dias_p", "dias_cama_total"],
             "porcentaje_ocupacion_med_interna": ["dias_p_med_int", "dias_cama_med"],
             "porcentaje_ocupacion_cirugia": ["dias_p_cirugia", "dias_cama_cir"],
@@ -1342,21 +1357,19 @@ def indicadores():
             "porcentaje_ocupacion_gineco": ["dias_p_gineco", "dias_cama_gin"],
             "porcentaje_ocupacion_otros": ["dias_p_otros", "dias_cama_otros"],
 
+            # --- ESTANCIA Y ROTACIÓN ---
             "prom_dias_estancia": ["dias_estancia", "total_egresos"],
-
-            "prom_estancia_med_interna": ["dias_est_med", "egresos_med"],
-            "prom_estancia_cirugia": ["dias_est_cir", "egresos_cir"],
-            "prom_estancia_pediatria": ["dias_est_ped", "egresos_ped "],
-            "prom_estancia_gineco": ["dias_est_gin", "egresos_gin "],
-            "prom_estancia_otros": ["dias_est_otr", "egresos_otr "],
-            
-            "porcentaje_cesareas": ["nac_cesarea", "total_nacimientos"],
-            "porcentaje_calificada": ["calificada", "urgencias"],
-            "porcentaje_apeo": ["apeo", "eventos_obstetricos"],
-            "porcentaje_adolescente_apeo": ["adolescente_apeo", "eventos_obstetricos_adolescentes"],
-            "prom_inter_diarias_qx": ["total_proced_dentro", "quirofanos"],
+            "prom_estancia_med_interna": ["dias_est_med", "egre_med_interna", "med_interna"],
+            "prom_estancia_cirugia": ["dias_est_cir", "egre_cirugia", "cirugia"],
+            "prom_estancia_pediatria": ["dias_est_ped", "egre_pediatria", "pediatria"],
+            "prom_estancia_gineco": ["dias_est_gin", "egre_gineco", "ginecobstetricia"],
+            "prom_estancia_otros": ["dias_est_otros", "dias_est_otr", "egre_otros", "otros"],
             "indice_rotacion": ["total_egresos", "camas_total"],
-            "interv_sustitucion": ["camas_total", "dias_p", "total_egresos"]
+            "interv_sustitucion": ["camas_total", "dias_p", "total_egresos"],
+
+            # --- URGENCIAS Y QUIRÓFANO ---
+            "porcentaje_calificada": ["calificada", "urgencias", "total_u"],
+            "prom_inter_diarias_qx": ["total_proced_dentro", "cirugias", "quirofanos"]
         }
 
         # Identificar qué absolutos necesitamos preservar en data_acumulada
