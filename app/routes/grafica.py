@@ -61,11 +61,19 @@ def generar_total_general(
     meses_validos,
     SUM_FIELDS,
     MAX_FIELDS,
-    indicadores_max,
-    calcular_kpis,
-    es_descarga_masiva,
-    indicadores_solicitados
+    indicadores_max=None, # 👈 VALOR POR DEFECTO DEFENSIVO
+    calcular_kpis=None,
+    es_descarga_masiva=False,
+    indicadores_solicitados=None,
 ):
+    if indicadores_max is None:
+        indicadores_max = {}
+
+    if not callable(calcular_kpis):
+        # Evita lanzar UnboundLocalError / TypeError
+        def calcular_kpis(data, dias):
+            return {}
+
     RECURSOS_FISICOS = [
         "camas_total", "quirofanos", "camas_med_int", "camas_cirugia",
         "camas_gineco", "camas_pediatria", "camas_otros", "hab_urgencias",
@@ -312,6 +320,9 @@ def generar_total_general(
 def indicadores():
 
     cols_equipo_medico = []
+    indicadores_max = {}
+    calcular_kpis = None
+    
 
     if not current_user.is_authenticated:
         return jsonify({
@@ -407,6 +418,25 @@ def indicadores():
         "porcentaje_ocupacion_gineco",
         "porcentaje_ocupacion_otros",
         "prom_dias_estancia",
+        "prom_estancia_med_int",
+        "prom_estancia_med_interna",
+        "prom_dias_estancia_med_interna",
+        
+        "prom_estancia_cir",
+        "prom_estancia_cirugia",
+        "prom_dias_estancia_cirugia",
+        
+        "prom_estancia_ped",
+        "prom_estancia_pediatria",
+        "prom_dias_estancia_pediatria",
+        
+        "prom_estancia_gin",
+        "prom_estancia_gineco",
+        "prom_dias_estancia_gineco",
+        
+        "prom_estancia_otr",
+        "prom_estancia_otros",
+        "prom_dias_estancia_otros",
         "indice_rotacion",
         "interv_sustitucion",
         "camas_total",
@@ -663,6 +693,9 @@ def indicadores():
     quiere_kpis = es_descarga_masiva or any(
         i in kpis_calculados
         or i in indicadores_equipo_medico
+        or i in DEPENDENCIAS_KPIS # 👈 Si está en las dependencias, ¡también quiere KPIs!
+        or i.startswith("prom_estancia_")
+        or i.startswith("prom_dias_estancia")
         for i in indicadores_solicitados
     )
 
@@ -1386,8 +1419,7 @@ def indicadores():
             "porcentaje_ocupacion_gineco": ["dias_p_gineco", "dias_cama_gin"],
             "porcentaje_ocupacion_otros": ["dias_p_otros", "dias_cama_otros"],
 
-            # --- ESTANCIA Y ROTACIÓN (SOPORTE PARA AMBOS NOMBRES EN FRONTEND) ---
-            # --- ESTANCIA Y ROTACIÓN (TOTALMENTE INDEPENDIENTES) ---
+          
             # --- ESTANCIA Y ROTACIÓN (SOPORTE PARA NOMBRES CORTOS Y LARGOS) ---
             "prom_dias_estancia": ["dias_estancia", "dias_estancia_sum", "total_egresos", "egresos"],
 
