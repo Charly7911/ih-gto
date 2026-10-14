@@ -819,7 +819,7 @@
   }
 
 
-  function cargarGrafica() {
+ function cargarGrafica() {
 
     // 1. Si hay selecciones directas en el mapa, ajustar visibilidad de toggles secundarios
     if (unidadesSeleccionadas.size > 0) {
@@ -945,21 +945,20 @@
     });
 
     // =========================
-    // MESES (DESGLOSE MENSUAL VS ANUAL)
+    // MESES (CORREGIDO: NO FORZAR 12 MESES SI VIENE VACÍO)
     // =========================
     let mesesSeleccionados = obtenerMesesSeleccionados();
 
     if (esAnual) {
       params.append("meses[]", "13");
-    } else {
-      if (mesesSeleccionados.length === 0) {
-        mesesSeleccionados = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-      }
-
+    } else if (mesesSeleccionados.length > 0) {
+      // 🔑 Solo enviamos los meses si el usuario los seleccionó explícitamente en el filtro
       mesesSeleccionados.forEach((m) => {
         params.append("meses[]", m);
       });
     }
+    // Si mesesSeleccionados está vacío, NO agregamos nada al params URL.
+    // Así la base de datos consulta libremente y devuelve ÚNICAMENTE los meses que tienen información cargada (ej. Ene-Ago).
 
     console.log("🔗 URL SOLICITADA A LA API MULTIGRUPO:", "/grafica/api/indicadores?" + params.toString());
 
@@ -1011,8 +1010,7 @@
       .catch((err) => {
         console.error("Error al cargar gráfica:", err);
       });
-  }
-
+}
 
 
   function validarDatosIndicadorIndividual(data, indicadorId) {
