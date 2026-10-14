@@ -1222,7 +1222,6 @@ def indicadores():
             egresos_otr = f(data.get("egre_otros"))
 
             dias_val = float(dias) if dias else 30.0
-
             return {
                 # KPIs Operativos
                 "consultas_por_dia": f(data.get("consultas")) / dias_val if dias_val else 0,
@@ -1333,21 +1332,7 @@ def indicadores():
 
   
         # 🔑 Mapeo de KPIs a sus insumos absolutos requeridos para ponderación
-        DEPENDENCIAS_KPIS = {
-            "mortalidad_cruda": ["egre_defunciones", "total_egresos"],
-            "mortalidad_ajustada": ["egre_defunciones_48h", "total_egresos_48h"],
-            "porcentaje_ocupacion": ["dias_p", "dias_cama_total"],
-            "prom_dias_estancia": ["dias_estancia", "total_egresos"],
-            "porcentaje_cesareas": ["nac_cesarea", "total_nacimientos"],
-        }
-
-        # Identificar qué absolutos necesitamos preservar en data_acumulada
-        insumos_necesarios = set()
-        for ind_req in indicadores_solicitados:
-            ind_req_low = str(ind_req).lower().strip()
-            if ind_req_low in DEPENDENCIAS_KPIS:
-                insumos_necesarios.update(DEPENDENCIAS_KPIS[ind_req_low])
-
+        
         for r in rows_e:
 
             anio = int(r["anio"])
