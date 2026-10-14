@@ -1332,7 +1332,37 @@ def indicadores():
 
   
         # 🔑 Mapeo de KPIs a sus insumos absolutos requeridos para ponderación
-        
+        DEPENDENCIAS_KPIS = {
+            "mortalidad_cruda": ["egre_defunciones", "total_egresos"],
+            "mortalidad_ajustada": ["egre_defunciones_48h", "total_egresos_48h"],
+            "porcentaje_ocupacion": ["dias_p", "dias_cama_total"],
+            "porcentaje_ocupacion_med_interna": ["dias_p_med_int", "dias_cama_med"],
+            "porcentaje_ocupacion_cirugia": ["dias_p_cirugia", "dias_cama_cir"],
+            "porcentaje_ocupacion_pediatria": ["dias_p_pediatria", "dias_cama_ped"],
+            "porcentaje_ocupacion_gineco": ["dias_p_gineco", "dias_cama_gin"],
+            "porcentaje_ocupacion_otros": ["dias_p_otros", "dias_cama_otros"],
+            "prom_dias_estancia": ["dias_estancia", "total_egresos"],
+            "prom_estancia_med_interna": ["dias_est_med", "egre_med_interna"],
+            "prom_estancia_cirugia": ["dias_est_cir", "egre_cirugia"],
+            "prom_estancia_pediatria": ["dias_est_ped", "egre_pediatria"],
+            "prom_estancia_gineco": ["dias_est_gin", "egre_gineco"],
+            "prom_estancia_otros": ["dias_est_otros", "egre_otros"],
+            "porcentaje_cesareas": ["nac_cesarea", "total_nacimientos"],
+            "porcentaje_calificada": ["calificada", "urgencias"],
+            "porcentaje_apeo": ["apeo", "eventos_obstetricos"],
+            "porcentaje_adolescente_apeo": ["adolescente_apeo", "eventos_obstetricos_adolescentes"],
+            "prom_inter_diarias_qx": ["total_proced_dentro", "quirofanos"],
+            "indice_rotacion": ["total_egresos", "camas_total"],
+            "interv_sustitucion": ["camas_total", "dias_p", "total_egresos"]
+        }
+
+        # Identificar qué absolutos necesitamos preservar en data_acumulada
+        insumos_necesarios = set()
+        for ind_req in indicadores_solicitados:
+            ind_req_low = str(ind_req).lower().strip()
+            if ind_req_low in DEPENDENCIAS_KPIS:
+                insumos_necesarios.update(DEPENDENCIAS_KPIS[ind_req_low])
+
         for r in rows_e:
 
             anio = int(r["anio"])
