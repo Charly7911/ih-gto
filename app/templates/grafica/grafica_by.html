@@ -1287,21 +1287,6 @@
         ? "line"
         : tipoOriginal;
 
-    // =========================
-    // ETIQUETAS X
-    // =========================
-    let etiquetasX;
-    if (esVistaAnual) {
-      etiquetasX = ["Total Anual"];
-    } else {
-      const mesesBase =
-        mesesSeleccionados.length > 0
-          ? mesesSeleccionados
-          : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-
-      etiquetasX = mesesBase.map((m) => mesesLabels[m - 1]);
-    }
-
     // =========================================================
     // FILTRADO ROBUSTO DE DATOS PARA GRUPOS (DESCARDA HOSPITALES INDIVIDUALES)
     // =========================================================
@@ -1327,11 +1312,35 @@
     console.log("DATOS FILTRADOS PARA DIBUJAR:", datosGrafica);
 
     // =========================
+    // CALCULO ROBUSTO DE ETIQUETAS X (RANGO DE MESES REAL)
+    // =========================
+    let etiquetasX = [];
+    let mesesBase = [];
+
+    if (esVistaAnual) {
+      etiquetasX = ["Total Anual"];
+    } else if (mesesSeleccionados.length > 0) {
+      mesesBase = mesesSeleccionados;
+      etiquetasX = mesesBase.map((m) => mesesLabels[m - 1]);
+    } else {
+      // 🔑 Buscar el último mes que realmente contenga producción/reporte (valor > 0)
+      const mesesConProduccionReal = datosGrafica
+        .filter((d) => Number(d.valor || 0) > 0 && Number(d.mes) >= 1 && Number(d.mes) <= 12)
+        .map((d) => Number(d.mes));
+
+      const ultimoMesReal = mesesConProduccionReal.length > 0 ? Math.max(...mesesConProduccionReal) : 12;
+
+      // Generar rango exacto solo de meses con datos (ej. 1 a 8 para Ene-Ago)
+      mesesBase = Array.from({ length: ultimoMesReal }, (_, i) => i + 1);
+      etiquetasX = mesesBase.map((m) => mesesLabels[m - 1]);
+    }
+
+    // =========================
     // GENERACIÓN DE COMBOS (UNIFICA GRUPOS)
     // =========================
     let combos = [];
 
-    if (mostrarTodasUnidades && acumularPorTipologia) {
+    if (mostrarTodasUnidades && typeof acumularPorTipologia !== "undefined" && acumularPorTipologia) {
       combos = [
         ...new Set(
           datosGrafica.map((d) => {
@@ -1360,7 +1369,7 @@
     };
 
     // =========================
-    // DATASETS (CONSTRUCCIÓN DE LÍNEAS)
+    // DATASETS (CONSTRUCCIÓN DE LÍNEAS / BARRAS)
     // =========================
     const datasets = combos.flatMap((c) => {
       const [indicadorNom, anioNom, unidadLimpia] = c.split("|||");
@@ -1394,27 +1403,13 @@
           const m = Number(r.mes);
           const val = Number(r.valor || 0);
 
-          // Si existen múltiples entradas para la misma unidad/grupo en un mismo mes,
-          // priorizamos la entrada que provenga explícitamente del objeto acumulado (TOTAL / GRUPO)
           if (!(m in mapaMeses) || str(r.clues).toUpperCase().startsWith("GRUPO_") || str(r.clues).toUpperCase() === "TOTAL") {
             mapaMeses[m] = val;
           }
         });
 
-        const mesesConDatos = datosGrafica
-          .map(d => Number(d.mes))
-          .filter(m => m >= 1 && m <= 12);
-
-        const ultimoMesReportado = mesesConDatos.length > 0 ? Math.max(...mesesConDatos) : 12;
-
-        const mesesBase =
-          mesesSeleccionados.length > 0
-            ? mesesSeleccionados
-            : Array.from({ length: ultimoMesReportado }, (_, i) => i + 1);
-
-        // Mapear etiquetas y valores basándose únicamente en ese rango real
-        etiquetasX = mesesBase.map((m) => mesesLabels[m - 1]);
-        valores = mesesBase.map((m) => mapaMeses[m] || 0);
+        // Mapear valores únicamente usando el rango 'mesesBase' determinado
+        valores = mesesBase.map((m) => (m in mapaMeses ? mapaMeses[m] : 0));
       } else {
         // Vista Anual (mes 13)
         const registros = datosGrafica.filter((d) => {
@@ -1439,7 +1434,6 @@
 
         let totalAnual = 0;
         if (registros.length > 0) {
-          // Se busca directamente la fila consolidada si existe
           const regConsolidado = registros.find(r => str(r.clues).toUpperCase() === "TOTAL" || norm(r.nombre_unidad).includes("total"));
           if (regConsolidado) {
             totalAnual = Number(regConsolidado.valor || 0);
@@ -1510,24 +1504,17 @@
         showLine: tipoOriginal !== "scatter",
         pointRadius: tipoOriginal === "scatter" ? 6 : 4,
         pointBackgroundColor: "#fff",
-        order: 2
+        order: 2 // 🔻 Enviar dataset base al fondo
       };
 
       if (!mostrarTendencia) return baseDataset;
 
       const tendencia = typeof calcularTendencia === "function" ? calcularTendencia(valores) : [];
 
-      // 1. Asignamos orden secundario al dataset base para enviarlo al fondo
-      const datasetBaseConOrden = {
-        ...baseDataset,
-        order: 2 // 👈 Las barras/áreas se dibujan primero (al fondo)
-      };
-
-      // 2. Definimos la línea de tendencia con color fijo e indiscutible
-      const COLOR_TENDENCIA = "#3ce742"; // Rojo brillante (o puedes usar "#ff3d00")
+      const COLOR_TENDENCIA = "#3ce742"; // Verde brillante contrastante
 
       return [
-        datasetBaseConOrden,
+        baseDataset,
         {
           label: `Tendencia - ${nombreEtiqueta}`,
           indicador: indicadorNom,
@@ -1536,19 +1523,18 @@
           data: tendencia,
           type: "line",
 
-          // 🎨 Colores fijos para evitar que absorba el color de las barras/líneas
           borderColor: COLOR_TENDENCIA,
           backgroundColor: COLOR_TENDENCIA,
           pointBorderColor: COLOR_TENDENCIA,
           pointBackgroundColor: COLOR_TENDENCIA,
 
-          borderWidth: 3,         // Grosor para resaltar
-          borderDash: [6, 4],     // Línea punteada profesional para tendencias
+          borderWidth: 3,
+          borderDash: [6, 4],
           pointRadius: 0,
           tension: 0,
           fill: false,
 
-          order: 1                // 🔑 Dibuja la línea SIEMPRE por encima de todo
+          order: 1 // 🔝 Dibuja la tendencia siempre por encima de las barras/líneas
         },
       ];
     });
