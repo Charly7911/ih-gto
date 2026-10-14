@@ -1502,15 +1502,24 @@
         showLine: tipoOriginal !== "scatter",
         pointRadius: tipoOriginal === "scatter" ? 6 : 4,
         pointBackgroundColor: "#fff",
-        order:2
+        order: 2
       };
 
       if (!mostrarTendencia) return baseDataset;
 
       const tendencia = typeof calcularTendencia === "function" ? calcularTendencia(valores) : [];
 
+      // 1. Asignamos orden secundario al dataset base para enviarlo al fondo
+      const datasetBaseConOrden = {
+        ...baseDataset,
+        order: 2 // 👈 Las barras/áreas se dibujan primero (al fondo)
+      };
+
+      // 2. Definimos la línea de tendencia con color fijo e indiscutible
+      const COLOR_TENDENCIA = "#e74c3c"; // Rojo brillante (o puedes usar "#ff3d00")
+
       return [
-        baseDataset,
+        datasetBaseConOrden,
         {
           label: `Tendencia - ${nombreEtiqueta}`,
           indicador: indicadorNom,
@@ -1518,12 +1527,20 @@
           anio: anioNom,
           data: tendencia,
           type: "line",
-          borderColor: "#e74c3c",
-          borderWidth: 3,
+
+          // 🎨 Colores fijos para evitar que absorba el color de las barras/líneas
+          borderColor: COLOR_TENDENCIA,
+          backgroundColor: COLOR_TENDENCIA,
+          pointBorderColor: COLOR_TENDENCIA,
+          pointBackgroundColor: COLOR_TENDENCIA,
+
+          borderWidth: 3,         // Grosor para resaltar
+          borderDash: [6, 4],     // Línea punteada profesional para tendencias
           pointRadius: 0,
           tension: 0,
-          order: 1,
           fill: false,
+
+          order: 1                // 🔑 Dibuja la línea SIEMPRE por encima de todo
         },
       ];
     });
