@@ -82,6 +82,27 @@ def generar_total_general(
         "hab_uci_ped", "hab_otras_areas", "total_no_censables",
     ]
 
+    # 🔑 FIX 1: INCLUIR EQUIPO MÉDICO EN SUM_FIELDS O MÁXIMOS
+    indicadores_equipo_medico = {
+        "arco_c_analogo", "arco_c_digital", "bascula_estadimetro", "bascula_bebe",
+        "camilla_radiotransp", "cardiotocografo", "carro_rojo_reanim", "cuna_calor_rad",
+        "cuna_calor_rad_foto", "defibrilador_monit", "ecocardiografo", "electrocardiografo",
+        "estuche_diag", "incubadora_fototer", "incubadora_trasl", "incubadora_cuidados",
+        "lampara_quirurgica_doble", "lampara_quir_port", "lampara_quir_senc", "mesa_quir_obs",
+        "mesa_exploracion", "mesa_quir_gral", "microscopio_rutina", "monitor_radiacion",
+        "monitor_signos_vit_avanz", "monitor_signos_neo", "monitor_signos_bas", "monitor_traslado",
+        "monitor_signos_int", "monitor_signos_vit_neona", "monitor_anestesia", "negatoscopio",
+        "refrige_lab", "sierra_yesos", "ultrasonido_diag", "unidad_anestesia_bas",
+        "ultrasonido_terap", "unidad_dental", "unidad_rx_analogo", "unidad_rx_dental",
+        "unidad_rx_digital", "unidad_rx_port_ana", "unidad_rx_port_dig", "fluoroscopio_dig",
+        "fluoroscopio_dig_analog", "mastografo_digital", "mastografo_estereo",
+        "mastografo_estereo_tomosin", "microscopio_cirugia", "resonancia_mag",
+        "tomografo_128", "tomografo_16", "tomografo_32", "tomografo_64",
+    }
+
+    # Asegurar que los campos de equipo médico se puedan sumar/consolidar
+    SUM_FIELDS = set(SUM_FIELDS) | indicadores_equipo_medico if SUM_FIELDS else indicadores_equipo_medico
+
     if not data_acumulada:
         return []
 
@@ -172,10 +193,10 @@ def generar_total_general(
             suma_campo = 0.0
 
             for x in registros_unicos:
-                # Opción A: Si viene como fila vertical (indicador == 'total_egresos')
+                # Opción A: Si viene como fila vertical (indicador == 'tomografo_64')
                 if str(x.get("indicador", "")).lower() == campo_lower:
                     suma_campo += float(x.get("valor") or 0)
-                # Opción B: Si viene como columna horizontal/atributo ('total_egresos': 323)
+                # Opción B: Si viene como columna horizontal/atributo ('tomografo_64': 2)
                 elif campo_lower in x:
                     try:
                         suma_campo += float(x.get(campo_lower) or 0)
@@ -1117,14 +1138,7 @@ def indicadores():
         try:
             cur.execute(query_e, params_e)
             rows_e = cur.fetchall()
-            sumas_sql_mes = {}
-            for r in rows_e:
-                m = int(r.get("mes") or 13)
-                sumas_sql_mes[m] = sumas_sql_mes.get(m, 0) + float(r.get("total_egresos") or 0)
-            print("🧪 [A - SQL PURO] EGRESOS TOTALES POR MES DESDE MYSQL:", dict(sorted(sumas_sql_mes.items())))
-            print("🧪 [A - SQL PURO] CANTIDAD DE HOSPITALES RECIBIDOS EN SQL:", len(set(r.get("clues") for r in rows_e)))
-
-
+           
         except Exception as err:
             import traceback
             traceback.print_exc()
