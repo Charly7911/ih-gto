@@ -1537,7 +1537,7 @@ def indicadores():
     print("🧪 [B - DATA ACUMULADA] TOTAL EGRESOS POR MES:", dict(sorted(sumas_acum_mes.items())))
     print(f"🧪 [B - DATA ACUMULADA] HOSPITALES UNICOS EN JULIO: {len(hospitales_julio)} / 42")
 
-   
+    
 
     if quiere_vistas:
 
@@ -1595,13 +1595,31 @@ def indicadores():
         # CACHE ANUAL
         # ======================================================
 
+        # 🔑 DETECTAR MESES ACTIVOS CON PRODUCCIÓN REAL (de rows_e)
+        meses_con_produccion_real = sorted(
+            list({
+                int(r["mes"]) 
+                for r in rows_e 
+                if r.get("mes") is not None and int(r.get("mes")) in range(1, 13)
+            })
+        )
+
+        # Si el usuario eligió meses manualmente usaremos esos; si no, usaremos sólo los meses con datos reales
+        if meses and 13 not in meses:
+            meses_a_permitir = meses
+        elif meses_con_produccion_real:
+            meses_a_permitir = meses_con_produccion_real
+        else:
+            meses_a_permitir = meses_validos
+
         vista_cache = {}
 
         for row in rows_v:
 
             mes = int(row["mes"])
 
-            if meses_validos and mes not in meses_validos:
+            # 🔑 FILTRO CORREGIDO: Usamos meses_a_permitir para cortar en Agosto (mes 8)
+            if meses_a_permitir and mes not in meses_a_permitir:
                 continue
 
             indicador = row["indicador"].strip().lower()
