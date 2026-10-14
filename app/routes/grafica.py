@@ -1382,22 +1382,55 @@ def indicadores():
             "porcentaje_ocupacion_otros": ["dias_p_otros", "dias_cama_otros"],
 
             # --- ESTANCIA Y ROTACIÓN (SOPORTE PARA AMBOS NOMBRES EN FRONTEND) ---
-            "prom_dias_estancia": ["dias_estancia", "dias_estancia_sum", "total_egresos"],
-            
-            "prom_estancia_med_interna": ["dias_est_med", "dias_estancia_med_interna", "egre_med_interna", "med_interna"],
-            "prom_dias_estancia_med_interna": ["dias_est_med", "dias_estancia_med_interna", "egre_med_interna", "med_interna"],
+            # --- ESTANCIA Y ROTACIÓN (TOTALMENTE INDEPENDIENTES) ---
+            "prom_dias_estancia": [
+                "dias_estancia", "dias_estancia_sum", "total_egresos", "egresos"
+            ],
 
-            "prom_estancia_cirugia": ["dias_est_cir", "dias_estancia_cirugia", "egre_cirugia", "cirugia"],
-            "prom_dias_estancia_cirugia": ["dias_est_cir", "dias_estancia_cirugia", "egre_cirugia", "cirugia"],
+            "prom_estancia_med_interna": [
+                "dias_est_med", "dias_estancia_med_interna", "egre_med_interna", 
+                "med_interna", "egresos_med", "total_egresos"
+            ],
+            "prom_dias_estancia_med_interna": [
+                "dias_est_med", "dias_estancia_med_interna", "egre_med_interna", 
+                "med_interna", "egresos_med", "total_egresos"
+            ],
 
-            "prom_estancia_pediatria": ["dias_est_ped", "dias_estancia_pediatria", "egre_pediatria", "pediatria"],
-            "prom_dias_estancia_pediatria": ["dias_est_ped", "dias_estancia_pediatria", "egre_pediatria", "pediatria"],
+            "prom_estancia_cirugia": [
+                "dias_est_cir", "dias_estancia_cirugia", "egre_cirugia", 
+                "cirugia", "egresos_cir", "egre_cir", "total_egresos"
+            ],
+            "prom_dias_estancia_cirugia": [
+                "dias_est_cir", "dias_estancia_cirugia", "egre_cirugia", 
+                "cirugia", "egresos_cir", "egre_cir", "total_egresos"
+            ],
 
-            "prom_estancia_gineco": ["dias_est_gin", "dias_estancia_ginecobstetricia", "egre_gineco", "ginecobstetricia"],
-            "prom_dias_estancia_gineco": ["dias_est_gin", "dias_estancia_ginecobstetricia", "egre_gineco", "ginecobstetricia"],
+            "prom_estancia_pediatria": [
+                "dias_est_ped", "dias_estancia_pediatria", "egre_pediatria", 
+                "pediatria", "egresos_ped", "egre_ped", "total_egresos"
+            ],
+            "prom_dias_estancia_pediatria": [
+                "dias_est_ped", "dias_estancia_pediatria", "egre_pediatria", 
+                "pediatria", "egresos_ped", "egre_ped", "total_egresos"
+            ],
 
-            "prom_estancia_otros": ["dias_est_otros", "dias_est_otr", "dias_estancia_otros", "egre_otros", "otros"],
-            "prom_dias_estancia_otros": ["dias_est_otros", "dias_est_otr", "dias_estancia_otros", "egre_otros", "otros"],
+            "prom_estancia_gineco": [
+                "dias_est_gin", "dias_estancia_ginecobstetricia", "egre_gineco", 
+                "ginecobstetricia", "egresos_gin", "egre_gin", "total_egresos"
+            ],
+            "prom_dias_estancia_gineco": [
+                "dias_est_gin", "dias_estancia_ginecobstetricia", "egre_gineco", 
+                "ginecobstetricia", "egresos_gin", "egre_gin", "total_egresos"
+            ],
+
+            "prom_estancia_otros": [
+                "dias_est_otros", "dias_est_otr", "dias_estancia_otros", 
+                "egre_otros", "otros", "egresos_otr", "egre_otr", "total_egresos"
+            ],
+            "prom_dias_estancia_otros": [
+                "dias_est_otros", "dias_est_otr", "dias_estancia_otros", 
+                "egre_otros", "otros", "egresos_otr", "egre_otr", "total_egresos"
+            ],
 
             "indice_rotacion": ["total_egresos", "camas_total"],
             "interv_sustitucion": ["camas_total", "dias_p", "total_egresos"],
