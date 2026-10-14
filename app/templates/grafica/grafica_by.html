@@ -1014,7 +1014,7 @@
   }
 
 
-  
+
   function validarDatosIndicadorIndividual(data, indicadorId) {
 
 
@@ -1786,21 +1786,33 @@
   function calcularTendencia(data) {
     if (!data || data.length < 2) return [];
 
-    const n = data.length;
-    const x = data.map((_, i) => i);
+    // 1. Filtrar solo los meses que tienen datos reales (excluyendo ceros/nulls de meses sin capturar)
+    const puntosValidos = [];
 
+    data.forEach((val, i) => {
+      const y = Number(val);
+      // Si el valor es mayor a 0 y válido, entra al cálculo de la regresión
+      if (!isNaN(y) && val !== null && val !== undefined && y > 0) {
+        puntosValidos.push({ x: i, y: y });
+      }
+    });
+
+    // Si hay menos de 2 meses con información real, no calculamos tendencia
+    const n = puntosValidos.length;
+    if (n < 2) return [];
+
+    // 2. Sumatorias basadas únicamente en datos reales
     let sumX = 0,
       sumY = 0,
       sumXY = 0,
       sumXX = 0;
 
     for (let i = 0; i < n; i++) {
-      const y = Number(data[i]) || 0;
-
-      sumX += x[i];
+      const { x, y } = puntosValidos[i];
+      sumX += x;
       sumY += y;
-      sumXY += x[i] * y;
-      sumXX += x[i] * x[i];
+      sumXY += x * y;
+      sumXX += x * x;
     }
 
     const denominator = (n * sumXX - sumX * sumX);
@@ -1809,8 +1821,17 @@
     const m = (n * sumXY - sumX * sumY) / denominator;
     const b = (sumY - m * sumX) / n;
 
-    return x.map(i => m * i + b);
+    // 3. Generar la recta proyectada: los meses no capturados devuelven null
+    // para evitar que la línea caiga hacia los meses vacíos
+    return data.map((val, i) => {
+      const y = Number(val);
+      if (!isNaN(y) && val !== null && val !== undefined && y > 0) {
+        return Number((m * i + b).toFixed(2));
+      }
+      return null;
+    });
   }
+
 
   function resetBotonExcel() {
     const btn = document.getElementById("btnExcel");
