@@ -409,7 +409,7 @@
  function sincronizarMesesUIConDatos(data) {
   if (!Array.isArray(data) || data.length === 0) return;
 
-  // Lista de indicadores estáticos (equipo médico) que siempre tienen valor en los 12 meses
+  // Set de indicadores estáticos de equipo médico
   const equipoMedicoSet = new Set([
     "arco_c_analogo", "arco_c_digital", "bascula_estadimetro", "bascula_bebe",
     "camilla_radiotransp", "cardiotocografo", "carro_rojo_reanim", "cuna_calor_rad",
@@ -427,26 +427,43 @@
     "tomografo_128", "tomografo_16", "tomografo_32", "tomografo_64"
   ]);
 
-  // 1. Intentar filtrar solo los registros de indicadores DINÁMICOS (operativos/mensuales)
-  const datosDinamicos = data.filter((d) => !equipoMedicoSet.has((d.indicador || "").toLowerCase()));
+  // 1. Filtrar únicamente los datos dinámicos/operativos
+  const datosDinamicos = data.filter(
+    (d) => !equipoMedicoSet.has((d.indicador || "").toLowerCase())
+  );
 
-  // 2. Si hay datos dinámicos, usamos esos para calcular el mes activo real (ej. 8 para Agosto)
-  // Si SOLO hay equipo médico graficado, buscamos el mes activo de la variable global o fallback a 12
-  const registrosParaCalculo = datosDinamicos.length > 0 ? datosDinamicos : data;
+  let limiteMesDetectado = null;
 
-  // 3. Extraer el mes máximo
-  const mesesConDatos = registrosParaCalculo
-    .filter((d) => Number(d.valor || 0) > 0 && Number(d.mes) >= 1 && Number(d.mes) <= 12)
-    .map((d) => Number(d.mes));
+  if (datosDinamicos.length > 0) {
+    // 2. Si hay indicadores dinámicos, calculamos el mes máximo real (ej. 8 para Agosto)
+    const mesesConDatos = datosDinamicos
+      .filter((d) => Number(d.valor || 0) > 0 && Number(d.mes) >= 1 && Number(d.mes) <= 12)
+      .map((d) => Number(d.mes));
 
-  const limiteMesDetectado = mesesConDatos.length > 0 ? Math.max(...mesesConDatos) : 12;
+    if (mesesConDatos.length > 0) {
+      limiteMesDetectado = Math.max(...mesesConDatos);
+      // Guardamos este límite en memoria para cuando solo se consulte equipo médico
+      window.ultimoLimiteMesDetectado = limiteMesDetectado;
+    }
+  }
 
-  // 4. Renderizar la barra de botones de meses con el límite correcto
+  // 3. Si SOLO se cargó Equipo Médico (datosDinamicos está vacío):
+  if (!limiteMesDetectado) {
+    // a) Usamos el último límite dinámico guardado en la sesión
+    if (window.ultimoLimiteMesDetectado) {
+      limiteMesDetectado = window.ultimoLimiteMesDetectado;
+    } else {
+      // b) O leemos cuántos meses están visibles actualmente en el DOM
+      const checksVisibles = document.querySelectorAll(".mes-check");
+      limiteMesDetectado = checksVisibles.length > 0 ? checksVisibles.length : 8; // Default defensivo (ej. 8 para el año en curso)
+    }
+  }
+
+  // 4. Renderizar los badges de meses en la interfaz con el límite dinámico correcto
   if (typeof window.renderizarMesesGrafica === "function") {
     window.renderizarMesesGrafica(limiteMesDetectado);
   }
 }
-
 
   // =========================
   // DRAG INDICADORES
