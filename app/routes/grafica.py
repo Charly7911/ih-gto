@@ -1197,42 +1197,59 @@ def indicadores():
             return (dp / dc) * 100 if dc > 0 else 0.0
 
         def calcular_kpis(data, dias):
-            # Usar .get() para evitar KeyError si la columna no existe en 'data'
+            # Función auxiliar para convertir valores de forma segura
+            def f(val):
+                try:
+                    return float(val) if val is not None else 0.0
+                except (ValueError, TypeError):
+                    return 0.0
+
+            # Variables base general
             egresos = f(data.get("total_egresos"))
             camas = f(data.get("camas_total"))
             quirofanos = f(data.get("quirofanos"))
             
-            nacimientos = f(data.get("total_nacimientos"))
+            nacimientos = f(data.get("total_nacimientos") or data.get("nacimientos"))
             abortos = f(data.get("abortos"))
-            eventos = nacimientos + abortos
+            eventos = f(data.get("eventos_obstetricos")) or (nacimientos + abortos)
 
             adolescente_apeo = f(data.get("adolescente_apeo"))
             eventos_obstetricos_adolescentes = f(data.get("eventos_obstetricos_adolescentes"))
 
-            dias_est_med = f(data.get("dias_est_med"))
-            dias_est_cir = f(data.get("dias_est_cir"))
-            dias_est_ped = f(data.get("dias_est_ped"))
-            dias_est_gin = f(data.get("dias_est_gin"))
-            dias_est_otr = f(data.get("dias_est_otros"))
+            # Días de estancia por servicio (con alias alternativos)
+            dias_est_med = f(data.get("dias_est_med") or data.get("dias_estancia_med_interna"))
+            dias_est_cir = f(data.get("dias_est_cir") or data.get("dias_estancia_cirugia"))
+            dias_est_ped = f(data.get("dias_est_ped") or data.get("dias_estancia_pediatria"))
+            dias_est_gin = f(data.get("dias_est_gin") or data.get("dias_estancia_ginecobstetricia"))
+            dias_est_otr = f(data.get("dias_est_otros") or data.get("dias_est_otr") or data.get("dias_estancia_otros"))
 
-            egresos_med = f(data.get("egre_med_interna"))
-            egresos_cir = f(data.get("egre_cirugia"))
-            egresos_ped = f(data.get("egre_pediatria"))
-            egresos_gin = f(data.get("egre_gineco"))
-            egresos_otr = f(data.get("egre_otros"))
+            # Egresos por servicio (denominadores)
+            egresos_med = f(data.get("egre_med_interna") or data.get("med_interna") or data.get("egresos_med"))
+            egresos_cir = f(data.get("egre_cirugia") or data.get("cirugia") or data.get("egresos_cir"))
+            egresos_ped = f(data.get("egre_pediatria") or data.get("pediatria") or data.get("egresos_ped"))
+            egresos_gin = f(data.get("egre_gineco") or data.get("ginecobstetricia") or data.get("egresos_gin"))
+            egresos_otr = f(data.get("egre_otros") or data.get("otros") or data.get("egresos_otr"))
 
             dias_val = float(dias) if dias else 30.0
+
+            # Cálculos intermedios de Promedio de Estancia
+            v_med = (dias_est_med / egresos_med) if egresos_med > 0 else 0
+            v_cir = (dias_est_cir / egresos_cir) if egresos_cir > 0 else 0
+            v_ped = (dias_est_ped / egresos_ped) if egresos_ped > 0 else 0
+            v_gin = (dias_est_gin / egresos_gin) if egresos_gin > 0 else 0
+            v_otr = (dias_est_otr / egresos_otr) if egresos_otr > 0 else 0
+
             return {
-                # KPIs Operativos
-                "consultas_por_dia": f(data.get("consultas")) / dias_val if dias_val else 0,
-                "especialidad_por_dia": f(data.get("especialidad")) / dias_val if dias_val else 0,
-                "urgencias_por_dia": f(data.get("urgencias")) / dias_val if dias_val else 0,
+                # KPIs Operativos (Productividad Diaria)
+                "consultas_por_dia": f(data.get("consultas")) / dias_val if dias_val > 0 else 0,
+                "especialidad_por_dia": f(data.get("especialidad")) / dias_val if dias_val > 0 else 0,
+                "urgencias_por_dia": f(data.get("urgencias") or data.get("total_u")) / dias_val if dias_val > 0 else 0,
                 "porcentaje_calificada": (
-                    (f(data.get("calificada")) / f(data.get("urgencias")) * 100)
-                    if f(data.get("urgencias")) > 0
+                    (f(data.get("calificada")) / f(data.get("urgencias") or data.get("total_u")) * 100)
+                    if f(data.get("urgencias") or data.get("total_u")) > 0
                     else 0
                 ),
-                "nacimientos_por_dia": nacimientos / dias_val if dias_val else 0,
+                "nacimientos_por_dia": nacimientos / dias_val if dias_val > 0 else 0,
                 "porcentaje_cesareas": (
                     (f(data.get("nac_cesarea")) / nacimientos * 100) if nacimientos > 0 else 0
                 ),
@@ -1241,7 +1258,7 @@ def indicadores():
                     if quirofanos > 0 and dias_val > 0
                     else 0
                 ),
-                "porcentaje_apeo": (f(data.get("apeo")) / eventos * 100) if eventos > 0 else 0,
+                "porcentaje_apeo": (f(data.get("apeo") or data.get("total_apeo")) / eventos * 100) if eventos > 0 else 0,
                 "porcentaje_adolescente_apeo": (
                     (adolescente_apeo * 100) / eventos_obstetricos_adolescentes
                     if eventos_obstetricos_adolescentes > 0
@@ -1268,16 +1285,26 @@ def indicadores():
                     data.get("dias_p_otros"), data.get("dias_cama_otros")
                 ),
 
-                # Estancia y Rotación
-                "prom_dias_estancia": (
-                    (f(data.get("dias_estancia")) / egresos) if egresos > 0 else 0
-                ),
-                "prom_estancia_med_interna": (dias_est_med / egresos_med) if egresos_med > 0 else 0,
-                "prom_estancia_cirugia": (dias_est_cir / egresos_cir) if egresos_cir > 0 else 0,
-                "prom_estancia_pediatria": (dias_est_ped / egresos_ped) if egresos_ped > 0 else 0,
-                "prom_estancia_gineco": (dias_est_gin / egresos_gin) if egresos_gin > 0 else 0,
-                "prom_estancia_otros": (dias_est_otr / egresos_otr) if egresos_otr > 0 else 0,
+                # Estancia General
+                "prom_dias_estancia": (f(data.get("dias_estancia")) / egresos) if egresos > 0 else 0,
 
+                # Estancia por Servicio (Respuesta duplicada para garantizar compatibilidad con el frontend)
+                "prom_estancia_med_interna": v_med,
+                "prom_dias_estancia_med_interna": v_med,
+
+                "prom_estancia_cirugia": v_cir,
+                "prom_dias_estancia_cirugia": v_cir,
+
+                "prom_estancia_pediatria": v_ped,
+                "prom_dias_estancia_pediatria": v_ped,
+
+                "prom_estancia_gineco": v_gin,
+                "prom_dias_estancia_gineco": v_gin,
+
+                "prom_estancia_otros": v_otr,
+                "prom_dias_estancia_otros": v_otr,
+
+                # Rotación y Sustitución
                 "indice_rotacion": (egresos / camas) if camas > 0 else 0,
                 "interv_sustitucion": (
                     (((camas * dias_val) - f(data.get("dias_p"))) / egresos) if egresos > 0 else 0
@@ -1330,9 +1357,6 @@ def indicadores():
 
             dataset = {**base, **kpis}
 
-  
-        # 🔑 Mapeo de KPIs a sus insumos absolutos requeridos para ponderación
-       # 🔑 MAPEO COMPLETO Y CORREGIDO DE KPIS A SUS INSUMOS ABSOLUTOS
         DEPENDENCIAS_KPIS = {
             # --- PRODUCTIVIDAD DIARIA ---
             "consultas_por_dia": ["consultas"],
@@ -1357,14 +1381,24 @@ def indicadores():
             "porcentaje_ocupacion_gineco": ["dias_p_gineco", "dias_cama_gin"],
             "porcentaje_ocupacion_otros": ["dias_p_otros", "dias_cama_otros"],
 
-            # --- ESTANCIA Y ROTACIÓN ---
-            "prom_dias_estancia": ["dias_estancia", "total_egresos"],
-            "prom_estancia_med_interna": ["dias_est_med", "dias_estancia_med_interna", "egre_med_interna", "med_interna", "egresos_med"],
-            "prom_estancia_cirugia": ["dias_est_cir", "dias_estancia_cirugia", "egre_cirugia", "cirugia", "egresos_cir"],
-            "prom_estancia_pediatria": ["dias_est_ped", "dias_estancia_pediatria", "egre_pediatria", "pediatria", "egresos_ped"],
-            "prom_estancia_gineco": ["dias_est_gin", "dias_estancia_ginecobstetricia", "egre_gineco", "ginecobstetricia", "egresos_gin"],
-            "prom_estancia_otros": ["dias_est_otros", "dias_est_otr", "dias_estancia_otros", "egre_otros", "otros", "egresos_otr"],
+            # --- ESTANCIA Y ROTACIÓN (SOPORTE PARA AMBOS NOMBRES EN FRONTEND) ---
+            "prom_dias_estancia": ["dias_estancia", "dias_estancia_sum", "total_egresos"],
             
+            "prom_estancia_med_interna": ["dias_est_med", "dias_estancia_med_interna", "egre_med_interna", "med_interna"],
+            "prom_dias_estancia_med_interna": ["dias_est_med", "dias_estancia_med_interna", "egre_med_interna", "med_interna"],
+
+            "prom_estancia_cirugia": ["dias_est_cir", "dias_estancia_cirugia", "egre_cirugia", "cirugia"],
+            "prom_dias_estancia_cirugia": ["dias_est_cir", "dias_estancia_cirugia", "egre_cirugia", "cirugia"],
+
+            "prom_estancia_pediatria": ["dias_est_ped", "dias_estancia_pediatria", "egre_pediatria", "pediatria"],
+            "prom_dias_estancia_pediatria": ["dias_est_ped", "dias_estancia_pediatria", "egre_pediatria", "pediatria"],
+
+            "prom_estancia_gineco": ["dias_est_gin", "dias_estancia_ginecobstetricia", "egre_gineco", "ginecobstetricia"],
+            "prom_dias_estancia_gineco": ["dias_est_gin", "dias_estancia_ginecobstetricia", "egre_gineco", "ginecobstetricia"],
+
+            "prom_estancia_otros": ["dias_est_otros", "dias_est_otr", "dias_estancia_otros", "egre_otros", "otros"],
+            "prom_dias_estancia_otros": ["dias_est_otros", "dias_est_otr", "dias_estancia_otros", "egre_otros", "otros"],
+
             "indice_rotacion": ["total_egresos", "camas_total"],
             "interv_sustitucion": ["camas_total", "dias_p", "total_egresos"],
 
