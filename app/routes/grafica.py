@@ -1341,12 +1341,15 @@ def indicadores():
             "porcentaje_ocupacion_pediatria": ["dias_p_pediatria", "dias_cama_ped"],
             "porcentaje_ocupacion_gineco": ["dias_p_gineco", "dias_cama_gin"],
             "porcentaje_ocupacion_otros": ["dias_p_otros", "dias_cama_otros"],
+
             "prom_dias_estancia": ["dias_estancia", "total_egresos"],
-            "prom_estancia_med_interna": ["dias_est_med", "egre_med_interna"],
-            "prom_estancia_cirugia": ["dias_est_cir", "egre_cirugia"],
-            "prom_estancia_pediatria": ["dias_est_ped", "egre_pediatria"],
-            "prom_estancia_gineco": ["dias_est_gin", "egre_gineco"],
-            "prom_estancia_otros": ["dias_est_otros", "egre_otros"],
+
+            "prom_estancia_med_interna": ["dias_est_med", "egresos_med"],
+            "prom_estancia_cirugia": ["dias_est_cir", "egresos_cir"],
+            "prom_estancia_pediatria": ["dias_est_ped", "egresos_ped "],
+            "prom_estancia_gineco": ["dias_est_gin", "egresos_gin "],
+            "prom_estancia_otros": ["dias_est_otr", "egresos_otr "],
+            
             "porcentaje_cesareas": ["nac_cesarea", "total_nacimientos"],
             "porcentaje_calificada": ["calificada", "urgencias"],
             "porcentaje_apeo": ["apeo", "eventos_obstetricos"],
