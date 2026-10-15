@@ -1473,3 +1473,46 @@ canvas {
     font-size: 11px !important;
   }
 }
+
+/* ==========================================
+   DESBLOQUEO DE DESBORDAMIENTO Y ALTURA DE LEYENDA
+   ========================================== */
+
+/* A) Eliminar restricciones de corte en las tarjetas */
+.graph-card,
+.graph-card .card-body,
+.chart-wrapper,
+#contenedorGraficas {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* B) Ajuste responsivo directo para laptops */
+@media (max-width: 1440px), (max-height: 850px) {
+
+  /* Reducir el contenedor del canvas para que la leyenda suba */
+  .grafica-container {
+    height: 240px !important;
+    min-height: 200px !important;
+  }
+
+  /* Asegurar que la leyenda tenga visibilidad total y espacio propio */
+  #leyendaPersonalizada {
+    display: block !important;
+    visibility: visible !important;
+    clear: both !important;
+    margin-top: 10px !important;
+    padding: 8px 12px !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+    max-height: 140px !important;
+    overflow-y: auto !important; /* Si hay muchas series, genera scroll interno suave */
+  }
+
+  .grupo-leyenda h6 {
+    margin: 2px 0 6px 0 !important;
+    font-size: 11px !important;
+  }
+}

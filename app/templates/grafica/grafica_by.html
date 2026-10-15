@@ -1050,7 +1050,7 @@
   }
 
 
-  
+
   function validarDatosIndicadorIndividual(data, indicadorId) {
 
 
@@ -1659,11 +1659,11 @@
     if (modoVistaSeleccionado === "combinada") {
       // 🔑 SOLUCIÓN: Usar clamp() dinámico en lugar de height: 380px
       contenedor.innerHTML = `
-      <div class="grafica-container w-100" style="position: relative; height: clamp(260px, 36vh, 380px);">
-        <canvas id="grafica"></canvas>
-      </div>
-      <div id="leyendaPersonalizada" class="mt-2 w-100"></div>
-    `;
+  <div class="grafica-container w-100" style="position: relative; height: clamp(220px, 32vh, 340px);">
+    <canvas id="grafica"></canvas>
+  </div>
+  <div id="leyendaPersonalizada" class="mt-2 w-100"></div>
+`;
 
       const canvas = document.getElementById("grafica");
       const ctx = canvas.getContext("2d");
