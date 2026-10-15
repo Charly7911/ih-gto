@@ -1342,13 +1342,22 @@
     );
 
     if (registrosTotales.length > 0) {
-      datosGrafica = registrosTotales;
-    } else if (typeof unidadesSeleccionadas !== "undefined" && unidadesSeleccionadas.size === 0 && !mostrarTodasUnidades) {
-      datosGrafica = data.filter((d) => str(d.nombre_unidad).toUpperCase().includes("TOTAL") || str(d.clues).toUpperCase() === "TOTAL");
-      if (datosGrafica.length === 0) datosGrafica = data;
+      // 🔑 Mantenemos las filas consolidadas Y TAMBIÉN los insumos/indicadores componentes devueltos
+      const indicadoresEnTotales = new Set(registrosTotales.map(d => norm(d.indicador)));
+
+      datosGrafica = data.filter((d) => {
+        const esTotal =
+          str(d.clues).toUpperCase() === "TOTAL" ||
+          str(d.clues).startsWith("GRUPO_") ||
+          str(d.nombre_unidad).toUpperCase().includes("TOTAL");
+
+        // Si no es un registro explícito "TOTAL", pero su indicador viene en la respuesta,
+        // significa que es un insumo componente traído para el grupo: NO LO DESCARTAMOS.
+        return esTotal || !indicadoresEnTotales.has(norm(d.indicador));
+      });
+
+      if (datosGrafica.length === 0) datosGrafica = registrosTotales;
     }
-
-
 
     // =========================
     // CALCULO ROBUSTO DE ETIQUETAS X
@@ -1411,7 +1420,7 @@
     ];
 
     // =========================
-    // DATASETS (CONSTRUCCIÓN CON COLORES Y ETIQUETAS MEJORADAS)
+    // DATASETS (CONSTRUCCIÓN CON FILTRADO FLEXIBLE PARA GRUPOS)
     // =========================
     const datasets = combos.flatMap((c, comboIndex) => {
       const [indicadorNom, anioNom, unidadLimpia] = c.split("|||");
@@ -1432,6 +1441,21 @@
           } else {
             const entReg = norm(d.nombre_unidad || d.clues);
             const cluesReg = norm(d.clues);
+
+            // 🔑 FLEXIBILIDAD EN GRUPOS/TOTALES:
+            // Acepta coincidencia exacta de entidad O registros consolidados (TOTAL GRUPO / GRUPO_...)
+            const esGrupoOTotal = unidadLimpia.includes("total") || unidadLimpia.includes("grupo") || unidadLimpia === "todas";
+
+            if (esGrupoOTotal) {
+              return (
+                entReg === unidadLimpia ||
+                cluesReg === unidadLimpia ||
+                entReg.includes("total") ||
+                cluesReg.includes("total") ||
+                cluesReg.startsWith("grupo_")
+              );
+            }
+
             return entReg === unidadLimpia || cluesReg === unidadLimpia;
           }
         });
@@ -1485,7 +1509,6 @@
 
       if (valores.length === 0) return [];
 
-      // 🔑 COLOR DIVERSIFICADO: Prioriza cambiar de color por CADA combinación única (Indicador + Unidad + Año)
       const colorBase = PALETA_COLORES_DISTINTOS[comboIndex % PALETA_COLORES_DISTINTOS.length];
 
       const estilosLinea = [
@@ -1496,13 +1519,11 @@
       const idxIndicador = listaIndicadores.indexOf(indicadorNom);
       const estiloDash = estilosLinea[Math.max(0, idxIndicador) % estilosLinea.length];
 
-      // Mapeo legible del nombre
       const regEjemplo = datosGrafica.find(d => norm(d.nombre_unidad || d.clues) === unidadLimpia);
       let nombreEntidadMostrar = esModoTipologia
         ? `ACUMULADO ${claveTipologia}`
         : (regEjemplo ? regEjemplo.nombre_unidad : unidadLimpia.toUpperCase());
 
-      // 🔑 Si el nombre devuelto es genérico o "TODAS", le damos un nombre descriptivo claro
       if (!nombreEntidadMostrar || nombreEntidadMostrar.toUpperCase() === "TODAS" || nombreEntidadMostrar.toUpperCase() === "TOTAL GENERAL") {
         nombreEntidadMostrar = "Todas las Unidades";
       }
@@ -1511,7 +1532,6 @@
         ? obtenerNombreIndicador(indicadorNom)
         : indicadorNom.toUpperCase().replace(/_/g, " ");
 
-      // 🏷️ ETIQUETA ESTRUCTURADA: [Indicador] - [Unidad / Grupo] (Año)
       const labelCompleto = `${indNombre} — ${nombreEntidadMostrar} (${anioNom})`;
 
       const baseDataset = {
@@ -1526,7 +1546,7 @@
         tension: 0.3,
         backgroundColor:
           tipoOriginal === "area"
-            ? colorBase + "4D" // Transparencia 30%
+            ? colorBase + "4D"
             : colorBase,
         fill: tipoOriginal === "area",
         showLine: tipoOriginal !== "scatter",
@@ -1538,7 +1558,7 @@
       if (!mostrarTendencia) return baseDataset;
 
       const tendencia = typeof calcularTendencia === "function" ? calcularTendencia(valores) : [];
-      const COLOR_TENDENCIA = "#3ce742"; // Verde brillante
+      const COLOR_TENDENCIA = "#3ce742";
 
       return [
         baseDataset,
@@ -1571,7 +1591,7 @@
         padding: { top: 35, right: 20, bottom: 10, left: 10 },
       },
       plugins: {
-        legend: { display: false }, // Se renderiza la leyenda personalizada abajo
+        legend: { display: false },
         datalabels: {
           display: function (context) {
             const sw = document.getElementById("switchEtiquetas");
@@ -1691,7 +1711,6 @@
       });
     }
   }
-
   // PARTE 3
 
   // Función auxiliar para redireccionar la leyenda en vistas dinámicas
