@@ -1176,7 +1176,6 @@
   function crearLeyendaPersonalizada(chart) {
     const contenedor = document.getElementById("leyendaPersonalizada");
 
-
     if (!contenedor) return;
 
     contenedor.innerHTML = "";
@@ -1189,7 +1188,9 @@
       // Si es línea de tendencia, se omite
       if (dataset.label?.includes("Tendencia")) return;
 
-      const nombreIndicador = obtenerNombreIndicador(dataset.indicador) || "General";
+      const nombreIndicador = (typeof obtenerNombreIndicador === "function"
+        ? obtenerNombreIndicador(dataset.indicador)
+        : dataset.indicador) || "General";
 
       if (!grupos[nombreIndicador]) {
         grupos[nombreIndicador] = [];
@@ -1206,7 +1207,7 @@
 
       // Título de la sección (Nombre del Indicador)
       const tituloGrupo = document.createElement("h6");
-      tituloGrupo.textContent = nombreIndicador;
+      tituloGrupo.textContent = `📊 ${nombreIndicador}`;
       tituloGrupo.style.width = "100%";
       tituloGrupo.style.margin = "15px 0 10px 0";
       tituloGrupo.style.paddingBottom = "4px";
@@ -1220,10 +1221,10 @@
       // Grid para los elementos de este indicador
       const gridItems = document.createElement("div");
       gridItems.style.display = "grid";
-      gridItems.style.gridTemplateColumns = "repeat(auto-fit, minmax(240px, 1fr))";
+      gridItems.style.gridTemplateColumns = "repeat(auto-fit, minmax(260px, 1fr))";
       gridItems.style.gap = "8px 15px";
 
-      // Ordenar los items del grupo por nombre de unidad
+      // Ordenar los items del grupo
       grupos[nombreIndicador].sort((a, b) =>
         a.dataset.label.localeCompare(b.dataset.label)
       );
@@ -1261,9 +1262,17 @@
         ctxIcon.lineTo(36, 7);
         ctxIcon.stroke();
 
-        // Texto (Nombre de la Unidad)
+        // 🔑 TEXTO CORREGIDO: Formatea la Unidad + Año para evitar repeticiones genéricas
         const texto = document.createElement("span");
-        texto.textContent = nombreUnidad(dataset.unidad || dataset.label);
+
+        const unidadTexto = typeof nombreUnidad === "function"
+          ? nombreUnidad(dataset.unidad || "TODAS")
+          : (dataset.unidad || "Todas las Unidades");
+
+        const anioTexto = dataset.anio ? `(${dataset.anio})` : "";
+
+        // Muestra: "Todas Las Unidades (42) (2026)" o la Unidad Específica + Año
+        texto.textContent = `${unidadTexto} ${anioTexto}`.trim();
         texto.style.color = "#495057";
 
         // Estado inicial si está oculto
@@ -1293,7 +1302,6 @@
       contenedor.appendChild(bloqueGrupo);
     });
   }
-
 
 
   function renderGrafica(data) {
@@ -1348,11 +1356,10 @@
         : tipoOriginal;
 
     // =========================================================
-    // FILTRADO ROBUSTO DE DATOS PARA GRUPOS (DESCARDA HOSPITALES INDIVIDUALES)
+    // FILTRADO ROBUSTO DE DATOS PARA GRUPOS
     // =========================================================
     let datosGrafica = data;
 
-    // 1. Filtrar filas consolidadas reales del Backend ("TOTAL GRUPO", "TOTAL", "GRUPO_...")
     const registrosTotales = data.filter((d) =>
       str(d.clues).toUpperCase() === "TOTAL" ||
       str(d.clues).startsWith("GRUPO_") ||
@@ -1361,7 +1368,6 @@
       str(d.nombre_unidad).toUpperCase().includes("TODAS LAS UNIDADES")
     );
 
-    // 2. Si existen consolidados, aislar solo esas filas para evitar la contaminación con hospitales individuales
     if (registrosTotales.length > 0) {
       datosGrafica = registrosTotales;
     } else if (typeof unidadesSeleccionadas !== "undefined" && unidadesSeleccionadas.size === 0 && !mostrarTodasUnidades) {
@@ -1372,7 +1378,7 @@
     console.log("DATOS FILTRADOS PARA DIBUJAR:", datosGrafica);
 
     // =========================
-    // CALCULO ROBUSTO DE ETIQUETAS X (RANGO DE MESES REAL)
+    // CALCULO ROBUSTO DE ETIQUETAS X
     // =========================
     let etiquetasX = [];
     let mesesBase = [];
@@ -1383,20 +1389,18 @@
       mesesBase = mesesSeleccionados;
       etiquetasX = mesesBase.map((m) => mesesLabels[m - 1]);
     } else {
-      // 🔑 Buscar el último mes que realmente contenga producción/reporte (valor > 0)
       const mesesConProduccionReal = datosGrafica
         .filter((d) => Number(d.valor || 0) > 0 && Number(d.mes) >= 1 && Number(d.mes) <= 12)
         .map((d) => Number(d.mes));
 
       const ultimoMesReal = mesesConProduccionReal.length > 0 ? Math.max(...mesesConProduccionReal) : 12;
 
-      // Generar rango exacto solo de meses con datos (ej. 1 a 8 para Ene-Ago)
       mesesBase = Array.from({ length: ultimoMesReal }, (_, i) => i + 1);
       etiquetasX = mesesBase.map((m) => mesesLabels[m - 1]);
     }
 
     // =========================
-    // GENERACIÓN DE COMBOS (UNIFICA GRUPOS)
+    // GENERACIÓN DE COMBOS
     // =========================
     let combos = [];
 
@@ -1422,16 +1426,21 @@
 
     const mostrarTendencia = document.getElementById("switchTendencia")?.checked || false;
 
-    // Listado de indicadores porcentuales/calculados
     const esIndicadorRazon = (ind) => {
       const i = norm(ind);
       return i.includes("mortalidad") || i.includes("porcentaje") || i.includes("prom") || i.includes("indice") || i.includes("interv");
     };
 
+    // 🎨 PALETA DE COLORES VIBRANTES Y ALTAMENTE CONTRASTANTES
+    const PALETA_COLORES_DISTINTOS = [
+      "#2563eb", "#dc2626", "#16a34a", "#d97706", "#9333ea",
+      "#0891b2", "#e11d48", "#059669", "#ca8a04", "#7c3aed"
+    ];
+
     // =========================
-    // DATASETS (CONSTRUCCIÓN DE LÍNEAS / BARRAS)
+    // DATASETS (CONSTRUCCIÓN CON COLORES Y ETIQUETAS MEJORADAS)
     // =========================
-    const datasets = combos.flatMap((c) => {
+    const datasets = combos.flatMap((c, comboIndex) => {
       const [indicadorNom, anioNom, unidadLimpia] = c.split("|||");
       let valores = [];
       const esModoTipologia = unidadLimpia.startsWith("TIPOLOGIA_");
@@ -1450,13 +1459,10 @@
           } else {
             const entReg = norm(d.nombre_unidad || d.clues);
             const cluesReg = norm(d.clues);
-
-            // 🔑 MATCH EXACTO POR CLUES O NOMBRE DE UNIDAD PARA EVITAR MEZCLAR GRUPOS
             return entReg === unidadLimpia || cluesReg === unidadLimpia;
           }
         });
 
-        // 🔑 ASIGNACIÓN DIRECTA Y PUNTUAL POR MES DE LA SERIE CORRESPONDIENTE
         const mapaMeses = {};
 
         registros.forEach((r) => {
@@ -1468,10 +1474,8 @@
           }
         });
 
-        // Mapear valores únicamente usando el rango 'mesesBase' determinado
         valores = mesesBase.map((m) => (m in mapaMeses ? mapaMeses[m] : 0));
       } else {
-        // Vista Anual (mes 13)
         const registros = datosGrafica.filter((d) => {
           const coincideInd = norm(d.indicador) === norm(indicadorNom);
           const coincideAnio = String(d.anio) === String(anioNom);
@@ -1506,27 +1510,10 @@
         valores = [totalAnual];
       }
 
-      function generarColor({ unidad, indicador, anio }) {
-        const paleta = [
-          "hsl(217, 91%, 60%)", "hsl(0, 84%, 60%)", "hsl(142, 71%, 45%)",
-          "hsl(38, 92%, 50%)", "hsl(280, 67%, 55%)", "hsl(199, 89%, 48%)"
-        ];
-        const key = `${unidad}-${indicador}-${anio}`;
-        let hash = 0;
-        for (let i = 0; i < key.length; i++) {
-          hash = (hash << 5) - hash + key.charCodeAt(i);
-          hash |= 0;
-        }
-        return paleta[Math.abs(hash) % paleta.length];
-      }
-
-      const colorBase = generarColor({
-        unidad: unidadLimpia,
-        indicador: indicadorNom,
-        anio: anioNom
-      });
-
       if (valores.length === 0) return [];
+
+      // 🔑 COLOR DIVERSIFICADO: Prioriza cambiar de color por CADA combinación única (Indicador + Unidad + Año)
+      const colorBase = PALETA_COLORES_DISTINTOS[comboIndex % PALETA_COLORES_DISTINTOS.length];
 
       const estilosLinea = [
         [], [6, 6], [2, 3], [12, 4, 2, 4], [8, 4]
@@ -1536,18 +1523,26 @@
       const idxIndicador = listaIndicadores.indexOf(indicadorNom);
       const estiloDash = estilosLinea[Math.max(0, idxIndicador) % estilosLinea.length];
 
-      // Mapeo legible del nombre para la leyenda
+      // Mapeo legible del nombre
       const regEjemplo = datosGrafica.find(d => norm(d.nombre_unidad || d.clues) === unidadLimpia);
-      const nombreEtiqueta = esModoTipologia
+      let nombreEntidadMostrar = esModoTipologia
         ? `ACUMULADO ${claveTipologia}`
         : (regEjemplo ? regEjemplo.nombre_unidad : unidadLimpia.toUpperCase());
 
+      // 🔑 Si el nombre devuelto es genérico o "TODAS", le damos un nombre descriptivo claro
+      if (!nombreEntidadMostrar || nombreEntidadMostrar.toUpperCase() === "TODAS" || nombreEntidadMostrar.toUpperCase() === "TOTAL GENERAL") {
+        nombreEntidadMostrar = "Todas las Unidades";
+      }
+
       const indNombre = typeof obtenerNombreIndicador === "function"
         ? obtenerNombreIndicador(indicadorNom)
-        : indicadorNom;
+        : indicadorNom.toUpperCase().replace(/_/g, " ");
+
+      // 🏷️ ETIQUETA ESTRUCTURADA: [Indicador] - [Unidad / Grupo] (Año)
+      const labelCompleto = `${indNombre} — ${nombreEntidadMostrar} (${anioNom})`;
 
       const baseDataset = {
-        label: `${nombreEtiqueta}\n${indNombre} (${anioNom})`,
+        label: labelCompleto,
         unidad: unidadLimpia,
         indicador: indicadorNom,
         anio: anioNom,
@@ -1558,43 +1553,39 @@
         tension: 0.3,
         backgroundColor:
           tipoOriginal === "area"
-            ? colorBase.replace("hsl", "hsla").replace(")", ",0.3)")
+            ? colorBase + "4D" // Transparencia 30%
             : colorBase,
         fill: tipoOriginal === "area",
         showLine: tipoOriginal !== "scatter",
         pointRadius: tipoOriginal === "scatter" ? 6 : 4,
         pointBackgroundColor: "#fff",
-        order: 2 // 🔻 Enviar dataset base al fondo
+        order: 2
       };
 
       if (!mostrarTendencia) return baseDataset;
 
       const tendencia = typeof calcularTendencia === "function" ? calcularTendencia(valores) : [];
-
-      const COLOR_TENDENCIA = "#3ce742"; // Verde brillante contrastante
+      const COLOR_TENDENCIA = "#3ce742"; // Verde brillante
 
       return [
         baseDataset,
         {
-          label: `Tendencia - ${nombreEtiqueta}`,
+          label: `Tendencia — ${indNombre} (${anioNom})`,
           indicador: indicadorNom,
           unidad: unidadLimpia,
           anio: anioNom,
           data: tendencia,
           type: "line",
-
           borderColor: COLOR_TENDENCIA,
           backgroundColor: COLOR_TENDENCIA,
           pointBorderColor: COLOR_TENDENCIA,
           pointBackgroundColor: COLOR_TENDENCIA,
-
           borderWidth: 3,
           borderDash: [6, 4],
           pointRadius: 0,
           tension: 0,
           fill: false,
-
-          order: 1 // 🔝 Dibuja la tendencia siempre por encima de las barras/líneas
+          order: 1
         },
       ];
     });
@@ -1607,7 +1598,7 @@
         padding: { top: 35, right: 20, bottom: 10, left: 10 },
       },
       plugins: {
-        legend: { display: false },
+        legend: { display: false }, // Se renderiza la leyenda personalizada abajo
         datalabels: {
           display: function (context) {
             const sw = document.getElementById("switchEtiquetas");
@@ -1637,7 +1628,7 @@
     });
 
     // ===================================================
-    // RENDERIZADO FINAL EN EL CONTENEDOR
+    // RENDERIZADO FINAL Y LEYENDA INFERIOR
     // ===================================================
     const contenedor = document.getElementById("contenedorGraficas");
 
@@ -1677,6 +1668,7 @@
       }
 
     } else {
+      // Vista separada por tarjetas de indicador
       const gruposDatasets = {};
 
       datasets.forEach(ds => {
@@ -1695,7 +1687,7 @@
 
         const nombreInd = typeof obtenerNombreIndicador === "function"
           ? obtenerNombreIndicador(indKey)
-          : indKey;
+          : indKey.toUpperCase().replace(/_/g, " ");
 
         const cardDiv = document.createElement("div");
         cardDiv.className = "tarjeta-subgrafica mb-4 p-3 border rounded bg-white shadow-sm w-100";
