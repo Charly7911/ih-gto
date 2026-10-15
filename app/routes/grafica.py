@@ -150,7 +150,7 @@ def generar_total_general(
             unidades_in = set(r.get("clues") for r in registros)
             egresos_in = [r for r in registros if str(r.get("indicador")).lower() == "total_egresos"]
             suma_egr = sum(float(r.get("valor") or 0) for r in egresos_in)
-            print(f"🧪 [C - CONSTRUIR BASE] MES {mes_actual}: {len(unidades_in)} unidades recibidas | Suma total_egresos: {suma_egr}")
+          
 
         # 🔑 Deduplicar registros por (anio, mes, clues, indicador)
         vistos = set()
@@ -1581,9 +1581,6 @@ def indicadores():
                     ",".join(["%s"] * len(solicitados_v))
                 )
                 params_v.extend(solicitados_v)
-
-        print("🔍 1. QUERY SQL GENERADA:", query_v)
-        print("🔍 1. PARÁMETROS SQL ENVIADOS:", params_v)
 
         cur.execute(query_v, params_v)
         rows_v = cur.fetchall()

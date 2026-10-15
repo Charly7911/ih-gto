@@ -471,20 +471,14 @@
   function initDraggableIndicadores() {
     const items = document.querySelectorAll(".indicador-item");
 
-
-
     items.forEach((el) => {
       el.draggable = true;
 
       const ind = el.dataset.ind;
 
-      if (!ind) {
-        console.warn("Indicador sin data-ind:", el);
-        return;
-      }
+      if (!ind) return;
 
       el.addEventListener("dragstart", (e) => {
-        console.log("DRAG:", ind);
         const data = {
           type: "indicador",
           value: ind,
@@ -496,8 +490,6 @@
           "application/json",
           JSON.stringify(data)
         );
-
-
       });
     });
   }
@@ -697,21 +689,13 @@
       e.preventDefault();
       dropZone.classList.remove("drag-over");
 
-      let raw = e.dataTransfer.getData("application/json") || e.dataTransfer.getData("text");
-
-      console.log("👉 1. DATOS RECIBIDOS RAW:", raw);
-
-      if (!raw) {
-        console.error("❌ No se recibieron datos en el evento drop.");
-        return;
-      }
+      const raw = e.dataTransfer.getData("application/json") || e.dataTransfer.getData("text");
+      if (!raw) return;
 
       let data;
       try {
         data = JSON.parse(raw);
-        console.log("👉 2. JSON PARSEADO CORRECTAMENTE:", data);
-      } catch (err) {
-        console.error("❌ Error al parsear JSON:", err, raw);
+      } catch {
         return;
       }
 
@@ -719,18 +703,12 @@
       // UNIDADES (INDIVIDUAL)
       // =========================
       if (data.type === "unidad") {
-        console.log("👉 Procesando unidad individual:", data.value);
         if (!unidadesSeleccionadas.has(data.value)) {
           unidadesSeleccionadas.add(data.value);
           if (typeof addBadge === "function") {
             const nombreLimpio = typeof limpiarNombreUnidad === "function" ? limpiarNombreUnidad(data.nombre) : data.nombre;
             addBadge(nombreLimpio, "unidad", data.value);
-            console.log("✅ Badge individual agregado:", nombreLimpio);
-          } else {
-            console.error("❌ La función addBadge NO existe o no está en alcance.");
           }
-        } else {
-          console.warn("⚠️ La unidad ya existía en unidadesSeleccionadas:", data.value);
         }
       }
 
@@ -738,8 +716,7 @@
       // UNIDADES (GRUPO / ABANICO: ACUMULADO)
       // =========================
       if (data.type === "grupo_unidades" && Array.isArray(data.items)) {
-
-        // 1. Agregar todos los IDs del grupo al Set (para que el backend reciba todas las unidades juntas)
+        // 1. Agregar todos los IDs del grupo al Set
         data.items.forEach((item) => {
           unidadesSeleccionadas.add(item.value);
         });
@@ -752,9 +729,8 @@
           etiquetaGrupo = "🏥 GRUPO " + data.grupo + " (" + data.items.length + " Unidades)";
         }
 
-        // 3. Crear UN SOLO BADGE ACUMULADO para todo el grupo en lugar de uno por cada hospital
+        // 3. Crear UN SOLO BADGE ACUMULADO para todo el grupo
         if (typeof addBadge === "function") {
-          // Usamos la clave del grupo (ej. 'GRUPO_HG' o 'GRUPO_TODAS') como identificador del badge
           const idGrupo = "GRUPO_" + data.grupo;
           addBadge(etiquetaGrupo, "grupo_unidad", idGrupo);
         }
@@ -1016,10 +992,7 @@
         params.append("meses[]", m);
       });
     }
-    // Si mesesSeleccionados está vacío, NO agregamos nada al params URL.
-    // Así la base de datos consulta libremente y devuelve ÚNICAMENTE los meses que tienen información cargada (ej. Ene-Ago).
 
-    console.log("🔗 URL SOLICITADA A LA API MULTIGRUPO:", "/grafica/api/indicadores?" + params.toString());
 
     // =========================
     // PETICIÓN HTTP (FETCH)
@@ -1037,7 +1010,7 @@
 
         if (!r.ok) {
           const errorTexto = await r.text();
-          console.error(`❌ ERROR ${r.status} DESDE EL SERVIDOR:`, errorTexto);
+
           destruirTodasLasGraficas();
           return null;
         }
@@ -1045,10 +1018,10 @@
         return r.json();
       })
       .then((data) => {
-        console.log("📊 RESPUESTA DE LA API INDICADORES:", data);
+
 
         if (!data || data.length === 0) {
-          console.warn("⚠️ La API devolvió un arreglo vacío []");
+
           destruirTodasLasGraficas();
           return;
         }
@@ -1375,7 +1348,7 @@
       if (datosGrafica.length === 0) datosGrafica = data;
     }
 
-    console.log("DATOS FILTRADOS PARA DIBUJAR:", datosGrafica);
+
 
     // =========================
     // CALCULO ROBUSTO DE ETIQUETAS X
@@ -1632,17 +1605,14 @@
     // ===================================================
     const contenedor = document.getElementById("contenedorGraficas");
 
-    if (!contenedor) {
-      console.error("No se encontró el contenedor 'contenedorGraficas'");
-      return;
-    }
+    if (!contenedor) return;
 
     if (typeof chart !== "undefined" && chart) {
       chart.destroy();
       chart = null;
     }
     if (typeof instanciasCharts !== "undefined" && Array.isArray(instanciasCharts)) {
-      instanciasCharts.forEach(c => c && c.destroy());
+      instanciasCharts.forEach((c) => c && c.destroy());
       instanciasCharts = [];
     }
 
@@ -1671,7 +1641,7 @@
       // Vista separada por tarjetas de indicador
       const gruposDatasets = {};
 
-      datasets.forEach(ds => {
+      datasets.forEach((ds) => {
         const indKey = ds.indicador || "general";
         if (!gruposDatasets[indKey]) {
           gruposDatasets[indKey] = [];
@@ -2203,7 +2173,7 @@
     let dataTotal = [];
 
     try {
-      console.log("🔗 SOLICITANDO EXCEL MASIVO:", "/grafica/api/indicadores?" + params.toString());
+
       const res = await fetch("/grafica/api/indicadores?" + params.toString());
       dataTotal = await res.json();
 
