@@ -1363,43 +1363,45 @@ canvas {
 
 /* Asegura que los botones numéricos no fuercen un desbordamiento horizontal */
 #paginacionTabla {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    max-width: 100%;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  max-width: 100%;
 }
 
 #paginacionTabla .page-link {
-    padding: 0.2rem 0.45rem;
-    font-size: 0.75rem;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.75rem;
 }
 
 @media (max-width: 768px) {
-    #paginacionTabla {
-        justify-content: center !important;
-        overflow-x: auto;
-        white-space: nowrap;
-    }
+  #paginacionTabla {
+    justify-content: center !important;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
 }
 
 /* ==========================================
-   OPTIMIZACIÓN RESPONSIVA PARA LAPTOPS Y PANTALLAS COMPACTAS
+   OPTIMIZACIÓN RESPONSIVA DEFINITIVA PARA LAPTOPS
    ========================================== */
 
-/* 1. Laptops y laptops de escritorio compactas (1024px a 1440px) */
+/* 1. Laptops y pantallas compactas (hasta 1440px de ancho) */
 @media (max-width: 1440px) {
-  /* Contenedores de gráfica adaptativos basados en viewport height */
+  /* Contenedores de la gráfica: Usa altura fluida (35vh) con un rango seguro */
   .chart-box,
   .chart-container,
   .chart-wrapper {
-    height: clamp(280px, 38vh, 420px) !important;
-    min-height: 260px !important;
-    position: relative;
-    width: 100%;
+    position: relative !important;
+    width: 100% !important;
+    height: clamp(260px, 35vh, 380px) !important;
+    padding-bottom: 25px !important; /* Espacio reservado para las etiquetas del eje X */
+    box-sizing: border-box !important;
+    overflow: visible !important;
   }
 
-  /* Reducción de espacios muertos superiores */
+  /* Compactación del área de Drop */
   .drop-area-modern {
-    min-height: 48px !important;
+    min-height: 45px !important;
     padding: 4px 8px !important;
     gap: 4px !important;
   }
@@ -1409,6 +1411,7 @@ canvas {
     font-size: 9.5px !important;
   }
 
+  /* Card de meses y botones compactos */
   .card-meses {
     padding: 6px 10px !important;
     margin-bottom: 8px !important;
@@ -1435,7 +1438,7 @@ canvas {
     font-size: 9.5px !important;
   }
 
-  /* Ajuste de controles superiores */
+  /* Controles superiores */
   .barra-controles-grafica {
     gap: 6px !important;
     margin-bottom: 6px !important;
@@ -1450,27 +1453,13 @@ canvas {
     padding: 2px 6px !important;
   }
 
-  /* Compactación de la leyenda */
+  /* Leyenda personalizada */
   #leyendaPersonalizada {
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
     gap: 6px !important;
     margin-top: 8px !important;
-    max-height: 120px;
+    max-height: 100px;
     overflow-y: auto;
-  }
-}
-
-/* 2. Ajuste específico para Laptops con resolución vertical ajustada (pantallas de 768px de alto) */
-@media (max-height: 800px) and (min-width: 993px) {
-  .chart-box,
-  .chart-container,
-  .chart-wrapper {
-    height: 32vh !important;
-    min-height: 240px !important;
-  }
-
-  .drop-area-modern {
-    min-height: 42px !important;
   }
 
   .footer-global {
@@ -1478,9 +1467,10 @@ canvas {
   }
 }
 
-/* 3. Asegurar que el canvas de Chart.js / Highcharts se reescale dinámicamente */
+/* 2. Forzar que el lienzo (Canvas) de Chart.js llene exactamente su contenedor */
 canvas#graficaIndicadores,
 .chart-container canvas {
-  max-height: 100% !important;
+  display: block !important;
   width: 100% !important;
+  height: 100% !important;
 }
