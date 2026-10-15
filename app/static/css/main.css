@@ -1386,13 +1386,21 @@ canvas {
    FIJADO Y COMPACTACIÓN VISIBLE PARA LAPTOPS
    ========================================== */
 
-/* 1. Permitir que la tarjeta de la gráfica no corte su contenido inferior */
+/* ==========================================
+   DESBLOQUEO DE DESBORDAMIENTO Y LEYENDA HORIZONTAL
+   ========================================== */
+
+/* 1. Permitir que las tarjetas no corten su contenido inferior */
 .graph-card,
-.graph-card .card-body {
+.graph-card .card-body,
+.chart-wrapper,
+#contenedorGraficas {
+  height: auto !important;
+  max-height: none !important;
   overflow: visible !important;
 }
 
-/* 2. Regla responsiva para cualquier laptop (por ancho O por alto) */
+/* 2. Regla responsiva unificada para laptops (por ancho O por alto) */
 @media (max-width: 1440px), (max-height: 850px) {
 
   /* Reducir padding del contenedor principal */
@@ -1421,7 +1429,7 @@ canvas {
     font-size: 9.5px !important;
   }
 
-  /* Compactar Drop Zone (Arrastre de indicadores) */
+  /* Compactar Drop Zone */
   #dropZone,
   .drop-area-modern {
     min-height: 38px !important;
@@ -1436,83 +1444,46 @@ canvas {
   .graph-card .card-header {
     padding: 6px 12px !important;
   }
-
   .graph-card .card-body {
     padding: 8px !important;
   }
 
-  /* Ajustar el contenedor de las gráficas */
-  #contenedorGraficas {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-  }
-
-  /* Altura fluida reducida para la gráfica en laptops */
+  /* Ajustar el contenedor del canvas */
   .grafica-container {
-    height: 280px !important; /* Libera más de 100px para la leyenda e indicadores */
-    min-height: 240px !important;
-  }
-
-  /* Contenedor de la leyenda visible y compacto */
-  #leyendaPersonalizada {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    margin-top: 8px !important;
-    padding: 8px 10px !important;
-    background-color: #f8fafc;
-    border-radius: 6px;
-    border: 1px solid #e2e8f0;
-    max-height: 110px !important; /* Activa scroll interno si hay muchas series */
-    overflow-y: auto !important;
-  }
-
-  .grupo-leyenda h6 {
-    margin: 4px 0 6px 0 !important;
-    font-size: 11px !important;
-  }
-}
-
-/* ==========================================
-   DESBLOQUEO DE DESBORDAMIENTO Y ALTURA DE LEYENDA
-   ========================================== */
-
-/* A) Eliminar restricciones de corte en las tarjetas */
-.graph-card,
-.graph-card .card-body,
-.chart-wrapper,
-#contenedorGraficas {
-  height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
-}
-
-/* B) Ajuste responsivo directo para laptops */
-@media (max-width: 1440px), (max-height: 850px) {
-
-  /* Reducir el contenedor del canvas para que la leyenda suba */
-  .grafica-container {
-    height: 240px !important;
+    height: 240px !important; /* Libera espacio para la leyenda inferior */
     min-height: 200px !important;
   }
 
-  /* Asegurar que la leyenda tenga visibilidad total y espacio propio */
+  /* 🔑 LEYENDA FLEXIBLE HORIZONTAL: Distribuye los indicadores en columnas */
   #leyendaPersonalizada {
-    display: block !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 10px 16px !important;
+    align-items: flex-start !important;
     visibility: visible !important;
-    clear: both !important;
-    margin-top: 10px !important;
+    opacity: 1 !important;
+    margin-top: 8px !important;
     padding: 8px 12px !important;
     background: #f8fafc !important;
     border: 1px solid #e2e8f0 !important;
     border-radius: 6px !important;
-    max-height: 140px !important;
-    overflow-y: auto !important; /* Si hay muchas series, genera scroll interno suave */
+    max-height: 120px !important;
+    overflow-y: auto !important; /* Scroll suave si el contenido sobrepasa la altura */
+    width: 100% !important;
   }
 
-  .grupo-leyenda h6 {
-    margin: 2px 0 6px 0 !important;
+  /* Distribución de cada bloque de indicador (ej. Mortalidad Ajustada / Cruda) */
+  #leyendaPersonalizada .grupo-leyenda {
+    flex: 1 1 200px !important; /* Permite acomodar 2 o más bloques por fila */
+    min-width: 180px !important;
+    margin-bottom: 0 !important;
+  }
+
+  #leyendaPersonalizada .grupo-leyenda h6 {
+    margin: 2px 0 4px 0 !important;
     font-size: 11px !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+    padding-bottom: 2px !important;
   }
 }
