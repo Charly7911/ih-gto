@@ -1149,135 +1149,141 @@
 
 
 
-  function crearLeyendaPersonalizada(chart) {
-    const contenedor = document.getElementById("leyendaPersonalizada");
+ function crearLeyendaPersonalizada(chart) {
+  const contenedor = document.getElementById("leyendaPersonalizada");
 
-    if (!contenedor) return;
+  if (!contenedor || !chart || !chart.data || !chart.data.datasets) return;
 
-    contenedor.innerHTML = "";
-    const datasets = chart.data.datasets;
+  contenedor.innerHTML = "";
+  const datasets = chart.data.datasets;
 
-    // 1. Agrupar los datasets por Indicador
-    const grupos = {};
+  // 1. Agrupar los datasets por Indicador
+  const grupos = {};
 
-    datasets.forEach((dataset, index) => {
-      // Si es línea de tendencia, se omite
-      if (dataset.label?.includes("Tendencia")) return;
+  datasets.forEach((dataset, index) => {
+    // Si es línea de tendencia, se omite de la leyenda
+    if (dataset.label?.includes("Tendencia")) return;
 
-      const nombreIndicador = (typeof obtenerNombreIndicador === "function"
-        ? obtenerNombreIndicador(dataset.indicador)
-        : dataset.indicador) || "General";
+    const indClave = dataset.indicador || "General";
+    const nombreIndicador = (typeof obtenerNombreIndicador === "function"
+      ? obtenerNombreIndicador(indClave)
+      : indClave.toUpperCase().replace(/_/g, " ")) || "General";
 
-      if (!grupos[nombreIndicador]) {
-        grupos[nombreIndicador] = [];
+    if (!grupos[nombreIndicador]) {
+      grupos[nombreIndicador] = [];
+    }
+
+    grupos[nombreIndicador].push({ dataset, index });
+  });
+
+  // 2. Renderizar cada bloque/grupo de indicador
+  Object.keys(grupos).forEach((nombreIndicador) => {
+    // Contenedor del grupo
+    const bloqueGrupo = document.createElement("div");
+    bloqueGrupo.classList.add("grupo-leyenda", "w-100", "mb-2");
+
+    // Título de la sección (Nombre del Indicador)
+    const tituloGrupo = document.createElement("h6");
+    tituloGrupo.textContent = `📊 ${nombreIndicador}`;
+    tituloGrupo.style.width = "100%";
+    tituloGrupo.style.margin = "8px 0 6px 0";
+    tituloGrupo.style.paddingBottom = "3px";
+    tituloGrupo.style.borderBottom = "2px solid #e9ecef";
+    tituloGrupo.style.color = "#2c3e50";
+    tituloGrupo.style.fontSize = "12px";
+    tituloGrupo.style.fontWeight = "bold";
+
+    bloqueGrupo.appendChild(tituloGrupo);
+
+    // 🔑 GRID FLEXIBLE: minmax en 180px para permitir múltiples columnas en laptop
+    const gridItems = document.createElement("div");
+    gridItems.style.display = "grid";
+    gridItems.style.gridTemplateColumns = "repeat(auto-fit, minmax(180px, 1fr))";
+    gridItems.style.gap = "6px 12px";
+    gridItems.style.width = "100%";
+
+    // Ordenar los items del grupo
+    grupos[nombreIndicador].sort((a, b) =>
+      (a.dataset.label || "").localeCompare(b.dataset.label || "")
+    );
+
+    grupos[nombreIndicador].forEach(({ dataset, index }) => {
+      const item = document.createElement("div");
+      item.style.display = "flex";
+      item.style.alignItems = "center";
+      item.style.cursor = "pointer";
+      item.style.fontSize = "11px";
+      item.style.userSelect = "none";
+
+      // 🎨 Canvas mini para la muestra de color/línea
+      const canvasIcon = document.createElement("canvas");
+      canvasIcon.width = 28;
+      canvasIcon.height = 12;
+      canvasIcon.style.marginRight = "6px";
+      canvasIcon.style.flexShrink = "0";
+
+      const ctxIcon = canvasIcon.getContext("2d");
+      const rawColor = dataset.borderColor || dataset.backgroundColor;
+      const colorFinal = Array.isArray(rawColor) ? rawColor[0] : rawColor;
+
+      ctxIcon.beginPath();
+      ctxIcon.strokeStyle = colorFinal;
+      ctxIcon.lineWidth = 3;
+
+      if (dataset.borderDash && dataset.borderDash.length > 0) {
+        ctxIcon.setLineDash(dataset.borderDash);
+      } else {
+        ctxIcon.setLineDash([]);
       }
 
-      grupos[nombreIndicador].push({ dataset, index });
+      ctxIcon.moveTo(0, 6);
+      ctxIcon.lineTo(28, 6);
+      ctxIcon.stroke();
+
+      // 🔑 TEXTO LÍMPIA Y FLEXIBLE:
+      // Toma el label completo (Ej: "Mortalidad — Todas Las Unidades (42) (2026)")
+      // y extrae únicamente la parte posterior al guión "—" para ahorrar espacio horizontal
+      const texto = document.createElement("span");
+
+      let etiquetaLimpia = dataset.label || "";
+      if (etiquetaLimpia.includes("—")) {
+        etiquetaLimpia = etiquetaLimpia.split("—")[1].trim();
+      }
+
+      texto.textContent = etiquetaLimpia;
+      texto.style.color = "#495057";
+      texto.style.fontWeight = "500";
+      texto.style.whiteSpace = "nowrap";
+      texto.style.overflow = "hidden";
+      texto.style.textOverflow = "ellipsis";
+
+      // Estado inicial si está oculto
+      if (!chart.isDatasetVisible(index)) {
+        texto.style.textDecoration = "line-through";
+        texto.style.opacity = "0.4";
+        canvasIcon.style.opacity = "0.4";
+      }
+
+      // Evento Click para ocultar/mostrar la serie
+      item.onclick = () => {
+        chart.setDatasetVisibility(index, !chart.isDatasetVisible(index));
+        chart.update();
+
+        const vis = chart.isDatasetVisible(index);
+        texto.style.textDecoration = vis ? "none" : "line-through";
+        texto.style.opacity = vis ? "1" : "0.4";
+        canvasIcon.style.opacity = vis ? "1" : "0.4";
+      };
+
+      item.appendChild(canvasIcon);
+      item.appendChild(texto);
+      gridItems.appendChild(item);
     });
 
-    // 2. Renderizar cada bloque/grupo de indicador
-    Object.keys(grupos).forEach((nombreIndicador) => {
-      // Contenedor del grupo
-      const bloqueGrupo = document.createElement("div");
-      bloqueGrupo.classList.add("grupo-leyenda");
-
-      // Título de la sección (Nombre del Indicador)
-      const tituloGrupo = document.createElement("h6");
-      tituloGrupo.textContent = `📊 ${nombreIndicador}`;
-      tituloGrupo.style.width = "100%";
-      tituloGrupo.style.margin = "15px 0 10px 0";
-      tituloGrupo.style.paddingBottom = "4px";
-      tituloGrupo.style.borderBottom = "2px solid #e9ecef";
-      tituloGrupo.style.color = "#2c3e50";
-      tituloGrupo.style.fontSize = "13px";
-      tituloGrupo.style.fontWeight = "bold";
-
-      bloqueGrupo.appendChild(tituloGrupo);
-
-      // Grid para los elementos de este indicador
-      const gridItems = document.createElement("div");
-      gridItems.style.display = "grid";
-      gridItems.style.gridTemplateColumns = "repeat(auto-fit, minmax(260px, 1fr))";
-      gridItems.style.gap = "8px 15px";
-
-      // Ordenar los items del grupo
-      grupos[nombreIndicador].sort((a, b) =>
-        a.dataset.label.localeCompare(b.dataset.label)
-      );
-
-      grupos[nombreIndicador].forEach(({ dataset, index }) => {
-        const item = document.createElement("div");
-        item.style.display = "flex";
-        item.style.alignItems = "center";
-        item.style.cursor = "pointer";
-        item.style.fontSize = "11px";
-
-        // 🎨 Canvas mini para replicar exacto el trazado de la gráfica
-        const canvasIcon = document.createElement("canvas");
-        canvasIcon.width = 36;
-        canvasIcon.height = 14;
-        canvasIcon.style.marginRight = "8px";
-        canvasIcon.style.flexShrink = "0";
-
-        const ctxIcon = canvasIcon.getContext("2d");
-        const rawColor = dataset.borderColor || dataset.backgroundColor;
-        const colorFinal = Array.isArray(rawColor) ? rawColor[0] : rawColor;
-
-        ctxIcon.beginPath();
-        ctxIcon.strokeStyle = colorFinal;
-        ctxIcon.lineWidth = 3;
-
-        // Patrón de línea exacto
-        if (dataset.borderDash && dataset.borderDash.length > 0) {
-          ctxIcon.setLineDash(dataset.borderDash);
-        } else {
-          ctxIcon.setLineDash([]);
-        }
-
-        ctxIcon.moveTo(0, 7);
-        ctxIcon.lineTo(36, 7);
-        ctxIcon.stroke();
-
-        // 🔑 TEXTO CORREGIDO: Formatea la Unidad + Año para evitar repeticiones genéricas
-        const texto = document.createElement("span");
-
-        const unidadTexto = typeof nombreUnidad === "function"
-          ? nombreUnidad(dataset.unidad || "TODAS")
-          : (dataset.unidad || "Todas las Unidades");
-
-        const anioTexto = dataset.anio ? `(${dataset.anio})` : "";
-
-        // Muestra: "Todas Las Unidades (42) (2026)" o la Unidad Específica + Año
-        texto.textContent = `${unidadTexto} ${anioTexto}`.trim();
-        texto.style.color = "#495057";
-
-        // Estado inicial si está oculto
-        if (!chart.isDatasetVisible(index)) {
-          texto.style.textDecoration = "line-through";
-          texto.style.opacity = "0.4";
-          canvasIcon.style.opacity = "0.4";
-        }
-
-        // Evento Click para ocultar/mostrar
-        item.onclick = () => {
-          chart.setDatasetVisibility(index, !chart.isDatasetVisible(index));
-          chart.update();
-
-          const vis = chart.isDatasetVisible(index);
-          texto.style.textDecoration = vis ? "none" : "line-through";
-          texto.style.opacity = vis ? "1" : "0.4";
-          canvasIcon.style.opacity = vis ? "1" : "0.4";
-        };
-
-        item.appendChild(canvasIcon);
-        item.appendChild(texto);
-        gridItems.appendChild(item);
-      });
-
-      bloqueGrupo.appendChild(gridItems);
-      contenedor.appendChild(bloqueGrupo);
-    });
-  }
+    bloqueGrupo.appendChild(gridItems);
+    contenedor.appendChild(bloqueGrupo);
+  });
+}
 
 
   function renderGrafica(data) {
