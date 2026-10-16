@@ -14,10 +14,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/reportes.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/sis_primer_nivel.css') }}">
 
-
-
-
-
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
         integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
 
@@ -26,6 +22,7 @@
     <link rel="shortcut icon" href="{{ url_for('static', filename='salud_favicon.ico') }}">
 
     <!-- 🟢 ESTILOS RESPONSIVOS PARA EL MENÚ LATERAL -->
+<!-- 🟢 ESTILOS RESPONSIVOS PARA EL MENÚ LATERAL -->
     <style>
         /* CABECERA PARA MÓVILES */
         .mobile-header-toggle {
@@ -39,6 +36,22 @@
             top: 0;
             z-index: 1040;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        /* 🔑 REGLA ANTI-LEAK: Cuando el body tiene la clase 'modo-login' */
+        body.modo-login #sidebar,
+        body.modo-login .mobile-header-toggle,
+        body.modo-login .sidebar-overlay-backdrop {
+            display: none !important;
+            visibility: hidden !important;
+        }
+
+        body.modo-login #page-wrapper,
+        body.modo-login #main-content,
+        body.modo-login .main-content {
+            margin-left: 0 !important;
+            padding-left: 0 !important;
+            width: 100% !important;
         }
 
         /* COMPORTAMIENTO DEL SIDEBAR EN PANTALLAS PEQUEÑAS (<768px) */
@@ -85,7 +98,6 @@
                 box-shadow: 5px 0 25px rgba(0, 0, 0, 0.7) !important;
                 overflow-y: auto !important;
                 overflow-x: visible !important;
-                /* 🟢 Permite desplegar popovers */
             }
 
             /* 3. Menú Lateral Activo */
@@ -95,34 +107,39 @@
                 transform: translateX(0) !important;
             }
 
-            /* 🟢 4. CORRECCIÓN PARA POPOVERS Y DESPLEGABLES DENTRO DEL SIDEBAR MÓVIL */
             #sidebar .popover-unidades,
             #sidebar .popover-list,
             #sidebar select {
                 z-index: 100000 !important;
-                /* Capa por encima del propio contenedor */
                 position: relative;
             }
         }
     </style>
 </head>
 
-<body data-login="{{ 'true' if mostrar_login else 'false' }}">
+<!-- 🔑 Asignación limpia de clase Jinja2 al <body> -->
+<body class="{% if mostrar_login or (current_user is defined and not current_user.is_authenticated) %}modo-login{% endif %}">
 
-    <!-- 🟢 CABECERA SUPERIOR SOLO EN MÓVILES / PANTALLAS PEQUEÑAS -->
-    <div class="mobile-header-toggle">
-        <button type="button" id="btnToggleSidebar"
-            class="btn btn-outline-light btn-sm d-flex align-items-center gap-2">
-            <i class="bi bi-list fs-5"></i>
-            <span class="fw-bold">Menú / Filtros</span>
-        </button>
-        <span class="fw-bold text-truncate ms-2" style="font-size: 0.9rem;">
-            {{ title if title else "Dashboard Hospitalario" }}
-        </span>
-    </div>
+    {# 🟢 Condición Jinja2 en HTML estándar (Válido para el parser) #}
+    {% if not mostrar_login and (current_user is not defined or current_user.is_authenticated) %}
+        
+        <!-- CABECERA SUPERIOR SOLO EN MÓVILES -->
+        <div class="mobile-header-toggle">
+            <button type="button" id="btnToggleSidebar"
+                class="btn btn-outline-light btn-sm d-flex align-items-center gap-2">
+                <i class="bi bi-list fs-5"></i>
+                <span class="fw-bold">Menú / Filtros</span>
+            </button>
+            <span class="fw-bold text-truncate ms-2" style="font-size: 0.9rem;">
+                {{ title if title else "Dashboard Hospitalario" }}
+            </span>
+        </div>
 
-    <!-- INCLUSIÓN DE TU MENÚ ORIGINAL (SIN MODIFICAR SU ESTRUCTURA INTERNA) -->
-    {% include 'layout/menu.html' %}
+        <!-- MENÚ LATERAL -->
+        {% include 'layout/menu.html' %}
+
+    {% endif %}
+
 
     <div id="page-wrapper">
 
@@ -162,7 +179,6 @@
                 document.body.appendChild(overlay);
             }
 
-            // Función auxiliar para cerrar el menú
             function cerrarSidebar() {
                 if (window.innerWidth <= 768) {
                     sidebar.classList.remove("show-sidebar");
@@ -170,7 +186,6 @@
                 }
             }
 
-            // Abrir / Cerrar mediante el botón principal
             if (btnToggle) {
                 btnToggle.addEventListener("click", function (e) {
                     e.stopPropagation();
@@ -179,22 +194,17 @@
                 });
             }
 
-            // Cerrar menú al presionar la capa oscura de fondo
-            overlay.addEventListener("click", cerrarSidebar);
+            if (overlay) overlay.addEventListener("click", cerrarSidebar);
 
-            // Cerrar menú al presionar la tecla Escape
             document.addEventListener("keydown", function (e) {
                 if (e.key === "Escape" && sidebar.classList.contains("show-sidebar")) {
                     cerrarSidebar();
                 }
             });
 
-            // 🟢 CERRAR AUTOMÁTICAMENTE EL MENÚ AL APLICAR FILTROS EN CUALQUIER SUBSISTEMA
-            // Detecta botones con la clase .btn-apply o cuyos IDs comiencen por 'btnFiltrar'
             const botonesFiltro = document.querySelectorAll('.btn-apply, [id^="btnFiltrar"]');
             botonesFiltro.forEach(function (btn) {
                 btn.addEventListener("click", function () {
-                    // Un pequeño retardo para asegurar que el evento de filtrado se dispare
                     setTimeout(cerrarSidebar, 150);
                 });
             });
