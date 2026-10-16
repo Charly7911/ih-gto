@@ -152,7 +152,7 @@
             <div class="menu-filtros">
                 <div class="header-filtros">
                     <p class="menu-section">🔍 FILTROS</p>
-                    <button type="button" id="btnResetAll" class="btn-reset-link">Limpiar</button>
+                    <button type="button" id="btnResetAll" class="btn-reset-link">Nuevo filtro</button>
                 </div>
 
                 <div class="filter-block">
@@ -222,7 +222,7 @@
             <div class="menu-filtros">
                 <div class="header-filtros">
                     <p class="menu-section">📊 {{ titulo_menu }}</p>
-                    <button type="button" id="btnReset{{ sufijo }}" class="btn-reset-link">Limpiar</button>
+                    <button type="button" id="btnReset{{ sufijo }}" class="btn-reset-link">Nuevo filtro</button>
                 </div>
 
                 <div class="filter-block">
@@ -336,7 +336,7 @@
             <div class="menu-filtros">
                 <div class="header-filtros">
                     <p class="menu-section">🔍 FILTROS</p>
-                    <button type="button" id="btnResetAll" class="btn-reset-link">Limpiar</button>
+                    <button type="button" id="btnResetAll" class="btn-reset-link">Nuevo filtro</button>
                 </div>
 
                 <div class="filter-block">
@@ -395,7 +395,7 @@
             <div class="menu-filtros">
                 <div class="header-filtros">
                     <p class="menu-section">🔍 FILTROS PRIMER NIVEL</p>
-                    <button type="button" id="btnResetAll" class="btn-reset-link">Limpiar</button>
+                    <button type="button" id="btnResetAll" class="btn-reset-link">Nuevo filtro</button>
                 </div>
 
                 <!-- Filtro Años -->
@@ -520,7 +520,7 @@
             <div class="menu-filtros">
                 <div class="header-filtros">
                     <p class="menu-section">🔍 FILTROS</p>
-                    <button type="button" id="btnResetAll" class="btn-reset-link">Limpiar</button>
+                    <button type="button" id="btnResetAll" class="btn-reset-link">Nuevo filtro</button>
                 </div>
 
                 <div class="filter-block">
@@ -585,7 +585,7 @@
             <div class="menu-filtros">
                 <div class="header-filtros">
                     <p class="menu-section">🔍 FILTROS</p>
-                    <button type="button" id="btnResetAll" class="btn-reset-link">Limpiar</button>
+                    <button type="button" id="btnResetAll" class="btn-reset-link">Nuevo filtro</button>
                 </div>
 
                 <div class="filter-block">
@@ -1442,7 +1442,7 @@
             });
         }
 
-     
+
 
         const payload = {
             type: 'grupo_unidades',
@@ -2155,119 +2155,179 @@
         // ======================================================
 
         document.addEventListener("click", function (e) {
-            if (e.target.closest('#btnResetAll, #btnResetSis, #btnReset' + (typeof sufijo !== 'undefined' ? sufijo : '') + ', .btn-reset, .btn-limpiar')) {
-                e.preventDefault();
+            // 🎯 Captura el clic en cualquier botón de reset/limpiar
+            const btnReset = e.target.closest(
+                '#btnResetAll, #btnResetSis, #btnResetIndicadores, #btnResetUrgencias, #btnResetEgresos, #btnResetMorb, #btnResetMort, #btnLimpiar, #btnReset' + (typeof sufijo !== 'undefined' ? sufijo : '') + ', .btn-reset, .btn-limpiar, .btn-reset-link, .btn-limpiar-egresos'
+            );
 
-                // ------------------------------------------------------
-                // A. RESETEAR ESTADO INTERNO Y SELECTS DE LA GRÁFICA TEMPORAL
-                // ------------------------------------------------------
-                if (typeof VARIABLES_DEFAULT !== 'undefined' && typeof variablesPersonalizadasEstado !== 'undefined') {
-                    variablesPersonalizadasEstado = typeof structuredClone === 'function'
-                        ? structuredClone(VARIABLES_DEFAULT)
-                        : JSON.parse(JSON.stringify(VARIABLES_DEFAULT));
+            if (!btnReset) return;
+            e.preventDefault();
+
+            console.log("🔍 Clic capturado en botón reset:", btnReset);
+
+            // ======================================================
+            // 1. MÓDULO DE INDICADORES
+            // ======================================================
+            if (typeof window.resetearVistaIndicadores === 'function') {
+                console.log("⚡ Ejecutando resetearVistaIndicadores()");
+                window.resetearVistaIndicadores();
+
+                if (typeof unidadesSeleccionadas !== 'undefined') {
+                    if (typeof unidadesSeleccionadas.clear === 'function') unidadesSeleccionadas.clear();
+                    else unidadesSeleccionadas = [];
                 }
+                const btnUnidadesInd = document.getElementById("btnUnidades");
+                if (btnUnidadesInd) btnUnidadesInd.textContent = "🔍 Seleccionar unidades";
+                return;
+            }
 
-                const selectModulo = document.getElementById("filtroSisDetalle");
-                if (selectModulo) selectModulo.value = "consultas";
+            // ======================================================
+            // 2. MÓDULO DE URGENCIAS
+            // ======================================================
+            if (typeof window.resetearVistaUrgencias === 'function') {
+                console.log("⚡ Ejecutando resetearVistaUrgencias()");
+                window.resetearVistaUrgencias();
 
-                const selectVista = document.getElementById("selectTipoVistaTemporal");
-                if (selectVista) selectVista.value = "mes";
-
-                const selectDesglose = document.getElementById("selectModoDesglose");
-                if (selectDesglose) selectDesglose.value = "por_apartado";
-
-                if (typeof toggleModoDesglose === 'function') {
-                    toggleModoDesglose();
+                if (typeof unidadesSeleccionadas !== 'undefined') {
+                    if (typeof unidadesSeleccionadas.clear === 'function') unidadesSeleccionadas.clear();
+                    else unidadesSeleccionadas = [];
                 }
+                const btnUnidadesUrg = document.getElementById("btnUnidades");
+                if (btnUnidadesUrg) btnUnidadesUrg.textContent = "🔍 Seleccionar unidades";
+                return;
+            }
 
-                if (typeof renderSubvariables === 'function') {
-                    renderSubvariables();
+            // ======================================================
+            // 3. MÓDULO DE EGRESOS
+            // ======================================================
+            if (typeof window.resetearVistaEgresos === 'function') {
+                console.log("⚡ Ejecutando resetearVistaEgresos()");
+                window.resetearVistaEgresos();
+
+                if (typeof unidadesSeleccionadas !== 'undefined') {
+                    if (typeof unidadesSeleccionadas.clear === 'function') unidadesSeleccionadas.clear();
+                    else unidadesSeleccionadas = [];
                 }
+                const btnUnidadesEgre = document.getElementById("btnUnidades");
+                if (btnUnidadesEgre) btnUnidadesEgre.textContent = "🔍 Seleccionar unidades";
+                return;
+            }
 
-                // ------------------------------------------------------
-                // B. DESMARCAR ELEMENTOS DEL MENÚ, POPOVERS Y SUBVARIABLES
-                // ------------------------------------------------------
-                document.querySelectorAll('.menu-filtros input[type="checkbox"], .popover-unidades input[type="checkbox"], .popover-content input[type="checkbox"]').forEach(cb => cb.checked = false);
+            // ======================================================
+            // 4. MÓDULO DE MORBILIDAD / MORTALIDAD (Añadido)
+            // ======================================================
+            const fnResetMorbMort = window.resetearVistaMorbilidadMortalidad || window.resetearVistaMorbilidad || window.resetearVistaMortalidad;
+            if (typeof fnResetMorbMort === 'function') {
+                console.log("⚡ Ejecutando resetearVistaMorbilidadMortalidad()");
+                fnResetMorbMort();
 
-                const contenedorSub = document.getElementById("contenedorSubvariables");
-                if (contenedorSub) {
-                    contenedorSub.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = true);
+                if (typeof unidadesSeleccionadas !== 'undefined') {
+                    if (typeof unidadesSeleccionadas.clear === 'function') unidadesSeleccionadas.clear();
+                    else unidadesSeleccionadas = [];
                 }
+                const btnUnidadesMM = document.getElementById("btnUnidades");
+                if (btnUnidadesMM) btnUnidadesMM.textContent = "🔍 Seleccionar unidades";
+                return;
+            }
 
-                // ------------------------------------------------------
-                // C. RESTAURAR SELECTS, ESTADOS Y VISIBILIDAD DE NIVELES
-                // ------------------------------------------------------
-                // 1. Vaciar cualquier arreglo global de elecciones previas (Ajusta los nombres según tus variables globales)
-                if (typeof jurisdiccionesSeleccionadas !== 'undefined') jurisdiccionesSeleccionadas = [];
-                if (typeof municipiosSeleccionados !== 'undefined') municipiosSeleccionados = [];
-                if (typeof unidadesSeleccionadas !== 'undefined') unidadesSeleccionadas = [];
+            // ======================================================
+            // 5. MÓDULOS SIS / TEMPORAL (Fallback General)
+            // ======================================================
+            console.log("⚡ Ejecutando reset general (SIS)");
 
-                // 2. Restaurar el valor del select principal
-                const selectNivelElem = document.getElementById("selectNivel") || (typeof selectNivel !== 'undefined' ? selectNivel : null);
-                if (selectNivelElem) {
-                    selectNivelElem.value = 'clues';
-                }
+            if (typeof VARIABLES_DEFAULT !== 'undefined' && typeof variablesPersonalizadasEstado !== 'undefined') {
+                variablesPersonalizadasEstado = typeof structuredClone === 'function'
+                    ? structuredClone(VARIABLES_DEFAULT)
+                    : JSON.parse(JSON.stringify(VARIABLES_DEFAULT));
+            }
 
-                // 3. Ocultar físicamente los contenedores que NO deben verse al inicio
-                const contUnidades = document.getElementById("blockUnidades") || (typeof blockUnidades !== 'undefined' ? blockUnidades : null);
-                const contJurisdicciones = document.getElementById("blockJurisdicciones") || (typeof blockJurisdicciones !== 'undefined' ? blockJurisdicciones : null);
-                const contMunicipios = document.getElementById("blockMunicipios") || (typeof blockMunicipios !== 'undefined' ? blockMunicipios : null);
+            const selectModulo = document.getElementById("filtroSisDetalle");
+            if (selectModulo) selectModulo.value = "consultas";
 
-                if (contUnidades) contUnidades.style.setProperty('display', 'block', 'important');
-                if (contJurisdicciones) contJurisdicciones.style.setProperty('display', 'none', 'important');
-                if (contMunicipios) contMunicipios.style.setProperty('display', 'none', 'important');
+            const selectVista = document.getElementById("selectTipoVistaTemporal");
+            if (selectVista) selectVista.value = "mes";
 
-                // ------------------------------------------------------
-                // D. LIMPIAR BUSCADORES Y RESTAURAR TEXTOS
-                // ------------------------------------------------------
-                document.querySelectorAll('input[type="text"], input[type="search"]').forEach(inp => {
-                    inp.value = "";
-                });
+            const selectDesglose = document.getElementById("selectModoDesglose");
+            if (selectDesglose) selectDesglose.value = "por_apartado";
 
-                const btnUnidades = typeof obtenerBotonUnidades === 'function' ? obtenerBotonUnidades() : null;
-                if (btnUnidades) btnUnidades.textContent = "🔍 Seleccionar unidades";
-                if (typeof btnJurisdicciones !== 'undefined' && btnJurisdicciones) btnJurisdicciones.textContent = "🔍 Seleccionar jurisdicciones";
-                if (typeof btnMunicipios !== 'undefined' && btnMunicipios) btnMunicipios.textContent = "🔍 Seleccionar municipios";
-                if (typeof btnServicio !== 'undefined' && btnServicio) btnServicio.textContent = "🔍 Seleccionar Egreso";
-                if (typeof btnAfecciones !== 'undefined' && btnAfecciones) btnAfecciones.textContent = "🔍 Seleccionar afecciones";
+            if (typeof toggleModoDesglose === 'function') {
+                toggleModoDesglose();
+            }
 
-                // ------------------------------------------------------
-                // E. REBOOT COMPLETO SINCRO VISTAS Y DATOS
-                // ------------------------------------------------------
-                if (typeof window.datosOriginalesSis !== 'undefined') {
-                    window.datosFiltradosSis = JSON.parse(JSON.stringify(window.datosOriginalesSis));
-                }
+            if (typeof renderSubvariables === 'function') {
+                renderSubvariables();
+            }
 
-                if (typeof paginaActual !== 'undefined') {
-                    paginaActual = 1;
-                }
+            // Desmarcar checkboxes
+            document.querySelectorAll('.menu-filtros input[type="checkbox"], .popover-unidades input[type="checkbox"], .popover-content input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+            });
 
-                // 🟢 IMPORTANTE: Si actualizarRelacionJurisdiccionMunicipio vuelve a mostrar los bloques, 
-                // ejecutamos la sincronización de niveles después de invocarla.
-                if (typeof actualizarRelacionJurisdiccionMunicipio === 'function') {
-                    actualizarRelacionJurisdiccionMunicipio();
-                }
+            const contenedorSub = document.getElementById("contenedorSubvariables");
+            if (contenedorSub) {
+                contenedorSub.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = true);
+            }
 
-                // Si tienes una función que controla el cambio de nivel (ej. manejarCambioNivel o toggleNivel)
-                if (typeof cambiarNivel === 'function') {
-                    cambiarNivel('clues');
-                } else if (selectNivelElem) {
-                    selectNivelElem.dispatchEvent(new Event("change"));
-                }
+            if (typeof jurisdiccionesSeleccionadas !== 'undefined') jurisdiccionesSeleccionadas = [];
+            if (typeof municipiosSeleccionados !== 'undefined') municipiosSeleccionados = [];
 
-                // Re-ocultar asegurado como último paso
-                if (contJurisdicciones) contJurisdicciones.style.display = 'none';
-                if (contMunicipios) contMunicipios.style.display = 'none';
-
-                // Renderizado global
-                if (typeof actualizarVistas === 'function') {
-                    actualizarVistas();
-                } else if (typeof ejecutarFiltradoSis === 'function') {
-                    ejecutarFiltradoSis(0);
+            if (typeof unidadesSeleccionadas !== 'undefined') {
+                if (typeof unidadesSeleccionadas.clear === 'function') {
+                    unidadesSeleccionadas.clear();
+                } else {
+                    unidadesSeleccionadas = [];
                 }
             }
-        });
 
+            const selectNivelElem = document.getElementById("selectNivel") || (typeof selectNivel !== 'undefined' ? selectNivel : null);
+            if (selectNivelElem) selectNivelElem.value = 'clues';
+
+            const contUnidades = document.getElementById("blockUnidades") || (typeof blockUnidades !== 'undefined' ? blockUnidades : null);
+            const contJurisdicciones = document.getElementById("blockJurisdicciones") || (typeof blockJurisdicciones !== 'undefined' ? blockJurisdicciones : null);
+            const contMunicipios = document.getElementById("blockMunicipios") || (typeof blockMunicipios !== 'undefined' ? blockMunicipios : null);
+
+            if (contUnidades) contUnidades.style.setProperty('display', 'block', 'important');
+            if (contJurisdicciones) contJurisdicciones.style.setProperty('display', 'none', 'important');
+            if (contMunicipios) contMunicipios.style.setProperty('display', 'none', 'important');
+
+            document.querySelectorAll('input[type="text"], input[type="search"]').forEach(inp => {
+                inp.value = "";
+            });
+
+            const btnUnidades = typeof obtenerBotonUnidades === 'function' ? obtenerBotonUnidades() : document.getElementById("btnUnidades");
+            if (btnUnidades) btnUnidades.textContent = "🔍 Seleccionar unidades";
+            if (typeof btnJurisdicciones !== 'undefined' && btnJurisdicciones) btnJurisdicciones.textContent = "🔍 Seleccionar jurisdicciones";
+            if (typeof btnMunicipios !== 'undefined' && btnMunicipios) btnMunicipios.textContent = "🔍 Seleccionar municipios";
+            if (typeof btnServicio !== 'undefined' && btnServicio) btnServicio.textContent = "🔍 Seleccionar Egreso";
+            if (typeof btnAfecciones !== 'undefined' && btnAfecciones) btnAfecciones.textContent = "🔍 Seleccionar afecciones";
+
+            if (typeof window.datosOriginalesSis !== 'undefined') {
+                window.datosFiltradosSis = JSON.parse(JSON.stringify(window.datosOriginalesSis));
+            }
+
+            if (typeof paginaActual !== 'undefined') {
+                paginaActual = 1;
+            }
+
+            if (typeof actualizarRelacionJurisdiccionMunicipio === 'function') {
+                actualizarRelacionJurisdiccionMunicipio();
+            }
+
+            if (typeof cambiarNivel === 'function') {
+                cambiarNivel('clues');
+            } else if (selectNivelElem) {
+                selectNivelElem.dispatchEvent(new Event("change"));
+            }
+
+            if (contJurisdicciones) contJurisdicciones.style.display = 'none';
+            if (contMunicipios) contMunicipios.style.display = 'none';
+
+            if (typeof actualizarVistas === 'function') {
+                actualizarVistas();
+            } else if (typeof ejecutarFiltradoSis === 'function') {
+                ejecutarFiltradoSis(0);
+            }
+        });
 
 
     });

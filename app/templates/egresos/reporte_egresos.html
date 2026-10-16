@@ -3,121 +3,127 @@
 
 {% block content %}
 <div class="main-content">
-    <div class="container-fluid mt-4 ps-4 pe-4">
+    <div class="container-fluid py-2 px-3">
 
-        <h2 class="mb-3" id="seul-title">
-            🏥 Egresos
-            <span id="seul-meta" style="font-size: 18px;" data-control='{{ control_anual | tojson | safe }}'>
-            </span>
-        </h2>
+        <!-- CABECERA -->
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <h3 class="mb-0 fs-5 fw-bold text-dark d-flex align-items-center gap-2" id="seul-title">
+                🏥 Egresos
+                <span id="seul-meta" class="fs-6 text-muted" data-control='{{ control_anual | tojson | safe }}'></span>
+            </h3>
+        </div>
 
-         
         <!-- =======================
-        RESUMEN EGRESOS GRAFICA DE BARRAS
+            RESUMEN EGRESOS GRAFICA DE BARRAS / SERVICIO
         ======================= -->
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted mb-2">Total por Año</h6>
-                        <div class="chart-box">
+        <div class="row g-2 mb-3">
+            <div class="col-12 col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body p-2 text-center">
+                        <h6 class="text-muted fw-bold mb-2" style="font-size: 12px;">Total por Año</h6>
+                        <div class="chart-box w-100" style="position: relative; height: clamp(180px, 25vh, 220px);">
                             <canvas id="graficaEgresosPorAnio"></canvas>
                         </div>
-
                     </div>
                 </div>
             </div>
 
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted mb-2" id="tituloServicio">Total por Servicio</h6>
-                        <div class="chart-box">
+            <div class="col-12 col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body p-2 text-center">
+                        <h6 class="text-muted fw-bold mb-2" id="tituloServicio" style="font-size: 12px;">Total por
+                            Servicio</h6>
+                        <div class="chart-box w-100" style="position: relative; height: clamp(180px, 25vh, 220px);">
                             <canvas id="graficaEgresosPorServicio"></canvas>
                         </div>
-
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="row mb-4 justify-content-center">
-            <div class="col-md-3">
-                <div class="card shadow-sm text-center bg-dark border-secondary">
-                    <div class="card-body">
-                        <h6 class="text-info text-uppercase small font-weight-bold">Mortalidad Cruda</h6>
-                        <h3 id="mortalidadCruda" class="text-white mb-0">--%</h3>
+        <!-- Tarjetas KPI Mortalidad -->
+        <div class="row g-2 mb-3 justify-content-center">
+            <div class="col-6 col-md-3">
+                <div class="card shadow-sm text-center bg-dark border-secondary py-1">
+                    <div class="card-body p-2">
+                        <h6 class="text-info text-uppercase mb-1 fw-bold" style="font-size: 11px;">Mortalidad Cruda</h6>
+                        <h4 id="mortalidadCruda" class="text-white mb-0 fs-5 fw-bold">--%</h4>
                     </div>
                 </div>
             </div>
 
-            <div class="col-md-3">
-                <div class="card shadow-sm text-center bg-dark border-secondary">
-                    <div class="card-body">
-                        <h6 class="text-warning text-uppercase small font-weight-bold">Mortalidad Ajustada</h6>
-                        <h3 id="MortalidadAjustada" class="text-white mb-0">--%</h3>
+            <div class="col-6 col-md-3">
+                <div class="card shadow-sm text-center bg-dark border-secondary py-1">
+                    <div class="card-body p-2">
+                        <h6 class="text-warning text-uppercase mb-1 fw-bold" style="font-size: 11px;">Mortalidad
+                            Ajustada</h6>
+                        <h4 id="MortalidadAjustada" class="text-white mb-0 fs-5 fw-bold">--%</h4>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- =======================
+            TABLA DE RESULTADOS
+        ======================= -->
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-body p-3">
+                <ul class="nav nav-tabs nav-tabs-sm mb-2" id="tabsAniosEgre"></ul>
 
-        <div class="card">
-            <div class="card-body">
-                <ul class="nav nav-tabs mb-3" id="tabsAniosEgre"></ul>
-
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover align-middle" id="tablaEgresos">
-                        <thead class="table-dark">
-                            <tr>
-                                <th class="text-nowrap">Año</th>
-                                <th class="text-nowrap">CLUES</th>
-                                <th class="text-nowrap">Unidad</th>
-                                <th class="text-center">Egresos</th>
-                                <th class="text-center">Defunciones</th>
-                                <th class="text-center">Defunciones >48h</th>
-                                <th class="text-center">Nacimientos</th>
-                                <th class="text-center">Abortos</th>
-                                <th class="text-nowrap text-center">Promedio Días Estancia</th>
+                <div class="table-responsive border rounded" style="max-height: 260px; overflow-y: auto;">
+                    <table class="table table-striped table-hover table-sm align-middle mb-0" id="tablaEgresos"
+                        style="min-width: 850px;">
+                        <thead class="table-dark sticky-top" style="z-index: 5;">
+                            <tr style="font-size: 0.75rem; text-align: center;">
+                                <th style="width: 60px;">Año</th>
+                                <th style="width: 110px;">CLUES</th>
+                                <th style="text-align: left;">Unidad</th>
+                                <th style="width: 85px;">Egresos</th>
+                                <th style="width: 95px;">Defunciones</th>
+                                <th style="width: 110px;">Defunciones >48h</th>
+                                <th style="width: 95px;">Nacimientos</th>
+                                <th style="width: 80px;">Abortos</th>
+                                <th style="width: 130px;">Prom. Días Estancia</th>
                             </tr>
                         </thead>
-                        <tbody>
-                        </tbody>
+                        <tbody style="font-size: 0.78rem;"></tbody>
                     </table>
                 </div>
 
-                <nav class="mt-3">
-                    <ul class="pagination pagination-sm" id="TablaPagination"></ul>
+                <nav class="mt-2 d-flex justify-content-end">
+                    <ul class="pagination pagination-sm mb-0" id="TablaPagination"></ul>
                 </nav>
             </div>
         </div>
+
         <!-- =======================
-          GRAFICAS DEBAJO DE LA TABLA 
-        ======================== -->
-
-        <hr>
-        <div class="card mb-4">
-            <div class="card-body">
+            GRAFICA LÍNEA MENSUAL
+        ======================= -->
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-body p-3">
                 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                    <h5 class="mb-0">📈Total Egresos por mes</h5>
+                    <h6 class="fw-bold text-dark mb-0" style="font-size: 13px;">📈 Total Egresos por mes</h6>
 
-                    <div class="d-flex gap-2 align-items-center">
-                        <select id="filtroServicio" class="form-select form-select-sm w-auto"></select>
+                    <div class="d-flex gap-2 align-items-center ms-auto">
+                        <select id="filtroServicio" class="form-select form-select-sm w-auto"
+                            style="font-size: 11px;"></select>
 
-                        <!-- BOTÓN AGREGADO -->
-                        <button type="button" class="btn btn-outline-primary btn-sm" id="btnToggleTablaLineaEgresos">
+                        <button type="button" class="btn btn-outline-primary btn-sm py-1 px-2"
+                            id="btnToggleTablaLineaEgresos" style="font-size: 11px;">
                             Mostrar valores
                         </button>
                     </div>
                 </div>
-                <div style="height:350px">
+
+                <!-- 🔑 Altura ampliada con la clase especial 'chart-container-large' -->
+                <div class="chart-container chart-container-large w-100"
+                    style="position: relative; height: clamp(300px, 45vh, 420px);">
                     <canvas id="graficaMensualTotal"></canvas>
                 </div>
             </div>
         </div>
 
     </div>
-
 </div>
 
 
@@ -156,7 +162,6 @@
         }
     };
 
-    // Registrar el plugin globalmente en Chart.js
     if (typeof Chart !== 'undefined') {
         Chart.register(pluginValoresLinea);
     }
@@ -186,7 +191,6 @@
     let chartEgresos = null;
     let chartServicios = null;
     let chartMensualTotal = null;
-
 
     // ==========================================
     // 2. FUNCIONES AUXILIARES Y FORMATO
@@ -224,8 +228,10 @@
         meta.textContent = ` | ${registro.estatus_inicio} al ${formatearFechaES(registro.fecha_actualizacion)} · ${registro.estatus}`;
     }
 
-    function obtenerCheckbox(clase) {
-        return Array.from(document.querySelectorAll(`.${clase}:checked`))
+    // Soporta múltiples clases posibles de checkboxes para evitar descalces
+    function obtenerCheckboxMultiples(clases) {
+        const selector = clases.map(c => `.${c}:checked, input[name='${c}']:checked`).join(",");
+        return Array.from(document.querySelectorAll(selector))
             .map(x => x.value)
             .join(",");
     }
@@ -270,12 +276,11 @@
         if (elAjustada) elAjustada.innerText = tasaAjustada.toFixed(2);
     }
 
-
     // ==========================================
     // 3. CONTROLADORES DE TABLA Y PAGINACIÓN
     // ==========================================
     function actualizarTabla(data) {
-        const anioSeleccionado = obtenerCheckbox("filtro-anio");
+        const anioSeleccionado = obtenerCheckboxMultiples(["filtro-anio", "egre-filtro-anio", "egresos_anio"]);
         if (anioSeleccionado) {
             const aniosPermitidos = anioSeleccionado.split(",");
             data = data.filter(row => aniosPermitidos.includes(String(row.anio)));
@@ -433,7 +438,6 @@
             });
         });
     }
-
 
     // ==========================================
     // 4. GENERACIÓN DE GRÁFICAS Y FILTROS
@@ -637,7 +641,6 @@
                 maintainAspectRatio: false,
                 layout: { padding: { top: 20, bottom: 20 } },
                 plugins: {
-                    // Activa/desactiva la renderización de números con el estado actual
                     pluginValoresLinea: { activo: mostrarValoresLineaEgresos },
                     legend: {
                         display: true,
@@ -656,13 +659,12 @@
         });
     }
 
-
     // ==========================================
     // 5. EVENTOS Y DISPARADOR PRINCIPAL
     // ==========================================
     function ejecutarFiltro() {
-        const anios = obtenerCheckbox("filtro-anio");
-        const meses = obtenerCheckbox("filtro-mes");
+        const anios = obtenerCheckboxMultiples(["filtro-anio", "egre-filtro-anio", "egresos_anio"]);
+        const meses = obtenerCheckboxMultiples(["filtro-mes", "egre-filtro-mes", "egresos_mes"]);
         const indicador = document.getElementById("filtroIndicadorEgresos")?.value || "egresos";
         const unidades = (typeof window.getUnidadesSeleccionadas === "function")
             ? window.getUnidadesSeleccionadas()
@@ -670,7 +672,7 @@
 
         cargarServicios(indicador);
 
-        // Fetch Principal
+        // Fetch Principal (Tabla y Gráficas de Barras)
         let params = new URLSearchParams();
         if (anios) params.append("anios", anios);
         if (meses) params.append("meses", meses);
@@ -723,109 +725,139 @@
             .catch(err => console.error("Error al obtener indicadores mensuales:", err));
     }
 
-    // ==========================================
-    // LÓGICA DE LIMPIEZA / RESET
-    // ==========================================
-    function resetearVistaEgresos() {
-        // 1. Desmarcar checkboxes de Filtros locales
-        document.querySelectorAll(".filtro-anio, .filtro-mes").forEach(chk => {
-            chk.checked = false;
-        });
+    /* =====================================================
+       LÓGICA DE LIMPIEZA Y EXPOSICIÓN GLOBAL (ÚNICA Y DEFINITIVA)
+    ===================================================== */
+    let temporizadorResetEgresos = null;
 
-        // 2. Resetear el Selector de Indicadores a su opción inicial
-        const selectorIndicador = document.getElementById("filtroIndicadorEgresos");
-        if (selectorIndicador) {
-            selectorIndicador.value = "egresos";
-            cargarServicios("egresos");
-        }
+    window.resetearVistaEgresos = function () {
+        // Debounce de 150ms para evitar ejecuciones múltiples
+        if (temporizadorResetEgresos) clearTimeout(temporizadorResetEgresos);
 
-        // 3. Resetear el botón de Mostrar/Ocultar Valores de la línea
-        mostrarValoresLineaEgresos = false;
-        const btnMostrar = document.getElementById("btnToggleTablaLineaEgresos");
-        if (btnMostrar) {
-            btnMostrar.innerHTML = "Mostrar valores";
-            btnMostrar.classList.remove("btn-primary");
-            btnMostrar.classList.add("btn-outline-primary");
-        }
+        temporizadorResetEgresos = setTimeout(() => {
+            console.log("🧹 Ejecutando reset limpio en Egresos...");
 
-        // 4. Recargar la información con todos los filtros limpios
+            // 1. Desmarcar todos los checkboxes de Egresos y del Menú Lateral
+            document.querySelectorAll(`
+                .filtro-anio, .filtro-mes, 
+                .egre-filtro-anio, .egre-filtro-mes, 
+                input[name='egresos_anio'], input[name='egresos_mes'],
+                .menu-filtros input[type='checkbox'],
+                .popover-unidades input[type='checkbox']
+            `).forEach(chk => {
+                chk.checked = false;
+            });
+
+            // 2. Limpiar estructuras de unidades en memoria y actualizar botón
+            if (typeof unidadesSeleccionadas !== 'undefined') {
+                if (typeof unidadesSeleccionadas.clear === 'function') unidadesSeleccionadas.clear();
+                else unidadesSeleccionadas = [];
+            }
+            const btnUnidades = document.getElementById("btnUnidades");
+            if (btnUnidades) btnUnidades.textContent = "🔍 Seleccionar unidades";
+
+            // 3. Resetear Selects
+            const selectServicio = document.getElementById("filtroServicio");
+            if (selectServicio) selectServicio.selectedIndex = 0;
+
+            const selectIndicador = document.getElementById("filtroIndicadorEgresos");
+            if (selectIndicador) selectIndicador.value = "egresos";
+
+            // 4. Resetear Arreglos de Respaldo Internos
+            datosEgresosPermanentes = [];
+            datosGlobales = [];
+            datosMensualesGlobales = [];
+
+            // 5. Restablecer botón "Mostrar valores"
+            mostrarValoresLineaEgresos = false;
+            const btnMostrar = document.getElementById("btnToggleTablaLineaEgresos");
+            if (btnMostrar) {
+                btnMostrar.innerHTML = "Mostrar valores";
+                btnMostrar.classList.remove("btn-primary");
+                btnMostrar.classList.add("btn-outline-primary");
+            }
+
+            // 6. Ejecutar recarga limpia sin filtros
+            ejecutarFiltro();
+        }, 150);
+    };
+
+    // Alias global para compatibilidad
+    window.ejecutarFiltroEgresos = function () {
         ejecutarFiltro();
-    }
+    };
+    window.resetearFiltrosEgresos = window.resetearVistaEgresos;
 
     /* =====================================================
-        LISTENERS DE EVENTOS GLOBALES (MENÚ LATERAL / UNIDADES)
+       LISTENERS DE EVENTOS GLOBALES Y DELEGACIÓN
     ===================================================== */
-    // 1. Al presionar "Aplicar" en el cuadro de unidades
     document.addEventListener("aplicarFiltroUnidades", function () {
-        ejecutarFiltro();
+        window.ejecutarFiltroEgresos();
     });
 
-    // 2. Al cambiar la selección en los checkboxes de unidades
-    document.addEventListener("unidadesSeleccionadasCambiadas", function () {
-        ejecutarFiltro();
-    });
-
-    // 3. Al hacer clic en "Limpiar" desde la barra lateral / global
     document.addEventListener("limpiarFiltrosGlobales", function () {
-        resetearVistaEgresos();
+        window.resetearVistaEgresos();
     });
 
-    // 4. Reset local legacy / navbar externo
-    document.addEventListener("solicitarResetFiltros", resetearVistaEgresos);
+    document.addEventListener("solicitarResetFiltros", function () {
+        window.resetearVistaEgresos();
+    });
 
-    // Delegación global de clics
     document.addEventListener("click", function (e) {
-        // Clic en Filtrar
-        if (e.target && e.target.id === "btnFiltrar") {
+        // Clic en Filtrar Local
+        const btnFiltrar = e.target.closest("#btnFiltrar, #btnFiltrarEgresos");
+        if (btnFiltrar) {
             e.preventDefault();
-            ejecutarFiltro();
+            window.ejecutarFiltroEgresos();
+            return;
         }
 
-        // Clic en Limpiar / Reset
-        const btnLimpiar = e.target.closest("#btnLimpiar");
+        // Clic en Limpiar Local
+        const btnLimpiar = e.target.closest("#btnLimpiar, .btn-limpiar-egresos");
         if (btnLimpiar) {
             e.preventDefault();
-            resetearVistaEgresos();
+            window.resetearVistaEgresos();
+            return;
         }
 
-        // Clic en Mostrar/Ocultar datos de la gráfica de líneas
+        // Clic en Mostrar/Ocultar valores de gráfica de líneas
         const btnMostrar = e.target.closest("#btnToggleTablaLineaEgresos");
         if (btnMostrar) {
             e.preventDefault();
             mostrarValoresLineaEgresos = !mostrarValoresLineaEgresos;
 
-            // Cambiar vista del botón
             btnMostrar.innerHTML = mostrarValoresLineaEgresos ? "Ocultar valores" : "Mostrar valores";
             btnMostrar.classList.toggle("btn-primary", mostrarValoresLineaEgresos);
             btnMostrar.classList.toggle("btn-outline-primary", !mostrarValoresLineaEgresos);
 
-            // Re-renderizar los números en la gráfica
-            if (chartMensualTotal) {
+            if (typeof chartMensualTotal !== "undefined" && chartMensualTotal) {
                 chartMensualTotal.options.plugins.pluginValoresLinea = { activo: mostrarValoresLineaEgresos };
                 chartMensualTotal.update();
             }
         }
     });
 
-    // Delegación global de cambios en selects
     document.addEventListener("change", function (e) {
         if (e.target && e.target.id === "filtroServicio") {
-            if (datosMensualesGlobales.length > 0) {
+            if (typeof datosMensualesGlobales !== "undefined" && datosMensualesGlobales.length > 0) {
                 graficaTotalPorMes(datosMensualesGlobales);
             }
         }
         if (e.target && e.target.id === "filtroIndicadorEgresos") {
             cargarServicios(e.target.value);
+            ejecutarFiltro();
         }
     });
 
-    // Inicialización al cargar la página
+    /* =====================================================
+       INICIALIZACIÓN AL CARGAR EL DOM
+    ===================================================== */
     function inicializarVista() {
         const indicadorSelect = document.getElementById("filtroIndicadorEgresos");
         if (indicadorSelect) {
             indicadorSelect.value = "egresos";
         }
-        ejecutarFiltro();
+        window.ejecutarFiltroEgresos();
     }
 
     if (document.readyState === "loading") {

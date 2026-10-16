@@ -2,24 +2,30 @@
 
 {% block content %}
 <div class="main-content">
-    <div class="container-fluid mt-4 ps-4 pe-4">
+    <div class="container-fluid py-2 px-3">
 
-        <h2 class="mb-4" id="urgencias-title">🚑 Urgencias
-            <span id="urgencias-meta" style="font-size: 18px;" data-control='{{ control_anual | tojson | safe }}'>
-            </span>
-        </h2>
+        <!-- CABECERA -->
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <h3 class="mb-0 fs-5 fw-bold text-dark d-flex align-items-center gap-2" id="urgencias-title">
+                🚑 Urgencias
+                <span id="urgencias-meta" class="fs-6 text-muted"
+                    data-control='{{ control_anual | tojson | safe }}'></span>
+            </h3>
+        </div>
 
-        
         <!-- ===============================
-            GRÁFICAS ANILLOS
+            1. GRÁFICAS ANILLOS (CALIFICADAS Y MOTIVO)
         ================================ -->
-        <div class="row mb-4">
+        <div class="row g-2 mb-3">
             <!-- CALIFICADAS VS NO -->
-            <div class="col-xl-6 col-lg-6 col-md-12">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted mb-2" id="tituloClasificacion">Calificadas vs No Calificadas</h6>
-                        <div class="chart-container" style="position: relative; height: 260px;">
+            <div class="col-12 col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body p-2 text-center">
+                        <h6 class="text-muted fw-bold mb-2" id="tituloClasificacion" style="font-size: 12px;">
+                            Calificadas vs No Calificadas
+                        </h6>
+                        <div class="chart-container w-100"
+                            style="position: relative; height: clamp(180px, 25vh, 220px);">
                             <canvas id="graficaClasificacion"></canvas>
                         </div>
                     </div>
@@ -27,11 +33,14 @@
             </div>
 
             <!-- TIPO DE ATENCIÓN -->
-            <div class="col-xl-6 col-lg-6 col-md-12">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted mb-2" id="tituloMotivo">Motivo de Atención</h6>
-                        <div class="chart-container" style="position: relative; height: 260px;">
+            <div class="col-12 col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body p-2 text-center">
+                        <h6 class="text-muted fw-bold mb-2" id="tituloMotivo" style="font-size: 12px;">
+                            Motivo de Atención
+                        </h6>
+                        <div class="chart-container w-100"
+                            style="position: relative; height: clamp(180px, 25vh, 220px);">
                             <canvas id="graficaTipoAtencion"></canvas>
                         </div>
                     </div>
@@ -40,68 +49,72 @@
         </div>
 
         <!-- ===============================
-            TABLA DE RESULTADOS
+            2. TABLA DE RESULTADOS
         ================================ -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <ul class="nav nav-tabs mb-3" id="tabsAnios"></ul>
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-body p-3">
+                <ul class="nav nav-tabs nav-tabs-sm mb-2" id="tabsAnios"></ul>
 
-                <div class="table-responsive">
-                    <table class="table table-striped table-sm align-middle" id="tablaResultados">
-                        <thead>
-                            <tr class="table-light">
-                                <th class="text-center">Año</th>
-                                <th>CLUES</th>
-                                <th>Hospital</th>
-                                <th class="text-center">Calificada</th>
-                                <th class="text-center">No Calificada</th>
-                                <th class="text-center">Accidentes</th>
-                                <th class="text-center">Médica</th>
-                                <th class="text-center">Ginecobstetricia</th>
-                                <th class="text-center">Pediátrica</th>
-                                <th class="text-center">Total</th>
-                                <th class="text-center">% Calificada</th>
+                <div class="table-responsive border rounded" style="max-height: 260px; overflow-y: auto;">
+                    <table class="table table-striped table-hover table-sm align-middle mb-0" id="tablaResultados"
+                        style="min-width: 900px;">
+                        <thead class="table-dark sticky-top" style="z-index: 5;">
+                            <tr style="font-size: 0.75rem; text-align: center;">
+                                <th style="width: 60px;">Año</th>
+                                <th style="width: 110px;">CLUES</th>
+                                <th style="text-align: left;">Hospital</th>
+                                <th style="width: 85px;">Calificada</th>
+                                <th style="width: 95px;">No Calificada</th>
+                                <th style="width: 85px;">Accidentes</th>
+                                <th style="width: 80px;">Médica</th>
+                                <th style="width: 110px;">Ginecobstetricia</th>
+                                <th style="width: 80px;">Pediátrica</th>
+                                <th style="width: 80px;">Total</th>
+                                <th style="width: 90px;">% Calificada</th>
                             </tr>
                         </thead>
-                        <tbody></tbody>
+                        <tbody style="font-size: 0.78rem;"></tbody>
                     </table>
                 </div>
 
-                <nav class="mt-2">
-                    <ul class="pagination pagination-sm" id="paginacionTabla"></ul>
+                <nav class="mt-2 d-flex justify-content-end">
+                    <ul class="pagination pagination-sm mb-0" id="paginacionTabla"></ul>
                 </nav>
             </div>
         </div>
 
         <!-- ===============================
-            GRÁFICA BARRAS HORIZONTALES
+            3. GRÁFICA BARRAS HORIZONTALES
         ================================ -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0">📊 Calificadas vs No Calificadas por Año</h5>
-                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnToggleValoresBarras">
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                    <h6 class="fw-bold text-dark mb-0" style="font-size: 13px;">
+                        📊 Calificadas vs No Calificadas por Año
+                    </h6>
+                    <button type="button" class="btn btn-outline-primary btn-sm py-1 px-2" id="btnToggleValoresBarras"
+                        style="font-size: 11px;">
                         Mostrar valores
                     </button>
                 </div>
-                <div class="chart-large-container" style="position: relative; height: 350px;">
+                <div class="chart-large-container w-100" style="position: relative; height: clamp(200px, 30vh, 280px);">
                     <canvas id="graficaPorAnio"></canvas>
                 </div>
             </div>
         </div>
 
         <!-- ===============================
-            GRÁFICA LÍNEAS
+            4. GRÁFICA LÍNEAS POR MES
         ================================ -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                    <h6 class="text-muted mb-0">
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                    <h6 class="text-muted fw-bold mb-0" style="font-size: 13px;">
                         📈 Total Urgencias por Mes
                     </h6>
 
-                    <div class="d-flex gap-2 align-items-center">
-                        <select id="selectMotivo" class="form-select form-select-sm" style="width:180px;">
+                    <div class="d-flex gap-2 align-items-center ms-auto">
+                        <select id="selectMotivo" class="form-select form-select-sm w-auto" style="font-size: 11px;">
                             <option value="">Todos los motivos</option>
                             <option value="Medica">Médica</option>
                             <option value="Pediatrica">Pediátrica</option>
@@ -109,13 +122,16 @@
                             <option value="Accidentes">Accidentes</option>
                         </select>
 
-                        <button type="button" class="btn btn-outline-primary btn-sm" id="btnToggleTablaLinea">
+                        <button type="button" class="btn btn-outline-primary btn-sm py-1 px-2" id="btnToggleTablaLinea"
+                            style="font-size: 11px;">
                             Mostrar valores
                         </button>
                     </div>
                 </div>
 
-                <div class="chart-container chart-linea" style="position: relative; height: 350px;">
+                <!-- 🔑 Clase 'chart-container-large' agregada y altura ampliada -->
+                <div class="chart-container chart-linea chart-container-large w-100"
+                    style="position: relative; height: clamp(300px, 45vh, 420px);">
                     <canvas id="graficaLineaMeses"></canvas>
                 </div>
             </div>
@@ -123,7 +139,6 @@
 
     </div>
 </div>
-
 <!-- ===============================
      JAVASCRIPT (AJAX + CHART)
 ================================ -->
@@ -408,6 +423,7 @@
             totPedi += Number(r.Pediatrica || 0);
         });
 
+        // 🎨 Plugin para centrar el total dentro de la dona
         const pluginCentroDinamico = {
             id: 'textoCentroDinamico',
             beforeDraw: function (chart) {
@@ -427,8 +443,8 @@
 
                 const texto = Math.round(totalVisibles).toLocaleString('es-MX');
 
-                ctx.font = "bold 18px sans-serif";
-                ctx.fillStyle = "#374151";
+                ctx.font = "bold 16px sans-serif";
+                ctx.fillStyle = "#1f2937";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
                 ctx.fillText(texto, left + width / 2, top + height / 2);
@@ -436,6 +452,38 @@
             }
         };
 
+        // 🔑 Configuración compacta con Leyenda Lateral Derecha (Aprovecha los espacios en blanco)
+        const opcionesDonaCompacta = {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: "68%", // Ligero ajuste para que el aro se vea más grueso y proporcionado
+            plugins: {
+                legend: {
+                    position: "right", // 🎯 Mueve la leyenda a la derecha
+                    align: "center",
+                    labels: {
+                        usePointStyle: true,
+                        boxWidth: 8,
+                        boxHeight: 8,
+                        padding: 10,
+                        font: {
+                            size: 11,
+                            weight: '600'
+                        }
+                    }
+                }
+            },
+            layout: {
+                padding: {
+                    top: 5,
+                    bottom: 5,
+                    left: 5,
+                    right: 15
+                }
+            }
+        };
+
+        // 1. Gráfica Clasificación
         if (window.chartClasificacion) window.chartClasificacion.destroy();
         window.chartClasificacion = new Chart(document.getElementById("graficaClasificacion"), {
             type: "doughnut",
@@ -446,17 +494,11 @@
                     backgroundColor: ["#10B981", "#EF4444"]
                 }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: "75%",
-                plugins: {
-                    legend: { position: "bottom" }
-                }
-            },
+            options: opcionesDonaCompacta,
             plugins: [pluginCentroDinamico]
         });
 
+        // 2. Gráfica Motivo de Atención
         if (window.chartTipoAtencion) window.chartTipoAtencion.destroy();
         window.chartTipoAtencion = new Chart(document.getElementById("graficaTipoAtencion"), {
             type: "doughnut",
@@ -467,14 +509,7 @@
                     backgroundColor: ["#F59E0B", "#3B82F6", "#8B5CF6", "#EC4899"]
                 }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: "75%",
-                plugins: {
-                    legend: { position: "bottom" }
-                }
-            },
+            options: opcionesDonaCompacta,
             plugins: [pluginCentroDinamico]
         });
     }
@@ -623,51 +658,68 @@
     }
 
     /* =====================================================
-        MÉTODO GLOBAL DE FILTRADO (Para llamado desde menú)
-    ===================================================== */
+    MÉTODO GLOBAL DE FILTRADO (Con Debounce Anti-Parpadeo)
+ ===================================================== */
+    let temporizadorUrgencias = null;
+
     window.ejecutarFiltroUrgencias = function () {
-        const anios = obtenerUrgCheckbox("urg-filtro-anio");
-        const meses = obtenerUrgCheckbox("urg-filtro-mes");
-        const tipoAtencion = document.getElementById("filtroTipoAtencion")?.value;
+        // 🔑 Cancela ejecuciones duplicadas dentro de una ventana de 150ms
+        if (temporizadorUrgencias) clearTimeout(temporizadorUrgencias);
 
-        let params = new URLSearchParams();
+        temporizadorUrgencias = setTimeout(() => {
+            const anios = obtenerUrgCheckbox("urg-filtro-anio");
+            const meses = obtenerUrgCheckbox("urg-filtro-mes");
+            const tipoAtencion = document.getElementById("filtroTipoAtencion")?.value;
 
-        if (anios) params.append("anios", anios);
-        if (meses) params.append("meses", meses);
-        if (tipoAtencion && tipoAtencion !== "todas")
-            params.append("tipo_atencion", tipoAtencion);
+            let params = new URLSearchParams();
 
-        // Toma unidades globales desde menu.html
-        const unidades = window.getUnidadesSeleccionadas?.() || [];
-        if (unidades.length)
-            params.append("unidades", unidades.join(","));
+            if (anios) params.append("anios", anios);
+            if (meses) params.append("meses", meses);
+            if (tipoAtencion && tipoAtencion !== "todas") {
+                params.append("tipo_atencion", tipoAtencion);
+            }
 
-        const motivoActual = document.getElementById("selectMotivo")?.value;
-        if (motivoActual && motivoActual !== "todas") {
-            params.append("motivo", motivoActual);
-        }
+            // Toma unidades globales desde menu.html
+            const unidades = window.getUnidadesSeleccionadas?.() || [];
+            if (unidades.length) {
+                params.append("unidades", unidades.join(","));
+            }
 
-        paramsActualesUrgencias = new URLSearchParams(params.toString());
-        cargarReporteUrgencias(params);
+            const motivoActual = document.getElementById("selectMotivo")?.value;
+            if (motivoActual && motivoActual !== "todas") {
+                params.append("motivo", motivoActual);
+            }
+
+            paramsActualesUrgencias = new URLSearchParams(params.toString());
+            cargarReporteUrgencias(params);
+        }, 150);
     };
 
     /* =====================================================
-        RECEPTOR DEL EVENTO RESET GLOBAL (MENÚ LATERAL)
+       LÓGICA DE RESETEO UNIFICADA (Expuesta en Window)
     ===================================================== */
-    document.addEventListener("solicitarResetFiltros", () => {
-        // 1. Desmarcar todos los Checkboxes propios de Urgencias
-        document.querySelectorAll(".urg-filtro-anio, .urg-filtro-mes").forEach(chk => {
+    window.resetearVistaUrgencias = function () {
+        // 1. Desmarcar Checkboxes propios de Urgencias y del Menú Lateral
+        document.querySelectorAll(".urg-filtro-anio, .urg-filtro-mes, .menu-filtros input[type='checkbox']").forEach(chk => {
             chk.checked = false;
         });
 
-        // 2. Resetear Selects
+        // 2. Vaciar estructura global de unidades y restaurar el botón selector
+        if (typeof unidadesSeleccionadas !== 'undefined') {
+            if (typeof unidadesSeleccionadas.clear === 'function') unidadesSeleccionadas.clear();
+            else unidadesSeleccionadas = [];
+        }
+        const btnUnidades = document.getElementById("btnUnidades");
+        if (btnUnidades) btnUnidades.textContent = "🔍 Seleccionar unidades";
+
+        // 3. Resetear Selects
         const selectMotivo = document.getElementById("selectMotivo");
         if (selectMotivo) selectMotivo.selectedIndex = 0;
 
         const filtroTipoAtencion = document.getElementById("filtroTipoAtencion");
         if (filtroTipoAtencion) filtroTipoAtencion.selectedIndex = 0;
 
-        // 3. Resetear botones "Mostrar valores"
+        // 4. Resetear botones "Mostrar valores"
         mostrarValoresBarras = false;
         mostrarValoresLinea = false;
 
@@ -685,86 +737,39 @@
             btnToggleLinea.classList.add("btn-outline-primary");
         }
 
-        // 4. Limpiar los parámetros y recargar datos limpios
+        // 5. Cargar reporte limpio sin parámetros
         paramsActualesUrgencias = new URLSearchParams();
         cargarReporteUrgencias(paramsActualesUrgencias);
-    });
+    };
+
+    // Alias para mantener compatibilidad si se llama desde otros puntos
+    window.resetearFiltrosUrgencias = window.resetearVistaUrgencias;
 
     /* =====================================================
-        EVENTOS E INICIALIZACIÓN
+       EVENTOS DE INTEGRACIÓN GLOBAL (MENÚ LATERAL)
     ===================================================== */
-    /* =====================================================
-         EVENTOS DE INTEGRACIÓN GLOBAL (MENÚ LATERAL)
-     ===================================================== */
-    // Escuchar cuando el menú aplique o cambie filtros de unidades
     document.addEventListener("aplicarFiltroUnidades", () => {
         window.ejecutarFiltroUrgencias();
     });
 
-    document.addEventListener("unidadesSeleccionadasCambiadas", () => {
-        window.ejecutarFiltroUrgencias();
-    });
-
-    // Escuchar el evento de limpieza global
-    document.addEventListener("limpiarFiltrosGlobales", () => {
-        resetearFiltrosUrgencias();
-    });
-
-    /* =====================================================
-        LÓGICA DE RESETEO REUTILIZABLE
-    ===================================================== */
-    function resetearFiltrosUrgencias() {
-        // 1. Desmarcar todos los Checkboxes propios de Urgencias
-        document.querySelectorAll(".urg-filtro-anio, .urg-filtro-mes").forEach(chk => {
-            chk.checked = false;
-        });
-
-        // 2. Resetear Selects
-        const selectMotivo = document.getElementById("selectMotivo");
-        if (selectMotivo) selectMotivo.selectedIndex = 0;
-
-        const filtroTipoAtencion = document.getElementById("filtroTipoAtencion");
-        if (filtroTipoAtencion) filtroTipoAtencion.selectedIndex = 0;
-
-        // 3. Resetear botones "Mostrar valores"
-        mostrarValoresBarras = false;
-        mostrarValoresLinea = false;
-
-        const btnToggleBarras = document.getElementById("btnToggleValoresBarras");
-        if (btnToggleBarras) {
-            btnToggleBarras.innerHTML = "Mostrar valores";
-            btnToggleBarras.classList.remove("btn-primary");
-            btnToggleBarras.classList.add("btn-outline-primary");
-        }
-
-        const btnToggleLinea = document.getElementById("btnToggleTablaLinea");
-        if (btnToggleLinea) {
-            btnToggleLinea.innerHTML = "Mostrar valores";
-            btnToggleLinea.classList.remove("btn-primary");
-            btnToggleLinea.classList.add("btn-outline-primary");
-        }
-
-        // 4. Limpiar los parámetros y recargar datos limpios
-        paramsActualesUrgencias = new URLSearchParams();
-        cargarReporteUrgencias(paramsActualesUrgencias);
-    }
-
-    /* =====================================================
-        RECEPTOR DEL EVENTO RESET LOCAL
-    ===================================================== */
     document.addEventListener("solicitarResetFiltros", () => {
-        resetearFiltrosUrgencias();
+        window.resetearVistaUrgencias();
+    });
+
+    document.addEventListener("limpiarFiltrosGlobales", () => {
+        window.resetearVistaUrgencias();
     });
 
     /* =====================================================
-        INICIALIZACIÓN AL CARGAR EL DOM
+       INICIALIZACIÓN AL CARGAR EL DOM
     ===================================================== */
     document.addEventListener("DOMContentLoaded", () => {
-        // Carga inicial (tomando unidades por defecto si las hubiera en el menú)
+        // Carga inicial
         window.ejecutarFiltroUrgencias();
 
-        // Botón principal de filtrar de la vista
-        document.getElementById("btnFiltrarUrgencias")?.addEventListener("click", () => {
+        // Botón principal de filtrar de la vista local
+        document.getElementById("btnFiltrarUrgencias")?.addEventListener("click", (e) => {
+            e.preventDefault();
             window.ejecutarFiltroUrgencias();
         });
 
@@ -777,7 +782,7 @@
             btnToggleBarras.classList.toggle("btn-primary", mostrarValoresBarras);
             btnToggleBarras.classList.toggle("btn-outline-primary", !mostrarValoresBarras);
 
-            if (chartPorAnio) {
+            if (typeof chartPorAnio !== 'undefined' && chartPorAnio) {
                 chartPorAnio.options.plugins.mostrarValoresActivo = mostrarValoresBarras;
                 chartPorAnio.update();
             }
@@ -797,6 +802,7 @@
                 window.chartLineaMeses.update();
             }
         });
+
     });
 </script>
 

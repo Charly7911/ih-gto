@@ -1,0 +1,70 @@
+/* ==========================================
+   AJUSTES RESPONSIVOS - MÓDULO EGRESOS
+   ========================================== */
+
+/* 1. Normalización de contenedores de gráficas superiores */
+#graficaEgresosPorAnio,
+#graficaEgresosPorServicio {
+  max-height: 200px !important;
+  width: 100% !important;
+  margin: 0 auto;
+}
+
+/* 2. Ampliación específica de la gráfica de líneas mensual */
+.chart-container-large {
+  height: clamp(300px, 45vh, 420px) !important;
+  min-height: 300px !important;
+}
+
+#graficaMensualTotal {
+  max-height: 420px !important;
+  width: 100% !important;
+}
+
+/* 3. Encabezado fijo con scroll interno para la Tabla de Egresos */
+#tablaEgresos thead.sticky-top {
+  position: sticky;
+  top: 0;
+  background-color: #1e293b !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 4. Reglas específicas para pantallas de Laptop / Resoluciones chicas */
+@media (max-width: 1440px), (max-height: 850px) {
+
+  /* Gráficas superiores (Barras/Servicios) súper compactas */
+  .chart-box,
+  .chart-container:not(.chart-container-large) {
+    height: 190px !important;
+  }
+
+  /* Gráfica de líneas ampliada a 340px en laptops */
+  .chart-container-large {
+    height: 340px !important;
+  }
+
+  /* Compactación de las tarjetas KPI de Mortalidad Cruda/Ajustada */
+  .bg-dark.border-secondary {
+    padding: 2px !important;
+  }
+  
+  .bg-dark.border-secondary h4 {
+    font-size: 1.1rem !important;
+  }
+
+  /* Compactación de la tabla de Egresos */
+  #tablaEgresos {
+    font-size: 0.75rem !important;
+  }
+
+  #tablaEgresos th, 
+  #tablaEgresos td {
+    padding: 4px 6px !important;
+  }
+
+  /* Ajuste de padding general en tarjetas */
+  .main-content .card-body {
+    padding: 10px !important;
+  }
+}

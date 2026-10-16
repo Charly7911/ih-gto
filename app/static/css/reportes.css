@@ -1,0 +1,51 @@
+/* ==========================================
+   AJUSTES RESPONSIVOS - MORBILIDAD / MORTALIDAD
+   ========================================== */
+
+/* 1. Encabezado pegajoso para las tablas dentro del contenedor dinámico */
+#contenedor .table responsive {
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+#contenedor table thead.sticky-top {
+  position: sticky;
+  top: 0;
+  background-color: #1e293b !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+/* 2. Reglas para Laptops y Pantallas Compactas (1366x768 / 1440x900) */
+@media (max-width: 1440px), (max-height: 850px) {
+  /* Limitar la altura de las tablas generadas dinámicamente con scroll interno */
+  #contenedor .table-responsive {
+    max-height: 260px !important;
+    overflow-y: auto !important;
+  }
+
+  /* Compactar el padding de las tarjetas dinámicas */
+  #contenedor .card-body {
+    padding: 8px 12px !important;
+  }
+
+  /* Reducir tamaño de fuente y padding en celdas de las tablas */
+  #contenedor table {
+    font-size: 0.75rem !important;
+  }
+
+  #contenedor table th,
+  #contenedor table td {
+    padding: 4px 6px !important;
+  }
+
+  /* Reducir encabezado y subtítulo de unidades */
+  .main-content h3 {
+    font-size: 1.1rem !important;
+  }
+
+  #unidadSeleccionada {
+    font-size: 11px !important;
+  }
+}

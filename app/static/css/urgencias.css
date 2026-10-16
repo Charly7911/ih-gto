@@ -1,0 +1,49 @@
+/* ==========================================
+   AJUSTES RESPONSIVOS - MÓDULO URGENCIAS
+   ========================================== */
+
+/* 1. Limitar el tamaño compacto de los canvas de Dona/Anillo */
+#graficaClasificacion,
+#graficaTipoAtencion {
+  max-height: 180px !important;
+  width: 100% !important;
+  margin: 0 auto;
+}
+
+/* 2. Ampliación específica para la gráfica de líneas mensual de Urgencias */
+#graficaLineaMeses {
+  max-height: 420px !important;
+  width: 100% !important;
+}
+
+/* 3. Encabezado fijo al hacer scroll en la tabla de Urgencias */
+#tablaResultados thead.sticky-top {
+  position: sticky;
+  top: 0;
+  background-color: #1e293b !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 4. Reglas específicas para pantallas de Laptop / Resoluciones chicas */
+@media (max-width: 1440px), (max-height: 850px) {
+
+  /* Donas y gráficas estándar compactas */
+  .chart-container:not(.chart-container-large) {
+    height: 180px !important;
+  }
+
+  /* 🔑 Gráfica de líneas mensual amplia a 340px */
+  .chart-container-large {
+    height: 340px !important;
+  }
+
+  /* Contención de tipografía y padding en la tabla y tarjetas */
+  #tablaResultados {
+    font-size: 0.75rem !important;
+  }
+  
+  .main-content .card-body {
+    padding: 10px !important;
+  }
+}

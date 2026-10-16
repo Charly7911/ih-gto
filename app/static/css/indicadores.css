@@ -1,0 +1,40 @@
+/* ==========================================
+   COMPACTACIÓN Y TABLAS EN TEMPLATE INDICADORES
+   ========================================== */
+
+/* Fijar el encabezado de la tabla al hacer scroll interno */
+.table-responsive .sticky-top {
+  position: sticky;
+  top: 0;
+  background-color: #1e293b !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Reglas de compactación vertical para Laptops */
+@media (max-width: 1440px), (max-height: 850px) {
+  
+  .main-content .container-fluid {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  /* Reducción de relleno en tarjetas */
+  .main-content .card-body {
+    padding: 10px !important;
+  }
+
+  /* Compactar Tarjetas KPI */
+  .main-content h4 {
+    font-size: 1rem !important;
+  }
+
+  /* Reducción de min-width de columna Nombre de Unidad en Tabla */
+  #tablaIndicadores th:nth-child(2) {
+    width: 220px !important;
+  }
+
+  /* Control de altura de contenedores de tablas y canvas */
+  .table-responsive {
+    max-height: 240px !important;
+  }
+}

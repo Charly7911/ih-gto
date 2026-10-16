@@ -3,24 +3,30 @@
 {% block content %}
 
 <div class="main-content">
-    <div class="container-fluid mt-4 ps-4 pe-4">
-        <h2>📊 {{ titulo }} </h2>
-        <div id="unidadSeleccionada" class="text-muted mt-2">
-            Todas las unidades
+    <div class="container-fluid py-2 px-3">
+        <!-- CABECERA DE LA VISTA -->
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <div>
+                <h3 class="mb-0 fs-5 fw-bold text-dark d-flex align-items-center gap-2">
+                    📊 {{ titulo }}
+                </h3>
+                <div id="unidadSeleccionada" class="text-muted fw-bold small mt-1" style="font-size: 12px;">
+                    Todas las unidades
+                </div>
+            </div>
         </div>
+
+        <!-- CONTENEDOR DINÁMICO DE TABLAS Y GRÁFICAS -->
+        <div id="contenedor" class="w-100"></div>
     </div>
-
-    <!-- =========================
-             RESULTADOS
-        ========================== -->
-    <div id="contenedor"></div>
-
-</div>
 </div>
 
 
 
 <script>
+    /* ==========================================
+       1. ACTUALIZACIÓN DE ENCABEZADO Y TÍTULOS
+    ========================================== */
     function actualizarTituloUnidad() {
         const unidades = window.getUnidadesRepSeleccionadas ? window.getUnidadesRepSeleccionadas() : [];
         const servicios = window.getServiciosSeleccionados ? window.getServiciosSeleccionados() : [];
@@ -45,38 +51,56 @@
         lbl.innerHTML = texto;
     }
 
+    /* ==========================================
+       2. CARGA Y CONSULTA DE DATOS (Con Debounce)
+    ========================================== */
+    let temporizadorMorbMort = null;
+
     function cargarDatos() {
-        const anios = Array.from(
-            document.querySelectorAll(`.filtro-anio-${tipo}:checked`)
-        ).map(x => x.value);
+        if (temporizadorMorbMort) clearTimeout(temporizadorMorbMort);
 
-        const meses = Array.from(
-            document.querySelectorAll(`.filtro-mes-${tipo}:checked`)
-        ).map(x => x.value);
+        temporizadorMorbMort = setTimeout(() => {
+            const typeofVar = typeof tipo !== 'undefined' ? tipo : 'morbilidad';
+            const sufijoVar = typeof sufijo !== 'undefined' ? sufijo : 'Morb';
 
-        const top = document.getElementById(`filtroTop${sufijo}`)?.value || "";
+            const anios = Array.from(
+                document.querySelectorAll(`.filtro-anio-${typeofVar}:checked, .filtro-anio:checked`)
+            ).map(x => x.value);
 
-        const unidades = window.getUnidadesRepSeleccionadas ? window.getUnidadesRepSeleccionadas() : [];
-        const afecciones = window.getAfeccionesSeleccionadas ? window.getAfeccionesSeleccionadas() : [];
-        const servicios = window.getServiciosSeleccionados ? window.getServiciosSeleccionados() : [];
+            const meses = Array.from(
+                document.querySelectorAll(`.filtro-mes-${typeofVar}:checked, .filtro-mes:checked`)
+            ).map(x => x.value);
 
-        actualizarTituloUnidad();
+            const top = document.getElementById(`filtroTop${sufijoVar}`)?.value || "";
 
-        const params = new URLSearchParams();
+            const unidades = window.getUnidadesRepSeleccionadas ? window.getUnidadesRepSeleccionadas() : [];
+            const afecciones = window.getAfeccionesSeleccionadas ? window.getAfeccionesSeleccionadas() : [];
+            const servicios = window.getServiciosSeleccionados ? window.getServiciosSeleccionados() : [];
 
-        if (anios.length) params.append("anios", anios.join(","));
-        if (meses.length) params.append("meses", meses.join(","));
-        if (top) params.append("top", top);
-        if (unidades.length) params.append("unidades", unidades.join(","));
-        if (afecciones.length) params.append("afecciones", afecciones.join(","));
-        if (servicios.length) params.append("servicios", servicios.join(","));
+            actualizarTituloUnidad();
 
-        fetch(`/reportes/${tipo}/data?${params.toString()}`)
-            .then(res => res.json())
-            .then(data => render(data))
-            .catch(err => console.error(err));
+            const params = new URLSearchParams();
+
+            if (anios.length) params.append("anios", anios.join(","));
+            if (meses.length) params.append("meses", meses.join(","));
+            if (top) params.append("top", top);
+            if (unidades.length) params.append("unidades", unidades.join(","));
+            if (afecciones.length) params.append("afecciones", afecciones.join(","));
+            if (servicios.length) params.append("servicios", servicios.join(","));
+
+            fetch(`/reportes/${typeofVar}/data?${params.toString()}`)
+                .then(res => {
+                    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                    return res.json();
+                })
+                .then(data => render(data))
+                .catch(err => console.error("Error al obtener reporte:", err));
+        }, 150);
     }
 
+    /* ==========================================
+       3. RENDERIZADO DE CONTENEDOR Y TABLAS
+    ========================================== */
     function render(data) {
         const afecciones = window.getAfeccionesSeleccionadas ? window.getAfeccionesSeleccionadas() : [];
         const contenedor = document.getElementById("contenedor");
@@ -84,6 +108,11 @@
         if (!contenedor) return;
 
         contenedor.innerHTML = "";
+
+        if (!data || data.length === 0) {
+            contenedor.innerHTML = `<div class="alert alert-info text-center">No se encontraron registros con los filtros seleccionados.</div>`;
+            return;
+        }
 
         // =========================
         // MODO POR UNIDAD
@@ -96,36 +125,40 @@
         ) {
             data.forEach(item => {
                 let html = `
-                <div class="card mb-3 shadow-sm">
-                    <div class="card-body">
-                        <h5 class="card-title">Año ${item.anio}</h5>
-                        <p class="text-muted">
-                            Total unidad: <b>${Number(item.total_unidad ?? 0).toLocaleString('es-MX')}</b>
-                        </p>
-                        <table class="table table-sm table-hover">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Unidad</th>
-                                    <th>Causa</th>
-                                    <th>Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>`;
+                <div class="card mb-3 shadow-sm border-0">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="card-title fw-bold text-dark mb-0" style="font-size: 15px;">Año ${item.anio}</h5>
+                            <span class="text-muted small">
+                                Total unidad: <b>${Number(item.total_unidad ?? 0).toLocaleString('es-MX')}</b>
+                            </span>
+                        </div>
+                        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                            <table class="table table-sm table-striped table-hover align-middle mb-0" style="font-size: 0.8rem;">
+                                <thead class="table-dark sticky-top" style="z-index: 2;">
+                                    <tr>
+                                        <th style="width: 50px;">#</th>
+                                        <th>Unidad</th>
+                                        <th>Causa</th>
+                                        <th style="width: 100px;" class="text-center">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
 
                 item.causas.forEach(c => {
                     html += `
-                                <tr>
-                                    <td>${c.orden ?? ''}</td>
-                                    <td>${c.unidad ?? ''}</td>
-                                    <td>${c.causa ?? ''}</td>
-                                    <td>${Number(c.total ?? 0).toLocaleString('es-MX')}</td>
-                                </tr>`;
+                                    <tr>
+                                        <td>${c.orden ?? ''}</td>
+                                        <td>${c.unidad ?? ''}</td>
+                                        <td>${c.causa ?? ''}</td>
+                                        <td class="text-center fw-bold">${Number(c.total ?? 0).toLocaleString('es-MX')}</td>
+                                    </tr>`;
                 });
 
                 html += `
-                            </tbody>
-                        </table>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>`;
 
@@ -140,34 +173,38 @@
         // =========================
         data.forEach(item => {
             let html = `
-            <div class="card mb-3 shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title">Año ${item.anio}</h5>
-                    <p class="text-muted">
-                        Total unidad: <b>${Number(item.total_unidad ?? 0).toLocaleString('es-MX')}</b>
-                    </p>
-                    <table class="table table-sm table-hover">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Causa</th>
-                                <th>Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
+            <div class="card mb-3 shadow-sm border-0">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="card-title fw-bold text-dark mb-0" style="font-size: 15px;">Año ${item.anio}</h5>
+                        <span class="text-muted small">
+                            Total unidad: <b>${Number(item.total_unidad ?? 0).toLocaleString('es-MX')}</b>
+                        </span>
+                    </div>
+                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                        <table class="table table-sm table-striped table-hover align-middle mb-0" style="font-size: 0.8rem;">
+                            <thead class="table-dark sticky-top" style="z-index: 2;">
+                                <tr>
+                                    <th style="width: 50px;">#</th>
+                                    <th>Causa</th>
+                                    <th style="width: 100px;" class="text-center">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
 
             item.causas.forEach(c => {
                 html += `
-                            <tr>
-                                <td>${c.orden || ''}</td>
-                                <td>${c.causa || ''}</td>
-                                <td>${Number(c.total || 0).toLocaleString('es-MX')}</td>
-                            </tr>`;
+                                <tr>
+                                    <td>${c.orden || ''}</td>
+                                    <td>${c.causa || ''}</td>
+                                    <td class="text-center fw-bold">${Number(c.total || 0).toLocaleString('es-MX')}</td>
+                                </tr>`;
             });
 
             html += `
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>`;
 
@@ -175,16 +212,22 @@
         });
     }
 
-    document.getElementById(`btnDescargar${sufijo}`)?.addEventListener("click", () => {
+    /* ==========================================
+       4. DESCARGA A EXCEL
+    ========================================== */
+    const sufijoVar = typeof sufijo !== 'undefined' ? sufijo : 'Morb';
+    const typeofVar = typeof tipo !== 'undefined' ? tipo : 'morbilidad';
+
+    document.getElementById(`btnDescargar${sufijoVar}`)?.addEventListener("click", () => {
         const anios = Array.from(
-            document.querySelectorAll(`.filtro-anio-${tipo}:checked`)
+            document.querySelectorAll(`.filtro-anio-${typeofVar}:checked, .filtro-anio:checked`)
         ).map(x => x.value);
 
         const meses = Array.from(
-            document.querySelectorAll(`.filtro-mes-${tipo}:checked`)
+            document.querySelectorAll(`.filtro-mes-${typeofVar}:checked, .filtro-mes:checked`)
         ).map(x => x.value);
 
-        const top = document.getElementById(`filtroTop${sufijo}`)?.value || "";
+        const top = document.getElementById(`filtroTop${sufijoVar}`)?.value || "";
         const unidades = window.getUnidadesRepSeleccionadas ? window.getUnidadesRepSeleccionadas() : [];
         const afecciones = window.getAfeccionesSeleccionadas ? window.getAfeccionesSeleccionadas() : [];
         const servicios = window.getServiciosSeleccionados ? window.getServiciosSeleccionados() : [];
@@ -198,33 +241,67 @@
         if (top) params.append("top", top);
         if (servicios.length) params.append("servicios", servicios.join(","));
 
-        window.location.href = `/reportes/${tipo}/excel?${params.toString()}`;
+        window.location.href = `/reportes/${typeofVar}/excel?${params.toString()}`;
     });
 
-    // ==========================================
-    // ESCUCHADOR Y LIMPIEZA DE EVENTO DESDE MENU
-    // ==========================================
-    function resetearFiltrosReporte() {
-        // 1. Desmarcar checkboxes dinámicos de año y mes según el "tipo"
-        document.querySelectorAll(`.filtro-anio-${tipo}, .filtro-mes-${tipo}`).forEach(chk => {
+    /* ==========================================
+       5. LÓGICA Y EXPOSICIÓN GLOBAL DE RESETEO
+    ========================================== */
+    window.resetearVistaMorbilidadMortalidad = function () {
+        console.log("🧹 Reseteando vista de Morbilidad / Mortalidad...");
+
+        const currentTipo = typeof tipo !== 'undefined' ? tipo : 'morbilidad';
+        const currentSufijo = typeof sufijo !== 'undefined' ? sufijo : 'Morb';
+
+        // 1. Desmarcar checkboxes locales y del menú
+        document.querySelectorAll(`
+            .filtro-anio-${currentTipo}, .filtro-mes-${currentTipo},
+            .filtro-anio, .filtro-mes,
+            .menu-filtros input[type='checkbox'],
+            .popover-unidades input[type='checkbox']
+        `).forEach(chk => {
             chk.checked = false;
         });
 
-        // 2. Resetear el select del "Top"
-        const selectTop = document.getElementById(`filtroTop${sufijo}`);
+        // 2. Resetear Select Top
+        const selectTop = document.getElementById(`filtroTop${currentSufijo}`);
         if (selectTop) {
-            selectTop.selectedIndex = 0; // Vuelve a la primera opción
+            selectTop.selectedIndex = 0;
         }
 
-        // 3. Recargar el reporte con todos los parámetros limpios
+        // 3. Vaciar selecciones globales en memoria (unidades, servicios, afecciones)
+        if (typeof unidadesSeleccionadas !== 'undefined') {
+            if (typeof unidadesSeleccionadas.clear === 'function') unidadesSeleccionadas.clear();
+            else unidadesSeleccionadas = [];
+        }
+        if (typeof afeccionesSeleccionadas !== 'undefined') afeccionesSeleccionadas = [];
+        if (typeof serviciosSeleccionados !== 'undefined') serviciosSeleccionados = [];
+
+        const btnUnidades = document.getElementById("btnUnidades");
+        if (btnUnidades) btnUnidades.textContent = "🔍 Seleccionar unidades";
+
+        // 4. Recargar datos limpios
+        cargarDatos();
+    };
+
+    // Aliases globales para atrapar llamados directos
+    window.resetearVistaMorbilidad = window.resetearVistaMorbilidadMortalidad;
+    window.resetearVistaMortalidad = window.resetearVistaMorbilidadMortalidad;
+    window.ejecutarFiltroMorbMort = cargarDatos;
+
+    /* ==========================================
+       6. LISTENERS GLOBALES Y INICIALIZACIÓN
+    ========================================== */
+    document.addEventListener("solicitarResetFiltros", window.resetearVistaMorbilidadMortalidad);
+    document.addEventListener("limpiarFiltrosGlobales", window.resetearVistaMorbilidadMortalidad);
+    document.addEventListener("aplicarFiltroUnidades", cargarDatos);
+
+    // Carga inicial al montar el DOM
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", cargarDatos);
+    } else {
         cargarDatos();
     }
-
-    // Escuchar el evento disparado desde el menu.html
-    document.addEventListener("solicitarResetFiltros", resetearFiltrosReporte);
-
-    // Carga inicial
-    cargarDatos();
 </script>
 
 {% endblock %}

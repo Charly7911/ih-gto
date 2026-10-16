@@ -1,0 +1,67 @@
+/* =====================================================
+   ESTILOS RESPONSIVOS - MÓDULO SIS (PRIMER NIVEL)
+===================================================== */
+
+/* 1. Gráficas superiores compactas */
+#graficaSisPorAnio,
+#graficaSis {
+  max-height: 200px !important;
+  width: 100% !important;
+}
+
+/* 2. Gráfica de evolución temporal amplia */
+#graficaSisMensual {
+  max-height: 420px !important;
+  width: 100% !important;
+}
+
+/* 3. Encabezados pegajosos para las tablas con scroll interno */
+#tablaResultados thead.sticky-top,
+#tablaEvolucionConsultas thead.sticky-top {
+  position: sticky;
+  top: 0;
+  background-color: #1e293b !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 5;
+}
+
+/* 4. Reglas específicas para Laptops y Laptops Pequeñas (1366x768 / 1440x900) */
+@media (max-width: 1440px), (max-height: 850px) {
+
+  /* Gráficas superiores aún más compactas en laptops */
+  .chart-box {
+    height: 180px !important;
+  }
+
+  /* 🔑 Gráfica de evolución temporal maximizada para lectura clara */
+  .chart-container-large {
+    height: 350px !important;
+  }
+
+  /* Altura del contenedor del árbol de variables y la tabla de resumen */
+  #contenedorSubvariables,
+  #tablaEvolucionConsultas {
+    max-height: 220px !important;
+  }
+
+  /* Densidad de datos en la tabla principal (fuente y padding reducido) */
+  #tablaResultados {
+    font-size: 0.75rem !important;
+  }
+
+  #tablaResultados th,
+  #tablaResultados td {
+    padding: 4px 6px !important;
+  }
+
+  /* Padding interno reducido en las tarjetas */
+  .main-content .card-body {
+    padding: 10px !important;
+  }
+
+  /* Ajuste de título e indicador general */
+  #sis-title {
+    font-size: 1.1rem !important;
+  }
+}

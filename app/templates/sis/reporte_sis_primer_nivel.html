@@ -1,54 +1,67 @@
 {% extends "layout/base.html" %}
 {% block content %}
 <div class="main-content">
-    <div class="container-fluid mt-4 ps-4 pe-4">
+    <div class="container-fluid py-2 px-3">
 
-        <h2 class="mb-3" id="sis-title">
-            🏥 SIS - Primer Nivel
-            <span id="sis-meta" style="font-size: 18px;" data-control='{{ control_anual | tojson | safe }}'>
-            </span>
-        </h2>
+        <!-- CABECERA -->
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <h3 class="mb-0 fs-5 fw-bold text-dark d-flex align-items-center gap-2" id="sis-title">
+                🏥 SIS - Primer Nivel
+                <span id="sis-meta" class="fs-6 text-muted" data-control='{{ control_anual | tojson | safe }}'></span>
+            </h3>
+        </div>
 
         <div id="loaderOverlay" class="overlay-loader">
             <div class="spinner"></div>
             <p>Cargando datos...</p>
         </div>
 
-        <!-- GRÁFICAS SUPERIORES -->
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted mb-2" id="tituloGraficaAnio">Total Atenciones por Año</h6>
-                        <canvas id="graficaSisPorAnio"></canvas>
+        <!-- =======================
+            GRÁFICAS SUPERIORES (COMPACTAS)
+        ======================= -->
+        <div class="row g-2 mb-3">
+            <div class="col-12 col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body p-2 text-center">
+                        <h6 class="text-muted fw-bold mb-2" id="tituloGraficaAnio" style="font-size: 12px;">Total
+                            Atenciones por Año</h6>
+                        <div class="chart-box w-100" style="position: relative; height: clamp(180px, 25vh, 200px);">
+                            <canvas id="graficaSisPorAnio"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted mb-2" id="tituloGraficaSis">Indicadores por Unidad</h6>
-                        <canvas id="graficaSis"></canvas>
+            <div class="col-12 col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body p-2 text-center">
+                        <h6 class="text-muted fw-bold mb-2" id="tituloGraficaSis" style="font-size: 12px;">Indicadores
+                            por Unidad</h6>
+                        <div class="chart-box w-100" style="position: relative; height: clamp(180px, 25vh, 200px);">
+                            <canvas id="graficaSis"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- TABLA DE RESULTADOS PRINCIPAL -->
-        <div class="card shadow-sm border-0 mb-4">
+        <!-- =======================
+            TABLA PRINCIPAL DE RESULTADOS
+        ======================= -->
+        <div class="card shadow-sm border-0 mb-3">
             <div class="card-body p-3">
                 <!-- 1. PESTAÑAS DE AÑOS -->
-                <ul class="nav nav-tabs mb-3 flex-wrap" id="tabsAnios"></ul>
+                <ul class="nav nav-tabs nav-tabs-sm mb-2 flex-wrap" id="tabsAnios"></ul>
 
-                <!-- 2. TABLA PRINCIPAL CON SCROLL HORIZONTAL PROPIO -->
-                <div class="table-responsive mb-2" style="max-width: 100%; overflow-x: auto;">
-                    <table class="table table-striped table-hover table-sm align-middle mb-0" id="tablaResultados">
-                        <thead>
-                            <tr>
-                                <th class="text-center">Año</th>
-                                <th>CLUES</th>
-                                <th>Unidad</th>
+                <!-- 2. TABLA PRINCIPAL CON SCROLL INTERNO -->
+                <div class="table-responsive border rounded" style="max-height: 260px; overflow-y: auto;">
+                    <table class="table table-striped table-hover table-sm align-middle mb-0" id="tablaResultados"
+                        style="min-width: 1100px;">
+                        <thead class="table-dark sticky-top" style="z-index: 5;">
+                            <tr style="font-size: 0.75rem;">
+                                <th class="text-center" style="width: 60px;">Año</th>
+                                <th style="width: 100px;">CLUES</th>
+                                <th style="min-width: 150px;">Unidad</th>
                                 <th class="text-center">Consultas</th>
                                 <th class="text-center">Embarazadas</th>
                                 <th class="text-center">Salud Mental</th>
@@ -61,160 +74,161 @@
                                 <th class="text-center">Orientación EDA/IRA</th>
                             </tr>
                         </thead>
-                        <tbody id="tablaSIS"></tbody>
+                        <tbody id="tablaSIS" style="font-size: 0.78rem;"></tbody>
                     </table>
                 </div>
 
-                <!-- 🟢 3. SECCIÓN DE PAGINACIÓN OPTIMIZADA Y RESPONSIVA -->
+                <!-- 3. SECCIÓN DE PAGINACIÓN -->
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-2 pt-2 border-top">
-                    <!-- Información de registros -->
                     <small class="text-muted" id="infoPaginacion"></small>
-
-                    <!-- Contenedor con envolvente flexible (flex-wrap) -->
                     <nav aria-label="Navegación de tabla" class="mw-100">
                         <ul class="pagination pagination-sm mb-0 flex-wrap justify-content-end" id="paginacionTabla"
                             style="gap: 2px;"></ul>
                     </nav>
                 </div>
+            </div>
+        </div>
 
-                <!-- 4. SECCIÓN DE GRÁFICA TEMPORAL -->
-                <hr class="my-4">
-                <div class="card mb-2 border-0 shadow-sm">
-                    <div class="card-body p-3">
-                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                            <h5 class="mb-0">📈 Evolución Temporal SIS</h5>
+        <!-- =======================
+            SECCIÓN DE GRÁFICA TEMPORAL (AMPLIADA)
+        ======================= -->
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h6 class="fw-bold text-dark mb-0" style="font-size: 13px;">📈 Evolución Temporal SIS</h6>
 
-                            <div class="d-flex gap-2 align-items-center flex-wrap">
-                                <select id="selectTipoVistaTemporal"
-                                    class="form-select form-select-sm w-auto fw-bold text-primary border-primary"
-                                    onchange="renderGraficaTemporal();">
-                                    <option value="mes" selected>Vista Mensual</option>
-                                    <option value="anio">Vista Anual (Acumulado)</option>
-                                </select>
+                    <div class="d-flex gap-2 align-items-center flex-wrap ms-auto">
+                        <select id="selectTipoVistaTemporal"
+                            class="form-select form-select-sm w-auto fw-bold text-primary border-primary"
+                            style="font-size: 11px;" onchange="renderGraficaTemporal();">
+                            <option value="mes" selected>Vista Mensual</option>
+                            <option value="anio">Vista Anual (Acumulado)</option>
+                        </select>
 
-                                <select id="filtroSisDetalle" class="form-select form-select-sm w-auto fw-bold">
-                                    <option value="consultas" selected>Consultas</option>
-                                    <option value="embarazadas">Embarazadas</option>
-                                    <option value="mental">Salud Mental</option>
-                                    <option value="bucal">Salud Bucal</option>
-                                    <option value="tamiz">Tamiz</option>
-                                    <option value="planificacion_familiar">Planificación Familiar</option>
-                                    <option value="detecciones">Detecciones</option>
-                                    <option value="detecciones_cardiometabolicas">Detecciones Cardiometab.</option>
-                                    <option value="orientacion_lac_des_obe">Orientación Lactancia/Desnutrición/Obesidad
-                                    </option>
-                                    <option value="orientacion_eda_ira">Orientación EDA/IRA</option>
-                                    <option value="todas">Todas</option>
-                                </select>
+                        <select id="filtroSisDetalle" class="form-select form-select-sm w-auto fw-bold"
+                            style="font-size: 11px;">
+                            <option value="consultas" selected>Consultas</option>
+                            <option value="embarazadas">Embarazadas</option>
+                            <option value="mental">Salud Mental</option>
+                            <option value="bucal">Salud Bucal</option>
+                            <option value="tamiz">Tamiz</option>
+                            <option value="planificacion_familiar">Planificación Familiar</option>
+                            <option value="detecciones">Detecciones</option>
+                            <option value="detecciones_cardiometabolicas">Detecciones Cardiometab.</option>
+                            <option value="orientacion_lac_des_obe">Orientación Lactancia/Desnutrición/Obesidad</option>
+                            <option value="orientacion_eda_ira">Orientación EDA/IRA</option>
+                            <option value="todas">Todas</option>
+                        </select>
 
-                                <!-- Control de Desglose -->
-                                <select id="selectModoDesglose"
-                                    class="form-select form-select-sm w-auto fw-bold border-info text-info d-none"
-                                    onchange="realizarConsultaBackend();">
-                                    <option value="acumulado" selected>📊 Acumulado</option>
-                                    <option value="por_apartado">🔀 Por Apartado</option>
-                                </select>
+                        <!-- Control de Desglose -->
+                        <select id="selectModoDesglose"
+                            class="form-select form-select-sm w-auto fw-bold border-info text-info d-none"
+                            style="font-size: 11px;" onchange="realizarConsultaBackend();">
+                            <option value="acumulado" selected>📊 Acumulado</option>
+                            <option value="por_apartado">🔀 Por Apartado</option>
+                        </select>
 
-                                <button type="button" class="btn btn-outline-primary btn-sm"
-                                    id="btnToggleValoresMensual">
-                                    Mostrar valores
-                                </button>
+                        <button type="button" class="btn btn-outline-primary btn-sm py-1 px-2"
+                            id="btnToggleValoresMensual" style="font-size: 11px;">
+                            Mostrar valores
+                        </button>
 
-                                <!-- Menú Desplegable Exportación Excel -->
-                                <div class="btn-group">
-                                    <button type="button"
-                                        class="btn btn-success btn-sm dropdown-toggle d-flex align-items-center gap-1"
-                                        id="btnExportarExcel" data-bs-toggle="dropdown" aria-expanded="false">
-                                        <i class="bi bi-file-earmark-excel-fill"></i> Excel
+                        <!-- Exportación Excel -->
+                        <div class="btn-group">
+                            <button type="button"
+                                class="btn btn-success btn-sm py-1 px-2 dropdown-toggle d-flex align-items-center gap-1"
+                                style="font-size: 11px;" id="btnExportarExcel" data-bs-toggle="dropdown"
+                                aria-expanded="false">
+                                <i class="bi bi-file-earmark-excel-fill"></i> Excel
+                            </button>
+
+                            <ul class="dropdown-menu dropdown-menu-end shadow" style="font-size: 12px;">
+                                <li>
+                                    <button type="button" class="dropdown-item d-flex align-items-center gap-2"
+                                        onclick="exportarExcelConModo('acumulado')">
+                                        <i class="bi bi-file-earmark-text text-success"></i>
+                                        <span>Reporte Acumulado (Resumen)</span>
                                     </button>
-
-                                    <ul class="dropdown-menu dropdown-menu-end shadow">
-                                        <li>
-                                            <button type="button" class="dropdown-item d-flex align-items-center gap-2"
-                                                onclick="exportarExcelConModo('acumulado')">
-                                                <i class="bi bi-file-earmark-text text-success"></i>
-                                                <span>Reporte Acumulado (Resumen)</span>
-                                            </button>
-                                        </li>
-                                        <li>
-                                            <hr class="dropdown-divider">
-                                        </li>
-                                        <li>
-                                            <button type="button" class="dropdown-item d-flex align-items-center gap-2"
-                                                onclick="exportarExcelConModo('desagregado')">
-                                                <i class="bi bi-list-nested text-primary"></i>
-                                                <span>Reporte Desagregado (Apartado y Variable)</span>
-                                            </button>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
+                                </li>
+                                <li>
+                                    <hr class="dropdown-divider">
+                                </li>
+                                <li>
+                                    <button type="button" class="dropdown-item d-flex align-items-center gap-2"
+                                        onclick="exportarExcelConModo('desagregado')">
+                                        <i class="bi bi-list-nested text-primary"></i>
+                                        <span>Reporte Desagregado (Apartado y Variable)</span>
+                                    </button>
+                                </li>
+                            </ul>
                         </div>
-
-                        <!-- CANVAS DE LA GRÁFICA TEMPORAL -->
-                        <div style="position: relative; height: 370px; width: 100%;">
-                            <div id="loaderGraficaTemporal"
-                                class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 flex-column align-items-center justify-content-center"
-                                style="z-index: 10; border-radius: 6px; display: none;">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Cargando...</span>
-                                </div>
-                                <small class="text-muted fw-bold mt-2">Actualizando datos...</small>
-                            </div>
-
-                            <canvas id="graficaSisMensual"></canvas>
-                        </div>
-
-                        <!-- SECCIÓN INFERIOR DIVIDIDA EN 2 COLUMNAS -->
-                        <div class="row mt-3 pt-3 border-top bg-light p-2 rounded mx-0 gap-y-3">
-                            <!-- COLUMNA IZQUIERDA: ÁRBOL DE VARIABLES -->
-                            <div class="col-lg-7 col-md-12 border-end-lg pe-lg-3">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <label class="form-label font-weight-bold mb-0 text-secondary"
-                                        id="lblSubvariablesModulo">
-                                        📋 Apartados y Variables del Catálogo:
-                                    </label>
-                                    <div>
-                                        <button type="button" class="btn btn-xs btn-outline-secondary py-0"
-                                            id="btnSeleccionarTodasSub">Todas</button>
-                                        <button type="button" class="btn btn-xs btn-outline-secondary py-0"
-                                            id="btnDesmarcarTodasSub">Ninguna</button>
-                                    </div>
-                                </div>
-
-                                <div id="contenedorSubvariables" style="max-height: 250px; overflow-y: auto;"></div>
-                            </div>
-
-                            <!-- COLUMNA DERECHA: NUEVA TABLA DEDICADA -->
-                            <div class="col-lg-5 col-md-12 ps-lg-3 mt-3 mt-lg-0">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <label class="form-label font-weight-bold mb-0 text-secondary" id="tituloTabla3">
-                                        📊 Resumen Acumulado:
-                                    </label>
-                                </div>
-
-                                <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
-                                    <table class="table table-sm table-striped table-hover border text-center mb-0"
-                                        id="tablaEvolucionConsultas">
-                                        <thead class="table-dark sticky-top">
-                                            <tr>
-                                                <th style="width: 20%;">Año</th>
-                                                <th id="thDetalleTabla3" style="width: 50%;">Descripción / Concepto</th>
-                                                <th style="width: 30%;" class="text-end pe-3">Total Acumulado</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="tbodyEvolucionConsultas">
-                                            <tr>
-                                                <td colspan="3" class="text-muted small">Sin datos cargados</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div> <!-- FIN DE SECCIÓN DIVIDIDA -->
-
                     </div>
                 </div>
+
+                <!-- 🔑 Contenedor amplio con 'chart-container-large' -->
+                <div class="chart-container chart-container-large w-100"
+                    style="position: relative; height: clamp(300px, 45vh, 420px);">
+                    <div id="loaderGraficaTemporal"
+                        class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 flex-column align-items-center justify-content-center"
+                        style="z-index: 10; border-radius: 6px; display: none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                        <small class="text-muted fw-bold mt-2">Actualizando datos...</small>
+                    </div>
+
+                    <canvas id="graficaSisMensual"></canvas>
+                </div>
+
+                <!-- SECCIÓN INFERIOR DIVIDIDA -->
+                <div class="row mt-3 pt-3 border-top bg-light p-2 rounded mx-0 g-3">
+                    <!-- ÁRBOL DE VARIABLES -->
+                    <div class="col-lg-7 col-md-12 border-end-lg pe-lg-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label font-weight-bold mb-0 text-secondary small fw-bold"
+                                id="lblSubvariablesModulo">
+                                📋 Apartados y Variables del Catálogo:
+                            </label>
+                            <div>
+                                <button type="button" class="btn btn-xs btn-outline-secondary py-0"
+                                    id="btnSeleccionarTodasSub" style="font-size: 10px;">Todas</button>
+                                <button type="button" class="btn btn-xs btn-outline-secondary py-0"
+                                    id="btnDesmarcarTodasSub" style="font-size: 10px;">Ninguna</button>
+                            </div>
+                        </div>
+
+                        <div id="contenedorSubvariables" style="max-height: 250px; overflow-y: auto;"></div>
+                    </div>
+
+                    <!-- TABLA DEDICADA DE RESUMEN -->
+                    <div class="col-lg-5 col-md-12 ps-lg-3 mt-3 mt-lg-0">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label font-weight-bold mb-0 text-secondary small fw-bold"
+                                id="tituloTabla3">
+                                📊 Resumen Acumulado:
+                            </label>
+                        </div>
+
+                        <div class="table-responsive border rounded" style="max-height: 250px; overflow-y: auto;">
+                            <table class="table table-sm table-striped table-hover border text-center mb-0"
+                                id="tablaEvolucionConsultas" style="font-size: 0.78rem;">
+                                <thead class="table-dark sticky-top">
+                                    <tr>
+                                        <th style="width: 20%;">Año</th>
+                                        <th id="thDetalleTabla3" style="width: 50%;">Descripción / Concepto</th>
+                                        <th style="width: 30%;" class="text-end pe-3">Total Acumulado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbodyEvolucionConsultas">
+                                    <tr>
+                                        <td colspan="3" class="text-muted small">Sin datos cargados</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
 
@@ -273,7 +287,7 @@
 
         if (registro) {
             let textoFecha = "";
-           
+
             if (registro.fecha_actualizacion) {
                 const fechaObj = new Date(registro.fecha_actualizacion.replace(/-/g, '\/'));
                 if (!isNaN(fechaObj)) {
@@ -1268,26 +1282,61 @@
         if (!data || data.length === 0) return;
 
         const porAnio = {};
-        data.forEach(r => { porAnio[r.anio] = (porAnio[r.anio] || 0) + (Number(r.consultas) || 0); });
+        data.forEach(r => {
+            porAnio[r.anio] = (porAnio[r.anio] || 0) + (Number(r.consultas) || 0);
+        });
 
         const anios = Object.keys(porAnio).sort();
         const colores = ['#4E79A7', '#59A14F', '#F28E2B', '#E15759', '#76B7B2', '#EDC948', '#B07AA1'];
 
+        // Función auxiliar de formato seguro
+        const formatearValor = (val) => {
+            if (typeof fmt === 'function') return fmt(val);
+            return Number(val).toLocaleString('es-MX');
+        };
+
         graficaAnio = new Chart(ctx, {
             type: 'bar',
-            data: { labels: anios, datasets: [{ label: 'Total Acumulado', data: anios.map(a => porAnio[a]), backgroundColor: colores }] },
+            data: {
+                labels: anios,
+                datasets: [{
+                    label: 'Total Acumulado',
+                    data: anios.map(a => porAnio[a]),
+                    // 🔑 Asigna un color distinto a cada barra de año
+                    backgroundColor: anios.map((_, i) => colores[i % colores.length]),
+                    borderRadius: 4
+                }]
+            },
             options: {
                 responsive: true,
+                // 🔑 Permite adaptarse dinámicamente al contenedor de la tarjeta
+                maintainAspectRatio: false,
                 animation: false,
-                scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: v => formatearValor(v) }
+                    }
+                },
                 plugins: {
-                    legend: { display: false },
+                    // 🔑 Sin leyenda ni etiquetas superiores
+                    legend: {
+                        display: false
+                    },
+                    // 🔑 Muestra el número centrado en medio de cada barra en color blanco
                     datalabels: {
                         anchor: 'center',
                         align: 'center',
                         color: '#ffffff',
                         font: { weight: 'bold', size: 11 },
-                        formatter: (val) => val > 0 ? fmt(val) : ''
+                        formatter: (val) => val > 0 ? formatearValor(val) : ''
+                    },
+                    tooltip: {
+                        displayColors: false,
+                        callbacks: {
+                            title: items => `Año ${items[0].label}`,
+                            label: context => `Total: ${formatearValor(context.raw)}`
+                        }
                     }
                 }
             }
