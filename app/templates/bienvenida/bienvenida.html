@@ -1,29 +1,30 @@
 {% extends "layout/base.html" %}
 
 {% block content %}
+<!-- Scripts e Iconos de Bootstrap (Inclusión estándar) -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
 
-
-<div class="hero-gradient py-5 mb-4">
-    <div class="container">
+<!-- ENCABEZADO DEL PORTAL -->
+<div class="hero-gradient py-4 mb-3">
+    <div class="container-fluid px-4">
         <div class="row align-items-center">
             <div class="col-md-8">
-                <span class="text-uppercase small fw-bold text-secondary mb-2 d-block"
-                    style="letter-spacing: 2px;">Indicador Hospitalario</span>
-
-                <h1 class="titulo-panel fw-bold text-dark mb-3">
+                <span class="text-uppercase small fw-bold text-secondary mb-1 d-block"
+                    style="letter-spacing: 1.5px; font-size: 0.72rem;">
+                    Indicadores Hospitalarios
+                </span>
+                <h1 class="titulo-panel fw-bold text-dark mb-1 fs-3">
                     Panel de Control <span style="color: #004a80;">Estadístico</span>
                 </h1>
-
-                <p class="subtitulo-panel text-muted">
-                    Gestión integral de indicadores y análisis predictivo para la
-                    optimización de los servicios de salud pública.
+                <p class="subtitulo-panel text-muted mb-0 small">
+                    Gestión integral de indicadores y análisis predictivo para la optimización de los servicios de salud
+                    pública.
                 </p>
             </div>
 
-            <div class="col-md-4 text-md-end mt-4 mt-md-0">
+            <div class="col-md-4 text-md-end mt-3 mt-md-0">
                 <span class="badge-status">
                     <span class="spinner-grow spinner-grow-sm text-success me-2" role="status"></span>
                     Sincronizado con Bases DGIS
@@ -33,108 +34,24 @@
     </div>
 </div>
 
-<div class="container py-5">
-    <style>
-        /* Estilos para hacer toda la tarjeta cliqueable */
-        .card-modulo-link {
-            text-decoration: none !important;
-            color: inherit !important;
-            display: flex;
-            flex-direction: column;
-            border: 1px solid rgba(0, 0, 0, 0.05);
-            border-radius: 18px;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
-        }
-
-        .card-modulo-link:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 14px 28px rgba(0, 0, 0, 0.08) !important;
-        }
-
-        /* Efecto sutil en la flecha indicadora al hacer hover */
-        .card-modulo-link:hover .arrow-indicator {
-            transform: translateX(4px);
-        }
-
-        .arrow-indicator {
-            transition: transform 0.2s ease;
-            font-size: 0.9rem;
-        }
-
-        .icon-wrapper {
-            width: 46px;
-            height: 46px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            background: #ffffff;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-        }
-
-        .badge-nature {
-            font-size: 0.68rem;
-            letter-spacing: 0.4px;
-            text-transform: uppercase;
-            font-weight: 700;
-            padding: 5px 12px;
-            border-radius: 20px;
-        }
-
-        /* Paleta de Fondos Claros / Pastel */
-        .bg-soft-info {
-            background-color: #f0f9ff;
-        }
-
-        .bg-soft-primary {
-            background-color: #f0f4ff;
-        }
-
-        .bg-soft-danger {
-            background-color: #fff2f2;
-        }
-
-        .bg-soft-dark {
-            background-color: #f8f9fa;
-        }
-
-        .bg-soft-warning {
-            background-color: #fffbe6;
-        }
-
-        .bg-soft-success {
-            background-color: #f0fdf4;
-        }
-
-        .bg-soft-secondary {
-            background-color: #f4f4f6;
-        }
-
-        /* Tarjeta Destacada de Análisis Comparativo */
-        .card-dynamic-light {
-            background: linear-gradient(135deg, #e0f2fe 0%, #e0e7ff 100%);
-            border: 1.5px solid #93c5fd !important;
-        }
-    </style>
-
-    <div class="row g-4">
+<!-- MÓDULOS DE NAVEGACIÓN -->
+<div class="container-fluid px-4 pb-4">
+    <div class="row g-3">
         <!-- Indicadores Operativos -->
-        <div class="col-md-6 col-lg-4">
-            <a href="/indicadores" class="card-modulo-link bg-soft-info p-4 h-100 shadow-sm">
-                <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="col-12 col-md-6 col-xl-4">
+            <a href="/indicadores" class="card-modulo-link bg-soft-info p-3 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="icon-wrapper text-info">
                         <i class="bi bi-activity"></i>
                     </div>
                     <span class="badge bg-white text-secondary border badge-nature">Datos Acumulativos</span>
                 </div>
-                <h3 class="h5 fw-bold text-dark mb-2">Indicadores Operativos</h3>
-                <p class="text-secondary small mb-4 flex-grow-1">
+                <h3 class="h6 fw-bold text-dark mb-1">Indicadores Operativos</h3>
+                <p class="text-secondary small mb-3 flex-grow-1">
                     Consolidado acumulado de métricas clave: días estancia, niveles de ocupación y mortalidad
                     hospitalaria.
                 </p>
-                <div class="d-flex align-items-center text-info fw-semibold small mt-auto">
+                <div class="d-flex align-items-center text-info fw-semibold small mt-auto" style="font-size: 0.8rem;">
                     <span>Ingresar al módulo</span>
                     <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
                 </div>
@@ -142,20 +59,21 @@
         </div>
 
         <!-- Egresos -->
-        <div class="col-md-6 col-lg-4">
-            <a href="/egresos/indicadores" class="card-modulo-link bg-soft-primary p-4 h-100 shadow-sm">
-                <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="col-12 col-md-6 col-xl-4">
+            <a href="/egresos/indicadores" class="card-modulo-link bg-soft-primary p-3 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="icon-wrapper text-primary">
                         <i class="bi bi-person-up"></i>
                     </div>
                     <span class="badge bg-white text-secondary border badge-nature">Datos Acumulativos</span>
                 </div>
-                <h3 class="h5 fw-bold text-dark mb-2">Egresos</h3>
-                <p class="text-secondary small mb-4 flex-grow-1">
+                <h3 class="h6 fw-bold text-dark mb-1">Egresos</h3>
+                <p class="text-secondary small mb-3 flex-grow-1">
                     Registro acumulado y totalizado de altas clínicas, procedimientos quirúrgicos y estadísticas de
                     natalidad.
                 </p>
-                <div class="d-flex align-items-center text-primary fw-semibold small mt-auto">
+                <div class="d-flex align-items-center text-primary fw-semibold small mt-auto"
+                    style="font-size: 0.8rem;">
                     <span>Ingresar al módulo</span>
                     <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
                 </div>
@@ -163,19 +81,19 @@
         </div>
 
         <!-- Morbilidad -->
-        <div class="col-md-6 col-lg-4">
-            <a href="/reportes/morbi/reporte" class="card-modulo-link bg-soft-danger p-4 h-100 shadow-sm">
-                <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="col-12 col-md-6 col-xl-4">
+            <a href="/reportes/morbi/reporte" class="card-modulo-link bg-soft-danger p-3 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="icon-wrapper text-danger">
                         <i class="bi bi-clipboard2-pulse"></i>
                     </div>
                     <span class="badge bg-white text-secondary border badge-nature">Datos Acumulativos</span>
                 </div>
-                <h3 class="h5 fw-bold text-dark mb-2">Morbilidad</h3>
-                <p class="text-secondary small mb-4 flex-grow-1">
+                <h3 class="h6 fw-bold text-dark mb-1">Morbilidad</h3>
+                <p class="text-secondary small mb-3 flex-grow-1">
                     Volumen acumulado de las principales causas de morbilidad por unidad médica, periodo y diagnósticos.
                 </p>
-                <div class="d-flex align-items-center text-danger fw-semibold small mt-auto">
+                <div class="d-flex align-items-center text-danger fw-semibold small mt-auto" style="font-size: 0.8rem;">
                     <span>Ingresar al módulo</span>
                     <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
                 </div>
@@ -183,20 +101,20 @@
         </div>
 
         <!-- Mortalidad -->
-        <div class="col-md-6 col-lg-4">
-            <a href="/reportes/morta/reporte" class="card-modulo-link bg-soft-dark p-4 h-100 shadow-sm">
-                <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="col-12 col-md-6 col-xl-4">
+            <a href="/reportes/morta/reporte" class="card-modulo-link bg-soft-dark p-3 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="icon-wrapper text-dark">
                         <i class="bi bi-heart-pulse"></i>
                     </div>
                     <span class="badge bg-white text-secondary border badge-nature">Datos Acumulativos</span>
                 </div>
-                <h3 class="h5 fw-bold text-dark mb-2">Mortalidad</h3>
-                <p class="text-secondary small mb-4 flex-grow-1">
+                <h3 class="h6 fw-bold text-dark mb-1">Mortalidad</h3>
+                <p class="text-secondary small mb-3 flex-grow-1">
                     Conteo general acumulado de causas de defunción clasificadas por unidad médica, periodos y
                     afecciones.
                 </p>
-                <div class="d-flex align-items-center text-dark fw-semibold small mt-auto">
+                <div class="d-flex align-items-center text-dark fw-semibold small mt-auto" style="font-size: 0.8rem;">
                     <span>Ingresar al módulo</span>
                     <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
                 </div>
@@ -204,39 +122,41 @@
         </div>
 
         <!-- Urgencias -->
-        <div class="col-md-6 col-lg-4">
-            <a href="/urgencias" class="card-modulo-link bg-soft-warning p-4 h-100 shadow-sm">
-                <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="col-12 col-md-6 col-xl-4">
+            <a href="/urgencias" class="card-modulo-link bg-soft-warning p-3 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="icon-wrapper text-warning">
                         <i class="bi bi-exclamation-triangle"></i>
                     </div>
                     <span class="badge bg-white text-secondary border badge-nature">Datos Acumulativos</span>
                 </div>
-                <h3 class="h5 fw-bold text-dark mb-2">Urgencias</h3>
-                <p class="text-secondary small mb-4 flex-grow-1">
+                <h3 class="h6 fw-bold text-dark mb-1">Urgencias</h3>
+                <p class="text-secondary small mb-3 flex-grow-1">
                     Acumulado de atenciones por triage, desglosado entre urgencias calificadas y no calificadas.
                 </p>
-                <div class="d-flex align-items-center text-warning text-darken fw-semibold small mt-auto">
+                <div class="d-flex align-items-center text-warning text-darken fw-semibold small mt-auto"
+                    style="font-size: 0.8rem;">
                     <span>Ingresar al módulo</span>
                     <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
                 </div>
             </a>
         </div>
 
-        <!-- Sistema (SIS) -->
-        <div class="col-md-6 col-lg-4">
-            <a href="/sis" class="card-modulo-link bg-soft-success p-4 h-100 shadow-sm">
-                <div class="d-flex justify-content-between align-items-center mb-3">
+        <!-- SIS Hospitalización -->
+        <div class="col-12 col-md-6 col-xl-4">
+            <a href="/sis" class="card-modulo-link bg-soft-success p-3 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="icon-wrapper text-success">
                         <i class="bi bi-hospital"></i>
                     </div>
                     <span class="badge bg-white text-secondary border badge-nature">Datos Acumulativos</span>
                 </div>
-                <h3 class="h5 fw-bold text-dark mb-2">SIS Hospitalización</h3>
-                <p class="text-secondary small mb-4 flex-grow-1">
+                <h3 class="h6 fw-bold text-dark mb-1">SIS Hospitalización</h3>
+                <p class="text-secondary small mb-3 flex-grow-1">
                     Consolidado cuantitativo total de la producción de servicios médicos y auxiliares diagnósticos.
                 </p>
-                <div class="d-flex align-items-center text-success fw-semibold small mt-auto">
+                <div class="d-flex align-items-center text-success fw-semibold small mt-auto"
+                    style="font-size: 0.8rem;">
                     <span>Ingresar al módulo</span>
                     <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
                 </div>
@@ -244,52 +164,52 @@
         </div>
 
         <!-- SIS Primer Nivel -->
-        <div class="col-md-6 col-lg-4">
-            <a href="/sis_primer_nivel" class="card-modulo-link bg-soft-success p-4 h-100 shadow-sm">
-                <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="col-12 col-md-6 col-xl-4">
+            <a href="/sis_primer_nivel" class="card-modulo-link bg-soft-success p-3 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="icon-wrapper text-success">
                         <i class="bi bi-building"></i>
                     </div>
                     <span class="badge bg-white text-secondary border badge-nature">Datos Acumulativos</span>
                 </div>
-                <h3 class="h5 fw-bold text-dark mb-2">SIS Primer Nivel</h3>
-                <p class="text-secondary small mb-4 flex-grow-1">
+                <h3 class="h6 fw-bold text-dark mb-1">SIS Primer Nivel</h3>
+                <p class="text-secondary small mb-3 flex-grow-1">
                     Consolidado de consultas, embarazadas, salud mental, bucal, tamiz, planificación familiar y
                     detecciones.
                 </p>
-                <div class="d-flex align-items-center text-success fw-semibold small mt-auto">
+                <div class="d-flex align-items-center text-success fw-semibold small mt-auto"
+                    style="font-size: 0.8rem;">
                     <span>Ingresar al módulo</span>
                     <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
                 </div>
             </a>
         </div>
 
-
         <!-- Agenda Estadística -->
-        <div class="col-md-6 col-lg-4">
-            <a href="/agenda/visor" class="card-modulo-link bg-soft-secondary p-4 h-100 shadow-sm">
-                <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="col-12 col-md-6 col-xl-4">
+            <a href="/agenda/visor" class="card-modulo-link bg-soft-secondary p-3 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="icon-wrapper text-secondary">
                         <i class="bi bi-calendar3"></i>
                     </div>
-                    <span class="badge bg-white text-secondary border badge-nature"></span>
+                    <span class="badge bg-white text-secondary border badge-nature">Consolidado</span>
                 </div>
-                <h3 class="h5 fw-bold text-dark mb-2">Agenda Estadística</h3>
-                <p class="text-secondary small mb-4 flex-grow-1">
-                    Visualización sobre la distribución de recursos asistenciales y panorama
-                    general.
+                <h3 class="h6 fw-bold text-dark mb-1">Agenda Estadística</h3>
+                <p class="text-secondary small mb-3 flex-grow-1">
+                    Visualización sobre la distribución de recursos asistenciales y panorama general.
                 </p>
-                <div class="d-flex align-items-center text-secondary fw-semibold small mt-auto">
+                <div class="d-flex align-items-center text-secondary fw-semibold small mt-auto"
+                    style="font-size: 0.8rem;">
                     <span>Ingresar al módulo</span>
                     <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
                 </div>
             </a>
         </div>
 
-        <!-- Análisis Dinámico (Módulo Comparativo Resaltado) -->
-        <div class="col-md-6 col-lg-4">
-            <a href="/grafica" class="card-modulo-link card-dynamic-light p-4 h-100 shadow-sm">
-                <div class="d-flex justify-content-between align-items-center mb-3">
+        <!-- Análisis Dinámico -->
+        <div class="col-12 col-md-6 col-xl-4">
+            <a href="/grafica" class="card-modulo-link card-dynamic-light p-3 h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="icon-wrapper bg-primary text-white shadow-sm">
                         <i class="bi bi-cpu"></i>
                     </div>
@@ -297,12 +217,12 @@
                         <i class="bi bi-arrow-left-right me-1"></i> Análisis Comparativo
                     </span>
                 </div>
-                <h3 class="h5 fw-bold text-dark mb-2">Análisis Dinámico</h3>
-                <p class="text-secondary small mb-4 flex-grow-1">
+                <h3 class="h6 fw-bold text-dark mb-1">Análisis Dinámico</h3>
+                <p class="text-secondary small mb-3 flex-grow-1">
                     Herramienta interactiva para minería de datos, cruzamiento de variables, comparativas temporales y
                     gráficos.
                 </p>
-                <div class="d-flex align-items-center text-primary fw-bold small mt-auto">
+                <div class="d-flex align-items-center text-primary fw-bold small mt-auto" style="font-size: 0.8rem;">
                     <span>Ingresar al módulo</span>
                     <i class="bi bi-arrow-right ms-2 arrow-indicator"></i>
                 </div>
@@ -311,121 +231,109 @@
     </div>
 </div>
 
-
-
+<!-- MODAL DE LOGIN (CONDICIONAL JINJA2) -->
 {% if mostrar_login %}
-
 <div class="modal fade show" id="modalBienvenida" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
     aria-hidden="true" style="display:block;">
-
     <div class="modal-dialog modal-fullscreen">
-        <div class="modal-content modal-content-full border-0">
+        <div class="modal-content border-0">
             <div class="row g-0 h-100">
-
+                <!-- Columna Lateral Institucional -->
                 <div
-                    class="col-lg-5 d-none d-lg-flex bg-institucional align-items-center justify-content-center text-white p-5">
-                    <div class="text-center w-100">
-                        <div class="mb-4 logo-container">
-                            <div style="background: white; padding: 2vh; border-radius: 20px; display: inline-block;">
-                                <img src="{{ url_for('static', filename='img/logo_gto.png') }}" alt="Logo GTO">
+                    class="col-lg-5 d-none d-lg-flex bg-institucional align-items-center justify-content-center text-white p-4">
+                    <div class="text-center w-100 px-3">
+                        <div class="mb-3 logo-container">
+                            <div
+                                style="background: white; padding: 1.5rem; border-radius: 16px; display: inline-block;">
+                                <img src="{{ url_for('static', filename='img/logo_gto.png') }}" alt="Logo GTO"
+                                    style="max-height: 80px; width: auto;">
                             </div>
                         </div>
 
-                        <h1 class="titulo-sih fw-bold mt-4">S.I.H.</h1>
-                        <p class="fs-3 fw-light">Sistema de Indicadores Hospitalarios</p>
+                        <h2 class="fw-bold mt-3 mb-1">S.I.H.</h2>
+                        <p class="fs-5 fw-light text-white-50">Sistema de Indicadores Hospitalarios</p>
 
-                        <hr class="w-50 mx-auto opacity-50 my-4">
-                        <p class="fs-6 text-uppercase" style="letter-spacing: 3px;">Gobierno del Estado de Guanajuato
+                        <hr class="w-50 mx-auto opacity-25 my-3">
+                        <p class="small text-uppercase tracking-wider" style="letter-spacing: 2px;">
+                            Gobierno del Estado de Guanajuato
                         </p>
                     </div>
                 </div>
 
-                <div class="col-lg-7 bg-white d-flex">
-                    <div class="w-100 d-flex align-items-center justify-content-center py-4 py-lg-3">
-                        <div class="w-100 px-4 px-md-5" style="max-width:650px;">
+                <!-- Columna Formulario Login -->
+                <div class="col-lg-7 bg-white d-flex align-items-center justify-content-center overflow-y-auto py-3">
+                    <div class="w-100 px-4 modal-login-card" style="max-width: 550px;">
+                        <div class="mb-2">
+                            <span class="badge rounded-pill bg-dark px-3 py-2" style="font-size: 0.72rem;">
+                                <i class="bi bi-lock-fill me-2 text-success"></i>CONEXIÓN SEGURA
+                            </span>
+                        </div>
 
+                        <h2 class="fw-bold text-dark mb-2 fs-3">
+                            Centro de <br><span style="color: #004a80;">Análisis y Evidencia</span>
+                        </h2>
 
-                            <div class="mx-auto" style="max-width: 650px;">
-                                <div class="mb-3">
-                                    <span class="badge rounded-pill bg-dark px-3 py-2">
-                                        <i class="bi bi-lock-fill me-2 text-success"></i>CONEXIÓN SEGURA
-                                    </span>
-                                </div>
+                        <p class="text-secondary mb-3 small">
+                            Bienvenido al portal centralizado de analítica estratégica institucional.
+                        </p>
 
-                                <h1 class="titulo-centro fw-bold text-dark mb-4">
-                                    Centro de <br><span style="color: #004a80;">Análisis y Evidencia</span>
-                                </h1>
+                        <div class="row g-3 mb-3 border-top pt-2">
+                            <div class="col-6">
+                                <h6 class="fw-bold mb-1 small">
+                                    <i class="bi bi-shield-check text-primary"></i> Confidencialidad
+                                </h6>
+                                <p class="text-muted mb-0" style="font-size: 0.72rem;">Uso exclusivo institucional.</p>
+                            </div>
 
-                                <p class="texto-descripcion text-secondary mb-4">
-                                    Bienvenido al portal centralizado de analítica estratégica institucional.
-                                </p>
-
-                                <div class="row g-4 mb-4 border-top pt-3">
-                                    <div class="col-6">
-                                        <h6 class="fw-bold">
-                                            <i class="bi bi-shield-check text-primary"></i> Confidencialidad
-                                        </h6>
-                                        <p class="small text-muted mb-0">Uso exclusivo institucional.</p>
-                                    </div>
-
-                                    <div class="col-6">
-                                        <h6 class="fw-bold">
-                                            <i class="bi bi-database-check text-success"></i> Sincronización
-                                        </h6>
-                                        <p class="small text-muted mb-0">Datos validados DGIS.</p>
-                                    </div>
-                                </div>
-
-                                {% with messages = get_flashed_messages(with_categories=true) %}
-                                {% if messages %}
-                                {% for category, message in messages %}
-                                <div class="alert alert-{{ category }} alert-dismissible fade show mb-4" role="alert">
-                                    {{ message }}
-                                    <button type="button" class="btn-close" data-bs-dismiss="alert">
-                                    </button>
-                                </div>
-                                {% endfor %}
-                                {% endif %}
-                                {% endwith %}
-                                <!-- LOGIN -->
-                                <form method="POST" action="{{ url_for('main.login') }}">
-
-                                    {{ form.hidden_tag() }}
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-bold">
-                                            <i class="bi bi-person-fill me-2"></i>Usuario
-                                        </label>
-
-                                        <input type="text" class="form-control form-control-lg" name="username"
-                                            required>
-                                    </div>
-
-
-                                    <div class="mb-4">
-                                        <label class="form-label fw-bold">
-                                            <i class="bi bi-key-fill me-2"></i>Contraseña
-                                        </label>
-
-                                        <input type="password" class="form-control form-control-lg" name="password"
-                                            required>
-                                    </div>
-
-
-                                    <div class="d-grid mt-4">
-                                        <button type="submit" class="btn btn-lg text-white p-3 fs-4 fw-bold btn-pulse"
-                                            style="background-color:#004a80; border-radius:15px;">
-
-                                            INGRESAR AHORA
-                                            <i class="bi bi-arrow-right-circle ms-2"></i>
-
-                                        </button>
-                                    </div>
-
-                                </form>
-
+                            <div class="col-6">
+                                <h6 class="fw-bold mb-1 small">
+                                    <i class="bi bi-database-check text-success"></i> Sincronización
+                                </h6>
+                                <p class="text-muted mb-0" style="font-size: 0.72rem;">Datos validados DGIS.</p>
                             </div>
                         </div>
+
+                        <!-- MENSAJES FLASH -->
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                        {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show mb-3 py-2 px-3 small"
+                            role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close py-2" data-bs-dismiss="alert"></button>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+                        {% endwith %}
+
+                        <!-- FORMULARIO LOGIN -->
+                        <form method="POST" action="{{ url_for('main.login') }}">
+                            {{ form.hidden_tag() }}
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small">
+                                    <i class="bi bi-person-fill me-1 text-secondary"></i>Usuario
+                                </label>
+                                <input type="text" class="form-control form-control-md" name="username"
+                                    placeholder="Ingrese su usuario" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small">
+                                    <i class="bi bi-key-fill me-1 text-secondary"></i>Contraseña
+                                </label>
+                                <input type="password" class="form-control form-control-md" name="password"
+                                    placeholder="Ingrese su contraseña" required>
+                            </div>
+
+                            <div class="d-grid mt-4">
+                                <button type="submit" class="btn btn-primary btn-md py-2 fs-6 fw-bold shadow-sm"
+                                    style="background-color:#004a80; border-color:#004a80; border-radius:10px;">
+                                    INGRESAR AHORA
+                                    <i class="bi bi-arrow-right-circle ms-2"></i>
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -433,8 +341,8 @@
     </div>
 </div>
 <div class="modal-backdrop fade show"></div>
-
 {% endif %}
+
 <script>
     document.addEventListener("DOMContentLoaded", function () {
 

@@ -1,265 +1,137 @@
-/* =====================================================
-   BIENVENIDA / LOGIN SIH
-===================================================== */
-
-:root{
-    --salud-primary:#004a80;
-    --salud-dark:#002e50;
+.hero-gradient {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-bottom: 1px solid #cbd5e1;
 }
 
-/* =====================================================
-   MODAL LOGIN
-===================================================== */
-
-#modalBienvenida{
-    z-index:99999!important;
+.badge-status {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #334155;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
-.modal-backdrop{
-    z-index:99998!important;
+/* Estilos para hacer toda la tarjeta cliqueable */
+.card-modulo-link {
+  text-decoration: none !important;
+  color: inherit !important;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.165, 0.84, 0.44, 1);
+  background-color: #ffffff;
 }
 
-.modal-fullscreen{
-    margin:0!important;
-    padding:0!important;
+.card-modulo-link:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08) !important;
 }
 
-.modal-content-full{
-    height:100vh!important;
-    min-height:100vh;
-    border-radius:0!important;
-    display:flex;
-    flex-direction:column;
-    overflow:hidden;
+.card-modulo-link:hover .arrow-indicator {
+  transform: translateX(4px);
 }
 
-.modal-content-full>.row{
-    height:100%;
-    margin:0;
+.arrow-indicator {
+  transition: transform 0.2s ease;
+  font-size: 0.85rem;
 }
 
-.login-panel{
-    overflow:hidden;
+.icon-wrapper {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  background: #ffffff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
-/* =====================================================
-   TITULOS DINAMICOS
-===================================================== */
-
-.titulo-sih{
-    font-size:clamp(3rem,12vh,8rem)!important;
-    line-height:.9;
-    letter-spacing:-3px;
+.badge-nature {
+  font-size: 0.65rem;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
 }
 
-.titulo-centro{
-    font-size:clamp(1.8rem,5vh,3.5rem)!important;
-    line-height:1.1;
+/* Paleta de Fondos Claros / Pastel */
+.bg-soft-info {
+  background-color: #f0f9ff;
 }
 
-.titulo-panel{
-    font-size:clamp(1.8rem,4vw,3.5rem)!important;
-    line-height:1.1;
+.bg-soft-primary {
+  background-color: #f0f4ff;
 }
 
-.texto-descripcion{
-    font-size:clamp(1rem,2vh,1.5rem)!important;
+.bg-soft-danger {
+  background-color: #fff2f2;
 }
 
-.subtitulo-panel{
-    width:100%!important;
-    max-width:600px;
-    font-size:clamp(.9rem,1.5vw,1.25rem)!important;
+.bg-soft-dark {
+  background-color: #f8f9fa;
 }
 
-/* =====================================================
-   LOGO
-===================================================== */
-
-.logo-container img{
-    width:auto;
-    height:auto;
-    max-height:25vh!important;
+.bg-soft-warning {
+  background-color: #fffbe6;
 }
 
-/* =====================================================
-   COLORES INSTITUCIONALES
-===================================================== */
-
-.bg-institucional{
-    background:linear-gradient(
-        135deg,
-        var(--salud-primary),
-        var(--salud-dark)
-    );
+.bg-soft-success {
+  background-color: #f0fdf4;
 }
 
-/* =====================================================
-   BOTON ANIMADO
-===================================================== */
-
-.btn-pulse{
-    animation:pulse-blue 2s infinite;
+.bg-soft-secondary {
+  background-color: #f4f4f6;
 }
 
-@keyframes pulse-blue{
-
-    0%{
-        box-shadow:0 0 0 0 rgba(0,74,128,.7);
-    }
-
-    70%{
-        box-shadow:0 0 0 15px rgba(0,74,128,0);
-    }
-
-    100%{
-        box-shadow:0 0 0 0 rgba(0,74,128,0);
-    }
-
+.card-dynamic-light {
+  background: linear-gradient(135deg, #e0f2fe 0%, #e0e7ff 100%);
+  border: 1.5px solid #93c5fd !important;
 }
 
-/* =====================================================
-   PANEL PRINCIPAL
-===================================================== */
-
-.hero-gradient{
-    width:100%;
+/* Estilos Modal de Login */
+.bg-institucional {
+  background: linear-gradient(135deg, #00335e 0%, #004a80 100%);
 }
 
-.card-subsistema{
-    display:flex;
-    flex-direction:column;
-    height:100%;
-    min-height:280px;
-}
+/* Reglas para Pantallas Pequeñas / Laptops (1366x768) */
+@media (max-width: 1440px), (max-height: 850px) {
+  .hero-gradient {
+    padding-top: 1.25rem !important;
+    padding-bottom: 1.25rem !important;
+    margin-bottom: 1rem !important;
+  }
 
-/* =====================================================
-   AJUSTES LAPTOP
-===================================================== */
+  .titulo-panel {
+    font-size: 1.5rem !important;
+    margin-bottom: 0.25rem !important;
+  }
 
-@media(max-height:850px) and (min-width:992px){
+  .subtitulo-panel {
+    font-size: 0.82rem !important;
+  }
 
-    .p-4.p-md-5{
-        padding:2rem!important;
-    }
+  .card-modulo-link {
+    padding: 0.9rem !important;
+  }
 
-    .titulo-centro{
-        font-size:2.3rem!important;
-    }
+  .card-modulo-link h3 {
+    font-size: 0.95rem !important;
+  }
 
-    .texto-descripcion{
-        margin-bottom:2rem!important;
-    }
+  .card-modulo-link p {
+    font-size: 0.75rem !important;
+    margin-bottom: 0.75rem !important;
+  }
 
-    .logo-container img{
-        max-height:18vh!important;
-    }
-
-}
-
-/* =====================================================
-   TABLETS Y LAPTOPS PEQUEÑAS
-===================================================== */
-
-@media(max-width:992px){
-
-    .hero-gradient{
-        padding-top:2rem!important;
-        padding-bottom:2rem!important;
-    }
-
-    .titulo-panel{
-        font-size:2rem!important;
-    }
-
-    .subtitulo-panel{
-        font-size:1rem!important;
-    }
-
-    .card-subsistema{
-        min-height:240px;
-    }
-
-    .card-subsistema .icon-box{
-        width:45px;
-        height:45px;
-        font-size:1.2rem;
-    }
-
-    .card-subsistema h4{
-        font-size:1rem;
-    }
-
-    .card-subsistema p{
-        font-size:.85rem!important;
-    }
-
-    .btn-modulo{
-        padding:8px 12px;
-        font-size:.75rem;
-    }
-
-    /* Login en tablet */
-
-    #modalBienvenida .login-panel{
-        overflow-y:auto;
-        align-items:flex-start!important;
-    }
-
-}
-
-
-/* =====================================================
-   AJUSTE DE MODULOS
-===================================================== */
-
-.home-modulos .card-subsistema{
-    border-radius:14px;
-}
-
-.home-modulos .btn-modulo{
-    margin-top:auto;
-}
-
-
-/* =====================================================
-   ALTURA REDUCIDA EN LAPTOP
-===================================================== */
-
-@media(max-height:750px) and (min-width:768px){
-
-    .hero-gradient{
-        padding-top:1.5rem!important;
-        padding-bottom:1.5rem!important;
-    }
-
-    .card-subsistema{
-        min-height:230px;
-    }
-
-    .titulo-panel{
-        font-size:1.8rem!important;
-    }
-
-    .subtitulo-panel{
-        font-size:.9rem!important;
-    }
-
-    .card-subsistema p{
-        margin-bottom:1rem!important;
-    }
-
-}
-
-
-/* =====================================================
-   TABLET HORIZONTAL
-===================================================== */
-
-@media(max-width:1200px) and (min-width:768px){
-
-    .home-modulos .col-md-4{
-        width:50%!important;
-    }
-
+  .modal-login-card {
+    max-width: 520px !important;
+  }
 }
