@@ -538,146 +538,7 @@
 
             //PARTE 2
 
-            {# 1. PRIMERO: EVALUACIÓN ESPECÍFICA PARA PRIMER NIVEL #}
-            {% if path_actual.startswith('/sis_primer_nivel') %}
-            <div class="menu-filtros mt-2 pt-2 border-top border-secondary border-opacity-25">
-                <div class="header-filtros d-flex justify-content-between align-items-center mb-2">
-                    <span class="menu-section fw-bold text-info" style="font-size: 0.75rem;">🔍 FILTROS PRIMER
-                        NIVEL</span>
-                    <button type="button" id="btnResetAll"
-                        class="btn-reset-link border-0 bg-transparent text-warning p-0"
-                        style="font-size: 0.72rem;">Nuevo filtro</button>
-                </div>
-
-                <!-- AÑOS -->
-                <div class="filter-block mb-2">
-                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Años</label>
-                    <div class="checklist checklist-years d-flex flex-wrap gap-1">
-                        {% for a in anios_disponibles | default([]) %}
-                        <label class="check-item badge bg-dark border border-secondary fw-normal p-1 cursor-pointer">
-                            <input type="checkbox" class="sis-filtro-anio" value="{{ a }}"> {{ a }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <!-- VER DATOS POR -->
-                <div class="filter-block mb-2">
-                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Ver datos
-                        por:</label>
-                    <select id="selectNivelAgrupacion" class="form-select form-select-sm py-1"
-                        style="font-size: 0.75rem;">
-                        <option value="clues" selected>Unidades</option>
-                        <option value="jurisdiccion">Jurisdicción</option>
-                        <option value="municipio">Municipio</option>
-                    </select>
-                </div>
-
-                <!-- UNIDAD MÉDICA -->
-                <div class="filter-block mb-2" id="blockUnidades">
-                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Unidad</label>
-                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
-                        id="btnUnidades" style="font-size: 0.75rem;">🔍 Seleccionar unidades</button>
-                </div>
-
-                <!-- POPOVER: UNIDADES -->
-                <div class="popover-unidades" id="popoverUnidades" style="display: none;">
-                    <label class="filter-label d-block text-white mb-1" style="font-size: 0.72rem;">Buscar
-                        unidad</label>
-                    <input type="text" id="buscarUnidad" class="input-text form-control form-control-sm mb-2"
-                        placeholder="Escribe para filtrar...">
-                    <div class="popover-list custom-scroll" style="max-height: 140px; overflow-y: auto;">
-                        {% for u in unidades_disponibles | default([]) %}
-                        <label class="popover-item d-block text-white-50 mb-1 cursor-pointer"
-                            style="font-size: 0.72rem;">
-                            <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                    <div class="popover-actions d-flex gap-2 justify-content-end mt-2">
-                        <button type="button" id="limpiarUnidades" class="btn btn-xs btn-outline-secondary py-0"
-                            style="font-size: 0.7rem;">Limpiar</button>
-                        <button type="button" id="aplicarUnidades" class="btn btn-xs btn-primary py-0"
-                            style="font-size: 0.7rem;">Aplicar</button>
-                    </div>
-                </div>
-
-                <!-- JURISDICCIONES -->
-                <div class="filter-block mb-2" id="blockJurisdicciones" style="display: none;">
-                    <label class="filter-label d-block text-white-50 mb-1"
-                        style="font-size: 0.72rem;">Jurisdicción</label>
-                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
-                        id="btnJurisdicciones" style="font-size: 0.75rem;">🔍 Seleccionar jurisdicciones</button>
-                </div>
-
-                <div class="popover-unidades" id="popoverJurisdicciones" style="display: none;">
-                    <label class="filter-label d-block text-white mb-1" style="font-size: 0.72rem;">Buscar
-                        jurisdicción</label>
-                    <input type="text" id="buscarJurisdiccion" class="input-text form-control form-control-sm mb-2"
-                        placeholder="Escribe para filtrar...">
-                    <div class="popover-list custom-scroll" style="max-height: 140px; overflow-y: auto;">
-                        {% for j in jurisdicciones_disponibles | default([]) %}
-                        <label class="popover-item d-block text-white-50 mb-1 cursor-pointer"
-                            style="font-size: 0.72rem;">
-                            <input type="checkbox" name="jurisdicciones" value="{{ j }}"> {{ j }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                    <div class="popover-actions d-flex gap-2 justify-content-end mt-2">
-                        <button type="button" id="limpiarJurisdicciones" class="btn btn-xs btn-outline-secondary py-0"
-                            style="font-size: 0.7rem;">Limpiar</button>
-                        <button type="button" id="aplicarJurisdicciones" class="btn btn-xs btn-primary py-0"
-                            style="font-size: 0.7rem;">Aplicar</button>
-                    </div>
-                </div>
-
-                <!-- MUNICIPIOS -->
-                <div class="filter-block mb-2" id="blockMunicipios" style="display: none;">
-                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Municipio</label>
-                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
-                        id="btnMunicipios" style="font-size: 0.75rem;">🔍 Seleccionar municipios</button>
-                </div>
-
-                <div class="popover-unidades" id="popoverMunicipios" style="display: none;">
-                    <label class="filter-label d-block text-white mb-1" style="font-size: 0.72rem;">Buscar
-                        municipio</label>
-                    <input type="text" id="buscarMunicipio" class="input-text form-control form-control-sm mb-2"
-                        placeholder="Escribe para filtrar...">
-                    <div class="popover-list custom-scroll" style="max-height: 140px; overflow-y: auto;">
-                        {% for m in municipios_disponibles | default([]) %}
-                        <label class="popover-item d-block text-white-50 mb-1 cursor-pointer"
-                            style="font-size: 0.72rem;">
-                            <input type="checkbox" name="municipios" value="{{ m }}"> {{ m }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                    <div class="popover-actions d-flex gap-2 justify-content-end mt-2">
-                        <button type="button" id="limpiarMunicipios" class="btn btn-xs btn-outline-secondary py-0"
-                            style="font-size: 0.7rem;">Limpiar</button>
-                        <button type="button" id="aplicarMunicipios" class="btn btn-xs btn-primary py-0"
-                            style="font-size: 0.7rem;">Aplicar</button>
-                    </div>
-                </div>
-
-                <!-- MESES -->
-                <div class="filter-block mb-2">
-                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Meses</label>
-                    <div class="checklist grid-3 d-grid gap-1" style="grid-template-columns: repeat(3, 1fr);">
-                        {% set meses_dict = {1:'Ene', 2:'Feb', 3:'Mar', 4:'Abr', 5:'May', 6:'Jun', 7:'Jul', 8:'Ago',
-                        9:'Sep', 10:'Oct', 11:'Nov', 12:'Dic'} %}
-                        {% for num, nombre in meses_dict.items() %}
-                        <label class="check-item text-white-50 cursor-pointer" style="font-size: 0.72rem;">
-                            <input type="checkbox" class="sis-filtro-mes" value="{{ num }}"> {{ nombre }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <button class="btn-apply btn btn-sm btn-info w-100 fw-bold py-1 mt-1" id="btnFiltrarSis"
-                    style="font-size: 0.78rem;">Aplicar filtros</button>
-            </div>
-
-            {# 2. SEGUNDO: EVALUACIÓN PARA SIS SEGUNDO NIVEL / REGULAR #}
+            {# FILTROS: SIS REGULAR / SEGUNDO NIVEL #}
             {% elif path_actual.startswith('/sis') %}
             <div class="menu-filtros mt-2 pt-2 border-top border-secondary border-opacity-25">
                 <div class="header-filtros d-flex justify-content-between align-items-center mb-2">
@@ -690,7 +551,7 @@
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Años</label>
                     <div class="checklist checklist-years d-flex flex-wrap gap-1">
-                        {% for a in anios_disponibles | default([]) %}
+                        {% for a in anios_disponibles %}
                         <label class="check-item badge bg-dark border border-secondary fw-normal p-1 cursor-pointer">
                             <input type="checkbox" class="sis-filtro-anio" value="{{ a }}"> {{ a }}
                         </label>
@@ -710,7 +571,7 @@
                     <input type="text" id="buscarUnidad" class="form-control form-control-sm mb-2"
                         placeholder="Escribe para filtrar...">
                     <div class="popover-list overflow-y-auto mb-2" style="max-height: 150px;">
-                        {% for u in unidades_disponibles | default([]) %}
+                        {% for u in unidades_disponibles %}
                         <label class="popover-item d-block text-white-50 small mb-1 cursor-pointer">
                             <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
                         </label>
@@ -726,9 +587,7 @@
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Meses</label>
                     <div class="checklist grid-3 d-grid gap-1" style="grid-template-columns: repeat(3, 1fr);">
-                        {% set lista_meses = meses if meses is defined and meses else {1:'Ene', 2:'Feb', 3:'Mar',
-                        4:'Abr', 5:'May', 6:'Jun', 7:'Jul', 8:'Ago', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dic'} %}
-                        {% for id, nombre in lista_meses.items() %}
+                        {% for id, nombre in meses.items() %}
                         <label class="check-item text-white-50 cursor-pointer" style="font-size: 0.72rem;">
                             <input type="checkbox" class="sis-filtro-mes" value="{{ id }}"> {{ nombre[:3] }}
                         </label>
@@ -748,8 +607,7 @@
                 <button class="btn-apply btn btn-sm btn-info w-100 fw-bold py-1 mt-1" id="btnFiltrarSis"
                     style="font-size: 0.78rem;">Aplicar filtros</button>
             </div>
-            
-
+            {% endif %}
 
 
             {# FILTROS: INDICADORES #}
@@ -2295,7 +2153,7 @@
             });
         }
 
-        // ======================================================
+      // ======================================================
         // 7. RESET GENERAL Y ESCUCHA DE CAMBIOS DIRECTOS
         // ======================================================
 
