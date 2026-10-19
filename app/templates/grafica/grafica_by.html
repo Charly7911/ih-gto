@@ -179,21 +179,28 @@
 <script>
 
   window.CATALOGO_UNIDADES_SERVIDO = JSON.parse('{{ unidades | tojson | safe }}');
-  let chart = null;
 
-  let unidadesSeleccionadas = new Set();
-  let indicadoresSeleccionados = new Set();
-  let aniosSeleccionados = new Set();
-  let mostrarTodasUnidades = false;
-  let avisosMostrados = new Set();
-  let alertasMostradas = new Set();
-  let instanciasCharts = []
-  let todasUnidades = [];
-  let tipologiaSeleccionada = "TODAS";
-  let timeoutRender = null;
-  let indicadoresSinDatos = new Set();
+  // Declaración limpia de la instancia principal del gráfico
+  window.chart = window.chart || null;
 
-  Chart.register(ChartDataLabels);
+  // Sets y variables globales seguras (evita SyntaxError)
+  window.unidadesSeleccionadas = window.unidadesSeleccionadas || new Set();
+  window.indicadoresSeleccionados = window.indicadoresSeleccionados || new Set();
+  window.aniosSeleccionados = window.aniosSeleccionados || new Set();
+  window.avisosMostrados = window.avisosMostrados || new Set();
+  window.alertasMostradas = window.alertasMostradas || new Set();
+  window.indicadoresSinDatos = window.indicadoresSinDatos || new Set();
+
+  window.mostrarTodasUnidades = window.mostrarTodasUnidades || false;
+  window.instanciasCharts = window.instanciasCharts || [];
+  window.todasUnidades = window.todasUnidades || [];
+  window.tipologiaSeleccionada = window.tipologiaSeleccionada || "TODAS";
+  window.timeoutRender = window.timeoutRender || null;
+
+  // Registro del plugin de Chart.js
+  if (typeof ChartDataLabels !== 'undefined' && typeof Chart !== 'undefined') {
+    Chart.register(ChartDataLabels);
+  }
 
   // =========================
   // NORMALIZADOR GLOBAL
@@ -668,8 +675,11 @@
 
   }
 
+
+  // PARTE 2
+
   // =========================
-  // DROP ZONE CON DEPURACIÓN
+  // DROP ZONE RESTRUCTURADO Y COMPATIBLE
   // =========================
   const dropZone = document.getElementById("dropZone");
 
@@ -701,15 +711,23 @@
         return;
       }
 
+      // Asegurar la referencia al Set global
+      window.unidadesSeleccionadas = window.unidadesSeleccionadas || new Set();
+      window.indicadoresSeleccionados = window.indicadoresSeleccionados || new Set();
+
+      // Obtener tipo y valor unificando nombres en español e inglés
+      const tipoData = data.tipo || data.type;
+      const valData = data.id || data.value || data.nombre;
+
       // =========================
       // UNIDADES (INDIVIDUAL)
       // =========================
-      if (data.type === "unidad") {
-        if (!unidadesSeleccionadas.has(data.value)) {
-          unidadesSeleccionadas.add(data.value);
+      if (tipoData === "unidad_individual" || tipoData === "unidad") {
+        if (!window.unidadesSeleccionadas.has(valData)) {
+          window.unidadesSeleccionadas.add(valData);
           if (typeof addBadge === "function") {
-            const nombreLimpio = typeof limpiarNombreUnidad === "function" ? limpiarNombreUnidad(data.nombre) : data.nombre;
-            addBadge(nombreLimpio, "unidad", data.value);
+            const nombreLimpio = typeof limpiarNombreUnidad === "function" ? limpiarNombreUnidad(data.nombre || valData) : (data.nombre || valData);
+            addBadge(nombreLimpio, "unidad", valData);
           }
         }
       }
@@ -717,44 +735,49 @@
       // =========================
       // UNIDADES (GRUPO / ABANICO: ACUMULADO)
       // =========================
-      if (data.type === "grupo_unidades" && Array.isArray(data.items)) {
-        // 1. Agregar todos los IDs del grupo al Set
-        data.items.forEach((item) => {
-          unidadesSeleccionadas.add(item.value);
-        });
+      if (tipoData === "grupo_unidades") {
+        const listaItems = data.unidades || data.items || [];
+        if (Array.isArray(listaItems)) {
+          // 1. Agregar todos los elementos del grupo al Set global
+          listaItems.forEach((item) => {
+            const valItem = typeof item === 'object' ? (item.value || item.id || item.nombre) : item;
+            window.unidadesSeleccionadas.add(valItem);
+          });
 
-        // 2. Nombre representativo del grupo para el Badge
-        let etiquetaGrupo = "";
-        if (data.grupo === "TODAS") {
-          etiquetaGrupo = "🏥 TODAS LAS UNIDADES (" + data.items.length + ")";
-        } else {
-          etiquetaGrupo = "🏥 GRUPO " + data.grupo + " (" + data.items.length + " Unidades)";
-        }
+          // 2. Nombre representativo para el Badge
+          let etiquetaGrupo = "";
+          if (data.grupo === "TODAS") {
+            etiquetaGrupo = "🏥 TODAS LAS UNIDADES (" + listaItems.length + ")";
+          } else {
+            etiquetaGrupo = "🏥 GRUPO " + data.grupo + " (" + listaItems.length + " Unidades)";
+          }
 
-        // 3. Crear UN SOLO BADGE ACUMULADO para todo el grupo
-        if (typeof addBadge === "function") {
-          const idGrupo = "GRUPO_" + data.grupo;
-          addBadge(etiquetaGrupo, "grupo_unidad", idGrupo);
+          // 3. Crear el badge acumulado del grupo
+          if (typeof addBadge === "function") {
+            const idGrupo = "GRUPO_" + data.grupo;
+            addBadge(etiquetaGrupo, "grupo_unidad", idGrupo);
+          }
         }
       }
 
       // =========================
       // INDICADORES
       // =========================
-      if (data.type === "indicador") {
-        if (!indicadoresSeleccionados.has(data.value)) {
-          indicadoresSeleccionados.add(data.value);
-          window.ultimoIndicadorArrastrado = data.value;
+      if (tipoData === "indicador") {
+        if (!window.indicadoresSeleccionados.has(valData)) {
+          window.indicadoresSeleccionados.add(valData);
+          window.ultimoIndicadorArrastrado = valData;
 
-          const el = document.querySelector(`.indicador-item[data-ind="${data.value}"]`);
-          const texto = el ? el.innerText.trim() : (data.nombre || data.value);
+          const el = document.querySelector(`.indicador-item[data-ind="${valData}"]`);
+          const texto = el ? el.innerText.trim() : (data.nombre || valData);
 
           if (typeof addBadge === "function") {
-            addBadge(texto, "indicador", data.value);
+            addBadge(texto, "indicador", valData);
           }
         }
       }
 
+      // Renderizar o actualizar gráfica
       if (typeof cargarGrafica === "function") {
         cargarGrafica();
       }
@@ -1050,6 +1073,7 @@
   }
 
 
+  // PARTE 3
 
   function validarDatosIndicadorIndividual(data, indicadorId) {
 
@@ -1149,141 +1173,141 @@
 
 
 
- function crearLeyendaPersonalizada(chart) {
-  const contenedor = document.getElementById("leyendaPersonalizada");
+  function crearLeyendaPersonalizada(chart) {
+    const contenedor = document.getElementById("leyendaPersonalizada");
 
-  if (!contenedor || !chart || !chart.data || !chart.data.datasets) return;
+    if (!contenedor || !chart || !chart.data || !chart.data.datasets) return;
 
-  contenedor.innerHTML = "";
-  const datasets = chart.data.datasets;
+    contenedor.innerHTML = "";
+    const datasets = chart.data.datasets;
 
-  // 1. Agrupar los datasets por Indicador
-  const grupos = {};
+    // 1. Agrupar los datasets por Indicador
+    const grupos = {};
 
-  datasets.forEach((dataset, index) => {
-    // Si es línea de tendencia, se omite de la leyenda
-    if (dataset.label?.includes("Tendencia")) return;
+    datasets.forEach((dataset, index) => {
+      // Si es línea de tendencia, se omite de la leyenda
+      if (dataset.label?.includes("Tendencia")) return;
 
-    const indClave = dataset.indicador || "General";
-    const nombreIndicador = (typeof obtenerNombreIndicador === "function"
-      ? obtenerNombreIndicador(indClave)
-      : indClave.toUpperCase().replace(/_/g, " ")) || "General";
+      const indClave = dataset.indicador || "General";
+      const nombreIndicador = (typeof obtenerNombreIndicador === "function"
+        ? obtenerNombreIndicador(indClave)
+        : indClave.toUpperCase().replace(/_/g, " ")) || "General";
 
-    if (!grupos[nombreIndicador]) {
-      grupos[nombreIndicador] = [];
-    }
-
-    grupos[nombreIndicador].push({ dataset, index });
-  });
-
-  // 2. Renderizar cada bloque/grupo de indicador
-  Object.keys(grupos).forEach((nombreIndicador) => {
-    // Contenedor del grupo
-    const bloqueGrupo = document.createElement("div");
-    bloqueGrupo.classList.add("grupo-leyenda", "w-100", "mb-2");
-
-    // Título de la sección (Nombre del Indicador)
-    const tituloGrupo = document.createElement("h6");
-    tituloGrupo.textContent = `📊 ${nombreIndicador}`;
-    tituloGrupo.style.width = "100%";
-    tituloGrupo.style.margin = "8px 0 6px 0";
-    tituloGrupo.style.paddingBottom = "3px";
-    tituloGrupo.style.borderBottom = "2px solid #e9ecef";
-    tituloGrupo.style.color = "#2c3e50";
-    tituloGrupo.style.fontSize = "12px";
-    tituloGrupo.style.fontWeight = "bold";
-
-    bloqueGrupo.appendChild(tituloGrupo);
-
-    // 🔑 GRID FLEXIBLE: minmax en 180px para permitir múltiples columnas en laptop
-    const gridItems = document.createElement("div");
-    gridItems.style.display = "grid";
-    gridItems.style.gridTemplateColumns = "repeat(auto-fit, minmax(180px, 1fr))";
-    gridItems.style.gap = "6px 12px";
-    gridItems.style.width = "100%";
-
-    // Ordenar los items del grupo
-    grupos[nombreIndicador].sort((a, b) =>
-      (a.dataset.label || "").localeCompare(b.dataset.label || "")
-    );
-
-    grupos[nombreIndicador].forEach(({ dataset, index }) => {
-      const item = document.createElement("div");
-      item.style.display = "flex";
-      item.style.alignItems = "center";
-      item.style.cursor = "pointer";
-      item.style.fontSize = "11px";
-      item.style.userSelect = "none";
-
-      // 🎨 Canvas mini para la muestra de color/línea
-      const canvasIcon = document.createElement("canvas");
-      canvasIcon.width = 28;
-      canvasIcon.height = 12;
-      canvasIcon.style.marginRight = "6px";
-      canvasIcon.style.flexShrink = "0";
-
-      const ctxIcon = canvasIcon.getContext("2d");
-      const rawColor = dataset.borderColor || dataset.backgroundColor;
-      const colorFinal = Array.isArray(rawColor) ? rawColor[0] : rawColor;
-
-      ctxIcon.beginPath();
-      ctxIcon.strokeStyle = colorFinal;
-      ctxIcon.lineWidth = 3;
-
-      if (dataset.borderDash && dataset.borderDash.length > 0) {
-        ctxIcon.setLineDash(dataset.borderDash);
-      } else {
-        ctxIcon.setLineDash([]);
+      if (!grupos[nombreIndicador]) {
+        grupos[nombreIndicador] = [];
       }
 
-      ctxIcon.moveTo(0, 6);
-      ctxIcon.lineTo(28, 6);
-      ctxIcon.stroke();
-
-      // 🔑 TEXTO LÍMPIA Y FLEXIBLE:
-      // Toma el label completo (Ej: "Mortalidad — Todas Las Unidades (42) (2026)")
-      // y extrae únicamente la parte posterior al guión "—" para ahorrar espacio horizontal
-      const texto = document.createElement("span");
-
-      let etiquetaLimpia = dataset.label || "";
-      if (etiquetaLimpia.includes("—")) {
-        etiquetaLimpia = etiquetaLimpia.split("—")[1].trim();
-      }
-
-      texto.textContent = etiquetaLimpia;
-      texto.style.color = "#495057";
-      texto.style.fontWeight = "500";
-      texto.style.whiteSpace = "nowrap";
-      texto.style.overflow = "hidden";
-      texto.style.textOverflow = "ellipsis";
-
-      // Estado inicial si está oculto
-      if (!chart.isDatasetVisible(index)) {
-        texto.style.textDecoration = "line-through";
-        texto.style.opacity = "0.4";
-        canvasIcon.style.opacity = "0.4";
-      }
-
-      // Evento Click para ocultar/mostrar la serie
-      item.onclick = () => {
-        chart.setDatasetVisibility(index, !chart.isDatasetVisible(index));
-        chart.update();
-
-        const vis = chart.isDatasetVisible(index);
-        texto.style.textDecoration = vis ? "none" : "line-through";
-        texto.style.opacity = vis ? "1" : "0.4";
-        canvasIcon.style.opacity = vis ? "1" : "0.4";
-      };
-
-      item.appendChild(canvasIcon);
-      item.appendChild(texto);
-      gridItems.appendChild(item);
+      grupos[nombreIndicador].push({ dataset, index });
     });
 
-    bloqueGrupo.appendChild(gridItems);
-    contenedor.appendChild(bloqueGrupo);
-  });
-}
+    // 2. Renderizar cada bloque/grupo de indicador
+    Object.keys(grupos).forEach((nombreIndicador) => {
+      // Contenedor del grupo
+      const bloqueGrupo = document.createElement("div");
+      bloqueGrupo.classList.add("grupo-leyenda", "w-100", "mb-2");
+
+      // Título de la sección (Nombre del Indicador)
+      const tituloGrupo = document.createElement("h6");
+      tituloGrupo.textContent = `📊 ${nombreIndicador}`;
+      tituloGrupo.style.width = "100%";
+      tituloGrupo.style.margin = "8px 0 6px 0";
+      tituloGrupo.style.paddingBottom = "3px";
+      tituloGrupo.style.borderBottom = "2px solid #e9ecef";
+      tituloGrupo.style.color = "#2c3e50";
+      tituloGrupo.style.fontSize = "12px";
+      tituloGrupo.style.fontWeight = "bold";
+
+      bloqueGrupo.appendChild(tituloGrupo);
+
+      // 🔑 GRID FLEXIBLE: minmax en 180px para permitir múltiples columnas en laptop
+      const gridItems = document.createElement("div");
+      gridItems.style.display = "grid";
+      gridItems.style.gridTemplateColumns = "repeat(auto-fit, minmax(180px, 1fr))";
+      gridItems.style.gap = "6px 12px";
+      gridItems.style.width = "100%";
+
+      // Ordenar los items del grupo
+      grupos[nombreIndicador].sort((a, b) =>
+        (a.dataset.label || "").localeCompare(b.dataset.label || "")
+      );
+
+      grupos[nombreIndicador].forEach(({ dataset, index }) => {
+        const item = document.createElement("div");
+        item.style.display = "flex";
+        item.style.alignItems = "center";
+        item.style.cursor = "pointer";
+        item.style.fontSize = "11px";
+        item.style.userSelect = "none";
+
+        // 🎨 Canvas mini para la muestra de color/línea
+        const canvasIcon = document.createElement("canvas");
+        canvasIcon.width = 28;
+        canvasIcon.height = 12;
+        canvasIcon.style.marginRight = "6px";
+        canvasIcon.style.flexShrink = "0";
+
+        const ctxIcon = canvasIcon.getContext("2d");
+        const rawColor = dataset.borderColor || dataset.backgroundColor;
+        const colorFinal = Array.isArray(rawColor) ? rawColor[0] : rawColor;
+
+        ctxIcon.beginPath();
+        ctxIcon.strokeStyle = colorFinal;
+        ctxIcon.lineWidth = 3;
+
+        if (dataset.borderDash && dataset.borderDash.length > 0) {
+          ctxIcon.setLineDash(dataset.borderDash);
+        } else {
+          ctxIcon.setLineDash([]);
+        }
+
+        ctxIcon.moveTo(0, 6);
+        ctxIcon.lineTo(28, 6);
+        ctxIcon.stroke();
+
+        // 🔑 TEXTO LÍMPIA Y FLEXIBLE:
+        // Toma el label completo (Ej: "Mortalidad — Todas Las Unidades (42) (2026)")
+        // y extrae únicamente la parte posterior al guión "—" para ahorrar espacio horizontal
+        const texto = document.createElement("span");
+
+        let etiquetaLimpia = dataset.label || "";
+        if (etiquetaLimpia.includes("—")) {
+          etiquetaLimpia = etiquetaLimpia.split("—")[1].trim();
+        }
+
+        texto.textContent = etiquetaLimpia;
+        texto.style.color = "#495057";
+        texto.style.fontWeight = "500";
+        texto.style.whiteSpace = "nowrap";
+        texto.style.overflow = "hidden";
+        texto.style.textOverflow = "ellipsis";
+
+        // Estado inicial si está oculto
+        if (!chart.isDatasetVisible(index)) {
+          texto.style.textDecoration = "line-through";
+          texto.style.opacity = "0.4";
+          canvasIcon.style.opacity = "0.4";
+        }
+
+        // Evento Click para ocultar/mostrar la serie
+        item.onclick = () => {
+          chart.setDatasetVisibility(index, !chart.isDatasetVisible(index));
+          chart.update();
+
+          const vis = chart.isDatasetVisible(index);
+          texto.style.textDecoration = vis ? "none" : "line-through";
+          texto.style.opacity = vis ? "1" : "0.4";
+          canvasIcon.style.opacity = vis ? "1" : "0.4";
+        };
+
+        item.appendChild(canvasIcon);
+        item.appendChild(texto);
+        gridItems.appendChild(item);
+      });
+
+      bloqueGrupo.appendChild(gridItems);
+      contenedor.appendChild(bloqueGrupo);
+    });
+  }
 
 
   function renderGrafica(data) {
@@ -1739,7 +1763,9 @@
       });
     }
   }
-  // PARTE 3
+
+
+  // PARTE 4
 
   // Función auxiliar para redireccionar la leyenda en vistas dinámicas
   function renderizarLeyendaEnContenedor(chartInstance, targetId) {
@@ -2982,41 +3008,46 @@
 
   function limpiarTodo() {
     // 1. Vaciar los Sets de selección y reiniciar variables globales de estado
-    unidadesSeleccionadas.clear();
-    indicadoresSeleccionados.clear();
-    avisosMostrados.clear();
-    alertasMostradas.clear();
-    indicadoresSinDatos.clear();
+    if (window.unidadesSeleccionadas) window.unidadesSeleccionadas.clear();
+    if (window.indicadoresSeleccionados) window.indicadoresSeleccionados.clear();
+    if (window.aniosSeleccionados) window.aniosSeleccionados.clear(); // 🟢 Importante: Limpiar Set de años
+    if (window.avisosMostrados) window.avisosMostrados.clear();
+    if (window.alertasMostradas) window.alertasMostradas.clear();
+    if (window.indicadoresSinDatos) window.indicadoresSinDatos.clear();
 
-    // 🔑 REINICIO DE ESTADOS Y MEMORIA GLOBAL DE MESES
+    // 🔑 REINICIO DE ESTADOS Y MEMORIA GLOBAL
     window.ultimoIndicadorArrastrado = null;
     window.ultimoDataRecibido = null;
     window.grupoSeleccionadoActual = null;
-    window.ultimoLimiteMesDetectado = null; // 👈 Borra el último límite detectado para evitar arrastrar cortes anteriores
+    window.ultimoLimiteMesDetectado = null;
 
-    mostrarTodasUnidades = false;
-    tipologiaSeleccionada = "TODAS";
+    window.mostrarTodasUnidades = false;
+    window.tipologiaSeleccionada = "TODAS";
 
-    // 2. Limpiar visualmente la Drop Zone
+    // 2. Limpiar visualmente la Drop Zone y Badges
     const dropZone = document.getElementById("dropZone");
-    const placeholder = dropZone ? dropZone.querySelector(".placeholder-text") : null;
+    if (dropZone) {
+      const placeholder = dropZone.querySelector(".placeholder-text");
+      const badges = dropZone.querySelectorAll(".badge-item, .badge, [data-badge]");
+      badges.forEach((b) => b.remove());
 
-    const badges = document.querySelectorAll(".badge-item");
-    badges.forEach((b) => b.remove());
-
-    if (placeholder) {
-      placeholder.style.display = "block";
+      if (placeholder) {
+        placeholder.style.display = "block";
+      }
     }
+
+    // Limpieza general de badges si están fuera de la dropZone
+    document.querySelectorAll(".badge-item").forEach((b) => b.remove());
 
     // 3. Destruir TODAS las gráficas de Chart.js
-    if (typeof chart !== "undefined" && chart) {
-      chart.destroy();
-      chart = null;
+    if (window.chart) {
+      if (typeof window.chart.destroy === "function") window.chart.destroy();
+      window.chart = null;
     }
 
-    if (Array.isArray(instanciasCharts)) {
-      instanciasCharts.forEach((c) => c && c.destroy());
-      instanciasCharts = [];
+    if (Array.isArray(window.instanciasCharts)) {
+      window.instanciasCharts.forEach((c) => c && typeof c.destroy === "function" && c.destroy());
+      window.instanciasCharts = [];
     }
 
     // 3.1 Restructurar el contenedor y limpiar leyenda
@@ -3025,19 +3056,23 @@
       contenedor.style.width = "100%";
       contenedor.className = "w-100 col-12";
       contenedor.innerHTML = `
-      <div class="grafica-container w-100" style="height: 380px; position: relative; width: 100%;">
-        <canvas id="grafica" style="width: 100%; height: 100%;"></canvas>
-      </div>
-      <div id="leyendaPersonalizada" class="mt-3 w-100"></div>
-    `;
+            <div class="grafica-container w-100" style="height: 380px; position: relative; width: 100%;">
+                <canvas id="grafica" style="width: 100%; height: 100%;"></canvas>
+            </div>
+            <div id="leyendaPersonalizada" class="mt-3 w-100"></div>
+        `;
     }
 
-    // 4. Reset años (solo el primero)
-    document.querySelectorAll(".anio-check").forEach((check, index) => {
-      check.checked = index === 0;
+    // 4. Reset años en DOM y sincronizar el primer año en el Set global
+    const chksAnios = document.querySelectorAll(".anio-check");
+    chksAnios.forEach((check, index) => {
+      check.checked = (index === 0);
+      if (index === 0 && window.aniosSeleccionados) {
+        window.aniosSeleccionados.add(check.value);
+      }
     });
 
-    // 🔑 4.1 Reset total de la barra de meses (Reconstruye de 1 a 12 en el DOM)
+    // 4.1 Reset total de la barra de meses
     if (typeof window.renderizarMesesGrafica === "function") {
       window.renderizarMesesGrafica(12);
     } else {
@@ -3056,38 +3091,32 @@
     const swUnidades = document.getElementById("switchUnidades");
     if (swUnidades) swUnidades.checked = false;
 
-    // 5.1 Reset del switch de Acumular por Tipología
+    // 5.1 Reset switch Acumular por Tipología
     const swAcumular = document.getElementById("switchAcumularTipologia");
     if (swAcumular) swAcumular.checked = false;
 
     const contenedorAcumular = document.getElementById("contenedorAcumularTipologia");
-    if (contenedorAcumular) {
-      contenedorAcumular.style.display = "none";
-    }
+    if (contenedorAcumular) contenedorAcumular.style.display = "none";
 
-    // 5.2 Reset del Radio Button de Vista (Regresar a Combinada)
+    // 5.2 Reset Radio Button Modo Vista
     const radioCombinada = document.querySelector('input[name="modoVista"][value="combinada"]');
     if (radioCombinada) radioCombinada.checked = true;
 
-    // Ocultar las tipologías
     const contenedorTipologia = document.getElementById("contenedorTipologia");
-    if (contenedorTipologia) {
-      contenedorTipologia.style.display = "none";
-    }
+    if (contenedorTipologia) contenedorTipologia.style.display = "none";
 
-    // Dejar seleccionada la opción "Todas"
     const tipTodas = document.getElementById("tipTodas");
-    if (tipTodas) {
-      tipTodas.checked = true;
-    }
+    if (tipTodas) tipTodas.checked = true;
 
-    // 6. Limpiar resumen si existe
+    // 6. Limpiar resumen de selección
     const summary = document.getElementById("selection-summary");
     if (summary) summary.innerHTML = "";
 
-    // 7. Recarga limpia (al estar vacíos los sets, destruirá gráficas y dejará el lienzo en blanco)
+    // 7. Ejecutar refresco final
     if (typeof cargarGrafica === "function") {
       cargarGrafica();
+    } else if (typeof window.cargarGrafica === "function") {
+      window.cargarGrafica();
     }
   }
 
