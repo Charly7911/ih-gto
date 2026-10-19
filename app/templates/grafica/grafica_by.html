@@ -720,13 +720,24 @@
       const valData = data.id || data.value || data.nombre;
 
       // =========================
-      // UNIDADES (INDIVIDUAL)
+      // UNIDADES (INDIVIDUAL - COMPARATIVO)
       // =========================
       if (tipoData === "unidad_individual" || tipoData === "unidad") {
-        if (!window.unidadesSeleccionadas.has(valData)) {
+        // 🟢 1. Si había un badge de grupo previo (ej. TODAS o HG), eliminarlo para cambiar a modo comparativo individual
+        const badgesGrupos = dropZone.querySelectorAll(".badge-item[data-tipo='grupo_unidad'], .badge-item[data-tipo='grupo_unidades']");
+        if (badgesGrupos.length > 0) {
+          badgesGrupos.forEach(b => b.remove());
+          window.unidadesSeleccionadas.clear(); // Limpiar acumulado anterior
+          window.grupoSeleccionadoActual = null;
+        }
+
+        // 🟢 2. Agregar la unidad individual al Set (permite acumular varias unidades para comparar sus líneas)
+        if (valData && !window.unidadesSeleccionadas.has(valData)) {
           window.unidadesSeleccionadas.add(valData);
           if (typeof addBadge === "function") {
-            const nombreLimpio = typeof limpiarNombreUnidad === "function" ? limpiarNombreUnidad(data.nombre || valData) : (data.nombre || valData);
+            const nombreLimpio = typeof limpiarNombreUnidad === "function"
+              ? limpiarNombreUnidad(data.nombre || valData)
+              : (data.nombre || valData);
             addBadge(nombreLimpio, "unidad", valData);
           }
         }
@@ -736,12 +747,17 @@
       // UNIDADES (GRUPO / ABANICO: ACUMULADO)
       // =========================
       if (tipoData === "grupo_unidades") {
+        // 🟢 Si se arrastra un grupo, eliminamos cualquier unidad individual previa del DOM y del Set
+        const badgesIndividuales = dropZone.querySelectorAll(".badge-item[data-tipo='unidad'], .badge-item[data-tipo='unidad_individual']");
+        badgesIndividuales.forEach(b => b.remove());
+        window.unidadesSeleccionadas.clear();
+
         const listaItems = data.unidades || data.items || [];
         if (Array.isArray(listaItems)) {
           // 1. Agregar todos los elementos del grupo al Set global
           listaItems.forEach((item) => {
             const valItem = typeof item === 'object' ? (item.value || item.id || item.nombre) : item;
-            window.unidadesSeleccionadas.add(valItem);
+            if (valItem) window.unidadesSeleccionadas.add(valItem);
           });
 
           // 2. Nombre representativo para el Badge
@@ -764,7 +780,7 @@
       // INDICADORES
       // =========================
       if (tipoData === "indicador") {
-        if (!window.indicadoresSeleccionados.has(valData)) {
+        if (valData && !window.indicadoresSeleccionados.has(valData)) {
           window.indicadoresSeleccionados.add(valData);
           window.ultimoIndicadorArrastrado = valData;
 
@@ -1360,9 +1376,9 @@
     const mesesSeleccionados = typeof obtenerMesesSeleccionados === "function" ? obtenerMesesSeleccionados() : [];
 
     const sw = document.getElementById("switchUnidades");
-    if (sw && typeof unidadesSeleccionadas !== "undefined" && unidadesSeleccionadas.size > 0) {
+    if (sw && typeof window.unidadesSeleccionadas !== "undefined" && window.unidadesSeleccionadas.size > 0) {
       sw.checked = false;
-      if (typeof mostrarTodasUnidades !== "undefined") mostrarTodasUnidades = false;
+      if (typeof window.mostrarTodasUnidades !== "undefined") window.mostrarTodasUnidades = false;
     }
 
     const mesesLabels = [
@@ -1385,34 +1401,35 @@
         : tipoOriginal;
 
     // =========================================================
-    // FILTRADO ROBUSTO DE DATOS PARA GRUPOS
+    // FILTRADO DE DATOS (MANTENER UNIDADES SEPARADAS)
     // =========================================================
     let datosGrafica = data;
 
-    const registrosTotales = data.filter((d) =>
-      str(d.clues).toUpperCase() === "TOTAL" ||
-      str(d.clues).startsWith("GRUPO_") ||
-      str(d.nombre_unidad).toUpperCase() === "TOTAL GRUPO" ||
-      str(d.nombre_unidad).toUpperCase() === "TOTAL GENERAL" ||
-      str(d.nombre_unidad).toUpperCase().includes("TODAS LAS UNIDADES")
+    // Detectar si el backend envió unidades individuales o un grupo acumulado
+    const esModoIndividual = data.some(d =>
+      d.clues &&
+      d.clues.toUpperCase() !== "TOTAL" &&
+      !d.clues.toUpperCase().startsWith("GRUPO_")
     );
 
-    if (registrosTotales.length > 0) {
-      // 🔑 Mantenemos las filas consolidadas Y TAMBIÉN los insumos/indicadores componentes devueltos
-      const indicadoresEnTotales = new Set(registrosTotales.map(d => norm(d.indicador)));
-
+    if (esModoIndividual) {
+      // 🟢 MODO INDIVIDUAL: Ignoramos los registros de "TOTAL" o "TOTAL GENERAL" 
+      // para quedarnos estrictamente con las filas de cada CLUES.
       datosGrafica = data.filter((d) => {
-        const esTotal =
-          str(d.clues).toUpperCase() === "TOTAL" ||
-          str(d.clues).startsWith("GRUPO_") ||
-          str(d.nombre_unidad).toUpperCase().includes("TOTAL");
-
-        // Si no es un registro explícito "TOTAL", pero su indicador viene en la respuesta,
-        // significa que es un insumo componente traído para el grupo: NO LO DESCARTAMOS.
-        return esTotal || !indicadoresEnTotales.has(norm(d.indicador));
+        const c = str(d.clues).toUpperCase();
+        const n = str(d.nombre_unidad).toUpperCase();
+        return c !== "TOTAL" && !c.startsWith("GRUPO_") && n !== "TOTAL GENERAL" && n !== "TOTAL GRUPO";
       });
-
-      if (datosGrafica.length === 0) datosGrafica = registrosTotales;
+    } else {
+      // 🏥 MODO GRUPO / ACUMULADO: Nos quedamos únicamente con los registros consolidados
+      const registrosTotales = data.filter((d) =>
+        str(d.clues).toUpperCase() === "TOTAL" ||
+        str(d.clues).startsWith("GRUPO_") ||
+        str(d.nombre_unidad).toUpperCase().includes("TOTAL")
+      );
+      if (registrosTotales.length > 0) {
+        datosGrafica = registrosTotales;
+      }
     }
 
     // =========================
@@ -1437,26 +1454,28 @@
       etiquetasX = mesesBase.map((m) => mesesLabels[m - 1]);
     }
 
-    // =========================
-    // GENERACIÓN DE COMBOS
-    // =========================
+    // =========================================================
+    // 🟢 GENERACIÓN DE COMBOS ÚNICOS (SEPARACIÓN POR CLUES EXACTO)
+    // =========================================================
     let combos = [];
 
-    if (mostrarTodasUnidades && typeof acumularPorTipologia !== "undefined" && acumularPorTipologia) {
+    if (window.mostrarTodasUnidades && typeof acumularPorTipologia !== "undefined" && acumularPorTipologia) {
       combos = [
         ...new Set(
           datosGrafica.map((d) => {
             const tip = str(d.tipologia || "OTRO").trim().toUpperCase();
-            return `${norm(d.indicador)}|||${d.anio}|||TIPOLOGIA_${tip}`;
+            return `${norm(d.indicador)}|||${d.anio}|||TIPOLOGIA_${tip}|||${tip}`;
           })
         ),
       ];
     } else {
+      // Usamos d.clues o d.nombre_unidad como identificador único para que NUNCA se fusionen
       combos = [
         ...new Set(
           datosGrafica.map((d) => {
-            const etiquetaEntidad = d.nombre_unidad || d.clues || "unidad";
-            return `${norm(d.indicador)}|||${d.anio}|||${norm(etiquetaEntidad)}`;
+            const idEntidad = d.clues || d.nombre_unidad || "unidad";
+            const nombreMostrar = d.nombre_unidad || d.clues || "Unidad";
+            return `${norm(d.indicador)}|||${d.anio}|||${str(idEntidad).trim()}|||${str(nombreMostrar).trim()}`;
           })
         ),
       ];
@@ -1476,15 +1495,15 @@
     ];
 
     // =========================
-    // DATASETS (CONSTRUCCIÓN CON FILTRADO FLEXIBLE PARA GRUPOS)
+    // DATASETS (CONSTRUCCIÓN DESGLOSADA)
     // =========================
     const datasets = combos.flatMap((c, comboIndex) => {
-      const [indicadorNom, anioNom, unidadLimpia] = c.split("|||");
+      const [indicadorNom, anioNom, idEntidad, nombreMostrar] = c.split("|||");
       let valores = [];
-      const esModoTipologia = unidadLimpia.startsWith("TIPOLOGIA_");
-      const claveTipologia = esModoTipologia ? unidadLimpia.replace("TIPOLOGIA_", "") : null;
+      const esModoTipologia = idEntidad.startsWith("TIPOLOGIA_");
 
       if (!esVistaAnual) {
+        // Filtrar registros que coincidan exactamente con la entidad (CLUES o Tipología)
         const registros = datosGrafica.filter((d) => {
           const coincideInd = norm(d.indicador) === norm(indicadorNom);
           const coincideAnio = String(d.anio) === String(anioNom);
@@ -1493,26 +1512,10 @@
           if (!coincideInd || !coincideAnio || !esMesValido) return false;
 
           if (esModoTipologia) {
-            return str(d.tipologia || "OTRO").trim().toUpperCase() === claveTipologia;
+            return str(d.tipologia || "OTRO").trim().toUpperCase() === nombreMostrar.toUpperCase();
           } else {
-            const entReg = norm(d.nombre_unidad || d.clues);
-            const cluesReg = norm(d.clues);
-
-            // 🔑 FLEXIBILIDAD EN GRUPOS/TOTALES:
-            // Acepta coincidencia exacta de entidad O registros consolidados (TOTAL GRUPO / GRUPO_...)
-            const esGrupoOTotal = unidadLimpia.includes("total") || unidadLimpia.includes("grupo") || unidadLimpia === "todas";
-
-            if (esGrupoOTotal) {
-              return (
-                entReg === unidadLimpia ||
-                cluesReg === unidadLimpia ||
-                entReg.includes("total") ||
-                cluesReg.includes("total") ||
-                cluesReg.startsWith("grupo_")
-              );
-            }
-
-            return entReg === unidadLimpia || cluesReg === unidadLimpia;
+            // Coincidencia exacta por CLUES o por Nombre
+            return str(d.clues).trim() === idEntidad || str(d.nombre_unidad).trim() === nombreMostrar;
           }
         });
 
@@ -1521,10 +1524,7 @@
         registros.forEach((r) => {
           const m = Number(r.mes);
           const val = Number(r.valor || 0);
-
-          if (!(m in mapaMeses) || str(r.clues).toUpperCase().startsWith("GRUPO_") || str(r.clues).toUpperCase() === "TOTAL") {
-            mapaMeses[m] = val;
-          }
+          mapaMeses[m] = val;
         });
 
         valores = mesesBase.map((m) => (m in mapaMeses ? mapaMeses[m] : 0));
@@ -1537,24 +1537,15 @@
           if (!coincideInd || !coincideAnio || !esMes13) return false;
 
           if (esModoTipologia) {
-            return str(d.tipologia || "OTRO").trim().toUpperCase() === claveTipologia;
+            return str(d.tipologia || "OTRO").trim().toUpperCase() === nombreMostrar.toUpperCase();
           } else {
-            const entReg = norm(d.nombre_unidad || d.clues);
-            const cluesReg = norm(d.clues);
-            return (
-              entReg === unidadLimpia ||
-              cluesReg === unidadLimpia ||
-              (unidadLimpia.includes("total") && (entReg.includes("total") || cluesReg.includes("total")))
-            );
+            return str(d.clues).trim() === idEntidad || str(d.nombre_unidad).trim() === nombreMostrar;
           }
         });
 
         let totalAnual = 0;
         if (registros.length > 0) {
-          const regConsolidado = registros.find(r => str(r.clues).toUpperCase() === "TOTAL" || norm(r.nombre_unidad).includes("total"));
-          if (regConsolidado) {
-            totalAnual = Number(regConsolidado.valor || 0);
-          } else if (esIndicadorRazon(indicadorNom)) {
+          if (esIndicadorRazon(indicadorNom)) {
             totalAnual = registros.reduce((acc, r) => acc + Number(r.valor || 0), 0) / registros.length;
           } else {
             totalAnual = registros.reduce((acc, r) => acc + Number(r.valor || 0), 0);
@@ -1571,34 +1562,33 @@
         [], [6, 6], [2, 3], [12, 4, 2, 4], [8, 4]
       ];
 
-      const listaIndicadores = typeof indicadoresSeleccionados !== "undefined" ? Array.from(indicadoresSeleccionados) : [];
+      const listaIndicadores = typeof window.indicadoresSeleccionados !== "undefined" ? Array.from(window.indicadoresSeleccionados) : [];
       const idxIndicador = listaIndicadores.indexOf(indicadorNom);
       const estiloDash = estilosLinea[Math.max(0, idxIndicador) % estilosLinea.length];
 
-      const regEjemplo = datosGrafica.find(d => norm(d.nombre_unidad || d.clues) === unidadLimpia);
-      let nombreEntidadMostrar = esModoTipologia
-        ? `ACUMULADO ${claveTipologia}`
-        : (regEjemplo ? regEjemplo.nombre_unidad : unidadLimpia.toUpperCase());
+      let nombreEntidadLabel = esModoTipologia
+        ? `ACUMULADO ${nombreMostrar}`
+        : nombreMostrar;
 
-      if (!nombreEntidadMostrar || nombreEntidadMostrar.toUpperCase() === "TODAS" || nombreEntidadMostrar.toUpperCase() === "TOTAL GENERAL") {
-        nombreEntidadMostrar = "Todas las Unidades";
+      if (!nombreEntidadLabel || nombreEntidadLabel.toUpperCase() === "TODAS" || nombreEntidadLabel.toUpperCase() === "TOTAL GENERAL") {
+        nombreEntidadLabel = "Todas las Unidades";
       }
 
       const indNombre = typeof obtenerNombreIndicador === "function"
         ? obtenerNombreIndicador(indicadorNom)
         : indicadorNom.toUpperCase().replace(/_/g, " ");
 
-      const labelCompleto = `${indNombre} — ${nombreEntidadMostrar} (${anioNom})`;
+      const labelCompleto = `${indNombre} — ${nombreEntidadLabel} (${anioNom})`;
 
       const baseDataset = {
         label: labelCompleto,
-        unidad: unidadLimpia,
+        unidad: idEntidad,
         indicador: indicadorNom,
         anio: anioNom,
         data: valores,
         borderColor: colorBase,
         borderDash: estiloDash,
-        borderWidth: 2,
+        borderWidth: 2.5,
         tension: 0.3,
         backgroundColor:
           tipoOriginal === "area"
@@ -1621,7 +1611,7 @@
         {
           label: `Tendencia — ${indNombre} (${anioNom})`,
           indicador: indicadorNom,
-          unidad: unidadLimpia,
+          unidad: idEntidad,
           anio: anioNom,
           data: tendencia,
           type: "line",
@@ -1647,7 +1637,7 @@
         padding: {
           top: 35,
           right: 20,
-          bottom: 30, // 🔑 Aumentado a 30px para dar espacio cómodo al eje X
+          bottom: 30,
           left: 10
         },
       },
@@ -1675,11 +1665,11 @@
       },
       scales: {
         x: {
-          display: true, // 🔑 Forzar siempre la visibilidad del eje X
+          display: true,
           ticks: {
             font: { size: 10 },
             autoSkip: false,
-            maxRotation: 0 // Evita que giren verticalmente si no hay espacio
+            maxRotation: 0
           },
           grid: {
             display: true
@@ -1693,46 +1683,44 @@
         },
       },
     });
+
     // ===================================================
     // RENDERIZADO FINAL Y LEYENDA INFERIOR
     // ===================================================
     const contenedor = document.getElementById("contenedorGraficas");
-
     if (!contenedor) return;
 
-    if (typeof chart !== "undefined" && chart) {
-      chart.destroy();
-      chart = null;
+    if (typeof window.chart !== "undefined" && window.chart) {
+      window.chart.destroy();
+      window.chart = null;
     }
-    if (typeof instanciasCharts !== "undefined" && Array.isArray(instanciasCharts)) {
-      instanciasCharts.forEach((c) => c && c.destroy());
-      instanciasCharts = [];
+    if (typeof window.instanciasCharts !== "undefined" && Array.isArray(window.instanciasCharts)) {
+      window.instanciasCharts.forEach((c) => c && c.destroy());
+      window.instanciasCharts = [];
     }
 
     if (modoVistaSeleccionado === "combinada") {
-      // 🔑 SOLUCIÓN: Usar clamp() dinámico en lugar de height: 380px
       contenedor.innerHTML = `
-  <div class="grafica-container w-100" style="position: relative; height: clamp(220px, 32vh, 340px);">
-    <canvas id="grafica"></canvas>
-  </div>
-  <div id="leyendaPersonalizada" class="mt-2 w-100"></div>
-`;
+        <div class="grafica-container w-100" style="position: relative; height: clamp(220px, 32vh, 340px);">
+          <canvas id="grafica"></canvas>
+        </div>
+        <div id="leyendaPersonalizada" class="mt-2 w-100"></div>
+      `;
 
       const canvas = document.getElementById("grafica");
       const ctx = canvas.getContext("2d");
 
-      chart = new Chart(ctx, {
+      window.chart = new Chart(ctx, {
         type: tipoChartJS,
         data: { labels: etiquetasX, datasets },
         options: obtenerOpcionesGrafica()
       });
 
       if (typeof crearLeyendaPersonalizada === "function") {
-        crearLeyendaPersonalizada(chart);
+        crearLeyendaPersonalizada(window.chart);
       }
 
     } else {
-      // Vista separada por tarjetas de indicador
       const gruposDatasets = {};
 
       datasets.forEach((ds) => {
@@ -1756,15 +1744,14 @@
         const cardDiv = document.createElement("div");
         cardDiv.className = "tarjeta-subgrafica mb-3 p-3 border rounded bg-white shadow-sm w-100";
         cardDiv.innerHTML = `
-        <h6 class="fw-bold text-primary mb-2 border-bottom pb-2" style="font-size: 12px; text-transform: uppercase;">
-          📊 Indicador: ${nombreInd}
-        </h6>
-        <!-- 🔑 SOLUCIÓN: Contenedor fluido en subgráficas -->
-        <div style="height: clamp(220px, 30vh, 300px); position: relative;" class="w-100">
-          <canvas id="grafica_sub_${index}"></canvas>
-        </div>
-        <div id="leyenda_sub_${index}" class="mt-2"></div>
-      `;
+          <h6 class="fw-bold text-primary mb-2 border-bottom pb-2" style="font-size: 12px; text-transform: uppercase;">
+            📊 Indicador: ${nombreInd}
+          </h6>
+          <div style="height: clamp(220px, 30vh, 300px); position: relative;" class="w-100">
+            <canvas id="grafica_sub_${index}"></canvas>
+          </div>
+          <div id="leyenda_sub_${index}" class="mt-2"></div>
+        `;
         contenedor.appendChild(cardDiv);
 
         const canvasSub = document.getElementById(`grafica_sub_${index}`);
@@ -1776,8 +1763,8 @@
           options: obtenerOpcionesGrafica()
         });
 
-        if (typeof instanciasCharts !== "undefined" && Array.isArray(instanciasCharts)) {
-          instanciasCharts.push(subChart);
+        if (typeof window.instanciasCharts !== "undefined" && Array.isArray(window.instanciasCharts)) {
+          window.instanciasCharts.push(subChart);
         }
 
         if (typeof renderizarLeyendaEnContenedor === "function") {
