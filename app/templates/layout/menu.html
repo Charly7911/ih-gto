@@ -463,7 +463,7 @@
             {% endif %}
 
 
-           {# FILTROS: SIS PRIMER NIVEL #}
+{# FILTROS: SIS PRIMER NIVEL #}
             {% set path_actual = request.path if request is defined and request.path is defined else (ruta if ruta is defined else '') %}
 
             {% if path_actual.startswith('/sis_primer_nivel') %}
@@ -479,20 +479,19 @@
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Años</label>
                     <div class="checklist checklist-years d-flex flex-wrap gap-1">
-                        {% if anios_disponibles is defined %}
-                            {% for a in anios_disponibles %}
-                            <label class="check-item badge bg-dark border border-secondary fw-normal p-1 cursor-pointer">
-                                <input type="checkbox" class="sis-filtro-anio" value="{{ a }}"> {{ a }}
-                            </label>
-                            {% endfor %}
-                        {% endif %}
+                        {% for a in anios_disponibles %}
+                        <label class="check-item badge bg-dark border border-secondary fw-normal p-1 cursor-pointer">
+                            <input type="checkbox" class="sis-filtro-anio" value="{{ a }}"> {{ a }}
+                        </label>
+                        {% endfor %}
                     </div>
                 </div>
 
                 <!-- VER DATOS POR -->
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Ver datos por:</label>
-                    <select id="selectNivelAgrupacion" class="form-select form-select-sm py-1" style="font-size: 0.75rem;">
+                    <select id="selectNivelAgrupacion" class="form-select form-select-sm py-1"
+                        style="font-size: 0.75rem;">
                         <option value="clues" selected>Unidades</option>
                         <option value="jurisdiccion">Jurisdicción</option>
                         <option value="municipio">Municipio</option>
@@ -509,15 +508,14 @@
                 <!-- POPOVER: UNIDADES -->
                 <div class="popover-unidades" id="popoverUnidades" style="display: none;">
                     <label class="filter-label d-block text-white mb-1" style="font-size: 0.72rem;">Buscar unidad</label>
-                    <input type="text" id="buscarUnidad" class="input-text form-control form-control-sm mb-2" placeholder="Escribe para filtrar...">
+                    <input type="text" id="buscarUnidad" class="input-text form-control form-control-sm mb-2"
+                        placeholder="Escribe para filtrar...">
                     <div class="popover-list custom-scroll" style="max-height: 140px; overflow-y: auto;">
-                        {% if unidades_disponibles is defined %}
-                            {% for u in unidades_disponibles %}
-                            <label class="popover-item d-block text-white-50 mb-1 cursor-pointer" style="font-size: 0.72rem;">
-                                <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
-                            </label>
-                            {% endfor %}
-                        {% endif %}
+                        {% for u in unidades_disponibles %}
+                        <label class="popover-item d-block text-white-50 mb-1 cursor-pointer" style="font-size: 0.72rem;">
+                            <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
+                        </label>
+                        {% endfor %}
                     </div>
                     <div class="popover-actions d-flex gap-2 justify-content-end mt-2">
                         <button type="button" id="limpiarUnidades" class="btn btn-xs btn-outline-secondary py-0" style="font-size: 0.7rem;">Limpiar</button>
@@ -535,15 +533,14 @@
                 <!-- POPOVER: JURISDICCIONES -->
                 <div class="popover-unidades" id="popoverJurisdicciones" style="display: none;">
                     <label class="filter-label d-block text-white mb-1" style="font-size: 0.72rem;">Buscar jurisdicción</label>
-                    <input type="text" id="buscarJurisdiccion" class="input-text form-control form-control-sm mb-2" placeholder="Escribe para filtrar...">
+                    <input type="text" id="buscarJurisdiccion" class="input-text form-control form-control-sm mb-2"
+                        placeholder="Escribe para filtrar...">
                     <div class="popover-list custom-scroll" style="max-height: 140px; overflow-y: auto;">
-                        {% if jurisdicciones_disponibles is defined %}
-                            {% for j in jurisdicciones_disponibles %}
-                            <label class="popover-item d-block text-white-50 mb-1 cursor-pointer" style="font-size: 0.72rem;">
-                                <input type="checkbox" name="jurisdicciones" value="{{ j }}"> {{ j }}
-                            </label>
-                            {% endfor %}
-                        {% endif %}
+                        {% for j in jurisdicciones_disponibles %}
+                        <label class="popover-item d-block text-white-50 mb-1 cursor-pointer" style="font-size: 0.72rem;">
+                            <input type="checkbox" name="jurisdicciones" value="{{ j }}"> {{ j }}
+                        </label>
+                        {% endfor %}
                     </div>
                     <div class="popover-actions d-flex gap-2 justify-content-end mt-2">
                         <button type="button" id="limpiarJurisdicciones" class="btn btn-xs btn-outline-secondary py-0" style="font-size: 0.7rem;">Limpiar</button>
@@ -561,15 +558,14 @@
                 <!-- POPOVER: MUNICIPIOS -->
                 <div class="popover-unidades" id="popoverMunicipios" style="display: none;">
                     <label class="filter-label d-block text-white mb-1" style="font-size: 0.72rem;">Buscar municipio</label>
-                    <input type="text" id="buscarMunicipio" class="input-text form-control form-control-sm mb-2" placeholder="Escribe para filtrar...">
+                    <input type="text" id="buscarMunicipio" class="input-text form-control form-control-sm mb-2"
+                        placeholder="Escribe para filtrar...">
                     <div class="popover-list custom-scroll" style="max-height: 140px; overflow-y: auto;">
-                        {% if municipios_disponibles is defined %}
-                            {% for m in municipios_disponibles %}
-                            <label class="popover-item d-block text-white-50 mb-1 cursor-pointer" style="font-size: 0.72rem;">
-                                <input type="checkbox" name="municipios" value="{{ m }}"> {{ m }}
-                            </label>
-                            {% endfor %}
-                        {% endif %}
+                        {% for m in municipios_disponibles %}
+                        <label class="popover-item d-block text-white-50 mb-1 cursor-pointer" style="font-size: 0.72rem;">
+                            <input type="checkbox" name="municipios" value="{{ m }}"> {{ m }}
+                        </label>
+                        {% endfor %}
                     </div>
                     <div class="popover-actions d-flex gap-2 justify-content-end mt-2">
                         <button type="button" id="limpiarMunicipios" class="btn btn-xs btn-outline-secondary py-0" style="font-size: 0.7rem;">Limpiar</button>
@@ -1487,10 +1483,7 @@
         event.dataTransfer.setData('text', payloadString);
     };
 
-    // 🟢 SOLUCIÓN: Asignación segura en el objeto global window
-    window.variablesPersonalizadasEstado = typeof VARIABLES_DEFAULT !== 'undefined'
-        ? (typeof structuredClone === 'function' ? structuredClone(VARIABLES_DEFAULT) : JSON.parse(JSON.stringify(VARIABLES_DEFAULT)))
-        : {};
+    
 
     window.dragGrupoUnidades = function (event, tipoGrupo) {
         let unidades = [];
