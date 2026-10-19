@@ -463,16 +463,20 @@
             {% endif %}
 
 
-         {% set path_actual = request.path if request is defined and request.path is defined else (ruta if ruta is defined else '') %}
+            {% set path_actual = request.path if request is defined and request.path is defined else (ruta if ruta is
+            defined else '') %}
 
             {# ====================================================== #}
-            {# 1. FILTROS: SIS PRIMER NIVEL                           #}
+            {# 1. FILTROS: SIS PRIMER NIVEL #}
             {# ====================================================== #}
             {% if path_actual.startswith('/sis_primer_nivel') %}
             <div class="menu-filtros mt-2 pt-2 border-top border-secondary border-opacity-25">
                 <div class="header-filtros d-flex justify-content-between align-items-center mb-2">
-                    <span class="menu-section fw-bold text-info" style="font-size: 0.75rem;">🔍 FILTROS PRIMER NIVEL</span>
-                    <button type="button" id="btnResetAll" class="btn-reset-link border-0 bg-transparent text-warning p-0" style="font-size: 0.72rem;">Nuevo filtro</button>
+                    <span class="menu-section fw-bold text-info" style="font-size: 0.75rem;">🔍 FILTROS PRIMER
+                        NIVEL</span>
+                    <button type="button" id="btnResetAll"
+                        class="btn-reset-link border-0 bg-transparent text-warning p-0"
+                        style="font-size: 0.72rem;">Nuevo filtro</button>
                 </div>
 
                 <!-- AÑOS -->
@@ -489,8 +493,10 @@
 
                 <!-- VER DATOS POR -->
                 <div class="filter-block mb-2">
-                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Ver datos por:</label>
-                    <select id="selectNivelAgrupacion" class="form-select form-select-sm py-1" style="font-size: 0.75rem;">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Ver datos
+                        por:</label>
+                    <select id="selectNivelAgrupacion" class="form-select form-select-sm py-1"
+                        style="font-size: 0.75rem;">
                         <option value="clues" selected>Unidades</option>
                         <option value="jurisdiccion">Jurisdicción</option>
                         <option value="municipio">Municipio</option>
@@ -500,13 +506,16 @@
                 <!-- UNIDAD MÉDICA -->
                 <div class="filter-block mb-2" id="blockUnidades">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Unidad</label>
-                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1" id="btnUnidades" style="font-size: 0.75rem;">🔍 Seleccionar unidades</button>
+                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
+                        id="btnUnidades" style="font-size: 0.75rem;">🔍 Seleccionar unidades</button>
                 </div>
 
                 <!-- POPOVER: UNIDADES -->
-                <div class="popover-unidades p-2 rounded bg-dark border border-secondary shadow" id="popoverUnidades" style="display: none;">
+                <div class="popover-unidades p-2 rounded bg-dark border border-secondary shadow" id="popoverUnidades"
+                    style="display: none;">
                     <label class="filter-label text-white small mb-1">Buscar unidad</label>
-                    <input type="text" id="buscarUnidad" class="form-control form-control-sm mb-2" placeholder="Escribe para filtrar...">
+                    <input type="text" id="buscarUnidad" class="form-control form-control-sm mb-2"
+                        placeholder="Escribe para filtrar...">
                     <div class="popover-list overflow-y-auto mb-2" style="max-height: 150px;">
                         {% for u in unidades_disponibles | default([]) %}
                         <label class="popover-item d-block text-white-50 small mb-1 cursor-pointer">
@@ -515,21 +524,26 @@
                         {% endfor %}
                     </div>
                     <div class="popover-actions d-flex gap-2 justify-content-end">
-                        <button type="button" id="limpiarUnidades" class="btn btn-xs btn-outline-secondary py-0">Limpiar</button>
+                        <button type="button" id="limpiarUnidades"
+                            class="btn btn-xs btn-outline-secondary py-0">Limpiar</button>
                         <button type="button" id="aplicarUnidades" class="btn btn-xs btn-primary py-0">Aplicar</button>
                     </div>
                 </div>
 
                 <!-- JURISDICCIONES -->
                 <div class="filter-block mb-2" id="blockJurisdicciones" style="display: none;">
-                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Jurisdicción</label>
-                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1" id="btnJurisdicciones" style="font-size: 0.75rem;">🔍 Seleccionar jurisdicciones</button>
+                    <label class="filter-label d-block text-white-50 mb-1"
+                        style="font-size: 0.72rem;">Jurisdicción</label>
+                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
+                        id="btnJurisdicciones" style="font-size: 0.75rem;">🔍 Seleccionar jurisdicciones</button>
                 </div>
 
                 <!-- POPOVER: JURISDICCIONES -->
-                <div class="popover-unidades p-2 rounded bg-dark border border-secondary shadow" id="popoverJurisdicciones" style="display: none;">
+                <div class="popover-unidades p-2 rounded bg-dark border border-secondary shadow"
+                    id="popoverJurisdicciones" style="display: none;">
                     <label class="filter-label text-white small mb-1">Buscar jurisdicción</label>
-                    <input type="text" id="buscarJurisdiccion" class="form-control form-control-sm mb-2" placeholder="Escribe para filtrar...">
+                    <input type="text" id="buscarJurisdiccion" class="form-control form-control-sm mb-2"
+                        placeholder="Escribe para filtrar...">
                     <div class="popover-list overflow-y-auto mb-2" style="max-height: 150px;">
                         {% for j in jurisdicciones_disponibles | default([]) %}
                         <label class="popover-item d-block text-white-50 small mb-1 cursor-pointer">
@@ -538,31 +552,42 @@
                         {% endfor %}
                     </div>
                     <div class="popover-actions d-flex gap-2 justify-content-end">
-                        <button type="button" id="limpiarJurisdicciones" class="btn btn-xs btn-outline-secondary py-0">Limpiar</button>
-                        <button type="button" id="aplicarJurisdicciones" class="btn btn-xs btn-primary py-0">Aplicar</button>
+                        <button type="button" id="limpiarJurisdicciones"
+                            class="btn btn-xs btn-outline-secondary py-0">Limpiar</button>
+                        <button type="button" id="aplicarJurisdicciones"
+                            class="btn btn-xs btn-primary py-0">Aplicar</button>
                     </div>
                 </div>
 
                 <!-- MUNICIPIOS -->
                 <div class="filter-block mb-2" id="blockMunicipios" style="display: none;">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Municipio</label>
-                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1" id="btnMunicipios" style="font-size: 0.75rem;">🔍 Seleccionar municipios</button>
+                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
+                        id="btnMunicipios" style="font-size: 0.75rem;">🔍 Seleccionar municipios</button>
                 </div>
 
                 <!-- POPOVER: MUNICIPIOS -->
-                <div class="popover-unidades p-2 rounded bg-dark border border-secondary shadow" id="popoverMunicipios" style="display: none;">
+                <div class="popover-unidades p-2 rounded bg-dark border border-secondary shadow" id="popoverMunicipios"
+                    style="display: none;">
                     <label class="filter-label text-white small mb-1">Buscar municipio</label>
-                    <input type="text" id="buscarMunicipio" class="form-control form-control-sm mb-2" placeholder="Escribe para filtrar...">
+                    <input type="text" id="buscarMunicipio" class="form-control form-control-sm mb-2"
+                        placeholder="Escribe para filtrar...">
                     <div class="popover-list overflow-y-auto mb-2" style="max-height: 150px;">
                         {% for m in municipios_disponibles | default([]) %}
                         <label class="popover-item d-block text-white-50 small mb-1 cursor-pointer">
-                            <input type="checkbox" name="municipios" value="{{ m }}"> {{ m }}
+                            <!-- 🟢 Si es un objeto/dict, imprimimos solo el nombre y guardamos la jurisdicción en un data attribute -->
+                            <input type="checkbox" name="municipios"
+                                value="{{ m.nombre if m.nombre is defined else m }}"
+                                data-jurisdiccion="{{ m.jurisdiccion if m.jurisdiccion is defined else '' }}">
+                            {{ m.nombre if m.nombre is defined else m }}
                         </label>
                         {% endfor %}
                     </div>
                     <div class="popover-actions d-flex gap-2 justify-content-end">
-                        <button type="button" id="limpiarMunicipios" class="btn btn-xs btn-outline-secondary py-0">Limpiar</button>
-                        <button type="button" id="aplicarMunicipios" class="btn btn-xs btn-primary py-0">Aplicar</button>
+                        <button type="button" id="limpiarMunicipios"
+                            class="btn btn-xs btn-outline-secondary py-0">Limpiar</button>
+                        <button type="button" id="aplicarMunicipios"
+                            class="btn btn-xs btn-primary py-0">Aplicar</button>
                     </div>
                 </div>
 
@@ -570,7 +595,8 @@
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Meses</label>
                     <div class="checklist grid-3 d-grid gap-1" style="grid-template-columns: repeat(3, 1fr);">
-                        {% set meses_dict = {1:'Ene', 2:'Feb', 3:'Mar', 4:'Abr', 5:'May', 6:'Jun', 7:'Jul', 8:'Ago', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dic'} %}
+                        {% set meses_dict = {1:'Ene', 2:'Feb', 3:'Mar', 4:'Abr', 5:'May', 6:'Jun', 7:'Jul', 8:'Ago',
+                        9:'Sep', 10:'Oct', 11:'Nov', 12:'Dic'} %}
                         {% for num, nombre in meses_dict.items() %}
                         <label class="check-item text-white-50 cursor-pointer" style="font-size: 0.72rem;">
                             <input type="checkbox" class="sis-filtro-mes" value="{{ num }}"> {{ nombre }}
@@ -579,17 +605,20 @@
                     </div>
                 </div>
 
-                <button class="btn-apply btn btn-sm btn-info w-100 fw-bold py-1 mt-1" id="btnFiltrarSis" style="font-size: 0.78rem;">Aplicar filtros</button>
+                <button class="btn-apply btn btn-sm btn-info w-100 fw-bold py-1 mt-1" id="btnFiltrarSis"
+                    style="font-size: 0.78rem;">Aplicar filtros</button>
             </div>
 
             {# ====================================================== #}
-            {# 2. FILTROS: SIS REGULAR / SEGUNDO NIVEL                #}
+            {# 2. FILTROS: SIS REGULAR / SEGUNDO NIVEL #}
             {# ====================================================== #}
             {% elif path_actual.startswith('/sis') %}
             <div class="menu-filtros mt-2 pt-2 border-top border-secondary border-opacity-25">
                 <div class="header-filtros d-flex justify-content-between align-items-center mb-2">
                     <span class="menu-section fw-bold text-info" style="font-size: 0.75rem;">🔍 FILTROS SIS</span>
-                    <button type="button" id="btnResetAll" class="btn-reset-link border-0 bg-transparent text-warning p-0" style="font-size: 0.72rem;">Nuevo filtro</button>
+                    <button type="button" id="btnResetAll"
+                        class="btn-reset-link border-0 bg-transparent text-warning p-0"
+                        style="font-size: 0.72rem;">Nuevo filtro</button>
                 </div>
 
                 <div class="filter-block mb-2">
@@ -605,12 +634,15 @@
 
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Unidad</label>
-                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1" id="btnUnidades" style="font-size: 0.75rem;">🔍 Seleccionar unidades</button>
+                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
+                        id="btnUnidades" style="font-size: 0.75rem;">🔍 Seleccionar unidades</button>
                 </div>
 
-                <div class="popover-unidades p-2 rounded bg-dark border border-secondary shadow" id="popoverUnidades" style="display: none;">
+                <div class="popover-unidades p-2 rounded bg-dark border border-secondary shadow" id="popoverUnidades"
+                    style="display: none;">
                     <label class="filter-label text-white small mb-1">Buscar unidad</label>
-                    <input type="text" id="buscarUnidad" class="form-control form-control-sm mb-2" placeholder="Escribe para filtrar...">
+                    <input type="text" id="buscarUnidad" class="form-control form-control-sm mb-2"
+                        placeholder="Escribe para filtrar...">
                     <div class="popover-list overflow-y-auto mb-2" style="max-height: 150px;">
                         {% for u in unidades_disponibles | default([]) %}
                         <label class="popover-item d-block text-white-50 small mb-1 cursor-pointer">
@@ -619,7 +651,8 @@
                         {% endfor %}
                     </div>
                     <div class="popover-actions d-flex gap-2 justify-content-end">
-                        <button type="button" id="limpiarUnidades" class="btn btn-xs btn-outline-secondary py-0">Limpiar</button>
+                        <button type="button" id="limpiarUnidades"
+                            class="btn btn-xs btn-outline-secondary py-0">Limpiar</button>
                         <button type="button" id="aplicarUnidades" class="btn btn-xs btn-primary py-0">Aplicar</button>
                     </div>
                 </div>
@@ -627,7 +660,8 @@
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Meses</label>
                     <div class="checklist grid-3 d-grid gap-1" style="grid-template-columns: repeat(3, 1fr);">
-                        {% set meses_dict_seg = meses if meses is defined and meses else {1:'Ene', 2:'Feb', 3:'Mar', 4:'Abr', 5:'May', 6:'Jun', 7:'Jul', 8:'Ago', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dic'} %}
+                        {% set meses_dict_seg = meses if meses is defined and meses else {1:'Ene', 2:'Feb', 3:'Mar',
+                        4:'Abr', 5:'May', 6:'Jun', 7:'Jul', 8:'Ago', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dic'} %}
                         {% for id, nombre in meses_dict_seg.items() %}
                         <label class="check-item text-white-50 cursor-pointer" style="font-size: 0.72rem;">
                             <input type="checkbox" class="sis-filtro-mes" value="{{ id }}"> {{ nombre[:3] }}
@@ -645,7 +679,8 @@
                     </select>
                 </div>
 
-                <button class="btn-apply btn btn-sm btn-info w-100 fw-bold py-1 mt-1" id="btnFiltrarSis" style="font-size: 0.78rem;">Aplicar filtros</button>
+                <button class="btn-apply btn btn-sm btn-info w-100 fw-bold py-1 mt-1" id="btnFiltrarSis"
+                    style="font-size: 0.78rem;">Aplicar filtros</button>
             </div>
             {% endif %}
 
@@ -2194,7 +2229,7 @@
             });
         }
 
-      // ======================================================
+        // ======================================================
         // 7. RESET GENERAL Y ESCUCHA DE CAMBIOS DIRECTOS
         // ======================================================
 
