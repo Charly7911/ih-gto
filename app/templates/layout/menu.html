@@ -8,24 +8,19 @@
     {% set ruta = request.path %}
 
     <!-- =========================================
-         MENÚ PRINCIPAL DE NAVEGACIÓN
+         SALUDO SUPERIOR DE USUARIO
     ========================================= -->
-
-
     {% if current_user.is_authenticated %}
-    <!-- Saludo en la parte SUPERIOR del Sidebar -->
-    <div class="sidebar-top-user"
-        style="padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 10px;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <i class="bi bi-person-circle" style="font-size: 1.5rem; color: #4dabf7;"></i>
-            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                <span
-                    style="display: block; font-size: 0.7rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.5px;">Bienvenido</span>
-                <strong style="color: #ffffff; font-weight: 600; font-size: 0.9rem;">
+    <div class="sidebar-top-user py-2 px-3 border-bottom border-secondary border-opacity-25 mb-2">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-person-circle fs-5 text-info"></i>
+            <div class="text-truncate">
+                <span class="d-block text-white-50 text-uppercase fw-semibold"
+                    style="font-size: 0.65rem; letter-spacing: 0.5px;">Bienvenido</span>
+                <strong class="text-white fw-bold d-block text-truncate" style="font-size: 0.82rem;">
                     {% set primer_nombre = current_user.nombre.split()[0] if current_user.nombre else '' %}
                     {% set primer_apellido = current_user.primer_apellido.split()[0] if current_user.primer_apellido
                     else '' %}
-
                     {{ primer_nombre }} {{ primer_apellido }}
                 </strong>
             </div>
@@ -33,19 +28,18 @@
     </div>
     {% endif %}
 
-    <!-- CONTENEDOR CONTENEDOR PADRE DEL SIDEBAR -->
-    <aside class="sidebar-container"
-        style="display: flex; flex-direction: column; height: 100vh; justify-content: space-between;">
+    <!-- CONTENEDOR PADRE -->
+    <aside class="sidebar-container d-flex flex-column h-100 justify-content-between">
 
-        <!-- BLOQUE SUPERIOR (Menú e ítems de navegación) -->
-        <div class="sidebar-top" style="flex: 1; overflow-y: auto;">
-            <nav class="menu">
+        <!-- BLOQUE SUPERIOR DE NAVEGACIÓN -->
+        <div class="sidebar-top flex-grow-1 overflow-y-auto px-2">
+            <nav class="menu d-flex flex-column gap-1">
                 {# 0. INICIO #}
                 <a href="{{ url_for('bienvenida.inicio') }}"
                     class="menu-item {% if request.blueprint == 'bienvenida' %}active{% endif %}">
                     🏠 Panel de Control
                 </a>
-                <div class="menu-divider"></div>
+                <div class="menu-divider my-1"></div>
 
                 {# 1. INDICADORES #}
                 {% if es_home or ruta.startswith('/indicadores') %}
@@ -103,8 +97,6 @@
                 </a>
                 {% endif %}
 
-
-
                 {# 8. GRAFICAR #}
                 {% if es_home or '/grafica' in ruta %}
                 <a href="{{ url_for('grafica.grafica_home') }}"
@@ -120,87 +112,106 @@
                 </a>
                 {% endif %}
 
-                <!-- ADMINISTRACIÓN -->
+                <!-- ADMINISTRACIÓN (COMPACTADO CON DETAILS) -->
                 {% if current_user.is_authenticated and current_user.rol_id == 6 and es_home %}
-                <div class="menu-divider"></div>
-                <p class="menu-section">⚙️ Administración</p>
-                <a href="{{ url_for('admin.crear_usuario') }}" class="menu-item">👤 Crear usuario</a>
-                <a href="{{ url_for('admin.subir_zip_egresos') }}" class="menu-item">📦 Cargar BD Egresos</a>
-                <a href="{{ url_for('admin.subir_zip_urgencias') }}" class="menu-item">📦 Cargar BD Urgencias</a>
-                <a href="{{ url_for('admin.subir_csv_sis') }}" class="menu-item">📦 Cargar BD SIS</a>
-                <a href="{{ url_for('admin.subir_csv_sis_primer_nivel') }}" class="menu-item">📦 Cargar BD SIS Primer
-                    Nivel</a>
-                <a href="{{ url_for('admin.subir_csv_abortos') }}" class="menu-item">📦 Cargar BD Abortos</a>
-                <a href="{{ url_for('admin.subir_csv_afecciones_morbi') }}" class="menu-item">📦 Cargar BD Morbi</a>
-                <a href="{{ url_for('admin.subir_csv_afecciones_morta') }}" class="menu-item">📦 Cargar BD Morta</a>
-                <a href="{{ url_for('admin.subir_sinerhias') }}" class="menu-item">📦 Cargar BD SINERHIAS</a>
-                <a href="{{ url_for('admin.subir_camas_no_censables') }}" class="menu-item">📦 Cargar BD CAMAS NO
-                    CENSABLES</a>
-                <a href="{{ url_for('admin.subir_equipo_medico') }}" class="menu-item">📦 Cargar BD EQUIPO MEDICO</a>
-                <a href="{{ url_for('admin.subir_imagenes_agenda') }}" class="menu-item">📦 Cargar JPG Agenda</a>
+                <div class="menu-divider my-1"></div>
+                <details class="admin-dropdown">
+                    <summary
+                        class="menu-section cursor-pointer py-1 text-white-50 fw-bold d-flex justify-content-between align-items-center"
+                        style="font-size: 0.75rem;">
+                        <span>⚙️ Administración</span>
+                        <i class="bi bi-chevron-down small"></i>
+                    </summary>
+                    <div class="d-flex flex-column gap-1 pt-1 ps-2">
+                        <a href="{{ url_for('admin.crear_usuario') }}" class="menu-item py-1">👤 Crear usuario</a>
+                        <a href="{{ url_for('admin.subir_zip_egresos') }}" class="menu-item py-1">📦 BD Egresos</a>
+                        <a href="{{ url_for('admin.subir_zip_urgencias') }}" class="menu-item py-1">📦 BD Urgencias</a>
+                        <a href="{{ url_for('admin.subir_csv_sis') }}" class="menu-item py-1">📦 BD SIS</a>
+                        <a href="{{ url_for('admin.subir_csv_sis_primer_nivel') }}" class="menu-item py-1">📦 BD SIS
+                            Primer Nivel</a>
+                        <a href="{{ url_for('admin.subir_csv_abortos') }}" class="menu-item py-1">📦 BD Abortos</a>
+                        <a href="{{ url_for('admin.subir_csv_afecciones_morbi') }}" class="menu-item py-1">📦 BD
+                            Morbi</a>
+                        <a href="{{ url_for('admin.subir_csv_afecciones_morta') }}" class="menu-item py-1">📦 BD
+                            Morta</a>
+                        <a href="{{ url_for('admin.subir_sinerhias') }}" class="menu-item py-1">📦 BD SINERHIAS</a>
+                        <a href="{{ url_for('admin.subir_camas_no_censables') }}" class="menu-item py-1">📦 BD Camas No
+                            Censables</a>
+                        <a href="{{ url_for('admin.subir_equipo_medico') }}" class="menu-item py-1">📦 BD Equipo
+                            Médico</a>
+                        <a href="{{ url_for('admin.subir_imagenes_agenda') }}" class="menu-item py-1">📦 JPG Agenda</a>
+                    </div>
+                </details>
                 {% endif %}
             </nav>
 
-
-
             <!-- =========================================
-           SECCIÓN DINÁMICA DE FILTROS SEGÚN RUTA
-           ========================================= -->
+                 FILTROS DINÁMICOS POR MÓDULO
+            ========================================= -->
 
             {# FILTROS: EGRESOS #}
             {% if ruta.startswith('/egresos') %}
-            <div class="menu-filtros">
-                <div class="header-filtros">
-                    <p class="menu-section">🔍 FILTROS</p>
-                    <button type="button" id="btnResetAll" class="btn-reset-link">Nuevo filtro</button>
+            <div class="menu-filtros mt-2 pt-2 border-top border-secondary border-opacity-25">
+                <div class="header-filtros d-flex justify-content-between align-items-center mb-2">
+                    <span class="menu-section fw-bold text-info" style="font-size: 0.75rem;">🔍 FILTROS</span>
+                    <button type="button" id="btnResetAll"
+                        class="btn-reset-link border-0 bg-transparent text-warning p-0"
+                        style="font-size: 0.72rem;">Nuevo filtro</button>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label" id="labelAnioEgresos">Años</label>
-                    <div class="checklist checklist-years">
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" id="labelAnioEgresos"
+                        style="font-size: 0.72rem;">Años</label>
+                    <div class="checklist checklist-years d-flex flex-wrap gap-1">
                         {% for a in anios_disponibles %}
-                        <label class="check-item">
+                        <label class="check-item badge bg-dark border border-secondary fw-normal p-1 cursor-pointer">
                             <input type="checkbox" class="filtro-anio" value="{{ a }}"> {{ a }}
                         </label>
                         {% endfor %}
                     </div>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label">Unidad</label>
-                    <button type="button" class="btn-selector" id="btnUnidades">🔍 Seleccionar unidades</button>
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Unidad</label>
+                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
+                        id="btnUnidades" style="font-size: 0.75rem;">🔍 Seleccionar unidades</button>
                 </div>
 
-                <div class="popover-unidades" id="popoverUnidades">
-                    <label class="filter-label">Buscar unidad</label>
-                    <input type="text" id="buscarUnidad" class="input-text" placeholder="Escribe para filtrar...">
-                    <div class="popover-list">
+                <div class="popover-unidades p-2 rounded bg-dark border border-secondary shadow" id="popoverUnidades"
+                    style="display:none;">
+                    <label class="filter-label text-white small mb-1">Buscar unidad</label>
+                    <input type="text" id="buscarUnidad" class="form-control form-control-sm mb-2"
+                        placeholder="Escribe para filtrar...">
+                    <div class="popover-list overflow-y-auto mb-2" style="max-height: 150px;">
                         {% for u in unidades_disponibles %}
-                        <label class="popover-item">
+                        <label class="popover-item d-block text-white-50 small mb-1 cursor-pointer">
                             <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
                         </label>
                         {% endfor %}
                     </div>
-                    <div class="popover-actions">
-                        <button type="button" id="limpiarUnidades">Limpiar</button>
-                        <button type="button" id="aplicarUnidades">Aplicar</button>
+                    <div class="popover-actions d-flex gap-2 justify-content-end">
+                        <button type="button" id="limpiarUnidades"
+                            class="btn btn-xs btn-outline-secondary py-0">Limpiar</button>
+                        <button type="button" id="aplicarUnidades" class="btn btn-xs btn-primary py-0">Aplicar</button>
                     </div>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label">Meses</label>
-                    <div class="checklist grid-3">
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Meses</label>
+                    <div class="checklist grid-3 d-grid gap-1" style="grid-template-columns: repeat(3, 1fr);">
                         {% for id, nombre in meses.items() %}
-                        <label class="check-item">
+                        <label class="check-item text-white-50 cursor-pointer" style="font-size: 0.72rem;">
                             <input type="checkbox" class="filtro-mes" value="{{ id }}"> {{ nombre[:3] }}
                         </label>
                         {% endfor %}
                     </div>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label" for="filtroIndicadorEgresos">Indicador</label>
-                    <select id="filtroIndicadorEgresos" class="input-text">
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" for="filtroIndicadorEgresos"
+                        style="font-size: 0.72rem;">Indicador</label>
+                    <select id="filtroIndicadorEgresos" class="form-select form-select-sm py-1"
+                        style="font-size: 0.75rem;">
                         <option value="egresos">Egresos</option>
                         <option value="defunciones">Defunciones</option>
                         <option value="defunciones48">Defunciones &gt;48h</option>
@@ -210,7 +221,8 @@
                     </select>
                 </div>
 
-                <button class="btn-apply" id="btnFiltrar">Aplicar filtros</button>
+                <button class="btn-apply btn btn-sm btn-info w-100 fw-bold py-1 mt-1" id="btnFiltrar"
+                    style="font-size: 0.78rem;">Aplicar filtros</button>
             </div>
             {% endif %}
 
@@ -219,37 +231,41 @@
             {% set sufijo = tipo|capitalize if tipo else '' %}
             {% set titulo_menu = "MORBILIDAD" if tipo == "morbi" else "MORTALIDAD" %}
 
-            <div class="menu-filtros">
-                <div class="header-filtros">
-                    <p class="menu-section">📊 {{ titulo_menu }}</p>
-                    <button type="button" id="btnReset{{ sufijo }}" class="btn-reset-link">Nuevo filtro</button>
+            <div class="menu-filtros mt-2 pt-2 border-top border-secondary border-opacity-25">
+                <div class="header-filtros d-flex justify-content-between align-items-center mb-2">
+                    <span class="menu-section fw-bold text-info" style="font-size: 0.75rem;">📊 {{ titulo_menu }}</span>
+                    <button type="button" id="btnReset{{ sufijo }}"
+                        class="btn-reset-link border-0 bg-transparent text-warning p-0"
+                        style="font-size: 0.72rem;">Nuevo filtro</button>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label">Años</label>
-                    <div class="checklist checklist-years">
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Años</label>
+                    <div class="checklist checklist-years d-flex flex-wrap gap-1">
                         {% for a in anios_disponibles %}
-                        <label class="check-item">
+                        <label class="check-item badge bg-dark border border-secondary fw-normal p-1 cursor-pointer">
                             <input type="checkbox" class="filtro-anio-{{tipo}}" value="{{ a }}"> {{ a }}
                         </label>
                         {% endfor %}
                     </div>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label">Meses</label>
-                    <div class="checklist grid-3">
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Meses</label>
+                    <div class="checklist grid-3 d-grid gap-1" style="grid-template-columns: repeat(3, 1fr);">
                         {% for id, nombre in meses.items() %}
-                        <label class="check-item">
+                        <label class="check-item text-white-50 cursor-pointer" style="font-size: 0.72rem;">
                             <input type="checkbox" class="filtro-mes-{{tipo}}" value="{{ id }}"> {{ nombre[:3] }}
                         </label>
                         {% endfor %}
                     </div>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label">Top resultados</label>
-                    <select id="filtroTop{{ sufijo }}" class="input-text">
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Top
+                        resultados</label>
+                    <select id="filtroTop{{ sufijo }}" class="form-select form-select-sm py-1"
+                        style="font-size: 0.75rem;">
                         <option value="">Todos</option>
                         <option value="10">Top 10</option>
                         <option value="15">Top 15</option>
@@ -257,404 +273,287 @@
                     </select>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label">Unidad</label>
-                    <button type="button" class="btn-selector" id="btnUnidades{{ sufijo }}">🔍 Seleccionar
-                        unidades</button>
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Unidad</label>
+                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
+                        id="btnUnidades{{ sufijo }}" style="font-size: 0.75rem;">🔍 Seleccionar unidades</button>
                 </div>
 
-                <div class="popover-unidades" id="popoverUnidades{{ sufijo }}">
-                    <label class="filter-label">Buscar unidad</label>
-                    <input type="text" id="buscarUnidad{{ sufijo }}" class="input-text"
-                        placeholder="Escribe para filtrar...">
-                    <div class="popover-list">
-                        {% for u in unidades_disponibles %}
-                        <label class="popover-item">
-                            <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                    <div class="popover-actions">
-                        <button type="button" id="limpiarUnidades{{ sufijo }}">Limpiar</button>
-                        <button type="button" id="aplicarUnidades{{ sufijo }}">Aplicar</button>
-                    </div>
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Servicio de
+                        egreso</label>
+                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
+                        id="btnServicio{{ sufijo }}" style="font-size: 0.75rem;">🔍 Seleccionar Egreso</button>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label">Servicio de egreso</label>
-                    <button type="button" class="btn-selector" id="btnServicio{{ sufijo }}">🔍 Seleccionar
-                        Egreso</button>
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Afecciones
+                        principales</label>
+                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
+                        id="btnAfecciones{{ sufijo }}" style="font-size: 0.75rem;">🔍 Seleccionar afecciones</button>
                 </div>
 
-                <div class="popover-unidades" id="popoverServicio{{ sufijo }}">
-                    <label class="filter-label">Buscar Servicio</label>
-                    <input type="text" id="buscarServicio{{ sufijo }}" class="input-text"
-                        placeholder="Escribe para filtrar...">
-                    <div class="popover-list">
-                        {% for a in servicio_disponibles %}
-                        <label class="popover-item">
-                            <input type="checkbox" name="servicios" value="{{ a }}"> {{ a }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                    <div class="popover-actions">
-                        <button type="button" id="limpiarServicios{{ sufijo }}">Limpiar</button>
-                        <button type="button" id="aplicarServicios{{ sufijo }}">Aplicar</button>
-                    </div>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn-apply btn btn-sm btn-info flex-grow-1 fw-bold py-1" id="btnFiltrar{{ sufijo }}"
+                        style="font-size: 0.75rem;">Aplicar</button>
+                    <button class="btn-apply btn btn-sm btn-success flex-grow-1 fw-bold py-1"
+                        id="btnDescargar{{ sufijo }}" style="font-size: 0.75rem;">📥 Excel</button>
                 </div>
-
-                <div class="filter-block">
-                    <label class="filter-label">Afecciones principales</label>
-                    <button type="button" class="btn-selector" id="btnAfecciones{{ sufijo }}">🔍 Seleccionar
-                        afecciones</button>
-                </div>
-
-                <div class="popover-unidades" id="popoverAfecciones{{ sufijo }}">
-                    <label class="filter-label">Buscar afección</label>
-                    <input type="text" id="buscarAfeccion{{ sufijo }}" class="input-text"
-                        placeholder="Escribe para filtrar...">
-                    <div class="popover-list">
-                        {% for a in afecciones_disponibles %}
-                        <label class="popover-item">
-                            <input type="checkbox" name="afecciones" value="{{ a }}"> {{ a }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                    <div class="popover-actions">
-                        <button type="button" id="limpiarAfecciones{{ sufijo }}">Limpiar</button>
-                        <button type="button" id="aplicarAfecciones{{ sufijo }}">Aplicar</button>
-                    </div>
-                </div>
-
-                <button class="btn-apply" id="btnFiltrar{{ sufijo }}">Aplicar filtros</button>
-                <button class="btn-apply" id="btnDescargar{{ sufijo }}">📥 Descargar Excel</button>
             </div>
             {% endif %}
 
             {# FILTROS: URGENCIAS #}
             {% if ruta.startswith('/urgencias') %}
-            <div class="menu-filtros">
-                <div class="header-filtros">
-                    <p class="menu-section">🔍 FILTROS</p>
-                    <button type="button" id="btnResetAll" class="btn-reset-link">Nuevo filtro</button>
+            <div class="menu-filtros mt-2 pt-2 border-top border-secondary border-opacity-25">
+                <div class="header-filtros d-flex justify-content-between align-items-center mb-2">
+                    <span class="menu-section fw-bold text-info" style="font-size: 0.75rem;">🔍 FILTROS URGENCIAS</span>
+                    <button type="button" id="btnResetAll"
+                        class="btn-reset-link border-0 bg-transparent text-warning p-0"
+                        style="font-size: 0.72rem;">Nuevo filtro</button>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label">Años</label>
-                    <div class="checklist checklist-years">
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Años</label>
+                    <div class="checklist checklist-years d-flex flex-wrap gap-1">
                         {% for a in anios_disponibles %}
-                        <label class="check-item">
+                        <label class="check-item badge bg-dark border border-secondary fw-normal p-1 cursor-pointer">
                             <input type="checkbox" class="urg-filtro-anio" value="{{ a }}"> {{ a }}
                         </label>
                         {% endfor %}
                     </div>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label">Unidad</label>
-                    <button type="button" class="btn-selector" id="btnUnidades">🔍 Seleccionar unidades</button>
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Unidad</label>
+                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
+                        id="btnUnidades" style="font-size: 0.75rem;">🔍 Seleccionar unidades</button>
                 </div>
 
-                <div class="popover-unidades" id="popoverUnidades">
-                    <label class="filter-label">Buscar unidad</label>
-                    <input type="text" id="buscarUnidad" class="input-text" placeholder="Escribe para filtrar...">
-                    <div class="popover-list">
-                        {% for u in unidades_disponibles %}
-                        <label class="popover-item">
-                            <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                    <div class="popover-actions">
-                        <button type="button" id="limpiarUnidades">Limpiar</button>
-                        <button type="button" id="aplicarUnidades">Aplicar</button>
-                    </div>
-                </div>
-
-                <div class="filter-block">
-                    <label class="filter-label">Meses</label>
-                    <div class="checklist grid-3">
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Meses</label>
+                    <div class="checklist grid-3 d-grid gap-1" style="grid-template-columns: repeat(3, 1fr);">
                         {% for id, nombre in meses.items() %}
-                        <label class="check-item">
+                        <label class="check-item text-white-50 cursor-pointer" style="font-size: 0.72rem;">
                             <input type="checkbox" class="urg-filtro-mes" value="{{ id }}"> {{ nombre[:3] }}
                         </label>
                         {% endfor %}
                     </div>
                 </div>
 
-                <button class="btn-apply" id="btnFiltrarUrgencias">Aplicar filtros</button>
+                <button class="btn-apply btn btn-sm btn-info w-100 fw-bold py-1 mt-1" id="btnFiltrarUrgencias"
+                    style="font-size: 0.78rem;">Aplicar filtros</button>
             </div>
             {% endif %}
-
 
             {# FILTROS: SIS PRIMER NIVEL #}
             {% set path_actual = request.path if request is defined and request.path is defined else (ruta if ruta is
             defined else '') %}
 
             {% if path_actual.startswith('/sis_primer_nivel') %}
-            <div class="menu-filtros">
-                <div class="header-filtros">
-                    <p class="menu-section">🔍 FILTROS PRIMER NIVEL</p>
-                    <button type="button" id="btnResetAll" class="btn-reset-link">Nuevo filtro</button>
+            <div class="menu-filtros mt-2 pt-2 border-top border-secondary border-opacity-25">
+                <div class="header-filtros d-flex justify-content-between align-items-center mb-2">
+                    <span class="menu-section fw-bold text-info" style="font-size: 0.75rem;">🔍 FILTROS PRIMER
+                        NIVEL</span>
+                    <button type="button" id="btnResetAll"
+                        class="btn-reset-link border-0 bg-transparent text-warning p-0"
+                        style="font-size: 0.72rem;">Nuevo filtro</button>
                 </div>
 
-                <!-- Filtro Años -->
-                <div class="filter-block">
-                    <label class="filter-label">Años</label>
-                    <div class="checklist checklist-years">
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Años</label>
+                    <div class="checklist checklist-years d-flex flex-wrap gap-1">
                         {% for a in anios_disponibles %}
-                        <label class="check-item">
+                        <label class="check-item badge bg-dark border border-secondary fw-normal p-1 cursor-pointer">
                             <input type="checkbox" class="sis-filtro-anio" value="{{ a }}"> {{ a }}
                         </label>
                         {% endfor %}
                     </div>
                 </div>
 
-                <!-- 1. NIVEL DE AGRUPACIÓN / VER POR -->
-                <div class="filter-block">
-                    <label class="filter-label">Ver datos por:</label>
-                    <select id="selectNivelAgrupacion" class="input-text" style="width: 100%; cursor: pointer;">
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Ver datos
+                        por:</label>
+                    <select id="selectNivelAgrupacion" class="form-select form-select-sm py-1"
+                        style="font-size: 0.75rem;">
                         <option value="clues" selected>Unidades</option>
                         <option value="jurisdiccion">Jurisdicción</option>
                         <option value="municipio">Municipio</option>
                     </select>
                 </div>
 
-                <!-- 2. FILTRO DINÁMICO: UNIDAD / JURISDICCIÓN / MUNICIPIO -->
-                <!-- Opción A: Unidades (CLUES) -->
-                <div class="filter-block" id="blockUnidades">
-                    <label class="filter-label">Unidad</label>
-                    <button type="button" class="btn-selector" id="btnUnidades">🔍 Seleccionar unidades</button>
+                <div class="filter-block mb-2" id="blockUnidades">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Unidad</label>
+                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
+                        id="btnUnidades" style="font-size: 0.75rem;">🔍 Seleccionar unidades</button>
                 </div>
 
-                <div class="popover-unidades" id="popoverUnidades" style="display: none;">
-                    <label class="filter-label">Buscar unidad</label>
-                    <input type="text" id="buscarUnidad" class="input-text" placeholder="Escribe para filtrar...">
-                    <div class="popover-list">
-                        {% for u in unidades_disponibles %}
-                        <label class="popover-item">
-                            <input type="checkbox" class="sis-filtro-unidad" name="unidades" value="{{ u }}"> {{ u }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                    <div class="popover-actions">
-                        <button type="button" id="limpiarUnidades">Limpiar</button>
-                        <button type="button" id="aplicarUnidades">Aplicar</button>
-                    </div>
+                <div class="filter-block mb-2" id="blockJurisdicciones" style="display: none;">
+                    <label class="filter-label d-block text-white-50 mb-1"
+                        style="font-size: 0.72rem;">Jurisdicción</label>
+                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
+                        id="btnJurisdicciones" style="font-size: 0.75rem;">🔍 Seleccionar jurisdicciones</button>
                 </div>
 
-                <!-- Opción B: Jurisdicciones -->
-                <div class="filter-block" id="blockJurisdicciones" style="display: none;">
-                    <label class="filter-label">Jurisdicción</label>
-                    <button type="button" class="btn-selector" id="btnJurisdicciones">🔍 Seleccionar
-                        jurisdicciones</button>
+                <div class="filter-block mb-2" id="blockMunicipios" style="display: none;">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Municipio</label>
+                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
+                        id="btnMunicipios" style="font-size: 0.75rem;">🔍 Seleccionar municipios</button>
                 </div>
 
-                <div class="popover-unidades" id="popoverJurisdicciones" style="display: none;">
-                    <label class="filter-label">Buscar jurisdicción</label>
-                    <input type="text" id="buscarJurisdiccion" class="input-text" placeholder="Escribe para filtrar...">
-                    <div class="popover-list">
-                        {% for j in jurisdicciones_disponibles %}
-                        <label class="popover-item">
-                            <input type="checkbox" class="sis-filtro-jurisdiccion" name="jurisdicciones"
-                                value="{{ j }}"> Jurisdicción {{ j }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                    <div class="popover-actions">
-                        <button type="button" id="limpiarJurisdicciones">Limpiar</button>
-                        <button type="button" id="aplicarJurisdicciones">Aplicar</button>
-                    </div>
-                </div>
-
-
-                <!-- Opción C: Municipios -->
-                <div class="filter-block" id="blockMunicipios" style="display: none;">
-                    <label class="filter-label">Municipio</label>
-                    <button type="button" class="btn-selector" id="btnMunicipios">🔍 Seleccionar municipios</button>
-                </div>
-
-                <div class="popover-unidades" id="popoverMunicipios" style="display: none;">
-                    <label class="filter-label">Buscar municipio</label>
-                    <input type="text" id="buscarMunicipio" class="input-text" placeholder="Escribe para filtrar...">
-                    <div class="popover-list">
-                        {% for m in municipios_disponibles %}
-                        {% set jur_id = m.jurisdiccion if m.jurisdiccion is defined else (m.cve_jurisdiccion if
-                        m.cve_jurisdiccion is defined else (m['jurisdiccion'] if m is mapping and 'jurisdiccion' in m
-                        else '')) %}
-                        {% set mun_nombre = m.nombre if m.nombre is defined else (m.municipio if m.municipio is defined
-                        else (m['nombre'] if m is mapping and 'nombre' in m else m)) %}
-
-                        <label class="popover-item" data-jurisdiccion="{{ jur_id }}">
-                            <input type="checkbox" class="sis-filtro-municipio" name="municipios"
-                                data-jurisdiccion="{{ jur_id }}" value="{{ mun_nombre }}">
-                            {{ mun_nombre }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                    <div class="popover-actions">
-                        <button type="button" id="limpiarMunicipios">Limpiar</button>
-                        <button type="button" id="aplicarMunicipios">Aplicar</button>
-                    </div>
-                </div>
-
-                <!-- Filtro Meses -->
-                <div class="filter-block">
-                    <label class="filter-label">Meses</label>
-                    <div class="checklist grid-3">
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Meses</label>
+                    <div class="checklist grid-3 d-grid gap-1" style="grid-template-columns: repeat(3, 1fr);">
                         {% set meses_dict = {1:'Ene', 2:'Feb', 3:'Mar', 4:'Abr', 5:'May', 6:'Jun', 7:'Jul', 8:'Ago',
                         9:'Sep', 10:'Oct', 11:'Nov', 12:'Dic'} %}
                         {% for num, nombre in meses_dict.items() %}
-                        <label class="check-item">
+                        <label class="check-item text-white-50 cursor-pointer" style="font-size: 0.72rem;">
                             <input type="checkbox" class="sis-filtro-mes" value="{{ num }}"> {{ nombre }}
                         </label>
                         {% endfor %}
                     </div>
                 </div>
 
-                <button class="btn-apply" id="btnFiltrarSis">Aplicar filtros</button>
+                <button class="btn-apply btn btn-sm btn-info w-100 fw-bold py-1 mt-1" id="btnFiltrarSis"
+                    style="font-size: 0.78rem;">Aplicar filtros</button>
             </div>
+            {% endif %}
 
             //PARTE 2
 
             {# FILTROS: SIS REGULAR / SEGUNDO NIVEL #}
             {% elif path_actual.startswith('/sis') %}
-            <div class="menu-filtros">
-                <div class="header-filtros">
-                    <p class="menu-section">🔍 FILTROS</p>
-                    <button type="button" id="btnResetAll" class="btn-reset-link">Nuevo filtro</button>
+            <div class="menu-filtros mt-2 pt-2 border-top border-secondary border-opacity-25">
+                <div class="header-filtros d-flex justify-content-between align-items-center mb-2">
+                    <span class="menu-section fw-bold text-info" style="font-size: 0.75rem;">🔍 FILTROS SIS</span>
+                    <button type="button" id="btnResetAll"
+                        class="btn-reset-link border-0 bg-transparent text-warning p-0"
+                        style="font-size: 0.72rem;">Nuevo filtro</button>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label">Años</label>
-                    <div class="checklist checklist-years">
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Años</label>
+                    <div class="checklist checklist-years d-flex flex-wrap gap-1">
                         {% for a in anios_disponibles %}
-                        <label class="check-item">
+                        <label class="check-item badge bg-dark border border-secondary fw-normal p-1 cursor-pointer">
                             <input type="checkbox" class="sis-filtro-anio" value="{{ a }}"> {{ a }}
                         </label>
                         {% endfor %}
                     </div>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label">Unidad</label>
-                    <button type="button" class="btn-selector" id="btnUnidades">🔍 Seleccionar unidades</button>
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Unidad</label>
+                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
+                        id="btnUnidades" style="font-size: 0.75rem;">🔍 Seleccionar unidades</button>
                 </div>
 
-                <div class="popover-unidades" id="popoverUnidades" style="display: none;">
-                    <label class="filter-label">Buscar unidad</label>
-                    <input type="text" id="buscarUnidad" class="input-text" placeholder="Escribe para filtrar...">
-                    <div class="popover-list">
+                <div class="popover-unidades p-2 rounded bg-dark border border-secondary shadow" id="popoverUnidades"
+                    style="display: none;">
+                    <label class="filter-label text-white small mb-1">Buscar unidad</label>
+                    <input type="text" id="buscarUnidad" class="form-control form-control-sm mb-2"
+                        placeholder="Escribe para filtrar...">
+                    <div class="popover-list overflow-y-auto mb-2" style="max-height: 150px;">
                         {% for u in unidades_disponibles %}
-                        <label class="popover-item">
+                        <label class="popover-item d-block text-white-50 small mb-1 cursor-pointer">
                             <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
                         </label>
                         {% endfor %}
                     </div>
-                    <div class="popover-actions">
-                        <button type="button" id="limpiarUnidades">Limpiar</button>
-                        <button type="button" id="aplicarUnidades">Aplicar</button>
+                    <div class="popover-actions d-flex gap-2 justify-content-end">
+                        <button type="button" id="limpiarUnidades"
+                            class="btn btn-xs btn-outline-secondary py-0">Limpiar</button>
+                        <button type="button" id="aplicarUnidades" class="btn btn-xs btn-primary py-0">Aplicar</button>
                     </div>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label">Meses</label>
-                    <div class="checklist grid-3">
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Meses</label>
+                    <div class="checklist grid-3 d-grid gap-1" style="grid-template-columns: repeat(3, 1fr);">
                         {% for id, nombre in meses.items() %}
-                        <label class="check-item">
+                        <label class="check-item text-white-50 cursor-pointer" style="font-size: 0.72rem;">
                             <input type="checkbox" class="sis-filtro-mes" value="{{ id }}"> {{ nombre[:3] }}
                         </label>
                         {% endfor %}
                     </div>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label">Indicador</label>
-                    <select id="filtroIndicador" class="input-text">
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Indicador</label>
+                    <select id="filtroIndicador" class="form-select form-select-sm py-1" style="font-size: 0.75rem;">
                         <option value="sis">Consultas</option>
                         <option value="estudios">Estudios</option>
                         <option value="diaspaciente">Días paciente</option>
                     </select>
                 </div>
 
-                <button class="btn-apply" id="btnFiltrarSis">Aplicar filtros</button>
+                <button class="btn-apply btn btn-sm btn-info w-100 fw-bold py-1 mt-1" id="btnFiltrarSis"
+                    style="font-size: 0.78rem;">Aplicar filtros</button>
             </div>
             {% endif %}
 
 
             {# FILTROS: INDICADORES #}
             {% if ruta.startswith('/indicadores') %}
-            <div class="menu-filtros">
-                <div class="header-filtros">
-                    <p class="menu-section">🔍 FILTROS</p>
-                    <button type="button" id="btnResetAll" class="btn-reset-link">Nuevo filtro</button>
+            <div class="menu-filtros mt-2 pt-2 border-top border-secondary border-opacity-25">
+                <div class="header-filtros d-flex justify-content-between align-items-center mb-2">
+                    <span class="menu-section fw-bold text-info" style="font-size: 0.75rem;">🔍 FILTROS</span>
+                    <button type="button" id="btnResetAll"
+                        class="btn-reset-link border-0 bg-transparent text-warning p-0"
+                        style="font-size: 0.72rem;">Nuevo filtro</button>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label">Años</label>
-                    <div class="checklist checklist-years">
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Años</label>
+                    <div class="checklist checklist-years d-flex flex-wrap gap-1">
                         {% for a in anios_disponibles %}
-                        <label class="check-item">
+                        <label class="check-item badge bg-dark border border-secondary fw-normal p-1 cursor-pointer">
                             <input type="checkbox" class="ind-filtro-anio" value="{{ a }}"> {{ a }}
                         </label>
                         {% endfor %}
                     </div>
                 </div>
 
-                <div class="filter-block">
-                    <label class="filter-label">Unidad</label>
-                    <button type="button" class="btn-selector" id="btnUnidades">🔍 Seleccionar unidades</button>
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Unidad</label>
+                    <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
+                        id="btnUnidades" style="font-size: 0.75rem;">🔍 Seleccionar unidades</button>
                 </div>
 
-                <div class="popover-unidades" id="popoverUnidades">
-                    <label class="filter-label">Buscar unidad</label>
-                    <input type="text" id="buscarUnidad" class="input-text" placeholder="Escribe para filtrar...">
-                    <div class="popover-list">
-                        {% for u in unidades_disponibles %}
-                        <label class="popover-item">
-                            <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                    <div class="popover-actions">
-                        <button type="button" id="limpiarUnidades">Limpiar</button>
-                        <button type="button" id="aplicarUnidades">Aplicar</button>
-                    </div>
-                </div>
-
-                <div class="filter-block">
-                    <label class="filter-label">Meses</label>
-                    <div class="checklist grid-3">
+                <div class="filter-block mb-2">
+                    <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Meses</label>
+                    <div class="checklist grid-3 d-grid gap-1" style="grid-template-columns: repeat(3, 1fr);">
                         {% for id, nombre in meses.items() %}
-                        <label class="check-item">
+                        <label class="check-item text-white-50 cursor-pointer" style="font-size: 0.72rem;">
                             <input type="checkbox" class="ind-filtro-mes" value="{{ id }}"> {{ nombre[:3] }}
                         </label>
                         {% endfor %}
                     </div>
                 </div>
 
-                <button class="btn-apply" id="btnFiltrarIndicadores">Aplicar filtros</button>
+                <button class="btn-apply btn btn-sm btn-info w-100 fw-bold py-1 mt-1" id="btnFiltrarIndicadores"
+                    style="font-size: 0.78rem;">Aplicar filtros</button>
             </div>
             {% endif %}
 
 
             {# FILTROS: ANÁLISIS DINÁMICO (GRÁFICA) #}
             {% if ruta.startswith('/grafica') %}
-            <div class="menu-filtros">
-                <p class="menu-section">📈 Configurar Gráfica</p>
+            <div class="menu-filtros mt-2 pt-2 border-top border-secondary border-opacity-25">
+                <span class="menu-section fw-bold text-info d-block mb-2" style="font-size: 0.75rem;">📈 Configurar
+                    Gráfica</span>
 
-                <!-- 🔍 BUSCADOR GLOBAL DE FILTROS -->
-                <div class="search-container my-3">
-                    <input type="text" id="searchGlobalSidebar" class="input-text"
-                        placeholder="🔍 Buscar unidad, indicador, equipo...">
+                <!-- BUSCADOR GLOBAL -->
+                <div class="search-container mb-2">
+                    <input type="text" id="searchGlobalSidebar" class="form-control form-control-sm"
+                        style="font-size: 0.75rem;" placeholder="🔍 Buscar unidad, indicador...">
                 </div>
 
-                <div class="quick-settings mb-3">
+                <div class="quick-settings mb-2">
                     <div class="setting-row">
-                        <span class="setting-label">Años:</span>
-                        <div class="setting-controls d-flex gap-2 flex-wrap w-100">
+                        <span class="setting-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Años:</span>
+                        <div class="setting-controls d-flex gap-1 flex-wrap w-100">
                             {% for anio in anios_disponibles %}
-                            <label class="chip-check">
+                            <label class="chip-check badge bg-dark border border-secondary p-1 cursor-pointer">
                                 <input type="checkbox" class="anio-check" value="{{ anio }}" {% if loop.first
                                     %}checked{% endif %}>
                                 <span>{{ anio }}</span>
@@ -665,551 +564,527 @@
                 </div>
 
                 <!-- ACORDEÓN: UNIDAD MÉDICA -->
-                <details class="acordeon-indicadores">
-                    <summary class="text-white d-flex justify-content-between align-items-center"
-                        style="font-size:11px; font-weight:bold; letter-spacing:.5px;">
-                        <span><i class="bi bi-chevron-right"></i> 🏥 UNIDAD MÉDICA</span>
+                <details class="acordeon-indicadores mb-2 border border-secondary border-opacity-25 rounded p-1">
+                    <summary class="text-white cursor-pointer d-flex justify-content-between align-items-center"
+                        style="font-size:0.75rem; font-weight:bold;">
+                        <span><i class="bi bi-chevron-right me-1"></i> 🏥 UNIDAD MÉDICA</span>
                     </summary>
 
-                    <!-- BOTÓN ANCHO COMPLETO: ARRASTRAR TODAS -->
-                    <div class="mb-2 mt-2">
+                    <div class="my-2">
                         <button type="button"
-                            class="btn btn-sm btn-info text-dark fw-bold w-100 d-flex align-items-center justify-content-center gap-2 p-2 shadow-sm"
+                            class="btn btn-sm btn-info text-dark fw-bold w-100 d-flex align-items-center justify-content-center gap-1 py-1 shadow-sm"
                             draggable="true" ondragstart="dragGrupoUnidades(event, 'TODAS')"
-                            style="cursor:grab; font-size:11px;"
+                            style="cursor:grab; font-size:0.72rem;"
                             title="Mantén presionado y arrastra al área de graficado">
-                            <i class="bi bi-grip-vertical fs-6"></i>
+                            <i class="bi bi-grip-vertical"></i>
                             <span>Arrastrar TODAS las Unidades</span>
                         </button>
                     </div>
 
                     <div class="filter-block-acordeon">
 
-                        <!-- HOSPITALES GENERALES (HG) -->
+                        <!-- HOSPITALES GENERALES -->
                         <details class="sub-acordeon mb-1">
-                            <summary class="d-flex justify-content-between align-items-center">
-                                <span><i class="bi bi-hospital"></i> Hospitales Generales (HG)</span>
+                            <summary
+                                class="d-flex justify-content-between align-items-center text-white-50 py-1 cursor-pointer"
+                                style="font-size:0.72rem;">
+                                <span><i class="bi bi-hospital me-1"></i> Hospitales Generales (HG)</span>
                             </summary>
 
                             <div class="p-1">
-                                <!-- Botón de grupo a lo ancho -->
                                 <button type="button"
-                                    class="btn btn-sm btn-outline-info text-white w-100 d-flex align-items-center justify-content-center gap-2 mb-2"
+                                    class="btn btn-xs btn-outline-info text-white w-100 d-flex align-items-center justify-content-center gap-1 mb-1 py-1"
                                     draggable="true" ondragstart="dragGrupoUnidades(event, 'HG')"
-                                    style="cursor:grab; font-size:10px;" title="Arrastrar grupo completo HG">
+                                    style="cursor:grab; font-size:0.68rem;">
                                     <i class="bi bi-grip-horizontal"></i>
-                                    <span>Arrastrar Grupo Hospitales Generales</span>
+                                    <span>Arrastrar Grupo HG</span>
                                 </button>
 
-                                <div id="listaGenerales" class="popover-list-inline custom-scroll unidad-container"
-                                    data-tipo="HG">
+                                <div id="listaGenerales"
+                                    class="popover-list-inline custom-scroll unidad-container overflow-y-auto"
+                                    data-tipo="HG" style="max-height: 120px;">
                                     {% for u in unidades_generales %}
-                                    <div class="item-unidad-drag searchable-item p-1 mb-1 rounded text-white-50 d-flex align-items-center gap-2 w-100"
+                                    <div class="item-unidad-drag searchable-item p-1 mb-1 rounded text-white-50 d-flex align-items-center gap-1 w-100"
                                         draggable="true"
-                                        style="cursor:grab; font-size:11px; background-color: rgba(255,255,255,0.05);"
+                                        style="cursor:grab; font-size:0.7rem; background-color: rgba(255,255,255,0.05);"
                                         ondragstart="dragUnidadIndividual(event, '{{ u.id if u.id else u }}', '{{ u.nombre if u.nombre else u }}')">
                                         <i class="bi bi-grip-vertical text-muted"></i>
-                                        <span>{{ u.nombre if u.nombre else u }}</span>
+                                        <span class="text-truncate">{{ u.nombre if u.nombre else u }}</span>
                                     </div>
                                     {% endfor %}
                                 </div>
                             </div>
                         </details>
 
-                        <!-- HOSPITALES COMUNITARIOS (HC) -->
+                        <!-- HOSPITALES COMUNITARIOS -->
                         <details class="sub-acordeon mb-1">
-                            <summary class="d-flex justify-content-between align-items-center">
-                                <span><i class="bi bi-building"></i> Hospitales Comunitarios (HC)</span>
+                            <summary
+                                class="d-flex justify-content-between align-items-center text-white-50 py-1 cursor-pointer"
+                                style="font-size:0.72rem;">
+                                <span><i class="bi bi-building me-1"></i> Hospitales Comunitarios (HC)</span>
                             </summary>
 
                             <div class="p-1">
-                                <!-- Botón de grupo a lo ancho -->
                                 <button type="button"
-                                    class="btn btn-sm btn-outline-info text-white w-100 d-flex align-items-center justify-content-center gap-2 mb-2"
+                                    class="btn btn-xs btn-outline-info text-white w-100 d-flex align-items-center justify-content-center gap-1 mb-1 py-1"
                                     draggable="true" ondragstart="dragGrupoUnidades(event, 'HC')"
-                                    style="cursor:grab; font-size:10px;" title="Arrastrar grupo completo HC">
+                                    style="cursor:grab; font-size:0.68rem;">
                                     <i class="bi bi-grip-horizontal"></i>
-                                    <span>Arrastrar Grupo Hospitales Comunitarios</span>
+                                    <span>Arrastrar Grupo HC</span>
                                 </button>
 
-                                <div id="listaComunitarios" class="popover-list-inline custom-scroll unidad-container"
-                                    data-tipo="HC">
+                                <div id="listaComunitarios"
+                                    class="popover-list-inline custom-scroll unidad-container overflow-y-auto"
+                                    data-tipo="HC" style="max-height: 120px;">
                                     {% for u in unidades_comunitarios %}
-                                    <div class="item-unidad-drag searchable-item p-1 mb-1 rounded text-white-50 d-flex align-items-center gap-2 w-100"
+                                    <div class="item-unidad-drag searchable-item p-1 mb-1 rounded text-white-50 d-flex align-items-center gap-1 w-100"
                                         draggable="true"
-                                        style="cursor:grab; font-size:11px; background-color: rgba(255,255,255,0.05);"
+                                        style="cursor:grab; font-size:0.7rem; background-color: rgba(255,255,255,0.05);"
                                         ondragstart="dragUnidadIndividual(event, '{{ u.id if u.id else u }}', '{{ u.nombre if u.nombre else u }}')">
                                         <i class="bi bi-grip-vertical text-muted"></i>
-                                        <span>{{ u.nombre if u.nombre else u }}</span>
+                                        <span class="text-truncate">{{ u.nombre if u.nombre else u }}</span>
                                     </div>
                                     {% endfor %}
                                 </div>
                             </div>
                         </details>
 
-                        <!-- HOSPITALES DE ESPECIALIDAD (HE) -->
+                        <!-- ESPECIALIDAD -->
                         <details class="sub-acordeon mb-1">
-                            <summary class="d-flex justify-content-between align-items-center">
-                                <span><i class="bi bi-heart-pulse"></i> Hospitales de Especialidad (HE)</span>
+                            <summary
+                                class="d-flex justify-content-between align-items-center text-white-50 py-1 cursor-pointer"
+                                style="font-size:0.72rem;">
+                                <span><i class="bi bi-heart-pulse me-1"></i> Especialidad (HE)</span>
                             </summary>
 
                             <div class="p-1">
-                                <!-- Botón de grupo a lo ancho -->
                                 <button type="button"
-                                    class="btn btn-sm btn-outline-info text-white w-100 d-flex align-items-center justify-content-center gap-2 mb-2"
+                                    class="btn btn-xs btn-outline-info text-white w-100 d-flex align-items-center justify-content-center gap-1 mb-1 py-1"
                                     draggable="true" ondragstart="dragGrupoUnidades(event, 'HE')"
-                                    style="cursor:grab; font-size:10px;" title="Arrastrar grupo completo HE">
+                                    style="cursor:grab; font-size:0.68rem;">
                                     <i class="bi bi-grip-horizontal"></i>
-                                    <span>Arrastrar Grupo Especialidades</span>
+                                    <span>Arrastrar Grupo HE</span>
                                 </button>
 
-                                <div id="listaEspecialidad" class="popover-list-inline custom-scroll unidad-container"
-                                    data-tipo="HE">
+                                <div id="listaEspecialidad"
+                                    class="popover-list-inline custom-scroll unidad-container overflow-y-auto"
+                                    data-tipo="HE" style="max-height: 120px;">
                                     {% for u in unidades_especialidad %}
-                                    <div class="item-unidad-drag searchable-item p-1 mb-1 rounded text-white-50 d-flex align-items-center gap-2 w-100"
+                                    <div class="item-unidad-drag searchable-item p-1 mb-1 rounded text-white-50 d-flex align-items-center gap-1 w-100"
                                         draggable="true"
-                                        style="cursor:grab; font-size:11px; background-color: rgba(255,255,255,0.05);"
+                                        style="cursor:grab; font-size:0.7rem; background-color: rgba(255,255,255,0.05);"
                                         ondragstart="dragUnidadIndividual(event, '{{ u.id if u.id else u }}', '{{ u.nombre if u.nombre else u }}')">
                                         <i class="bi bi-grip-vertical text-muted"></i>
-                                        <span>{{ u.nombre if u.nombre else u }}</span>
+                                        <span class="text-truncate">{{ u.nombre if u.nombre else u }}</span>
                                     </div>
                                     {% endfor %}
                                 </div>
                             </div>
                         </details>
-
                     </div>
                 </details>
 
-                <details class="acordeon-indicadores">
-                    <summary class="text-white" style="color:#b39dc5 !important;">
-                        <i class="bi bi-chevron-right"></i> 📈 Desempeño
+
+
+                <!-- ACORDEÓN: DESEMPEÑO -->
+                <details class="acordeon-indicadores mb-2 border border-secondary border-opacity-25 rounded p-1">
+                    <summary class="text-white cursor-pointer"
+                        style="font-size:0.75rem; font-weight:bold; color:#b39dc5 !important;">
+                        <i class="bi bi-chevron-right me-1"></i> 📈 Desempeño
                     </summary>
-                    <div class="checklist p-2">
-                        <!-- % OCUPACION -->
+                    <div class="checklist p-1 d-flex flex-column gap-1">
                         <details class="sub-acordeon">
-                            <summary><i class="bi bi-pie-chart-fill"></i> 📊 % Ocupación</summary>
-                            <div class="indicador-item" draggable="true" data-ind="porcentaje_ocupacion"
-                                data-sub="kpis">General
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="porcentaje_ocupacion_med_interna"
-                                data-sub="kpis">Medicina Interna</div>
-                            <div class="indicador-item" draggable="true" data-ind="porcentaje_ocupacion_cirugia"
-                                data-sub="kpis">Cirugía</div>
-                            <div class="indicador-item" draggable="true" data-ind="porcentaje_ocupacion_pediatria"
-                                data-sub="kpis">Pediatría</div>
-                            <div class="indicador-item" draggable="true" data-ind="porcentaje_ocupacion_gineco"
-                                data-sub="kpis">
-                                Ginecobstetricia</div>
-                            <div class="indicador-item" draggable="true" data-ind="porcentaje_ocupacion_otros"
-                                data-sub="kpis">
-                                Otros</div>
-                        </details>
-
-                        <!-- PROMEDIO ESTANCIA -->
-                        <details class="sub-acordeon">
-                            <summary><i class="bi bi-moon-stars-fill"></i> 🛏️ Promedio de Estancia</summary>
-                            <div class="indicador-item" draggable="true" data-ind="prom_dias_estancia" data-sub="kpis">
-                                General
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="prom_estancia_med_int"
-                                data-sub="kpis">
+                            <summary class="text-white-50 cursor-pointer" style="font-size:0.72rem;"><i
+                                    class="bi bi-pie-chart-fill me-1"></i> % Ocupación</summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="porcentaje_ocupacion" data-sub="kpis" style="font-size:0.7rem;">General</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="porcentaje_ocupacion_med_interna" data-sub="kpis" style="font-size:0.7rem;">
                                 Medicina Interna</div>
-                            <div class="indicador-item" draggable="true" data-ind="prom_estancia_cirugia"
-                                data-sub="kpis">
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="porcentaje_ocupacion_cirugia" data-sub="kpis" style="font-size:0.7rem;">
                                 Cirugía</div>
-                            <div class="indicador-item" draggable="true" data-ind="prom_estancia_pediatria"
-                                data-sub="kpis">
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="porcentaje_ocupacion_pediatria" data-sub="kpis" style="font-size:0.7rem;">
                                 Pediatría</div>
-                            <div class="indicador-item" draggable="true" data-ind="prom_estancia_gineco"
-                                data-sub="kpis">
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="porcentaje_ocupacion_gineco" data-sub="kpis" style="font-size:0.7rem;">
                                 Ginecobstetricia</div>
-                            <div class="indicador-item" draggable="true" data-ind="prom_estancia_otros" data-sub="kpis">
-                                Otros
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="porcentaje_ocupacion_otros" data-sub="kpis" style="font-size:0.7rem;">Otros
                             </div>
                         </details>
 
-                        <!-- PRODUCTIVIDAD DIARIA -->
                         <details class="sub-acordeon">
-                            <summary><i class="bi bi-calendar-week"></i> 📅 Productividad diaria</summary>
-                            <div class="indicador-item" draggable="true" data-ind="consultas_por_dia" data-sub="kpis">
-                                Consultas
+                            <summary class="text-white-50 cursor-pointer" style="font-size:0.72rem;"><i
+                                    class="bi bi-moon-stars-fill me-1"></i> Promedio Estancia</summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="prom_dias_estancia" data-sub="kpis" style="font-size:0.7rem;">General</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="prom_estancia_med_int" data-sub="kpis" style="font-size:0.7rem;">Medicina
+                                Interna</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="prom_estancia_cirugia" data-sub="kpis" style="font-size:0.7rem;">Cirugía</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="prom_estancia_pediatria" data-sub="kpis" style="font-size:0.7rem;">Pediatría
+                            </div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="prom_estancia_gineco" data-sub="kpis" style="font-size:0.7rem;">
+                                Ginecobstetricia</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="prom_estancia_otros" data-sub="kpis" style="font-size:0.7rem;">Otros</div>
+                        </details>
+
+
+                        <details class="sub-acordeon">
+                            <summary class="text-white-50 cursor-pointer" style="font-size:0.72rem;"><i
+                                    class="bi bi-calendar-week me-1"></i> Productividad diaria</summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="consultas_por_dia" data-sub="kpis" style="font-size:0.7rem;">Consultas por día
+                            </div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="especialidad_por_dia" data-sub="kpis" style="font-size:0.7rem;">Especialidades
                                 por día</div>
-                            <div class="indicador-item" draggable="true" data-ind="especialidad_por_dia"
-                                data-sub="kpis">
-                                Especialidades por día</div>
-                            <div class="indicador-item" draggable="true" data-ind="urgencias_por_dia" data-sub="kpis">
-                                Urgencias
-                                por día</div>
-                            <div class="indicador-item" draggable="true" data-ind="nacimientos_por_dia" data-sub="kpis">
-                                Nacimientos por día</div>
-                            <div class="indicador-item" draggable="true" data-ind="prom_inter_diarias_qx"
-                                data-sub="kpis">Prom.
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="urgencias_por_dia" data-sub="kpis" style="font-size:0.7rem;">Urgencias por día
+                            </div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="nacimientos_por_dia" data-sub="kpis" style="font-size:0.7rem;">Nacimientos por
+                                día</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="prom_inter_diarias_qx" data-sub="kpis" style="font-size:0.7rem;">
                                 Intervenciones diarias Qx</div>
                         </details>
 
-                        <!-- INDICADORES HOSPITALARIOS -->
                         <details class="sub-acordeon">
-                            <summary><i class="bi bi-bar-chart-line-fill"></i> 📈 Indicadores Hospitalarios</summary>
-                            <div class="indicador-item" draggable="true" data-ind="porcentaje_calificada"
-                                data-sub="kpis">%
-                                Urgencia Calificada</div>
-                            <div class="indicador-item" draggable="true" data-ind="porcentaje_cesareas" data-sub="kpis">
-                                %
-                                Cesáreas</div>
-                            <div class="indicador-item" draggable="true" data-ind="porcentaje_apeo" data-sub="kpis">%
-                                Apeo</div>
-                            <div class="indicador-item" draggable="true" data-ind="indice_rotacion" data-sub="kpis">
-                                Índice de
-                                Rotación</div>
-                            <div class="indicador-item" draggable="true" data-ind="interv_sustitucion" data-sub="kpis">
-                                Intervalo
-                                de Sustitución</div>
-                            <div class="indicador-item" draggable="true" data-ind="mortalidad_cruda" data-sub="kpis">
-                                Mortalidad
-                                Cruda</div>
-                            <div class="indicador-item" draggable="true" data-ind="mortalidad_ajustada" data-sub="kpis">
-                                Mortalidad Ajustada</div>
+                            <summary class="text-white-50 cursor-pointer" style="font-size:0.72rem;"><i
+                                    class="bi bi-bar-chart-line-fill me-1"></i> Indicadores Hospitalarios</summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="porcentaje_calificada" data-sub="kpis" style="font-size:0.7rem;">% Urgencia
+                                Calificada</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="porcentaje_cesareas" data-sub="kpis" style="font-size:0.7rem;">% Cesáreas
+                            </div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="porcentaje_apeo" data-sub="kpis" style="font-size:0.7rem;">% Apeo</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="indice_rotacion" data-sub="kpis" style="font-size:0.7rem;">Índice de Rotación
+                            </div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="interv_sustitucion" data-sub="kpis" style="font-size:0.7rem;">Intervalo de
+                                Sustitución</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="mortalidad_cruda" data-sub="kpis" style="font-size:0.7rem;">Mortalidad Cruda
+                            </div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="mortalidad_ajustada" data-sub="kpis" style="font-size:0.7rem;">Mortalidad
+                                Ajustada</div>
                         </details>
                     </div>
                 </details>
 
-                <details class="acordeon-indicadores">
-                    <summary class="text-primary"><i class="bi bi-chevron-right"></i> 📤 Egresos</summary>
-                    <div class="checklist p-2">
+
+                <!-- ACORDEÓN: EGRESOS -->
+                <details class="acordeon-indicadores mb-2 border border-secondary border-opacity-25 rounded p-1">
+                    <summary class="text-primary cursor-pointer" style="font-size:0.75rem; font-weight:bold;">
+                        <i class="bi bi-chevron-right me-1"></i> 📤 Egresos
+                    </summary>
+                    <div class="checklist p-1 d-flex flex-column gap-1">
                         <details class="sub-acordeon">
-                            <summary>🏥 Egresos Hospitalarios</summary>
-                            <div class="indicador-item" draggable="true" data-ind="total_egresos" data-sub="egresos">
-                                Total de
-                                Egresos</div>
-                            <div class="indicador-item" draggable="true" data-ind="egre_med_interna" data-sub="egresos">
-                                Medicina
+                            <summary class="text-white-50 cursor-pointer" style="font-size:0.72rem;">🏥 Egresos
+                                Hospitalarios</summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="total_egresos" data-sub="egresos" style="font-size:0.7rem;">Total de Egresos
+                            </div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="egre_med_interna" data-sub="egresos" style="font-size:0.7rem;">Medicina
                                 Interna</div>
-                            <div class="indicador-item" draggable="true" data-ind="egre_cirugia" data-sub="egresos">
-                                Cirugía
-                                General</div>
-                            <div class="indicador-item" draggable="true" data-ind="egre_pediatria" data-sub="egresos">
-                                Pediatría
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="egre_cirugia" data-sub="egresos" style="font-size:0.7rem;">Cirugía General
                             </div>
-                            <div class="indicador-item" draggable="true" data-ind="egre_gineco" data-sub="egresos">
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="egre_pediatria" data-sub="egresos" style="font-size:0.7rem;">Pediatría</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="egre_gineco" data-sub="egresos" style="font-size:0.7rem;">Ginecobstetricia
+                            </div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="egre_otros" data-sub="egresos" style="font-size:0.7rem;">Otros</div>
+                        </details>
+
+                        <details class="sub-acordeon">
+                            <summary class="text-white-50 cursor-pointer" style="font-size:0.72rem;">⚰️ Defunciones
+                            </summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="egre_defunciones" data-sub="egresos" style="font-size:0.7rem;">Defunciones
+                            </div>
+                        </details>
+
+                        <details class="sub-acordeon">
+                            <summary class="text-white-50 cursor-pointer" style="font-size:0.72rem;">👶 Nacimientos
+                            </summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="total_nacimientos" data-sub="egresos" style="font-size:0.7rem;">Total de
+                                Nacimientos</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="nac_eutocico" data-sub="egresos" style="font-size:0.7rem;">Partos Eutócicos
+                            </div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="nac_distocico" data-sub="egresos" style="font-size:0.7rem;">Partos Distócicos
+                            </div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="nac_cesarea" data-sub="egresos" style="font-size:0.7rem;">Cesáreas</div>
+                        </details>
+                    </div>
+                </details>
+
+
+                <!-- ACORDEÓN: PROCEDIMIENTOS -->
+                <details class="acordeon-indicadores mb-2 border border-secondary border-opacity-25 rounded p-1">
+                    <summary class="text-info cursor-pointer" style="font-size:0.75rem; font-weight:bold;">
+                        <i class="bi bi-chevron-right me-1"></i> ⚙️ Procedimientos
+                    </summary>
+                    <div class="checklist p-1 d-flex flex-column gap-1">
+                        <details class="sub-acordeon">
+                            <summary class="text-white-50 cursor-pointer" style="font-size:0.72rem;">📊 Totales
+                            </summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="total_proced" data-sub="procedimientos" style="font-size:0.7rem;">Total
+                                Procedimientos</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="total_proced_dentro" data-sub="procedimientos" style="font-size:0.7rem;">
+                                Dentro Quirófano</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="total_proced_fuera" data-sub="procedimientos" style="font-size:0.7rem;">Fuera
+                                Quirófano</div>
+                        </details>
+
+                        <details class="sub-acordeon">
+                            <summary class="text-white-50 cursor-pointer" style="font-size:0.72rem;">🟢 Dentro Quirófano
+                            </summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="med_int_dentro" data-sub="procedimientos" style="font-size:0.7rem;">Medicina
+                                Interna</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="cirugia_dentro" data-sub="procedimientos" style="font-size:0.7rem;">Cirugía
+                            </div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="gineco_dentro" data-sub="procedimientos" style="font-size:0.7rem;">
                                 Ginecobstetricia</div>
-                            <div class="indicador-item" draggable="true" data-ind="egre_otros" data-sub="egresos">Otros
-                            </div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="pediatria_dentro" data-sub="procedimientos" style="font-size:0.7rem;">
+                                Pediatría</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="otros_dentro" data-sub="procedimientos" style="font-size:0.7rem;">Otros</div>
                         </details>
 
-                        <!-- DEFUNCIONES -->
                         <details class="sub-acordeon">
-                            <summary>⚰️ Defunciones</summary>
-                            <div class="indicador-item" draggable="true" data-ind="egre_defunciones" data-sub="egresos">
-                                Defunciones
+                            <summary class="text-white-50 cursor-pointer" style="font-size:0.72rem;">🔵 Fuera Quirófano
+                            </summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="med_int_fuera" data-sub="procedimientos" style="font-size:0.7rem;">Medicina
+                                Interna</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="cirugia_fuera" data-sub="procedimientos" style="font-size:0.7rem;">Cirugía
                             </div>
-                        </details>
-
-                        <!-- NACIMIENTOS -->
-                        <details class="sub-acordeon">
-                            <summary>👶 Nacimientos</summary>
-                            <div class="indicador-item" draggable="true" data-ind="total_nacimientos"
-                                data-sub="egresos">
-                                Total de Nacimientos
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="gineco_fuera" data-sub="procedimientos" style="font-size:0.7rem;">
+                                Ginecobstetricia</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="pediatria_fuera" data-sub="procedimientos" style="font-size:0.7rem;">Pediatría
                             </div>
-                            <div class="indicador-item" draggable="true" data-ind="nac_eutocico" data-sub="egresos">
-                                Partos Eutócicos
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="nac_distocico" data-sub="egresos">
-                                Partos Distócicos
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="nac_cesarea" data-sub="egresos">
-                                Cesáreas
-                            </div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="otros_fuera" data-sub="procedimientos" style="font-size:0.7rem;">Otros</div>
                         </details>
                     </div>
                 </details>
 
-                <details class="acordeon-indicadores">
-                    <summary class="text-info">
-                        <i class="bi bi-chevron-right"></i> ⚙️ Procedimientos
+                <!-- ACORDEÓN: URGENCIAS -->
+                <details class="acordeon-indicadores mb-2 border border-secondary border-opacity-25 rounded p-1">
+                    <summary class="text-danger cursor-pointer" style="font-size:0.75rem; font-weight:bold;">
+                        <i class="bi bi-chevron-right me-1"></i> 🚑 Urgencias
                     </summary>
-                    <div class="checklist p-2">
-                        <!-- TOTALES -->
+                    <div class="checklist p-1 d-flex flex-column gap-1">
                         <details class="sub-acordeon">
-                            <summary>📊 Procedimientos Totales</summary>
-                            <div class="indicador-item" draggable="true" data-ind="total_proced"
-                                data-sub="procedimientos">
-                                Total de Procedimientos
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="total_proced_dentro"
-                                data-sub="procedimientos">
-                                Total Dentro de Quirófano
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="total_proced_fuera"
-                                data-sub="procedimientos">
-                                Total Fuera de Quirófano
-                            </div>
+                            <summary class="text-white-50 cursor-pointer" style="font-size:0.72rem;">📋 Atenciones
+                            </summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="urgencias" data-sub="urgencias" style="font-size:0.7rem;"><i
+                                    class="bi bi-hospital me-1"></i> Total Urgencias</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="calificada" data-sub="urgencias" style="font-size:0.7rem;"><i
+                                    class="bi bi-check-circle me-1"></i> Calificadas</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="no_calificada" data-sub="urgencias" style="font-size:0.7rem;"><i
+                                    class="bi bi-x-circle me-1"></i> No Calificadas</div>
                         </details>
 
-                        <!-- DENTRO -->
                         <details class="sub-acordeon">
-                            <summary>🟢 Dentro de Quirófano</summary>
-                            <div class="indicador-item" draggable="true" data-ind="med_int_dentro"
-                                data-sub="procedimientos">
-                                Medicina Interna
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="cirugia_dentro"
-                                data-sub="procedimientos">
-                                Cirugía
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="gineco_dentro"
-                                data-sub="procedimientos">
-                                Ginecobstetricia
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="pediatria_dentro"
-                                data-sub="procedimientos">
-                                Pediatría
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="otros_dentro"
-                                data-sub="procedimientos">
-                                Otros
-                            </div>
-                        </details>
-
-                        <!-- FUERA -->
-                        <details class="sub-acordeon">
-                            <summary>🔵 Fuera de Quirófano</summary>
-                            <div class="indicador-item" draggable="true" data-ind="med_int_fuera"
-                                data-sub="procedimientos">
-                                Medicina Interna
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="cirugia_fuera"
-                                data-sub="procedimientos">
-                                Cirugía
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="gineco_fuera"
-                                data-sub="procedimientos">
-                                Ginecobstetricia
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="pediatria_fuera"
-                                data-sub="procedimientos">
-                                Pediatría
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="otros_fuera"
-                                data-sub="procedimientos">
-                                Otros
-                            </div>
+                            <summary class="text-white-50 cursor-pointer" style="font-size:0.72rem;">🩺 Clasificación
+                            </summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="medica" data-sub="urgencias" style="font-size:0.7rem;"><i
+                                    class="bi bi-person-heart me-1"></i> Médicas</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="accidentes" data-sub="urgencias" style="font-size:0.7rem;"><i
+                                    class="bi bi-cone-striped me-1"></i> Accidentes / Violencia</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="pediatrica" data-sub="urgencias" style="font-size:0.7rem;"><i
+                                    class="bi bi-balloon-heart me-1"></i> Pediátricas</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="ginecobstetricia" data-sub="urgencias" style="font-size:0.7rem;"><i
+                                    class="bi bi-gender-female me-1"></i> Ginecobstetricia</div>
                         </details>
                     </div>
                 </details>
 
-                <details class="acordeon-indicadores">
-                    <summary class="text-danger">
-                        <i class="bi bi-chevron-right"></i> 🚑 Urgencias
+                <!-- ACORDEÓN: SIS -->
+                <details class="acordeon-indicadores mb-2 border border-secondary border-opacity-25 rounded p-1">
+                    <summary class="text-success cursor-pointer" style="font-size:0.75rem; font-weight:bold;">
+                        <i class="bi bi-chevron-right me-1"></i> 📊 SIS
                     </summary>
-                    <div class="checklist p-2">
-                        <!-- SUBGRUPO ATENCIONES -->
+                    <div class="checklist p-1 d-flex flex-column gap-1">
                         <details class="sub-acordeon">
-                            <summary>📋 Atenciones</summary>
-                            <div class="indicador-item" draggable="true" data-ind="urgencias" data-sub="urgencias">
-                                <i class="bi bi-hospital"></i> Total Urgencias
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="calificada" data-sub="urgencias">
-                                <i class="bi bi-check-circle"></i> Calificadas
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="no_calificada" data-sub="urgencias">
-                                <i class="bi bi-x-circle"></i> No Calificadas
-                            </div>
-                        </details>
-
-                        <!-- SUBGRUPO CLASIFICACIÓN -->
-                        <details class="sub-acordeon">
-                            <summary>🩺 Clasificación</summary>
-                            <div class="indicador-item" draggable="true" data-ind="medica" data-sub="urgencias">
-                                <i class="bi bi-person-heart"></i> Médicas
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="accidentes" data-sub="urgencias">
-                                <i class="bi bi-cone-striped"></i> Accidentes / Violencia
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="pediatrica" data-sub="urgencias">
-                                <i class="bi bi-balloon-heart"></i> Pediátricas
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="ginecobstetricia"
-                                data-sub="urgencias">
-                                <i class="bi bi-gender-female"></i> Ginecobstetricia
-                            </div>
-                        </details>
-                    </div>
-                </details>
-
-                <details class="acordeon-indicadores">
-                    <summary class="text-success">
-                        <i class="bi bi-chevron-right"></i> 📊 SIS
-                    </summary>
-                    <div class="checklist p-2">
-                        <!-- CONSULTAS -->
-                        <details class="sub-acordeon">
-                            <summary>🏥 Consultas y Atención</summary>
-                            <div class="indicador-item" draggable="true" data-ind="consultas" data-sub="sis">
-                                Consultas
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="especialidad" data-sub="sis">
-                                Especialidades
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="mental" data-sub="sis">
-                                Salud Mental
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="bucal" data-sub="sis">
-                                Salud Bucal
-                            </div>
+                            <summary class="text-white-50 cursor-pointer" style="font-size:0.72rem;">🏥 Consultas y
+                                Atención</summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="consultas" data-sub="sis" style="font-size:0.7rem;">Consultas</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="especialidad" data-sub="sis" style="font-size:0.7rem;">Especialidades</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="mental" data-sub="sis" style="font-size:0.7rem;">Salud Mental</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="bucal" data-sub="sis" style="font-size:0.7rem;">Salud Bucal</div>
                         </details>
 
                         <!-- APOYO DIAGNÓSTICO -->
-                        <details class="sub-acordeon">
-                            <summary>🧪 Servicios Diagnósticos</summary>
-                            <div class="indicador-item" draggable="true" data-ind="laboratorio" data-sub="sis">
-                                Laboratorio
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="rayosx" data-sub="sis">
-                                Rayos X
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="ultrasonido" data-sub="sis">
-                                Ultrasonido
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="electro" data-sub="sis">
-                                Electrocardiograma
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="encefa" data-sub="sis">
-                                Encefalograma
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="tac" data-sub="sis">
-                                Tomografía (TAC)
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="rnm" data-sub="sis">
-                                Resonancia Magnética
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="anatomia" data-sub="sis">
-                                Anatomía Patológica
-                            </div>
+                        <details class="sub-acordeon mb-1">
+                            <summary class="text-white-50 cursor-pointer py-1" style="font-size:0.72rem;"><i
+                                    class="bi bi-vial me-1"></i> 🧪 Servicios Diagnósticos</summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="laboratorio" data-sub="sis" style="font-size:0.7rem;">Laboratorio</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="rayosx" data-sub="sis" style="font-size:0.7rem;">Rayos X</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="ultrasonido" data-sub="sis" style="font-size:0.7rem;">Ultrasonido</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="electro" data-sub="sis" style="font-size:0.7rem;">Electrocardiograma</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="encefa" data-sub="sis" style="font-size:0.7rem;">Encefalograma</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="tac" data-sub="sis" style="font-size:0.7rem;">Tomografía (TAC)</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="rnm" data-sub="sis" style="font-size:0.7rem;">Resonancia Magnética</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="anatomia" data-sub="sis" style="font-size:0.7rem;">Anatomía Patológica</div>
                         </details>
 
                         <!-- DÍAS PACIENTE -->
-                        <details class="sub-acordeon">
-                            <summary>🛏️ Días Paciente</summary>
-                            <div class="indicador-item" draggable="true" data-ind="dias_p_med_int" data-sub="sis">
-                                Medicina Interna
+                        <details class="sub-acordeon mb-1">
+                            <summary class="text-white-50 cursor-pointer py-1" style="font-size:0.72rem;"><i
+                                    class="bi bi-moon-stars me-1"></i> 🛏️ Días Paciente</summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="dias_p_med_int" data-sub="sis" style="font-size:0.7rem;">Medicina Interna
                             </div>
-                            <div class="indicador-item" draggable="true" data-ind="dias_p_cirugia" data-sub="sis">
-                                Cirugía
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="dias_p_pediatria" data-sub="sis">
-                                Pediatría
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="dias_p_gineco" data-sub="sis">
-                                Ginecobstetricia
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="dias_p_otros" data-sub="sis">
-                                Otros
-                            </div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="dias_p_cirugia" data-sub="sis" style="font-size:0.7rem;">Cirugía</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="dias_p_pediatria" data-sub="sis" style="font-size:0.7rem;">Pediatría</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="dias_p_gineco" data-sub="sis" style="font-size:0.7rem;">Ginecobstetricia</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="dias_p_otros" data-sub="sis" style="font-size:0.7rem;">Otros</div>
                         </details>
                     </div>
                 </details>
 
-                <details class="acordeon-indicadores">
-                    <summary class="text-warning">
-                        <i class="bi bi-chevron-right"></i> 🔄 SINERHIAS
+                <!-- ACORDEÓN: SINERHIAS -->
+                <details class="acordeon-indicadores mb-2 border border-secondary border-opacity-25 rounded p-1">
+                    <summary class="text-warning cursor-pointer" style="font-size:0.75rem; font-weight:bold;">
+                        <i class="bi bi-chevron-right me-1"></i> 🔄 SINERHIAS
                     </summary>
-
-
-                    <div class="checklist p-2">
+                    <div class="checklist p-1 d-flex flex-column gap-1">
                         <!-- QUIRÓFANOS -->
-                        <details class="sub-acordeon">
-                            <summary>🏥 Quirófanos</summary>
-                            <div class="indicador-item" draggable="true" data-ind="quirofanos" data-sub="sinerhias">
-                                Quirófanos Habilitados
-                            </div>
+                        <details class="sub-acordeon mb-1">
+                            <summary class="text-white-50 cursor-pointer py-1" style="font-size:0.72rem;">🏥 Quirófanos
+                            </summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="quirofanos" data-sub="sinerhias" style="font-size:0.7rem;">Quirófanos
+                                Habilitados</div>
                         </details>
 
                         <!-- CAMAS CENSABLES -->
-                        <details class="sub-acordeon">
-                            <summary>🛏️ Camas Censables</summary>
-                            <div class="indicador-item" draggable="true" data-ind="camas_total" data-sub="sinerhias">
-                                Total Camas Censables
+                        <details class="sub-acordeon mb-1">
+                            <summary class="text-white-50 cursor-pointer py-1" style="font-size:0.72rem;">🛏️ Camas
+                                Censables</summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="camas_total" data-sub="sinerhias" style="font-size:0.7rem;">Total Camas
+                                Censables</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="camas_med_int" data-sub="sinerhias" style="font-size:0.7rem;">Medicina Interna
                             </div>
-                            <div class="indicador-item" draggable="true" data-ind="camas_med_int" data-sub="sinerhias">
-                                Medicina Interna
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="camas_cirugia" data-sub="sinerhias" style="font-size:0.7rem;">Cirugía</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="camas_pediatria" data-sub="sinerhias" style="font-size:0.7rem;">Pediatría
                             </div>
-                            <div class="indicador-item" draggable="true" data-ind="camas_cirugia" data-sub="sinerhias">
-                                Cirugía
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="camas_gineco" data-sub="sinerhias" style="font-size:0.7rem;">Ginecobstetricia
                             </div>
-                            <div class="indicador-item" draggable="true" data-ind="camas_pediatria"
-                                data-sub="sinerhias">
-                                Pediatría
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="camas_gineco" data-sub="sinerhias">
-                                Ginecobstetricia
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="camas_otros" data-sub="sinerhias">
-                                Otros
-                            </div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="camas_otros" data-sub="sinerhias" style="font-size:0.7rem;">Otros</div>
                         </details>
 
                         <!-- CAMAS NO CENSABLES -->
-                        <details class="sub-acordeon">
-                            <summary>🛌 Camas No Censables</summary>
-                            <div class="indicador-item" draggable="true" data-ind="hab_urgencias"
-                                data-sub="camas_no_censables">
-                                Urgencias
+                        <details class="sub-acordeon mb-1">
+                            <summary class="text-white-50 cursor-pointer py-1" style="font-size:0.72rem;">🛌 Camas No
+                                Censables</summary>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="hab_urgencias" data-sub="camas_no_censables" style="font-size:0.7rem;">
+                                Urgencias</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="hab_observacion" data-sub="camas_no_censables" style="font-size:0.7rem;">
+                                Observación</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="hab_cuid_int" data-sub="camas_no_censables" style="font-size:0.7rem;">Cuidados
+                                Intermedios</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="hab_cirug_amb" data-sub="camas_no_censables" style="font-size:0.7rem;">Cirugía
+                                Ambulatoria</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="hab_quemados" data-sub="camas_no_censables" style="font-size:0.7rem;">Quemados
                             </div>
-                            <div class="indicador-item" draggable="true" data-ind="hab_observacion"
-                                data-sub="camas_no_censables">
-                                Observación
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="hab_cuid_int"
-                                data-sub="camas_no_censables">
-                                Cuidados Intermedios
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="hab_cirug_amb"
-                                data-sub="camas_no_censables">
-                                Cirugía Ambulatoria
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="hab_quemados"
-                                data-sub="camas_no_censables">
-                                Quemados
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="hab_lab_parto"
-                                data-sub="camas_no_censables">
-                                Labor de Parto
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="hab_recup_pp"
-                                data-sub="camas_no_censables">
-                                Recuperación Post-Parto
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="hab_recup_pq"
-                                data-sub="camas_no_censables">
-                                Recuperación Post-Quirúrgica
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="hab_uci_adulto"
-                                data-sub="camas_no_censables">
-                                UCI Adultos
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="hab_uci_ped"
-                                data-sub="camas_no_censables">
-                                UCI Pediatría
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="hab_otras_areas"
-                                data-sub="camas_no_censables">
-                                Otras Áreas
-                            </div>
-                            <div class="indicador-item" draggable="true" data-ind="tot_otras_areas"
-                                data-sub="camas_no_censables">
-                                Total No Censables
-                            </div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="hab_lab_parto" data-sub="camas_no_censables" style="font-size:0.7rem;">Labor
+                                de Parto</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="hab_recup_pp" data-sub="camas_no_censables" style="font-size:0.7rem;">
+                                Recuperación Post-Parto</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="hab_recup_pq" data-sub="camas_no_censables" style="font-size:0.7rem;">
+                                Recuperación Post-Quirúrgica</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="hab_uci_adulto" data-sub="camas_no_censables" style="font-size:0.7rem;">UCI
+                                Adultos</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="hab_uci_ped" data-sub="camas_no_censables" style="font-size:0.7rem;">UCI
+                                Pediatría</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="hab_otras_areas" data-sub="camas_no_censables" style="font-size:0.7rem;">Otras
+                                Áreas</div>
+                            <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                data-ind="tot_otras_areas" data-sub="camas_no_censables" style="font-size:0.7rem;">Total
+                                No Censables</div>
                         </details>
 
                         <!-- EQUIPO MÉDICO -->
-                        <details class="sub-acordeon">
-                            <summary>⚙️ Equipo Médico</summary>
+                        <details class="sub-acordeon mb-1">
+                            <summary class="text-white-50 cursor-pointer py-1" style="font-size:0.72rem;">⚙️ Equipo
+                                Médico</summary>
 
                             <!-- Imagenología -->
-                            <details class="sub-acordeon">
-                                <summary>🩻 Imagenología</summary>
+                            <details class="sub-acordeon ps-2 my-1">
+                                <summary class="text-white-50 cursor-pointer" style="font-size:0.7rem;">🩻 Imagenología
+                                </summary>
                                 {% set imagen = [
                                 ('arco_c_analogo','Arco en C Analógico'),
                                 ('arco_c_digital','Arco en C Digital'),
@@ -1232,16 +1107,17 @@
                                 ('tomografo_128','Tomógrafo 128')
                                 ] %}
                                 {% for id_sql, etiqueta in imagen %}
-                                <div class="indicador-item" draggable="true" data-ind="{{ id_sql }}"
-                                    data-sub="equipo_medico">
+                                <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                    data-ind="{{ id_sql }}" data-sub="equipo_medico" style="font-size:0.68rem;">
                                     {{ etiqueta }}
                                 </div>
                                 {% endfor %}
                             </details>
 
                             <!-- Monitoreo -->
-                            <details class="sub-acordeon">
-                                <summary>❤️ Monitoreo</summary>
+                            <details class="sub-acordeon ps-2 my-1">
+                                <summary class="text-white-50 cursor-pointer" style="font-size:0.7rem;">❤️ Monitoreo
+                                </summary>
                                 {% set monitoreo = [
                                 ('cardiotocografo','Cardiotocógrafo'),
                                 ('ecocardiografo','Ecocardiógrafo'),
@@ -1256,16 +1132,17 @@
                                 ('monitor_anestesia','Monitor Anestesia')
                                 ] %}
                                 {% for id_sql, etiqueta in monitoreo %}
-                                <div class="indicador-item" draggable="true" data-ind="{{ id_sql }}"
-                                    data-sub="equipo_medico">
+                                <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                    data-ind="{{ id_sql }}" data-sub="equipo_medico" style="font-size:0.68rem;">
                                     {{ etiqueta }}
                                 </div>
                                 {% endfor %}
                             </details>
 
-                            <!-- Quirófano -->
-                            <details class="sub-acordeon">
-                                <summary>🏥 Quirófano y Soporte</summary>
+                            <!-- Quirófano y Soporte -->
+                            <details class="sub-acordeon ps-2 my-1">
+                                <summary class="text-white-50 cursor-pointer" style="font-size:0.7rem;">🏥 Quirófano y
+                                    Soporte</summary>
                                 {% set soporte = [
                                 ('camilla_radiotransp','Camilla Radiotransparente'),
                                 ('carro_rojo_reanim','Carro Rojo'),
@@ -1281,16 +1158,17 @@
                                 ('sierra_yesos','Sierra para Yesos')
                                 ] %}
                                 {% for id_sql, etiqueta in soporte %}
-                                <div class="indicador-item" draggable="true" data-ind="{{ id_sql }}"
-                                    data-sub="equipo_medico">
+                                <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                    data-ind="{{ id_sql }}" data-sub="equipo_medico" style="font-size:0.68rem;">
                                     {{ etiqueta }}
                                 </div>
                                 {% endfor %}
                             </details>
 
-                            <!-- Neonatal -->
-                            <details class="sub-acordeon">
-                                <summary>👶 Mobiliario y Neonatal</summary>
+                            <!-- Mobiliario y Neonatal -->
+                            <details class="sub-acordeon ps-2 my-1">
+                                <summary class="text-white-50 cursor-pointer" style="font-size:0.7rem;">👶 Mobiliario y
+                                    Neonatal</summary>
                                 {% set mobiliario = [
                                 ('bascula_estadimetro','Báscula Estadímetro'),
                                 ('bascula_bebe','Báscula Bebé'),
@@ -1306,8 +1184,8 @@
                                 ('estuche_diag','Estuche Diagnóstico')
                                 ] %}
                                 {% for id_sql, etiqueta in mobiliario %}
-                                <div class="indicador-item" draggable="true" data-ind="{{ id_sql }}"
-                                    data-sub="equipo_medico">
+                                <div class="indicador-item cursor-pointer p-1 rounded text-white-50" draggable="true"
+                                    data-ind="{{ id_sql }}" data-sub="equipo_medico" style="font-size:0.68rem;">
                                     {{ etiqueta }}
                                 </div>
                                 {% endfor %}
@@ -1316,55 +1194,60 @@
                     </div>
                 </details>
 
-                <div class="quick-settings mt-3">
-                    <div class="setting-row">
-                        <span class="setting-label">Detalle:</span>
-                        <div class="setting-controls">
-                            <select class="input-text-inline" id="modoVista">
-                                <option value="mensual">📅 Desglose Mensual</option>
-                                <option value="anual">📊 Total Anual</option>
-                            </select>
-                        </div>
+                <!-- CONFIGURACIÓN RÁPIDA DE LA GRÁFICA -->
+                <div
+                    class="quick-settings mt-2 pt-2 border-top border-secondary border-opacity-25 d-flex flex-column gap-2">
+                    <div class="setting-row d-flex align-items-center justify-content-between">
+                        <span class="setting-label text-white-50" style="font-size: 0.72rem;">Detalle:</span>
+                        <select class="form-select form-select-sm py-0 ps-2 pe-4" id="modoVista"
+                            style="font-size: 0.72rem; width: 65%;">
+                            <option value="mensual">📅 Desglose Mensual</option>
+                            <option value="anual">📊 Total Anual</option>
+                        </select>
                     </div>
 
-                    <div class="setting-row">
-                        <span class="setting-label">Gráfica:</span>
-                        <div class="setting-controls">
-                            <select class="input-text-inline" id="tipoGrafica">
-                                <optgroup label="Tendencias">
-                                    <option value="line">📈 Líneas</option>
-                                    <option value="bar">📊 Barras</option>
-                                    <option value="area">🎨 Área Sombreada</option>
-                                    <option value="scatter">📍 Puntos (Dispersión)</option>
-                                </optgroup>
-                                <optgroup label="Comparativos">
-                                    <option value="radar">🕸️ Radar</option>
-                                    <option value="polarArea">🔘 Área Polar</option>
-                                    <option value="doughnut">🍩 Anillo</option>
-                                    <option value="pie">🍕 Pastel</option>
-                                </optgroup>
-                            </select>
-                        </div>
+                    <div class="setting-row d-flex align-items-center justify-content-between">
+                        <span class="setting-label text-white-50" style="font-size: 0.72rem;">Gráfica:</span>
+                        <select class="form-select form-select-sm py-0 ps-2 pe-4" id="tipoGrafica"
+                            style="font-size: 0.72rem; width: 65%;">
+                            <optgroup label="Tendencias">
+                                <option value="line">📈 Líneas</option>
+                                <option value="bar">📊 Barras</option>
+                                <option value="area">🎨 Área Sombreada</option>
+                                <option value="scatter">📍 Puntos (Dispersión)</option>
+                            </optgroup>
+                            <optgroup label="Comparativos">
+                                <option value="radar">🕸️ Radar</option>
+                                <option value="polarArea">🔘 Área Polar</option>
+                                <option value="doughnut">🍩 Anillo</option>
+                                <option value="pie">🍕 Pastel</option>
+                            </optgroup>
+                        </select>
                     </div>
                 </div>
             </div>
             {% endif %}
 
-        </div>
+        </div> <!-- FIN SIDEBAR-TOP -->
 
-        <!-- BLOQUE INFERIOR (Cerrar sesión anclado abajo) -->
+        <!-- =========================================
+        BLOQUE INFERIOR (CERRAR SESIÓN ANCLADO ABAJO)
+        ========================================= -->
         {% if current_user.is_authenticated %}
-        <div class="sidebar-bottom"
-            style="padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;">
-            <a href="{{ url_for('main.logout') }}" class="menu-item logout">
-                🚪 Cerrar Sesión
+        <div class="sidebar-bottom py-2 px-2 border-top border-secondary border-opacity-25 flex-shrink-0 mt-auto">
+            <a href="{{ url_for('main.logout') }}"
+                class="menu-item logout d-flex align-items-center justify-content-center gap-2 py-1 px-2 rounded text-danger text-decoration-none fw-semibold transition-all"
+                style="font-size: 0.78rem; background-color: rgba(220, 53, 69, 0.1);"
+                onmouseover="this.style.backgroundColor='rgba(220, 53, 69, 0.25)'"
+                onmouseout="this.style.backgroundColor='rgba(220, 53, 69, 0.1)'">
+                <i class="bi bi-box-arrow-right fs-6"></i>
+                <span>Cerrar Sesión</span>
             </a>
         </div>
         {% endif %}
-
     </aside>
+</div> <!-- FIN SIDEBAR -->
 
-</div>
 
 
 
