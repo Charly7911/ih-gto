@@ -226,6 +226,7 @@
             </div>
             {% endif %}
 
+
             {# FILTROS: REPORTES (MORBILIDAD / MORTALIDAD) #}
             {% if ruta.startswith('/reportes') %}
             {% set sufijo = tipo|capitalize if tipo else '' %}
@@ -239,6 +240,7 @@
                         style="font-size: 0.72rem;">Nuevo filtro</button>
                 </div>
 
+                <!-- AÑOS -->
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Años</label>
                     <div class="checklist checklist-years d-flex flex-wrap gap-1">
@@ -250,6 +252,7 @@
                     </div>
                 </div>
 
+                <!-- MESES -->
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Meses</label>
                     <div class="checklist grid-3 d-grid gap-1" style="grid-template-columns: repeat(3, 1fr);">
@@ -261,6 +264,7 @@
                     </div>
                 </div>
 
+                <!-- TOP RESULTADOS -->
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Top
                         resultados</label>
@@ -273,12 +277,38 @@
                     </select>
                 </div>
 
+                <!-- UNIDAD MÉDICA -->
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Unidad</label>
                     <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
                         id="btnUnidades{{ sufijo }}" style="font-size: 0.75rem;">🔍 Seleccionar unidades</button>
                 </div>
 
+                <!-- POPOVER: UNIDADES -->
+                <div class="popover-unidades" id="popoverUnidades{{ sufijo }}" style="display: none;">
+                    <label class="filter-label d-block text-white mb-1" style="font-size: 0.72rem;">Buscar
+                        unidad</label>
+                    <input type="text" id="buscarUnidad{{ sufijo }}"
+                        class="input-text form-control form-control-sm mb-2" placeholder="Escribe para filtrar...">
+
+                    <div class="popover-list custom-scroll" style="max-height: 140px; overflow-y: auto;">
+                        {% for u in unidades_disponibles %}
+                        <label class="popover-item d-block text-white-50 mb-1 cursor-pointer"
+                            style="font-size: 0.72rem;">
+                            <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
+                        </label>
+                        {% endfor %}
+                    </div>
+
+                    <div class="popover-actions d-flex gap-2 justify-content-end mt-2">
+                        <button type="button" id="limpiarUnidades{{ sufijo }}"
+                            class="btn btn-xs btn-outline-secondary py-0" style="font-size: 0.7rem;">Limpiar</button>
+                        <button type="button" id="aplicarUnidades{{ sufijo }}" class="btn btn-xs btn-primary py-0"
+                            style="font-size: 0.7rem;">Aplicar</button>
+                    </div>
+                </div>
+
+                <!-- SERVICIO DE EGRESO -->
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Servicio de
                         egreso</label>
@@ -286,6 +316,40 @@
                         id="btnServicio{{ sufijo }}" style="font-size: 0.75rem;">🔍 Seleccionar Egreso</button>
                 </div>
 
+                <!-- 🟢 POPOVER: SERVICIOS DE EGRESO (CORREGIDO CON 'servicio_disponibles') -->
+                <div class="popover-unidades" id="popoverServicio{{ sufijo }}" style="display: none;">
+                    <label class="filter-label d-block text-white mb-1" style="font-size: 0.72rem;">Buscar
+                        Servicio</label>
+                    <input type="text" id="buscarServicio{{ sufijo }}"
+                        class="input-text form-control form-control-sm mb-2" placeholder="Escribe para filtrar...">
+
+                    <div class="popover-list custom-scroll" style="max-height: 140px; overflow-y: auto;">
+                        {% if servicio_disponibles is defined %}
+                        {% for a in servicio_disponibles %}
+                        <label class="popover-item d-block text-white-50 mb-1 cursor-pointer"
+                            style="font-size: 0.72rem;">
+                            <input type="checkbox" name="servicios" value="{{ a }}"> {{ a }}
+                        </label>
+                        {% endfor %}
+                        {% elif servicios_disponibles is defined %}
+                        {% for a in servicios_disponibles %}
+                        <label class="popover-item d-block text-white-50 mb-1 cursor-pointer"
+                            style="font-size: 0.72rem;">
+                            <input type="checkbox" name="servicios" value="{{ a }}"> {{ a }}
+                        </label>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+
+                    <div class="popover-actions d-flex gap-2 justify-content-end mt-2">
+                        <button type="button" id="limpiarServicios{{ sufijo }}"
+                            class="btn btn-xs btn-outline-secondary py-0" style="font-size: 0.7rem;">Limpiar</button>
+                        <button type="button" id="aplicarServicios{{ sufijo }}" class="btn btn-xs btn-primary py-0"
+                            style="font-size: 0.7rem;">Aplicar</button>
+                    </div>
+                </div>
+
+                <!-- AFECCIONES PRINCIPALES -->
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Afecciones
                         principales</label>
@@ -293,6 +357,31 @@
                         id="btnAfecciones{{ sufijo }}" style="font-size: 0.75rem;">🔍 Seleccionar afecciones</button>
                 </div>
 
+                <!-- POPOVER: AFECCIONES PRINCIPALES -->
+                <div class="popover-unidades" id="popoverAfecciones{{ sufijo }}" style="display: none;">
+                    <label class="filter-label d-block text-white mb-1" style="font-size: 0.72rem;">Buscar
+                        afección</label>
+                    <input type="text" id="buscarAfeccion{{ sufijo }}"
+                        class="input-text form-control form-control-sm mb-2" placeholder="Escribe para filtrar...">
+
+                    <div class="popover-list custom-scroll" style="max-height: 140px; overflow-y: auto;">
+                        {% for a in afecciones_disponibles %}
+                        <label class="popover-item d-block text-white-50 mb-1 cursor-pointer"
+                            style="font-size: 0.72rem;">
+                            <input type="checkbox" name="afecciones" value="{{ a }}"> {{ a }}
+                        </label>
+                        {% endfor %}
+                    </div>
+
+                    <div class="popover-actions d-flex gap-2 justify-content-end mt-2">
+                        <button type="button" id="limpiarAfecciones{{ sufijo }}"
+                            class="btn btn-xs btn-outline-secondary py-0" style="font-size: 0.7rem;">Limpiar</button>
+                        <button type="button" id="aplicarAfecciones{{ sufijo }}" class="btn btn-xs btn-primary py-0"
+                            style="font-size: 0.7rem;">Aplicar</button>
+                    </div>
+                </div>
+
+                <!-- BOTONES DE ACCIÓN -->
                 <div class="d-flex gap-2 mt-2">
                     <button class="btn-apply btn btn-sm btn-info flex-grow-1 fw-bold py-1" id="btnFiltrar{{ sufijo }}"
                         style="font-size: 0.75rem;">Aplicar</button>
@@ -301,6 +390,7 @@
                 </div>
             </div>
             {% endif %}
+
 
             {# FILTROS: URGENCIAS #}
             {% if ruta.startswith('/urgencias') %}
@@ -312,6 +402,7 @@
                         style="font-size: 0.72rem;">Nuevo filtro</button>
                 </div>
 
+                <!-- AÑOS -->
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Años</label>
                     <div class="checklist checklist-years d-flex flex-wrap gap-1">
@@ -323,12 +414,38 @@
                     </div>
                 </div>
 
+                <!-- UNIDAD MÉDICA -->
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Unidad</label>
                     <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
                         id="btnUnidades" style="font-size: 0.75rem;">🔍 Seleccionar unidades</button>
                 </div>
 
+                <!-- 🟢 POPOVER / MODAL DE UNIDADES RECUPERADO -->
+                <div class="popover-unidades" id="popoverUnidades" style="display: none;">
+                    <label class="filter-label d-block text-white mb-1" style="font-size: 0.72rem;">Buscar
+                        unidad</label>
+                    <input type="text" id="buscarUnidad" class="input-text form-control form-control-sm mb-2"
+                        placeholder="Escribe para filtrar...">
+
+                    <div class="popover-list custom-scroll" style="max-height: 140px; overflow-y: auto;">
+                        {% for u in unidades_disponibles %}
+                        <label class="popover-item d-block text-white-50 mb-1 cursor-pointer"
+                            style="font-size: 0.72rem;">
+                            <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
+                        </label>
+                        {% endfor %}
+                    </div>
+
+                    <div class="popover-actions d-flex gap-2 justify-content-end mt-2">
+                        <button type="button" id="limpiarUnidades" class="btn btn-xs btn-outline-secondary py-0"
+                            style="font-size: 0.7rem;">Limpiar</button>
+                        <button type="button" id="aplicarUnidades" class="btn btn-xs btn-primary py-0"
+                            style="font-size: 0.7rem;">Aplicar</button>
+                    </div>
+                </div>
+
+                <!-- MESES -->
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Meses</label>
                     <div class="checklist grid-3 d-grid gap-1" style="grid-template-columns: repeat(3, 1fr);">
@@ -344,6 +461,7 @@
                     style="font-size: 0.78rem;">Aplicar filtros</button>
             </div>
             {% endif %}
+
 
             {# FILTROS: SIS PRIMER NIVEL #}
             {% set path_actual = request.path if request is defined and request.path is defined else (ruta if ruta is
@@ -416,7 +534,7 @@
                 <button class="btn-apply btn btn-sm btn-info w-100 fw-bold py-1 mt-1" id="btnFiltrarSis"
                     style="font-size: 0.78rem;">Aplicar filtros</button>
             </div>
-            {% endif %}
+
 
             //PARTE 2
 
@@ -502,6 +620,7 @@
                         style="font-size: 0.72rem;">Nuevo filtro</button>
                 </div>
 
+                <!-- AÑOS -->
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Años</label>
                     <div class="checklist checklist-years d-flex flex-wrap gap-1">
@@ -513,12 +632,38 @@
                     </div>
                 </div>
 
+                <!-- UNIDAD MÉDICA -->
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Unidad</label>
                     <button type="button" class="btn-selector btn btn-sm btn-outline-light w-100 text-start py-1"
                         id="btnUnidades" style="font-size: 0.75rem;">🔍 Seleccionar unidades</button>
                 </div>
 
+                <!-- 🟢 CONTENEDOR DEL POPOVER RECUPERADO -->
+                <div class="popover-unidades" id="popoverUnidades" style="display: none;">
+                    <label class="filter-label d-block text-white mb-1" style="font-size: 0.72rem;">Buscar
+                        unidad</label>
+                    <input type="text" id="buscarUnidad" class="input-text form-control form-control-sm mb-2"
+                        placeholder="Escribe para filtrar...">
+
+                    <div class="popover-list custom-scroll" style="max-height: 140px; overflow-y: auto;">
+                        {% for u in unidades_disponibles %}
+                        <label class="popover-item d-block text-white-50 mb-1 cursor-pointer"
+                            style="font-size: 0.72rem;">
+                            <input type="checkbox" name="unidades" value="{{ u }}"> {{ u }}
+                        </label>
+                        {% endfor %}
+                    </div>
+
+                    <div class="popover-actions d-flex gap-2 justify-content-end mt-2">
+                        <button type="button" id="limpiarUnidades" class="btn btn-xs btn-outline-secondary py-0"
+                            style="font-size: 0.7rem;">Limpiar</button>
+                        <button type="button" id="aplicarUnidades" class="btn btn-xs btn-primary py-0"
+                            style="font-size: 0.7rem;">Aplicar</button>
+                    </div>
+                </div>
+
+                <!-- MESES -->
                 <div class="filter-block mb-2">
                     <label class="filter-label d-block text-white-50 mb-1" style="font-size: 0.72rem;">Meses</label>
                     <div class="checklist grid-3 d-grid gap-1" style="grid-template-columns: repeat(3, 1fr);">
@@ -1284,7 +1429,6 @@
     window.dragGrupoUnidades = function (event, tipoGrupo) {
         let unidades = [];
 
-        // 1. SI ES 'TODAS' Y TENEMOS LA VARIABLE DEL SERVIDOR: Respuesta instantánea (0ms)
         if (tipoGrupo === 'TODAS' && window.CATALOGO_UNIDADES_SERVIDO && window.CATALOGO_UNIDADES_SERVIDO.length > 0) {
             unidades = window.CATALOGO_UNIDADES_SERVIDO.map(u => ({
                 value: String(u.clues),
@@ -1292,7 +1436,6 @@
             }));
         }
 
-        // 2. SI NO SE OBTUVIERON (O ES HG, HC, HE): Buscar en el DOM
         if (unidades.length === 0) {
             let elementos = [];
             const acordeonPrincipal = event.target.closest('.acordeon-indicadores, .filter-block-acordeon, #sidebar, body') || document;
@@ -1328,8 +1471,6 @@
             });
         }
 
-
-
         const payload = {
             type: 'grupo_unidades',
             grupo: tipoGrupo,
@@ -1341,8 +1482,7 @@
         event.dataTransfer.setData('text', payloadString);
     };
 
-
-    const tipo = "{{ tipo }}"; // morbi | morta | urg | urgencias | sis | egresos | ind | indicadores
+    const tipo = "{{ tipo }}";
     const sufijo = tipo ? (tipo.charAt(0).toUpperCase() + tipo.slice(1)) : "";
 
     document.addEventListener("DOMContentLoaded", function () {
@@ -1434,13 +1574,6 @@
                 document.querySelector(".popover-unidades");
         };
 
-        const buscarUnidad = document.getElementById(`buscarUnidad${sufijo}`) ||
-            document.getElementById("buscarUnidadSis") ||
-            document.getElementById("buscarUnidadUrgencias") ||
-            document.getElementById("buscarUnidadIndicadores") ||
-            document.getElementById("buscarUnidadEgresos") ||
-            document.getElementById("buscarUnidad");
-
         const btnJurisdicciones = document.getElementById("btnJurisdicciones");
         const popoverJurisdicciones = document.getElementById("popoverJurisdicciones");
         const buscarJurisdiccion = document.getElementById("buscarJurisdiccion");
@@ -1451,7 +1584,6 @@
 
         const btnAfecciones = document.getElementById(`btnAfecciones${sufijo}`) || document.getElementById("btnAfecciones");
         const popoverAfecciones = document.getElementById(`popoverAfecciones${sufijo}`) || document.querySelector(".popover-afecciones");
-        const buscarAfeccion = document.getElementById(`buscarAfeccion${sufijo}`) || document.getElementById("buscarAfeccion");
 
         const btnServicio = document.getElementById(`btnServicio${sufijo}`) ||
             document.getElementById("btnServicioSis") ||
@@ -1467,8 +1599,6 @@
             document.getElementById("popoverServicioEgresos") ||
             document.querySelector(".popover-servicios");
 
-        const buscarServicio = document.getElementById(`buscarServicio${sufijo}`) || document.getElementById("buscarServicio");
-
         // ======================================================
         // 1.1 FILTRADO EN CASCADA DE MUNICIPIOS Y UNIDADES
         // ======================================================
@@ -1478,31 +1608,25 @@
 
             if (!popoverMun) return;
 
-            // 1. Obtener Jurisdicciones seleccionadas
             let jurisdiccionesActivas = [];
             if (popoverJur) {
                 const checks = popoverJur.querySelectorAll('input[type="checkbox"]:checked');
                 jurisdiccionesActivas = Array.from(checks).map(cb => String(cb.value).trim().replace(/^0+/, ''));
             }
 
-            // Si no hay jurisdicciones seleccionadas, mostramos todos los municipios de inmediato
             if (jurisdiccionesActivas.length === 0) {
                 const items = popoverMun.querySelectorAll('.popover-item, label, .form-check, div:has(> input)');
                 items.forEach(item => item.style.display = "");
                 return;
             }
 
-            // 2. Buscar si existe alguna variable de datos global disponible
             const datasetGlobal = window.datos || window.datosGlobales || window.datosOriginales || window.dataset || [];
-
-            // 3. Filtrar los elementos visuales en el DOM
             const itemsMunicipio = popoverMun.querySelectorAll('.popover-item, label, .form-check, div:has(> input)');
 
             itemsMunicipio.forEach(item => {
                 const cb = item.querySelector('input[type="checkbox"]');
                 if (!cb) return;
 
-                // Intentar obtener la jurisdicción asociada al municipio directamente desde los atributos HTML
                 const jurAttr = item.dataset.jurisdiccion ||
                     cb.dataset.jurisdiccion ||
                     item.getAttribute('data-jurisdiccion') ||
@@ -1513,11 +1637,9 @@
                 let coincide = false;
 
                 if (jurAttr) {
-                    // Comparación directa por atributo HTML (ej. data-jurisdiccion="1")
                     const valJurSinCeros = String(jurAttr).trim().replace(/^0+/, '');
                     coincide = jurisdiccionesActivas.includes(valJurSinCeros);
                 } else if (datasetGlobal.length > 0) {
-                    // Si hay datos en memoria, intentamos cruzar con la base de datos
                     const nombreMun = (cb.value || item.textContent).trim().toLowerCase();
                     coincide = datasetGlobal.some(row => {
                         const jurRow = String(row.jurisdiccion || row.cve_jurisdiccion || '').trim().replace(/^0+/, '');
@@ -1525,7 +1647,6 @@
                         return jurisdiccionesActivas.includes(jurRow) && munRow === nombreMun;
                     });
                 } else {
-                    // Respeta la visibilidad si no hay información de mapeo disponible
                     coincide = true;
                 }
 
@@ -1534,20 +1655,18 @@
                 } else {
                     item.style.display = "none";
                     if (cb.checked) {
-                        cb.checked = false; // Desmarca si se oculta
+                        cb.checked = false;
                     }
                 }
             });
         }
 
-        // Delegación global para cambios en checkboxes de Jurisdicción
         document.addEventListener('change', (e) => {
             if (e.target.matches('#popoverJurisdicciones input[type="checkbox"], [data-popover="jurisdiccion"] input[type="checkbox"]')) {
                 actualizarRelacionJurisdiccionMunicipio();
             }
         });
 
-        // Ejecución inicial al cargar la vista
         actualizarRelacionJurisdiccionMunicipio();
 
         // ======================================================
@@ -1579,8 +1698,6 @@
                 }
 
                 if (typeof ejecutarCargaGraficaYDatos === "function") {
-
-
                     ejecutarCargaGraficaYDatos();
                 }
             });
@@ -1683,14 +1800,14 @@
         }, true);
 
         // ======================================================
-        // 2. BUSCADORES INTERNOS LOCALES
+        // 2. BUSCADORES INTERNOS LOCALES (RESOLUCIÓN DINÁMICA)
         // ======================================================
-        function asociarBuscadorInterno(inputIdOrEl, obtenerPopFn) {
-            const inputEl = typeof inputIdOrEl === "string" ? document.getElementById(inputIdOrEl) : inputIdOrEl;
-            if (!inputEl) return;
+        function asociarBuscadorInterno(getResolverFn, obtenerPopFn) {
+            document.addEventListener("input", function (e) {
+                const targetInput = typeof getResolverFn === "function" ? getResolverFn() : getResolverFn;
+                if (!targetInput || e.target !== targetInput) return;
 
-            inputEl.addEventListener("input", function () {
-                const query = this.value.toLowerCase().trim();
+                const query = targetInput.value.toLowerCase().trim();
                 const contenedorPop = typeof obtenerPopFn === "function" ? obtenerPopFn() : obtenerPopFn;
 
                 if (!contenedorPop) return;
@@ -1716,11 +1833,30 @@
             });
         }
 
-        asociarBuscadorInterno(typeof buscarUnidad !== "undefined" ? buscarUnidad : "buscarUnidad", obtenerPopoverUnidades);
-        asociarBuscadorInterno(buscarJurisdiccion, popoverJurisdicciones);
-        asociarBuscadorInterno(buscarMunicipio, popoverMunicipios);
-        asociarBuscadorInterno(typeof buscarServicio !== "undefined" ? buscarServicio : "buscarServicio", typeof popoverServicio !== "undefined" ? popoverServicio : "popoverServicio");
-        asociarBuscadorInterno(typeof buscarAfeccion !== "undefined" ? buscarAfeccion : "buscarAfeccion", typeof popoverAfecciones !== "undefined" ? popoverAfecciones : "popoverAfecciones");
+        asociarBuscadorInterno(() => {
+            return document.getElementById(`buscarUnidad${sufijo}`) ||
+                document.getElementById("buscarUnidadSis") ||
+                document.getElementById("buscarUnidadUrgencias") ||
+                document.getElementById("buscarUnidadIndicadores") ||
+                document.getElementById("buscarUnidadEgresos") ||
+                document.getElementById("buscarUnidad") ||
+                document.querySelector(".popover-unidades input[type='text']");
+        }, obtenerPopoverUnidades);
+
+        asociarBuscadorInterno(() => buscarJurisdiccion, () => popoverJurisdicciones);
+        asociarBuscadorInterno(() => buscarMunicipio, () => popoverMunicipios);
+
+        asociarBuscadorInterno(() => {
+            return document.getElementById(`buscarServicio${sufijo}`) ||
+                document.getElementById("buscarServicio") ||
+                document.querySelector("#popoverServicio input[type='text']");
+        }, () => popoverServicio || document.getElementById(`popoverServicio${sufijo}`));
+
+        asociarBuscadorInterno(() => {
+            return document.getElementById(`buscarAfeccion${sufijo}`) ||
+                document.getElementById("buscarAfeccion") ||
+                document.querySelector("#popoverAfecciones input[type='text']");
+        }, () => popoverAfecciones || document.getElementById(`popoverAfecciones${sufijo}`));
 
         // ======================================================
         // 3. RECUPERACIÓN AISLADA DE UNIDADES Y DRAG & DROP
@@ -1730,9 +1866,6 @@
             if (!pop) return [];
             return Array.from(pop.querySelectorAll('input[type="checkbox"]'));
         }
-
-
-        // PARTE 2
 
         function extraerTextoLimpio(cb) {
             const parent = cb.closest('.popover-item') || cb.closest('label') || cb.closest('.check-unidad') || cb.closest('.form-check') || cb.parentElement;
@@ -1809,18 +1942,14 @@
         }
 
         function obtenerJurisdiccionesSeleccionadasGlobal() {
-
             if (!popoverJurisdicciones) return [];
             const checkboxes = popoverJurisdicciones.querySelectorAll('input[type="checkbox"]:checked');
-
             return Array.from(checkboxes).map(cb => cb.value);
         }
 
         function obtenerMunicipiosSeleccionadosGlobal() {
-
             if (!popoverMunicipios) return [];
             const checkboxes = popoverMunicipios.querySelectorAll('input[type="checkbox"]:checked');
-
             return Array.from(checkboxes).map(cb => cb.value);
         }
 
@@ -1879,10 +2008,7 @@
             if (typeof renderChartSis === "function") renderChartSis();
         }
 
-        // parte 2
-
         async function ejecutarCargaGraficaYDatos() {
-            // 1. Actualización de textos en botones
             const btnActual = obtenerBotonUnidades();
             const totalSelUnidades = obtenerCheckboxesUnidadesGlobal().length;
             if (btnActual) btnActual.textContent = totalSelUnidades > 0 ? `🔍 Unidades (${totalSelUnidades})` : "🔍 Seleccionar unidades";
@@ -1899,7 +2025,6 @@
             const totalSelAfecciones = obtenerAfeccionesSeleccionadasGlobal().length;
             if (btnAfecciones) btnAfecciones.textContent = totalSelAfecciones > 0 ? `🔍 Afecciones (${totalSelAfecciones})` : "🔍 Seleccionar afecciones";
 
-            // 2. Preparar Payload
             const payloadFiltros = {
                 agrupar_por: selectNivel ? selectNivel.value : 'clues',
                 anios: obtenerAniosSeleccionadosGlobal(),
@@ -1914,7 +2039,6 @@
             window.filtrosSis = Object.assign(window.filtrosSis || {}, payloadFiltros);
             window.filtros = Object.assign(window.filtros || {}, payloadFiltros);
 
-            // 3. Peticiones HTTP asíncronas (Backend)
             if (typeof window.cargarDatosSis === "function") await window.cargarDatosSis();
             if (typeof window.ejecutarFiltradoSis === "function") await window.ejecutarFiltradoSis();
             if (typeof cargarTablaSis === "function") await cargarTablaSis();
@@ -1923,20 +2047,16 @@
             if (typeof cargarDatosIndicadores === "function") await cargarDatosIndicadores();
             if (typeof cargarDatosEgresos === "function") await cargarDatosEgresos();
 
-            // 4. Disparar eventos secundarios
             document.dispatchEvent(new CustomEvent("aplicarFiltroUnidades", { detail: payloadFiltros }));
 
-            // 5. Dibujar gráficas (Render)
             if (typeof ejecutarGraficasSis === "function") ejecutarGraficasSis();
             if (typeof actualizarGraficaDrag === "function") actualizarGraficaDrag();
             if (typeof renderGraficaUrg === "function") renderGraficaUrg();
             if (typeof renderGraficaIndicadores === "function") renderGraficaIndicadores();
             if (typeof renderGraficaEgresos === "function") renderGraficaEgresos();
 
-            // 6. Esperar a que el navegador termine de pintar el DOM y Canvas
             await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 100)));
 
-            // 7. Ocultar la animación/loader de forma segura
             if (typeof ocultarCargandoGrafica === "function") {
                 ocultarCargandoGrafica();
             } else if (typeof window.ocultarCargandoGrafica === "function") {
@@ -1945,7 +2065,7 @@
         }
 
         // ======================================================
-        // 6. DISPARO POR BOTONES DE ACCIÓN
+        // 6. DISPARO POR BOTONES DE ACCIÓN Y LIMPIADORES
         // ======================================================
         const selectoresBotonesAccion = [
             `#aplicarUnidades${sufijo}`, "#aplicarUnidades", "#aplicarUnidadesSis", "#btnAplicarSis",
@@ -1974,25 +2094,21 @@
                 cerrar(popoverServicio);
                 cerrar(popoverAfecciones);
 
-                // 1. Mostrar la capa de carga
                 const loader = document.getElementById("loaderOverlay");
                 if (loader) loader.style.display = "flex";
 
-                // 2. Ejecutar la función y ESPERAR a que termine todo el procesamiento
                 setTimeout(async () => {
                     try {
                         await ejecutarCargaGraficaYDatos();
                     } catch (error) {
                         console.error("Error al actualizar datos y gráficas:", error);
                     } finally {
-                        // 3. Ocultar el loader solo hasta que las llamadas hayan finalizado
                         if (loader) loader.style.display = "none";
                     }
                 }, 50);
             }
         });
 
-        // Limpiadores individuales
         document.getElementById("limpiarJurisdicciones")?.addEventListener("click", () => {
             if (popoverJurisdicciones) {
                 popoverJurisdicciones.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
@@ -2019,7 +2135,7 @@
         });
 
         document.addEventListener("click", (e) => {
-            if (e.target.closest("#limpiarUnidades, #limpiarUnidades" + sufijo)) {
+            if (e.target.closest("#limpiarUnidades, #limpiarUnidades" + sufijo + ", [id^='limpiarUnidades']")) {
                 const popUnidades = obtenerPopoverUnidades();
                 if (popUnidades) {
                     popUnidades.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
@@ -2039,9 +2155,7 @@
         // ======================================================
         // 7. RESET GENERAL Y ESCUCHA DE CAMBIOS DIRECTOS
         // ======================================================
-
         document.addEventListener("click", function (e) {
-            // 🎯 Captura el clic en cualquier botón de reset/limpiar
             const btnReset = e.target.closest(
                 '#btnResetAll, #btnResetSis, #btnResetIndicadores, #btnResetUrgencias, #btnResetEgresos, #btnResetMorb, #btnResetMort, #btnLimpiar, #btnReset' + (typeof sufijo !== 'undefined' ? sufijo : '') + ', .btn-reset, .btn-limpiar, .btn-reset-link, .btn-limpiar-egresos'
             );
@@ -2049,77 +2163,34 @@
             if (!btnReset) return;
             e.preventDefault();
 
-            console.log("🔍 Clic capturado en botón reset:", btnReset);
-
-            // ======================================================
-            // 1. MÓDULO DE INDICADORES
-            // ======================================================
             if (typeof window.resetearVistaIndicadores === 'function') {
-                console.log("⚡ Ejecutando resetearVistaIndicadores()");
                 window.resetearVistaIndicadores();
-
-                if (typeof unidadesSeleccionadas !== 'undefined') {
-                    if (typeof unidadesSeleccionadas.clear === 'function') unidadesSeleccionadas.clear();
-                    else unidadesSeleccionadas = [];
-                }
                 const btnUnidadesInd = document.getElementById("btnUnidades");
                 if (btnUnidadesInd) btnUnidadesInd.textContent = "🔍 Seleccionar unidades";
                 return;
             }
 
-            // ======================================================
-            // 2. MÓDULO DE URGENCIAS
-            // ======================================================
             if (typeof window.resetearVistaUrgencias === 'function') {
-                console.log("⚡ Ejecutando resetearVistaUrgencias()");
                 window.resetearVistaUrgencias();
-
-                if (typeof unidadesSeleccionadas !== 'undefined') {
-                    if (typeof unidadesSeleccionadas.clear === 'function') unidadesSeleccionadas.clear();
-                    else unidadesSeleccionadas = [];
-                }
                 const btnUnidadesUrg = document.getElementById("btnUnidades");
                 if (btnUnidadesUrg) btnUnidadesUrg.textContent = "🔍 Seleccionar unidades";
                 return;
             }
 
-            // ======================================================
-            // 3. MÓDULO DE EGRESOS
-            // ======================================================
             if (typeof window.resetearVistaEgresos === 'function') {
-                console.log("⚡ Ejecutando resetearVistaEgresos()");
                 window.resetearVistaEgresos();
-
-                if (typeof unidadesSeleccionadas !== 'undefined') {
-                    if (typeof unidadesSeleccionadas.clear === 'function') unidadesSeleccionadas.clear();
-                    else unidadesSeleccionadas = [];
-                }
                 const btnUnidadesEgre = document.getElementById("btnUnidades");
                 if (btnUnidadesEgre) btnUnidadesEgre.textContent = "🔍 Seleccionar unidades";
                 return;
             }
 
-            // ======================================================
-            // 4. MÓDULO DE MORBILIDAD / MORTALIDAD (Añadido)
-            // ======================================================
             const fnResetMorbMort = window.resetearVistaMorbilidadMortalidad || window.resetearVistaMorbilidad || window.resetearVistaMortalidad;
             if (typeof fnResetMorbMort === 'function') {
-                console.log("⚡ Ejecutando resetearVistaMorbilidadMortalidad()");
                 fnResetMorbMort();
-
-                if (typeof unidadesSeleccionadas !== 'undefined') {
-                    if (typeof unidadesSeleccionadas.clear === 'function') unidadesSeleccionadas.clear();
-                    else unidadesSeleccionadas = [];
-                }
                 const btnUnidadesMM = document.getElementById("btnUnidades");
                 if (btnUnidadesMM) btnUnidadesMM.textContent = "🔍 Seleccionar unidades";
                 return;
             }
-
-            // ======================================================
-            // 5. MÓDULOS SIS / TEMPORAL (Fallback General)
-            // ======================================================
-            console.log("⚡ Ejecutando reset general (SIS)");
 
             if (typeof VARIABLES_DEFAULT !== 'undefined' && typeof variablesPersonalizadasEstado !== 'undefined') {
                 variablesPersonalizadasEstado = typeof structuredClone === 'function'
@@ -2136,15 +2207,9 @@
             const selectDesglose = document.getElementById("selectModoDesglose");
             if (selectDesglose) selectDesglose.value = "por_apartado";
 
-            if (typeof toggleModoDesglose === 'function') {
-                toggleModoDesglose();
-            }
+            if (typeof toggleModoDesglose === 'function') toggleModoDesglose();
+            if (typeof renderSubvariables === 'function') renderSubvariables();
 
-            if (typeof renderSubvariables === 'function') {
-                renderSubvariables();
-            }
-
-            // Desmarcar checkboxes
             document.querySelectorAll('.menu-filtros input[type="checkbox"], .popover-unidades input[type="checkbox"], .popover-content input[type="checkbox"]').forEach(cb => {
                 cb.checked = false;
             });
@@ -2191,9 +2256,7 @@
                 window.datosFiltradosSis = JSON.parse(JSON.stringify(window.datosOriginalesSis));
             }
 
-            if (typeof paginaActual !== 'undefined') {
-                paginaActual = 1;
-            }
+            if (typeof paginaActual !== 'undefined') paginaActual = 1;
 
             if (typeof actualizarRelacionJurisdiccionMunicipio === 'function') {
                 actualizarRelacionJurisdiccionMunicipio();
@@ -2215,6 +2278,41 @@
             }
         });
 
+        // ======================================================
+        // CORRECCIÓN DIRECTA: BUSCADOR EN TIEMPO REAL PARA POPOVERS
+        // ======================================================
+        document.addEventListener("input", function (e) {
+            // Detecta si se está escribiendo en el buscador de Unidades, Servicios o Afecciones
+            const esBuscadorPopover = e.target.closest(".popover-unidades, .popover-servicios, .popover-afecciones") && 
+                                     (e.target.matches("input[type='text'], input[type='search']"));
+
+            if (!esBuscadorPopover) return;
+
+            const textoBusqueda = e.target.value.toLowerCase().trim();
+            const popoverContenedor = e.target.closest(".popover-unidades, .popover-servicios, .popover-afecciones");
+
+            if (!popoverContenedor) return;
+
+            // Selecciona todos los elementos de la lista dentro del popover
+            const items = popoverContenedor.querySelectorAll(".popover-item, label.popover-item, .popover-list label, .form-check");
+
+            items.forEach(function (item) {
+                // Evita ocultar las acciones de limpiar/aplicar o encabezados
+                if (item.closest('.popover-actions') || item.classList.contains('filter-label')) {
+                    return;
+                }
+
+                const textoElemento = item.textContent.toLowerCase();
+
+                if (textoBusqueda === "") {
+                    item.style.setProperty("display", "", "important");
+                } else if (textoElemento.includes(textoBusqueda)) {
+                    item.style.setProperty("display", "block", "important");
+                } else {
+                    item.style.setProperty("display", "none", "important");
+                }
+            });
+        });
 
     });
 </script>
