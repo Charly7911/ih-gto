@@ -269,7 +269,11 @@
     let idPeticionActual = 0;
     let idPeticionPrincipal = 0;
 
-    let variablesPersonalizadasEstado = structuredClone(VARIABLES_DEFAULT);
+    window.variablesPersonalizadasEstado = window.variablesPersonalizadasEstado || (
+        typeof structuredClone === 'function'
+            ? structuredClone(VARIABLES_DEFAULT)
+            : JSON.parse(JSON.stringify(VARIABLES_DEFAULT))
+    );
 
     let graficaAnio = null;
     let graficaUnidad = null;
