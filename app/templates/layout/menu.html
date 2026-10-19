@@ -810,7 +810,7 @@
 
                     <div class="filter-block-acordeon">
 
-                        <!-- HOSPITALES GENERALES -->
+                        <!-- HOSPITALES GENERALES (HG) -->
                         <details class="sub-acordeon mb-1">
                             <summary
                                 class="d-flex justify-content-between align-items-center text-white-50 py-1 cursor-pointer"
@@ -830,20 +830,24 @@
                                 <div id="listaGenerales"
                                     class="popover-list-inline custom-scroll unidad-container overflow-y-auto"
                                     data-tipo="HG" style="max-height: 120px;">
-                                    {% for u in unidades_generales %}
+                                    {% for u in unidades_generales | default([]) %}
+                                    {% set u_id = u.id if u.id is defined else (u['id'] if u is mapping and 'id' in u
+                                    else u) %}
+                                    {% set u_nom = u.nombre if u.nombre is defined else (u['nombre'] if u is mapping and
+                                    'nombre' in u else u) %}
                                     <div class="item-unidad-drag searchable-item p-1 mb-1 rounded text-white-50 d-flex align-items-center gap-1 w-100"
                                         draggable="true"
                                         style="cursor:grab; font-size:0.7rem; background-color: rgba(255,255,255,0.05);"
-                                        ondragstart="dragUnidadIndividual(event, '{{ u.id if u.id else u }}', '{{ u.nombre if u.nombre else u }}')">
+                                        ondragstart="dragUnidadIndividual(event, '{{ u_id }}', '{{ u_nom }}')">
                                         <i class="bi bi-grip-vertical text-muted"></i>
-                                        <span class="text-truncate">{{ u.nombre if u.nombre else u }}</span>
+                                        <span class="text-truncate">{{ u_nom }}</span>
                                     </div>
                                     {% endfor %}
                                 </div>
                             </div>
                         </details>
 
-                        <!-- HOSPITALES COMUNITARIOS -->
+                        <!-- HOSPITALES COMUNITARIOS (HC) -->
                         <details class="sub-acordeon mb-1">
                             <summary
                                 class="d-flex justify-content-between align-items-center text-white-50 py-1 cursor-pointer"
@@ -863,20 +867,24 @@
                                 <div id="listaComunitarios"
                                     class="popover-list-inline custom-scroll unidad-container overflow-y-auto"
                                     data-tipo="HC" style="max-height: 120px;">
-                                    {% for u in unidades_comunitarios %}
+                                    {% for u in unidades_comunitarios | default([]) %}
+                                    {% set u_id = u.id if u.id is defined else (u['id'] if u is mapping and 'id' in u
+                                    else u) %}
+                                    {% set u_nom = u.nombre if u.nombre is defined else (u['nombre'] if u is mapping and
+                                    'nombre' in u else u) %}
                                     <div class="item-unidad-drag searchable-item p-1 mb-1 rounded text-white-50 d-flex align-items-center gap-1 w-100"
                                         draggable="true"
                                         style="cursor:grab; font-size:0.7rem; background-color: rgba(255,255,255,0.05);"
-                                        ondragstart="dragUnidadIndividual(event, '{{ u.id if u.id else u }}', '{{ u.nombre if u.nombre else u }}')">
+                                        ondragstart="dragUnidadIndividual(event, '{{ u_id }}', '{{ u_nom }}')">
                                         <i class="bi bi-grip-vertical text-muted"></i>
-                                        <span class="text-truncate">{{ u.nombre if u.nombre else u }}</span>
+                                        <span class="text-truncate">{{ u_nom }}</span>
                                     </div>
                                     {% endfor %}
                                 </div>
                             </div>
                         </details>
 
-                        <!-- ESPECIALIDAD -->
+                        <!-- ESPECIALIDAD (HE) -->
                         <details class="sub-acordeon mb-1">
                             <summary
                                 class="d-flex justify-content-between align-items-center text-white-50 py-1 cursor-pointer"
@@ -896,18 +904,23 @@
                                 <div id="listaEspecialidad"
                                     class="popover-list-inline custom-scroll unidad-container overflow-y-auto"
                                     data-tipo="HE" style="max-height: 120px;">
-                                    {% for u in unidades_especialidad %}
+                                    {% for u in unidades_especialidad | default([]) %}
+                                    {% set u_id = u.id if u.id is defined else (u['id'] if u is mapping and 'id' in u
+                                    else u) %}
+                                    {% set u_nom = u.nombre if u.nombre is defined else (u['nombre'] if u is mapping and
+                                    'nombre' in u else u) %}
                                     <div class="item-unidad-drag searchable-item p-1 mb-1 rounded text-white-50 d-flex align-items-center gap-1 w-100"
                                         draggable="true"
                                         style="cursor:grab; font-size:0.7rem; background-color: rgba(255,255,255,0.05);"
-                                        ondragstart="dragUnidadIndividual(event, '{{ u.id if u.id else u }}', '{{ u.nombre if u.nombre else u }}')">
+                                        ondragstart="dragUnidadIndividual(event, '{{ u_id }}', '{{ u_nom }}')">
                                         <i class="bi bi-grip-vertical text-muted"></i>
-                                        <span class="text-truncate">{{ u.nombre if u.nombre else u }}</span>
+                                        <span class="text-truncate">{{ u_nom }}</span>
                                     </div>
                                     {% endfor %}
                                 </div>
                             </div>
                         </details>
+
                     </div>
                 </details>
 
