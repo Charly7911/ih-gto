@@ -2156,7 +2156,34 @@
         // ======================================================
         // 7. RESET GENERAL Y ESCUCHA DE CAMBIOS DIRECTOS
         // ======================================================
+
+        // Función auxiliar para restaurar el texto visual de TODOS los botones selector
+        function restablecerTextosBotones() {
+            // 🟢 Resetea botones de unidades (con cualquier sufijo: Morbi, Mort, Urg, SIS, etc.)
+            document.querySelectorAll('[id^="btnUnidades"], .btn-selector-unidades').forEach(btn => {
+                btn.textContent = "🔍 Seleccionar unidades";
+            });
+
+            // 🟢 Resetea botones de servicios/egresos
+            document.querySelectorAll('[id^="btnServicio"], .btn-selector-servicio').forEach(btn => {
+                btn.textContent = "🔍 Seleccionar Egreso";
+            });
+
+            // 🟢 Resetea botones de afecciones
+            document.querySelectorAll('[id^="btnAfecciones"], .btn-selector-afecciones').forEach(btn => {
+                btn.textContent = "🔍 Seleccionar afecciones";
+            });
+
+            // 🟢 Resetea botones de jurisdicciones y municipios
+            const btnJur = document.getElementById("btnJurisdicciones");
+            if (btnJur) btnJur.textContent = "🔍 Seleccionar jurisdicciones";
+
+            const btnMun = document.getElementById("btnMunicipios");
+            if (btnMun) btnMun.textContent = "🔍 Seleccionar municipios";
+        }
+
         document.addEventListener("click", function (e) {
+            // Captura clic en cualquier enlace o botón de reset
             const btnReset = e.target.closest(
                 '#btnResetAll, #btnResetSis, #btnResetIndicadores, #btnResetUrgencias, #btnResetEgresos, #btnResetMorb, #btnResetMort, #btnLimpiar, #btnReset' + (typeof sufijo !== 'undefined' ? sufijo : '') + ', .btn-reset, .btn-limpiar, .btn-reset-link, .btn-limpiar-egresos'
             );
@@ -2164,35 +2191,76 @@
             if (!btnReset) return;
             e.preventDefault();
 
+            // 1. Limpieza general de checkboxes en pantalla
+            document.querySelectorAll('.menu-filtros input[type="checkbox"], .popover-unidades input[type="checkbox"], .popover-servicios input[type="checkbox"], .popover-afecciones input[type="checkbox"], .popover-content input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+            });
+
+            // 2. Limpieza de cajas de texto
+            document.querySelectorAll('input[type="text"], input[type="search"]').forEach(inp => {
+                inp.value = "";
+            });
+
+            // 3. Forzar el cambio de texto de todos los botones ANTES de evaluar vistas específicas
+            restablecerTextosBotones();
+
+            // 4. Reset seguro de estructuras de datos (Solución a SonarQube S2703)
+            if (window.unidadesSeleccionadas) {
+                if (typeof window.unidadesSeleccionadas.clear === 'function') {
+                    window.unidadesSeleccionadas.clear();
+                } else {
+                    window.unidadesSeleccionadas = [];
+                }
+            }
+
+            if (window.municipiosSeleccionados) {
+                window.municipiosSeleccionados = [];
+            }
+
+            if (window.jurisdiccionesSeleccionadas) {
+                window.jurisdiccionesSeleccionadas = [];
+            }
+
+            // ======================================================
+            // 1. MÓDULO DE INDICADORES
+            // ======================================================
             if (typeof window.resetearVistaIndicadores === 'function') {
                 window.resetearVistaIndicadores();
-                const btnUnidadesInd = document.getElementById("btnUnidades");
-                if (btnUnidadesInd) btnUnidadesInd.textContent = "🔍 Seleccionar unidades";
+                restablecerTextosBotones();
                 return;
             }
 
+            // ======================================================
+            // 2. MÓDULO DE URGENCIAS
+            // ======================================================
             if (typeof window.resetearVistaUrgencias === 'function') {
                 window.resetearVistaUrgencias();
-                const btnUnidadesUrg = document.getElementById("btnUnidades");
-                if (btnUnidadesUrg) btnUnidadesUrg.textContent = "🔍 Seleccionar unidades";
+                restablecerTextosBotones();
                 return;
             }
 
+            // ======================================================
+            // 3. MÓDULO DE EGRESOS
+            // ======================================================
             if (typeof window.resetearVistaEgresos === 'function') {
                 window.resetearVistaEgresos();
-                const btnUnidadesEgre = document.getElementById("btnUnidades");
-                if (btnUnidadesEgre) btnUnidadesEgre.textContent = "🔍 Seleccionar unidades";
+                restablecerTextosBotones();
                 return;
             }
 
+            // ======================================================
+            // 4. MÓDULO DE MORBILIDAD / MORTALIDAD
+            // ======================================================
             const fnResetMorbMort = window.resetearVistaMorbilidadMortalidad || window.resetearVistaMorbilidad || window.resetearVistaMortalidad;
             if (typeof fnResetMorbMort === 'function') {
                 fnResetMorbMort();
-                const btnUnidadesMM = document.getElementById("btnUnidades");
-                if (btnUnidadesMM) btnUnidadesMM.textContent = "🔍 Seleccionar unidades";
+                restablecerTextosBotones();
                 return;
             }
 
+            // ======================================================
+            // 5. MÓDULOS SIS / FALLBACK GENERAL
+            // ======================================================
             if (typeof VARIABLES_DEFAULT !== 'undefined' && typeof variablesPersonalizadasEstado !== 'undefined') {
                 variablesPersonalizadasEstado = typeof structuredClone === 'function'
                     ? structuredClone(VARIABLES_DEFAULT)
@@ -2211,24 +2279,9 @@
             if (typeof toggleModoDesglose === 'function') toggleModoDesglose();
             if (typeof renderSubvariables === 'function') renderSubvariables();
 
-            document.querySelectorAll('.menu-filtros input[type="checkbox"], .popover-unidades input[type="checkbox"], .popover-content input[type="checkbox"]').forEach(cb => {
-                cb.checked = false;
-            });
-
             const contenedorSub = document.getElementById("contenedorSubvariables");
             if (contenedorSub) {
                 contenedorSub.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = true);
-            }
-
-            if (typeof jurisdiccionesSeleccionadas !== 'undefined') jurisdiccionesSeleccionadas = [];
-            if (typeof municipiosSeleccionados !== 'undefined') municipiosSeleccionados = [];
-
-            if (typeof unidadesSeleccionadas !== 'undefined') {
-                if (typeof unidadesSeleccionadas.clear === 'function') {
-                    unidadesSeleccionadas.clear();
-                } else {
-                    unidadesSeleccionadas = [];
-                }
             }
 
             const selectNivelElem = document.getElementById("selectNivel") || (typeof selectNivel !== 'undefined' ? selectNivel : null);
@@ -2241,17 +2294,6 @@
             if (contUnidades) contUnidades.style.setProperty('display', 'block', 'important');
             if (contJurisdicciones) contJurisdicciones.style.setProperty('display', 'none', 'important');
             if (contMunicipios) contMunicipios.style.setProperty('display', 'none', 'important');
-
-            document.querySelectorAll('input[type="text"], input[type="search"]').forEach(inp => {
-                inp.value = "";
-            });
-
-            const btnUnidades = typeof obtenerBotonUnidades === 'function' ? obtenerBotonUnidades() : document.getElementById("btnUnidades");
-            if (btnUnidades) btnUnidades.textContent = "🔍 Seleccionar unidades";
-            if (typeof btnJurisdicciones !== 'undefined' && btnJurisdicciones) btnJurisdicciones.textContent = "🔍 Seleccionar jurisdicciones";
-            if (typeof btnMunicipios !== 'undefined' && btnMunicipios) btnMunicipios.textContent = "🔍 Seleccionar municipios";
-            if (typeof btnServicio !== 'undefined' && btnServicio) btnServicio.textContent = "🔍 Seleccionar Egreso";
-            if (typeof btnAfecciones !== 'undefined' && btnAfecciones) btnAfecciones.textContent = "🔍 Seleccionar afecciones";
 
             if (typeof window.datosOriginalesSis !== 'undefined') {
                 window.datosFiltradosSis = JSON.parse(JSON.stringify(window.datosOriginalesSis));
@@ -2283,7 +2325,6 @@
         // CORRECCIÓN DIRECTA: BUSCADOR EN TIEMPO REAL PARA POPOVERS
         // ======================================================
         document.addEventListener("input", function (e) {
-            // Detecta si se está escribiendo en el buscador de Unidades, Servicios o Afecciones
             const esBuscadorPopover = e.target.closest(".popover-unidades, .popover-servicios, .popover-afecciones") &&
                 (e.target.matches("input[type='text'], input[type='search']"));
 
@@ -2294,11 +2335,9 @@
 
             if (!popoverContenedor) return;
 
-            // Selecciona todos los elementos de la lista dentro del popover
             const items = popoverContenedor.querySelectorAll(".popover-item, label.popover-item, .popover-list label, .form-check");
 
             items.forEach(function (item) {
-                // Evita ocultar las acciones de limpiar/aplicar o encabezados
                 if (item.closest('.popover-actions') || item.classList.contains('filter-label')) {
                     return;
                 }
@@ -2314,6 +2353,5 @@
                 }
             });
         });
-
     });
 </script>
