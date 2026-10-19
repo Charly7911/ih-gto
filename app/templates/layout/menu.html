@@ -1375,23 +1375,25 @@
 
         </div> <!-- FIN SIDEBAR-TOP -->
 
-        <!-- =========================================
-        BLOQUE INFERIOR (CERRAR SESIÓN ANCLADO ABAJO)
-        ========================================= -->
-        {% if current_user.is_authenticated %}
-        <div class="sidebar-bottom py-2 px-2 border-top border-secondary border-opacity-25 flex-shrink-0 mt-auto">
-            <a href="{{ url_for('main.logout') }}"
-                class="menu-item logout d-flex align-items-center justify-content-center gap-2 py-1 px-2 rounded text-danger text-decoration-none fw-semibold transition-all"
-                style="font-size: 0.78rem; background-color: rgba(220, 53, 69, 0.1);"
-                onmouseover="this.style.backgroundColor='rgba(220, 53, 69, 0.25)'"
-                onmouseout="this.style.backgroundColor='rgba(220, 53, 69, 0.1)'">
-                <i class="bi bi-box-arrow-right fs-6"></i>
-                <span>Cerrar Sesión</span>
-            </a>
-        </div>
-        {% endif %}
     </aside>
+
+    {% if current_user.is_authenticated %}
+    <div class="sidebar-bottom py-2 px-2 border-top border-secondary border-opacity-25 flex-shrink-0 mt-auto">
+        <a href="{{ url_for('main.logout') }}"
+            class="menu-item logout d-flex align-items-center justify-content-center gap-2 py-1 px-2 rounded text-decoration-none fw-semibold transition-all"
+            style="font-size: 0.78rem; color: #fca5a5; background-color: rgba(220, 53, 69, 0.25); border: 1px solid rgba(239, 68, 68, 0.4);"
+            onmouseover="this.style.backgroundColor='rgba(220, 53, 69, 0.45)'; this.style.color='#ffffff'; this.style.borderColor='rgba(239, 68, 68, 0.7)';"
+            onmouseout="this.style.backgroundColor='rgba(220, 53, 69, 0.25)'; this.style.color='#fca5a5'; this.style.borderColor='rgba(239, 68, 68, 0.4)';">
+            <i class="bi bi-box-arrow-right fs-6"></i>
+            <span>Cerrar Sesión</span>
+        </a>
+    </div>
+    {% endif %}
 </div> <!-- FIN SIDEBAR -->
+
+
+
+
 
 
 
@@ -2283,8 +2285,8 @@
         // ======================================================
         document.addEventListener("input", function (e) {
             // Detecta si se está escribiendo en el buscador de Unidades, Servicios o Afecciones
-            const esBuscadorPopover = e.target.closest(".popover-unidades, .popover-servicios, .popover-afecciones") && 
-                                     (e.target.matches("input[type='text'], input[type='search']"));
+            const esBuscadorPopover = e.target.closest(".popover-unidades, .popover-servicios, .popover-afecciones") &&
+                (e.target.matches("input[type='text'], input[type='search']"));
 
             if (!esBuscadorPopover) return;
 
