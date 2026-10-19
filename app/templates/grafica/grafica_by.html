@@ -788,9 +788,15 @@
   // BADGES
   // =========================
   function addBadge(texto, tipo, value) {
-    const placeholder = dropZone.querySelector(".placeholder-text");
+    const dropZone = document.getElementById("dropZone");
+    if (!dropZone) return;
 
+    const placeholder = dropZone.querySelector(".placeholder-text");
     if (placeholder) placeholder.style.display = "none";
+
+    // Evitar badges duplicados
+    const badgeExistente = dropZone.querySelector(`.badge-item[data-value="${value}"][data-tipo="${tipo}"]`);
+    if (badgeExistente) return;
 
     const span = document.createElement("span");
     span.className = "badge-item";
@@ -804,19 +810,21 @@
     let estiloFondoTexto = "";
     let icono = "";
 
-    if (tipo === "grupo_unidad") {
+    const sinDatos = window.indicadoresSinDatos && window.indicadoresSinDatos.has(value);
+
+    if (tipo === "grupo_unidad" || tipo === "grupo_unidades") {
       // 🏥 GRUPO (TODAS/42 UNIDADES): Fondo claro (#f1f5f9) con LETRA NEGRA (#0f172a)
       estiloFondoTexto = "background-color: #f1f5f9 !important; color: #0f172a !important; border: 1px solid #cbd5e1 !important;";
       icono = '<i class="bi bi-collection-fill me-1" style="color: #0f172a !important;"></i>';
 
-    } else if (tipo === "unidad") {
-      // 🏥 UNIDAD INDIVIDUAL: Fondo azul suave con LETRA OSCURA (#1e293b)
+    } else if (tipo === "unidad" || tipo === "unidad_individual") {
+      // 🏥 UNIDAD INDIVIDUAL: Fondo azul suave con LETRA OSCURA (#0369a1)
       estiloFondoTexto = "background-color: #e0f2fe !important; color: #0369a1 !important; border: 1px solid #bae6fd !important;";
       icono = '<i class="bi bi-hospital me-1" style="color: #0369a1 !important;"></i>';
 
     } else if (tipo === "indicador") {
-      // 📊 INDICADOR: Fondo azul oscuro/institucional con LETRA BLANCA (#ffffff)
-      if (indicadoresSinDatos.has(value)) {
+      // 📊 INDICADOR: Fondo azul oscuro con LETRA BLANCA (#ffffff) o ROJO si sin datos
+      if (sinDatos) {
         span.classList.add("indicador-sin-datos");
         estiloFondoTexto = "background-color: #fef2f2 !important; color: #dc2626 !important; border: 1px solid #fecaca !important;";
       } else {
@@ -828,42 +836,52 @@
     // Aplicar estilos generales de contenedor
     span.style.cssText = `${estiloFondoTexto} font-weight: 600; padding: 5px 10px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; margin-bottom: 6px; font-size: 13px;`;
 
-    // HTML del badge con herencia de color para que el texto NO se pierda
+    // HTML del badge con la X responsiva
     span.innerHTML = `
-    ${icono}
-    <span style="color: inherit !important;">${texto}</span>
-    <span class="close-btn" style="color: inherit !important; font-weight: bold; margin-left: 6px; cursor: pointer; opacity: 0.8;">&times;</span>
-  `;
+        ${icono}
+        <span style="color: inherit !important;">${texto}</span>
+        <span class="close-btn" style="color: inherit !important; font-weight: bold; margin-left: 6px; cursor: pointer; opacity: 0.8; padding: 0 2px;" title="Eliminar">&times;</span>
+    `;
 
-    // ❌ EVENTO DE ELIMINACIÓN DEL BADGE
-    span.querySelector(".close-btn").onclick = () => {
-      if (tipo === "unidad") {
-        unidadesSeleccionadas.delete(value);
-      } else if (tipo === "grupo_unidad") {
-        // Si se borra el grupo (ej. TODAS), limpiamos las 42 unidades
-        unidadesSeleccionadas.clear();
-        if (window.grupoSeleccionadoActual) {
+    // ❌ EVENTO DE ELIMINACIÓN DEL BADGE (CONECTADO A WINDOW)
+    const closeBtn = span.querySelector(".close-btn");
+    if (closeBtn) {
+      closeBtn.onclick = (e) => {
+        e.stopPropagation(); // Prevenir propagación de clic
+
+        // Asegurar lectura de variables globales
+        window.unidadesSeleccionadas = window.unidadesSeleccionadas || new Set();
+        window.indicadoresSeleccionados = window.indicadoresSeleccionados || new Set();
+
+        if (tipo === "unidad" || tipo === "unidad_individual") {
+          window.unidadesSeleccionadas.delete(value);
+        } else if (tipo === "grupo_unidad" || tipo === "grupo_unidades") {
+          // Si se borra un grupo, limpiamos la selección completa
+          window.unidadesSeleccionadas.clear();
           window.grupoSeleccionadoActual = null;
+        } else if (tipo === "indicador") {
+          window.indicadoresSeleccionados.delete(value);
         }
-      } else if (tipo === "indicador") {
-        indicadoresSeleccionados.delete(value);
-      }
 
-      span.remove();
+        // Remover elemento del DOM
+        span.remove();
 
-      if (
-        dropZone.querySelectorAll(".badge-item").length === 0 &&
-        placeholder
-      ) {
-        placeholder.style.display = "block";
-      }
+        // Restaurar mensaje placeholder si no quedan insignias
+        if (dropZone.querySelectorAll(".badge-item").length === 0 && placeholder) {
+          placeholder.style.display = "block";
+        }
 
-      cargarGrafica();
-    };
+        // Refrescar o limpiar gráfica
+        if (typeof cargarGrafica === "function") {
+          cargarGrafica();
+        } else if (typeof window.cargarGrafica === "function") {
+          window.cargarGrafica();
+        }
+      };
+    }
 
     dropZone.appendChild(span);
   }
-
 
 
   // Helper global para destruir cualquier tipo de gráfica
