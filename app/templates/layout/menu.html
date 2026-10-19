@@ -574,12 +574,16 @@
                         placeholder="Escribe para filtrar...">
                     <div class="popover-list overflow-y-auto mb-2" style="max-height: 150px;">
                         {% for m in municipios_disponibles | default([]) %}
-                        <label class="popover-item d-block text-white-50 small mb-1 cursor-pointer">
-                            <!-- 🟢 Si es un objeto/dict, imprimimos solo el nombre y guardamos la jurisdicción en un data attribute -->
-                            <input type="checkbox" name="municipios"
-                                value="{{ m.nombre if m.nombre is defined else m }}"
-                                data-jurisdiccion="{{ m.jurisdiccion if m.jurisdiccion is defined else '' }}">
-                            {{ m.nombre if m.nombre is defined else m }}
+                        {% set nombre_mun = m.nombre if m.nombre is defined else (m['nombre'] if m is mapping and
+                        'nombre' in m else m) %}
+                        {% set jur_mun = m.jurisdiccion if m.jurisdiccion is defined else (m['jurisdiccion'] if m is
+                        mapping and 'jurisdiccion' in m else '') %}
+
+                        <label class="popover-item d-block text-white-50 small mb-1 cursor-pointer"
+                            data-jurisdiccion="{{ jur_mun }}">
+                            <input type="checkbox" name="municipios" value="{{ nombre_mun }}"
+                                data-jurisdiccion="{{ jur_mun }}">
+                            {{ nombre_mun }}
                         </label>
                         {% endfor %}
                     </div>
@@ -1740,6 +1744,12 @@
 
         document.addEventListener('change', (e) => {
             if (e.target.matches('#popoverJurisdicciones input[type="checkbox"], [data-popover="jurisdiccion"] input[type="checkbox"]')) {
+                actualizarRelacionJurisdiccionMunicipio();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('#aplicarJurisdicciones, #limpiarJurisdicciones')) {
                 actualizarRelacionJurisdiccionMunicipio();
             }
         });
