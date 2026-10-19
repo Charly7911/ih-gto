@@ -1393,6 +1393,11 @@
 
 
 <script>
+
+    let unidadesSeleccionadas = [];
+    let municipiosSeleccionados = [];
+    let jurisdiccionesSeleccionadas = [];
+    let variablesPersonalizadasEstado = {};
     // ======================================================
     // FUNCIONES GLOBALES PARA SELECCIÓN Y ARRASTRE DE UNIDADES
     // (Deben ir FUERA de DOMContentLoaded)
@@ -2151,51 +2156,7 @@
         // ======================================================
         // 7. RESET GENERAL Y ESCUCHA DE CAMBIOS DIRECTOS
         // ======================================================
-
-        // Función para restaurar las etiquetas predeterminadas de todos los botones
-        function restablecerTextosBotones() {
-            const suf = typeof sufijo !== 'undefined' ? sufijo : '';
-
-            // Botones de Unidades
-            const btnUnidadesList = [
-                document.getElementById(`btnUnidades${suf}`),
-                document.getElementById("btnUnidades"),
-                document.getElementById("btnUnidadesSis"),
-                document.getElementById("btnUnidadesUrgencias"),
-                document.getElementById("btnUnidadesIndicadores"),
-                document.getElementById("btnUnidadesEgresos")
-            ];
-            btnUnidadesList.forEach(btn => { if (btn) btn.textContent = "🔍 Seleccionar unidades"; });
-
-            // Botones de Servicios/Egresos
-            const btnServicioList = [
-                document.getElementById(`btnServicio${suf}`),
-                document.getElementById("btnServicio"),
-                document.getElementById("btnServicioEgresos"),
-                document.getElementById("btnServicioMorbi"),
-                document.getElementById("btnServicioMort")
-            ];
-            btnServicioList.forEach(btn => { if (btn) btn.textContent = "🔍 Seleccionar Egreso"; });
-
-            // Botones de Afecciones
-            const btnAfeccionesList = [
-                document.getElementById(`btnAfecciones${suf}`),
-                document.getElementById("btnAfecciones"),
-                document.getElementById("btnAfeccionesMorbi"),
-                document.getElementById("btnAfeccionesMort")
-            ];
-            btnAfeccionesList.forEach(btn => { if (btn) btn.textContent = "🔍 Seleccionar afecciones"; });
-
-            // Botones de Jurisdicciones y Municipios
-            const btnJur = document.getElementById("btnJurisdicciones");
-            if (btnJur) btnJur.textContent = "🔍 Seleccionar jurisdicciones";
-
-            const btnMun = document.getElementById("btnMunicipios");
-            if (btnMun) btnMun.textContent = "🔍 Seleccionar municipios";
-        }
-
         document.addEventListener("click", function (e) {
-            // 🎯 Captura el clic en cualquier botón de reset/limpiar
             const btnReset = e.target.closest(
                 '#btnResetAll, #btnResetSis, #btnResetIndicadores, #btnResetUrgencias, #btnResetEgresos, #btnResetMorb, #btnResetMort, #btnLimpiar, #btnReset' + (typeof sufijo !== 'undefined' ? sufijo : '') + ', .btn-reset, .btn-limpiar, .btn-reset-link, .btn-limpiar-egresos'
             );
@@ -2203,71 +2164,35 @@
             if (!btnReset) return;
             e.preventDefault();
 
-            // 🟢 1. Limpia los textos de los botones en TODOS los casos
-            restablecerTextosBotones();
-
-            // 🟢 2. Desmarca todos los checkboxes visibles en modales y filtros
-            document.querySelectorAll('.menu-filtros input[type="checkbox"], .popover-unidades input[type="checkbox"], .popover-servicios input[type="checkbox"], .popover-afecciones input[type="checkbox"], .popover-content input[type="checkbox"]').forEach(cb => {
-                cb.checked = false;
-            });
-
-            // 🟢 3. Limpia las entradas de texto/búsqueda
-            document.querySelectorAll('input[type="text"], input[type="search"]').forEach(inp => {
-                inp.value = "";
-            });
-
-            // ======================================================
-            // MÓDULO DE INDICADORES
-            // ======================================================
             if (typeof window.resetearVistaIndicadores === 'function') {
                 window.resetearVistaIndicadores();
-                if (typeof unidadesSeleccionadas !== 'undefined') {
-                    if (typeof unidadesSeleccionadas.clear === 'function') unidadesSeleccionadas.clear();
-                    else unidadesSeleccionadas = [];
-                }
+                const btnUnidadesInd = document.getElementById("btnUnidades");
+                if (btnUnidadesInd) btnUnidadesInd.textContent = "🔍 Seleccionar unidades";
                 return;
             }
 
-            // ======================================================
-            // MÓDULO DE URGENCIAS
-            // ======================================================
             if (typeof window.resetearVistaUrgencias === 'function') {
                 window.resetearVistaUrgencias();
-                if (typeof unidadesSeleccionadas !== 'undefined') {
-                    if (typeof unidadesSeleccionadas.clear === 'function') unidadesSeleccionadas.clear();
-                    else unidadesSeleccionadas = [];
-                }
+                const btnUnidadesUrg = document.getElementById("btnUnidades");
+                if (btnUnidadesUrg) btnUnidadesUrg.textContent = "🔍 Seleccionar unidades";
                 return;
             }
 
-            // ======================================================
-            // MÓDULO DE EGRESOS
-            // ======================================================
             if (typeof window.resetearVistaEgresos === 'function') {
                 window.resetearVistaEgresos();
-                if (typeof unidadesSeleccionadas !== 'undefined') {
-                    if (typeof unidadesSeleccionadas.clear === 'function') unidadesSeleccionadas.clear();
-                    else unidadesSeleccionadas = [];
-                }
+                const btnUnidadesEgre = document.getElementById("btnUnidades");
+                if (btnUnidadesEgre) btnUnidadesEgre.textContent = "🔍 Seleccionar unidades";
                 return;
             }
 
-            // ======================================================
-            // MÓDULO DE MORBILIDAD / MORTALIDAD
-            // ======================================================
             const fnResetMorbMort = window.resetearVistaMorbilidadMortalidad || window.resetearVistaMorbilidad || window.resetearVistaMortalidad;
             if (typeof fnResetMorbMort === 'function') {
                 fnResetMorbMort();
-                if (typeof unidadesSeleccionadas !== 'undefined') {
-                    if (typeof unidadesSeleccionadas.clear === 'function') unidadesSeleccionadas.clear();
-                    else unidadesSeleccionadas = [];
-                }
+                const btnUnidadesMM = document.getElementById("btnUnidades");
+                if (btnUnidadesMM) btnUnidadesMM.textContent = "🔍 Seleccionar unidades";
                 return;
             }
 
-            // ======================================================
-            // MÓDULOS SIS / FALLBACK GENERAL
-            // ======================================================
             if (typeof VARIABLES_DEFAULT !== 'undefined' && typeof variablesPersonalizadasEstado !== 'undefined') {
                 variablesPersonalizadasEstado = typeof structuredClone === 'function'
                     ? structuredClone(VARIABLES_DEFAULT)
@@ -2285,6 +2210,10 @@
 
             if (typeof toggleModoDesglose === 'function') toggleModoDesglose();
             if (typeof renderSubvariables === 'function') renderSubvariables();
+
+            document.querySelectorAll('.menu-filtros input[type="checkbox"], .popover-unidades input[type="checkbox"], .popover-content input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+            });
 
             const contenedorSub = document.getElementById("contenedorSubvariables");
             if (contenedorSub) {
@@ -2312,6 +2241,17 @@
             if (contUnidades) contUnidades.style.setProperty('display', 'block', 'important');
             if (contJurisdicciones) contJurisdicciones.style.setProperty('display', 'none', 'important');
             if (contMunicipios) contMunicipios.style.setProperty('display', 'none', 'important');
+
+            document.querySelectorAll('input[type="text"], input[type="search"]').forEach(inp => {
+                inp.value = "";
+            });
+
+            const btnUnidades = typeof obtenerBotonUnidades === 'function' ? obtenerBotonUnidades() : document.getElementById("btnUnidades");
+            if (btnUnidades) btnUnidades.textContent = "🔍 Seleccionar unidades";
+            if (typeof btnJurisdicciones !== 'undefined' && btnJurisdicciones) btnJurisdicciones.textContent = "🔍 Seleccionar jurisdicciones";
+            if (typeof btnMunicipios !== 'undefined' && btnMunicipios) btnMunicipios.textContent = "🔍 Seleccionar municipios";
+            if (typeof btnServicio !== 'undefined' && btnServicio) btnServicio.textContent = "🔍 Seleccionar Egreso";
+            if (typeof btnAfecciones !== 'undefined' && btnAfecciones) btnAfecciones.textContent = "🔍 Seleccionar afecciones";
 
             if (typeof window.datosOriginalesSis !== 'undefined') {
                 window.datosFiltradosSis = JSON.parse(JSON.stringify(window.datosOriginalesSis));
