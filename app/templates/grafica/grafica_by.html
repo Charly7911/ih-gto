@@ -880,10 +880,13 @@
 
 
   function cargarGrafica() {
+    // Sincronizar referencias globales de Sets
+    const setUnidades = window.unidadesSeleccionadas || new Set();
+    const setIndicadores = window.indicadoresSeleccionados || new Set();
 
-    // 1. Si hay selecciones directas en el mapa, ajustar visibilidad de toggles secundarios
-    if (unidadesSeleccionadas.size > 0) {
-      mostrarTodasUnidades = false;
+    // 1. Si hay selecciones directas, ajustar visibilidad de toggles secundarios
+    if (setUnidades.size > 0) {
+      window.mostrarTodasUnidades = false;
 
       const swUnidades = document.getElementById("switchUnidades");
       if (swUnidades) swUnidades.checked = false;
@@ -895,32 +898,38 @@
       if (contenedorAcumular) contenedorAcumular.style.display = "none";
     }
 
-    // 🔑 2. DETECTAR TODOS LOS GRUPOS PRESENTES EN EL DROPZONE / SELECCIÓN
+    // 2. DETECTAR GRUPOS PRESENTES EN EL DROPZONE / SELECCIÓN
     const badgesGrupos = Array.from(
       document.querySelectorAll(".badge-grupo-unidad, [data-tipo='grupo_unidad'], [data-tipo='grupo_unidades']")
     );
-
     const hayGrupos = badgesGrupos.length > 0 || Boolean(window.grupoSeleccionadoActual);
 
-    // 🔑 3. VALIDACIONES INICIALES
-    const puedeMostrarTodas = mostrarTodasUnidades && unidadesSeleccionadas.size === 0;
-
-    if (!puedeMostrarTodas && unidadesSeleccionadas.size === 0 && !hayGrupos) {
-      destruirTodasLasGraficas();
+    // ⛔ 3. CONTROL DE SEGURIDAD: REQUIERE OBLIGATORIAMENTE UNIDAD O GRUPO
+    // Si no hay unidades individuales ni grupos en el DropZone, destruye gráficas y detiene la ejecución
+    if (setUnidades.size === 0 && !hayGrupos) {
+      if (typeof destruirTodasLasGraficas === "function") {
+        destruirTodasLasGraficas();
+      }
       return;
     }
 
-    if (indicadoresSeleccionados.size === 0) {
-      destruirTodasLasGraficas();
+    // ⛔ 4. REQUERIR INDICADORES
+    if (setIndicadores.size === 0) {
+      if (typeof destruirTodasLasGraficas === "function") {
+        destruirTodasLasGraficas();
+      }
       return;
     }
 
+    // ⛔ 5. REQUERIR AÑOS SELECCIONADOS
     const aniosChecked = Array.from(
       document.querySelectorAll(".anio-check:checked")
     ).map((el) => el.value);
 
     if (aniosChecked.length === 0) {
-      destruirTodasLasGraficas();
+      if (typeof destruirTodasLasGraficas === "function") {
+        destruirTodasLasGraficas();
+      }
       return;
     }
 
@@ -941,7 +950,6 @@
           const idLimpio = valGrupo.replace("GRUPO_", "").toUpperCase().trim();
           params.append("grupos[]", idLimpio);
 
-          // 🔑 ENVIAR LAS CLUES ESPECÍFICAS DE CADA GRUPO SI EXISTEN EN EL ELEMENTO
           if (badge.dataset.clues) {
             try {
               const cluesArr = JSON.parse(badge.dataset.clues);
@@ -955,7 +963,6 @@
         }
       });
 
-      // 🔑 SI SE SELECCIONÓ UN GRUPO COMPLETO CON ARREGLO DE CLUES
       if (window.grupoSeleccionadoActual && Array.isArray(window.grupoSeleccionadoActual.items)) {
         const idGrupoActual = (window.grupoSeleccionadoActual.id || "TODAS").replace("GRUPO_", "").toUpperCase().trim();
 
@@ -974,8 +981,7 @@
     } else {
       params.append("modo", "individual");
 
-      // Enviar selección de unidades individuales
-      unidadesSeleccionadas.forEach((u) => {
+      setUnidades.forEach((u) => {
         const val = typeof u === "object" ? u.value : u;
         if (val) params.append("clues[]", val);
       });
@@ -984,16 +990,15 @@
     // =========================
     // TIPOLOGIA
     // =========================
-    if (mostrarTodasUnidades) {
-      const tipologia =
-        document.querySelector("input[name='tipologia']:checked")?.value || "TODAS";
+    if (window.mostrarTodasUnidades) {
+      const tipologia = document.querySelector("input[name='tipologia']:checked")?.value || "TODAS";
       params.append("tipologia", tipologia);
     }
 
     // =========================
     // INDICADORES
     // =========================
-    indicadoresSeleccionados.forEach((i) => {
+    setIndicadores.forEach((i) => {
       params.append("indicadores[]", i);
     });
 
@@ -1005,19 +1010,17 @@
     });
 
     // =========================
-    // MESES (CORREGIDO: NO FORZAR 12 MESES SI VIENE VACÍO)
+    // MESES
     // =========================
-    let mesesSeleccionados = obtenerMesesSeleccionados();
+    let mesesSeleccionados = typeof obtenerMesesSeleccionados === "function" ? obtenerMesesSeleccionados() : [];
 
     if (esAnual) {
       params.append("meses[]", "13");
     } else if (mesesSeleccionados.length > 0) {
-      // 🔑 Solo enviamos los meses si el usuario los seleccionó explícitamente en el filtro
       mesesSeleccionados.forEach((m) => {
         params.append("meses[]", m);
       });
     }
-
 
     // =========================
     // PETICIÓN HTTP (FETCH)
@@ -1034,37 +1037,39 @@
         }
 
         if (!r.ok) {
-          const errorTexto = await r.text();
-
-          destruirTodasLasGraficas();
+          if (typeof destruirTodasLasGraficas === "function") {
+            destruirTodasLasGraficas();
+          }
           return null;
         }
 
         return r.json();
       })
       .then((data) => {
-
-
         if (!data || data.length === 0) {
-
-          destruirTodasLasGraficas();
+          if (typeof destruirTodasLasGraficas === "function") {
+            destruirTodasLasGraficas();
+          }
           return;
         }
 
         window.ultimoDataRecibido = data;
 
-        // 🔑 1. Limitar los botones de la interfaz a los meses cargados (ej. 1 a 8 para Ene-Ago)
-        sincronizarMesesUIConDatos(data);
+        if (typeof sincronizarMesesUIConDatos === "function") {
+          sincronizarMesesUIConDatos(data);
+        }
 
-        // 🔑 2. Dibujar la gráfica
-        renderGrafica(data);
+        if (typeof renderGrafica === "function") {
+          renderGrafica(data);
+        }
 
         if (window.ultimoIndicadorArrastrado && !hayGrupos) {
-          validarDatosIndicadorIndividual(
-            data,
-            window.ultimoIndicadorArrastrado
-          );
-          restaurarEstadosBadges();
+          if (typeof validarDatosIndicadorIndividual === "function") {
+            validarDatosIndicadorIndividual(data, window.ultimoIndicadorArrastrado);
+          }
+          if (typeof restaurarEstadosBadges === "function") {
+            restaurarEstadosBadges();
+          }
         }
       })
       .catch((err) => {
