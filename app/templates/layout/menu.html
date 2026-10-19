@@ -576,8 +576,10 @@
                         {% for m in municipios_disponibles | default([]) %}
                         {% set nombre_mun = m.nombre if m.nombre is defined else (m['nombre'] if m is mapping and
                         'nombre' in m else m) %}
-                        {% set jur_mun = m.jurisdiccion if m.jurisdiccion is defined else (m['jurisdiccion'] if m is
+                        {% set jur_raw = m.jurisdiccion if m.jurisdiccion is defined else (m['jurisdiccion'] if m is
                         mapping and 'jurisdiccion' in m else '') %}
+                        {% set jur_mun = jur_raw | string | replace('0', '') if jur_raw | string | length > 1 and
+                        jur_raw | string | startswith('0') else jur_raw | string %}
 
                         <label class="popover-item d-block text-white-50 small mb-1 cursor-pointer"
                             data-jurisdiccion="{{ jur_mun }}">
@@ -1684,66 +1686,51 @@
         // 1.1 FILTRADO EN CASCADA DE MUNICIPIOS Y UNIDADES
         // ======================================================
         function actualizarRelacionJurisdiccionMunicipio() {
-            const popoverMun = document.querySelector('[data-popover="municipio"]') || document.getElementById('popoverMunicipios');
-            const popoverJur = document.querySelector('[data-popover="jurisdiccion"]') || document.getElementById('popoverJurisdicciones');
+            const popoverMun = document.getElementById('popoverMunicipios');
+            const popoverJur = document.getElementById('popoverJurisdicciones');
 
-            if (!popoverMun) return;
+            if (!popoverMun || !popoverJur) return;
 
-            let jurisdiccionesActivas = [];
-            if (popoverJur) {
-                const checks = popoverJur.querySelectorAll('input[type="checkbox"]:checked');
-                jurisdiccionesActivas = Array.from(checks).map(cb => String(cb.value).trim().replace(/^0+/, ''));
-            }
+            // 1. Obtener las jurisdicciones seleccionadas limpiando espacios y ceros iniciales ("01" -> "1")
+            const checksJur = popoverJur.querySelectorAll('input[type="checkbox"]:checked');
+            const jurSeleccionadas = Array.from(checksJur).map(cb =>
+                String(cb.value).trim().replace(/^0+/, '')
+            );
 
-            if (jurisdiccionesActivas.length === 0) {
-                const items = popoverMun.querySelectorAll('.popover-item, label, .form-check, div:has(> input)');
-                items.forEach(item => item.style.display = "");
+            const itemsMunicipio = popoverMun.querySelectorAll('.popover-item');
+
+            // 2. Si no hay jurisdicciones seleccionadas, mostrar TODOS los municipios
+            if (jurSeleccionadas.length === 0) {
+                itemsMunicipio.forEach(item => {
+                    item.style.setProperty('display', 'block', 'important');
+                });
                 return;
             }
 
-            const datasetGlobal = window.datos || window.datosGlobales || window.datosOriginales || window.dataset || [];
-            const itemsMunicipio = popoverMun.querySelectorAll('.popover-item, label, .form-check, div:has(> input)');
-
+            // 3. Evaluar cada municipio
             itemsMunicipio.forEach(item => {
-                const cb = item.querySelector('input[type="checkbox"]');
-                if (!cb) return;
+                const input = item.querySelector('input[type="checkbox"]');
+                if (!input) return;
 
-                const jurAttr = item.dataset.jurisdiccion ||
-                    cb.dataset.jurisdiccion ||
-                    item.getAttribute('data-jurisdiccion') ||
-                    cb.getAttribute('data-jurisdiccion') ||
-                    item.dataset.jur ||
-                    cb.dataset.jur;
+                // Leer el atributo data-jurisdiccion del elemento o del checkbox
+                const rawJur = item.getAttribute('data-jurisdiccion') || input.getAttribute('data-jurisdiccion') || '';
+                const jurMunicipio = String(rawJur).trim().replace(/^0+/, '');
 
-                let coincide = false;
-
-                if (jurAttr) {
-                    const valJurSinCeros = String(jurAttr).trim().replace(/^0+/, '');
-                    coincide = jurisdiccionesActivas.includes(valJurSinCeros);
-                } else if (datasetGlobal.length > 0) {
-                    const nombreMun = (cb.value || item.textContent).trim().toLowerCase();
-                    coincide = datasetGlobal.some(row => {
-                        const jurRow = String(row.jurisdiccion || row.cve_jurisdiccion || '').trim().replace(/^0+/, '');
-                        const munRow = String(row.municipio || row.nom_municipio || '').trim().toLowerCase();
-                        return jurisdiccionesActivas.includes(jurRow) && munRow === nombreMun;
-                    });
+                // Si coincide con las jurisdicciones seleccionadas, mostrarlo
+                if (jurSeleccionadas.includes(jurMunicipio)) {
+                    item.style.setProperty('display', 'block', 'important');
                 } else {
-                    coincide = true;
-                }
-
-                if (coincide) {
-                    item.style.display = "";
-                } else {
-                    item.style.display = "none";
-                    if (cb.checked) {
-                        cb.checked = false;
+                    item.style.setProperty('display', 'none', 'important');
+                    if (input.checked) {
+                        input.checked = false; // Desmarcar municipios que queden ocultos
                     }
                 }
             });
         }
 
+        // Escuchadores de eventos
         document.addEventListener('change', (e) => {
-            if (e.target.matches('#popoverJurisdicciones input[type="checkbox"], [data-popover="jurisdiccion"] input[type="checkbox"]')) {
+            if (e.target.matches('#popoverJurisdicciones input[name="jurisdicciones"]')) {
                 actualizarRelacionJurisdiccionMunicipio();
             }
         });
