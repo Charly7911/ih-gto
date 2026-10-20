@@ -151,12 +151,14 @@ def generar_total_general(
             egresos_in = [r for r in registros if str(r.get("indicador")).lower() == "total_egresos"]
             suma_egr = sum(float(r.get("valor") or 0) for r in egresos_in)
           
-
-        # 🔑 Deduplicar registros por (anio, mes, clues, indicador)
+       # 🔑 Deduplicar de forma segura incluyendo el ID único del registro si existe
         vistos = set()
         registros_unicos = []
-        for x in registros:
-            clave = (x.get("anio"), x.get("mes"), x.get("clues"), str(x.get("indicador", "")).lower())
+        for idx, x in enumerate(registros):
+            # Usar 'id' del registro o en su defecto la posición única en memoria
+            reg_id = x.get("id") or x.get("registro_id") or idx
+            clave = (x.get("anio"), x.get("mes"), x.get("clues"), str(x.get("indicador", "")).lower(), reg_id)
+            
             if clave not in vistos:
                 vistos.add(clave)
                 registros_unicos.append(x)
