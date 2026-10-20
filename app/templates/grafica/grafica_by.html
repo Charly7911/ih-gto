@@ -418,6 +418,25 @@
   function sincronizarMesesUIConDatos(data) {
     if (!Array.isArray(data) || data.length === 0) return;
 
+    // 🟢 1. REVISAR AÑOS SELECCIONADOS (DOM Y RESPUESTA JSON)
+    const aniosChecked = Array.from(document.querySelectorAll(".anio-check:checked")).map((el) => Number(el.value));
+    const aniosEnDatos = Array.from(new Set(data.map((d) => Number(d.anio))));
+    const todosLosAnios = Array.from(new Set([...aniosChecked, ...aniosEnDatos]));
+
+    const anioActualSistema = new Date().getFullYear(); // 2026
+
+    // Si hay seleccionado al menos un año anterior (ej. 2025) o múltiples años
+    const tieneAnioHistorico = todosLosAnios.some((a) => a < anioActualSistema);
+
+    if (tieneAnioHistorico || todosLosAnios.length > 1) {
+      // Force 12 meses completos para años cerrados como 2025
+      window.ultimoLimiteMesDetectado = 12;
+      if (typeof window.renderizarMesesGrafica === "function") {
+        window.renderizarMesesGrafica(12);
+      }
+      return; // ⛔ Se detiene aquí para no recortar la UI
+    }
+
     // Set de indicadores estáticos de equipo médico
     const equipoMedicoSet = new Set([
       "arco_c_analogo", "arco_c_digital", "bascula_estadimetro", "bascula_bebe",
@@ -436,7 +455,7 @@
       "tomografo_128", "tomografo_16", "tomografo_32", "tomografo_64"
     ]);
 
-    // 1. Filtrar únicamente los datos dinámicos/operativos
+    // 2. Filtrar únicamente los datos dinámicos/operativos
     const datosDinamicos = data.filter(
       (d) => !equipoMedicoSet.has((d.indicador || "").toLowerCase())
     );
@@ -444,31 +463,28 @@
     let limiteMesDetectado = null;
 
     if (datosDinamicos.length > 0) {
-      // 2. Si hay indicadores dinámicos, calculamos el mes máximo real (ej. 8 para Agosto)
+      // 3. Si hay indicadores dinámicos, calculamos el mes máximo real (ej. 9 para Septiembre en 2026)
       const mesesConDatos = datosDinamicos
         .filter((d) => Number(d.valor || 0) > 0 && Number(d.mes) >= 1 && Number(d.mes) <= 12)
         .map((d) => Number(d.mes));
 
       if (mesesConDatos.length > 0) {
         limiteMesDetectado = Math.max(...mesesConDatos);
-        // Guardamos este límite en memoria para cuando solo se consulte equipo médico
         window.ultimoLimiteMesDetectado = limiteMesDetectado;
       }
     }
 
-    // 3. Si SOLO se cargó Equipo Médico (datosDinamicos está vacío):
+    // 4. Si SOLO se cargó Equipo Médico (datosDinamicos está vacío):
     if (!limiteMesDetectado) {
-      // a) Usamos el último límite dinámico guardado en la sesión
       if (window.ultimoLimiteMesDetectado) {
         limiteMesDetectado = window.ultimoLimiteMesDetectado;
       } else {
-        // b) O leemos cuántos meses están visibles actualmente en el DOM
         const checksVisibles = document.querySelectorAll(".mes-check");
-        limiteMesDetectado = checksVisibles.length > 0 ? checksVisibles.length : 8; // Default defensivo (ej. 8 para el año en curso)
+        limiteMesDetectado = checksVisibles.length > 0 ? checksVisibles.length : 12;
       }
     }
 
-    // 4. Renderizar los badges de meses en la interfaz con el límite dinámico correcto
+    // 5. Renderizar los badges de meses en la interfaz con el límite dinámico correcto
     if (typeof window.renderizarMesesGrafica === "function") {
       window.renderizarMesesGrafica(limiteMesDetectado);
     }
@@ -939,7 +955,6 @@
     const hayGrupos = badgesGrupos.length > 0 || Boolean(window.grupoSeleccionadoActual);
 
     // ⛔ 3. CONTROL DE SEGURIDAD: REQUIERE OBLIGATORIAMENTE UNIDAD O GRUPO
-    // Si no hay unidades individuales ni grupos en el DropZone, destruye gráficas y detiene la ejecución
     if (setUnidades.size === 0 && !hayGrupos) {
       if (typeof destruirTodasLasGraficas === "function") {
         destruirTodasLasGraficas();
@@ -955,7 +970,7 @@
       return;
     }
 
-    // ⛔ 5. REQUERIR AÑOS SELECCIONADOS
+    // ⛔ 5. REQUERIR AÑOS SELECCIONADOS (SINCRONIZAR CON WINDOW)
     const aniosChecked = Array.from(
       document.querySelectorAll(".anio-check:checked")
     ).map((el) => el.value);
@@ -966,6 +981,9 @@
       }
       return;
     }
+
+    // 🟢 Sincronizar Set global de años con la selección actual del DOM
+    window.aniosSeleccionados = new Set(aniosChecked);
 
     const modoVista = document.getElementById("modoVista")?.value;
     const esAnual = modoVista === "anual";
@@ -1037,7 +1055,7 @@
     });
 
     // =========================
-    // AÑOS
+    // AÑOS (LIMPIAR Y RECONSTRUIR PARÁMETROS)
     // =========================
     aniosChecked.forEach((a) => {
       params.append("anios[]", a);
@@ -1405,24 +1423,34 @@
     // =========================================================
     let datosGrafica = data;
 
-    // Detectar si el backend envió unidades individuales o un grupo acumulado
-    const esModoIndividual = data.some(d =>
+    // 1. Obtener la lista de indicadores seleccionados explícitamente por el usuario
+    const indsSeleccionados = Array.from(window.indicadoresSeleccionados || []).map(i => norm(i));
+
+    // 2. Si hay indicadores seleccionados en la DropZone, descartar cualquier insumo secundario devuelto por el backend
+    if (indsSeleccionados.length > 0) {
+      datosGrafica = data.filter((d) => {
+        const indReg = norm(d.indicador);
+
+        // Mantiene la fila SOLO si el indicador del registro coincide con alguno seleccionado
+        return indsSeleccionados.some(iSel => indReg === iSel || indReg.includes(iSel));
+      });
+    }
+
+    // 3. Filtrar registros de unidades (Modo Individual vs Grupo)
+    const esModoIndividual = datosGrafica.some(d =>
       d.clues &&
       d.clues.toUpperCase() !== "TOTAL" &&
       !d.clues.toUpperCase().startsWith("GRUPO_")
     );
 
     if (esModoIndividual) {
-      // 🟢 MODO INDIVIDUAL: Ignoramos los registros de "TOTAL" o "TOTAL GENERAL" 
-      // para quedarnos estrictamente con las filas de cada CLUES.
-      datosGrafica = data.filter((d) => {
+      datosGrafica = datosGrafica.filter((d) => {
         const c = str(d.clues).toUpperCase();
         const n = str(d.nombre_unidad).toUpperCase();
         return c !== "TOTAL" && !c.startsWith("GRUPO_") && n !== "TOTAL GENERAL" && n !== "TOTAL GRUPO";
       });
     } else {
-      // 🏥 MODO GRUPO / ACUMULADO: Nos quedamos únicamente con los registros consolidados
-      const registrosTotales = data.filter((d) =>
+      const registrosTotales = datosGrafica.filter((d) =>
         str(d.clues).toUpperCase() === "TOTAL" ||
         str(d.clues).startsWith("GRUPO_") ||
         str(d.nombre_unidad).toUpperCase().includes("TOTAL")
@@ -1444,11 +1472,23 @@
       mesesBase = mesesSeleccionados;
       etiquetasX = mesesBase.map((m) => mesesLabels[m - 1]);
     } else {
-      const mesesConProduccionReal = datosGrafica
-        .filter((d) => Number(d.valor || 0) > 0 && Number(d.mes) >= 1 && Number(d.mes) <= 12)
-        .map((d) => Number(d.mes));
+      // 🟢 Detectar los años que están presentes en la respuesta de datos
+      const aniosPresentes = Array.from(new Set(datosGrafica.map((d) => String(d.anio))));
+      const anioActualSistema = new Date().getFullYear().toString();
 
-      const ultimoMesReal = mesesConProduccionReal.length > 0 ? Math.max(...mesesConProduccionReal) : 12;
+      // Si hay algún año anterior (ej. 2025, 2024), ese año tiene los 12 meses completos
+      const tieneAniosCompletos = aniosPresentes.some((a) => a < anioActualSistema);
+
+      let ultimoMesReal = 12;
+
+      if (!tieneAniosCompletos) {
+        // Si SOLO estamos consultando el año en curso (ej. 2026), calculamos su último mes con datos
+        const mesesConProduccionReal = datosGrafica
+          .filter((d) => Number(d.valor || 0) > 0 && Number(d.mes) >= 1 && Number(d.mes) <= 12)
+          .map((d) => Number(d.mes));
+
+        ultimoMesReal = mesesConProduccionReal.length > 0 ? Math.max(...mesesConProduccionReal) : 12;
+      }
 
       mesesBase = Array.from({ length: ultimoMesReal }, (_, i) => i + 1);
       etiquetasX = mesesBase.map((m) => mesesLabels[m - 1]);
@@ -1529,12 +1569,17 @@
 
         valores = mesesBase.map((m) => (m in mapaMeses ? mapaMeses[m] : 0));
       } else {
+        // =========================================================
+        // 📅 VISTA ANUAL (EVITAR DUPLICACIÓN DE VALORES)
+        // =========================================================
         const registros = datosGrafica.filter((d) => {
           const coincideInd = norm(d.indicador) === norm(indicadorNom);
           const coincideAnio = String(d.anio) === String(anioNom);
-          const esMes13 = Number(d.mes) === 13;
 
-          if (!coincideInd || !coincideAnio || !esMes13) return false;
+          // Acepta registros con mes 13 o los registros traídos para el cálculo anual
+          const esAnualReg = Number(d.mes) === 13 || str(d.mes) === "13";
+
+          if (!coincideInd || !coincideAnio) return false;
 
           if (esModoTipologia) {
             return str(d.tipologia || "OTRO").trim().toUpperCase() === nombreMostrar.toUpperCase();
@@ -1544,13 +1589,30 @@
         });
 
         let totalAnual = 0;
+
         if (registros.length > 0) {
-          if (esIndicadorRazon(indicadorNom)) {
+          // 🟢 1. Buscar primero si el backend ya envió una fila explícita de Total Anual / Mes 13
+          const regConsolidado = registros.find(r => Number(r.mes) === 13 || str(r.clues).toUpperCase() === "TOTAL");
+
+          if (regConsolidado) {
+            // Si ya viene consolidado por la base de datos/Python, tomamos su valor directo sin sumar nada más
+            totalAnual = Number(regConsolidado.valor || 0);
+          } else if (esIndicadorRazon(indicadorNom)) {
+            // Si es razón/porcentaje y vienen los meses, se saca el promedio
             totalAnual = registros.reduce((acc, r) => acc + Number(r.valor || 0), 0) / registros.length;
           } else {
-            totalAnual = registros.reduce((acc, r) => acc + Number(r.valor || 0), 0);
+            // Si no hay fila explícita de total, sumamos únicamente los meses de 1 a 12 (descartando duplicados de mes)
+            const mapaMesesUnicos = {};
+            registros.forEach((r) => {
+              const m = Number(r.mes);
+              if (m >= 1 && m <= 12) {
+                mapaMesesUnicos[m] = Number(r.valor || 0);
+              }
+            });
+            totalAnual = Object.values(mapaMesesUnicos).reduce((acc, val) => acc + val, 0);
           }
         }
+
         valores = [totalAnual];
       }
 
