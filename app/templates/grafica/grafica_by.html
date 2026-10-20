@@ -1419,24 +1419,21 @@
         : tipoOriginal;
 
     // =========================================================
-    // FILTRADO DE DATOS (MANTENER UNIDADES SEPARADAS)
+    // FILTRADO ESTRICTO DE DATOS POR INDICADOR Y MODO
     // =========================================================
     let datosGrafica = data;
 
-    // 1. Obtener la lista de indicadores seleccionados explícitamente por el usuario
+    // 1. Descartar insumos secundarios si hay indicadores seleccionados explícitamente
     const indsSeleccionados = Array.from(window.indicadoresSeleccionados || []).map(i => norm(i));
 
-    // 2. Si hay indicadores seleccionados en la DropZone, descartar cualquier insumo secundario devuelto por el backend
     if (indsSeleccionados.length > 0) {
       datosGrafica = data.filter((d) => {
         const indReg = norm(d.indicador);
-
-        // Mantiene la fila SOLO si el indicador del registro coincide con alguno seleccionado
         return indsSeleccionados.some(iSel => indReg === iSel || indReg.includes(iSel));
       });
     }
 
-    // 3. Filtrar registros de unidades (Modo Individual vs Grupo)
+    // 2. Filtrar registros de unidades (Modo Individual vs Grupo/Acumulado)
     const esModoIndividual = datosGrafica.some(d =>
       d.clues &&
       d.clues.toUpperCase() !== "TOTAL" &&
@@ -1444,12 +1441,14 @@
     );
 
     if (esModoIndividual) {
+      // Quedarse únicamente con las filas de cada CLUES individual
       datosGrafica = datosGrafica.filter((d) => {
         const c = str(d.clues).toUpperCase();
         const n = str(d.nombre_unidad).toUpperCase();
         return c !== "TOTAL" && !c.startsWith("GRUPO_") && n !== "TOTAL GENERAL" && n !== "TOTAL GRUPO";
       });
     } else {
+      // Modo Grupo: Quedarse con los registros consolidados
       const registrosTotales = datosGrafica.filter((d) =>
         str(d.clues).toUpperCase() === "TOTAL" ||
         str(d.clues).startsWith("GRUPO_") ||
@@ -1460,9 +1459,9 @@
       }
     }
 
-    // =========================
-    // CALCULO ROBUSTO DE ETIQUETAS X
-    // =========================
+    // =========================================================
+    // CALCULO ROBUSTO DE ETIQUETAS X (AÑOS HISTÓRICOS VS ACTUAL)
+    // =========================================================
     let etiquetasX = [];
     let mesesBase = [];
 
@@ -1472,17 +1471,20 @@
       mesesBase = mesesSeleccionados;
       etiquetasX = mesesBase.map((m) => mesesLabels[m - 1]);
     } else {
-      // 🟢 Detectar los años que están presentes en la respuesta de datos
-      const aniosPresentes = Array.from(new Set(datosGrafica.map((d) => String(d.anio))));
+      // Leer años tanto del DOM como del JSON recibido
+      const aniosDOM = Array.from(document.querySelectorAll(".anio-check:checked")).map(el => String(el.value));
+      const aniosDatos = Array.from(new Set(datosGrafica.map((d) => String(d.anio))));
+      const todosLosAnios = Array.from(new Set([...aniosDOM, ...aniosDatos]));
+
       const anioActualSistema = new Date().getFullYear().toString();
 
-      // Si hay algún año anterior (ej. 2025, 2024), ese año tiene los 12 meses completos
-      const tieneAniosCompletos = aniosPresentes.some((a) => a < anioActualSistema);
+      // Si hay al menos un año previo (ej. 2025), se extienden los 12 meses completos
+      const tieneAnioHistorico = todosLosAnios.some((a) => Number(a) < Number(anioActualSistema));
 
       let ultimoMesReal = 12;
 
-      if (!tieneAniosCompletos) {
-        // Si SOLO estamos consultando el año en curso (ej. 2026), calculamos su último mes con datos
+      if (!tieneAnioHistorico) {
+        // Si es SOLO el año en curso, cortamos en el último mes con producción
         const mesesConProduccionReal = datosGrafica
           .filter((d) => Number(d.valor || 0) > 0 && Number(d.mes) >= 1 && Number(d.mes) <= 12)
           .map((d) => Number(d.mes));
@@ -1495,7 +1497,7 @@
     }
 
     // =========================================================
-    // 🟢 GENERACIÓN DE COMBOS ÚNICOS (SEPARACIÓN POR CLUES EXACTO)
+    // GENERACIÓN DE COMBOS ÚNICOS POR CLUES/ENTIDAD
     // =========================================================
     let combos = [];
 
@@ -1509,7 +1511,6 @@
         ),
       ];
     } else {
-      // Usamos d.clues o d.nombre_unidad como identificador único para que NUNCA se fusionen
       combos = [
         ...new Set(
           datosGrafica.map((d) => {
@@ -1528,22 +1529,22 @@
       return i.includes("mortalidad") || i.includes("porcentaje") || i.includes("prom") || i.includes("indice") || i.includes("interv");
     };
 
-    // 🎨 PALETA DE COLORES VIBRANTES Y ALTAMENTE CONTRASTANTES
+    // 🎨 PALETA DE COLORES
     const PALETA_COLORES_DISTINTOS = [
       "#2563eb", "#dc2626", "#16a34a", "#d97706", "#9333ea",
       "#0891b2", "#e11d48", "#059669", "#ca8a04", "#7c3aed"
     ];
 
-    // =========================
-    // DATASETS (CONSTRUCCIÓN DESGLOSADA)
-    // =========================
+    // =========================================================
+    // DATASETS (CONSTRUCCIÓN ACUMULADA / COMPARATIVA EXCEL)
+    // =========================================================
     const datasets = combos.flatMap((c, comboIndex) => {
       const [indicadorNom, anioNom, idEntidad, nombreMostrar] = c.split("|||");
       let valores = [];
       const esModoTipologia = idEntidad.startsWith("TIPOLOGIA_");
 
       if (!esVistaAnual) {
-        // Filtrar registros que coincidan exactamente con la entidad (CLUES o Tipología)
+        // Filtrar registros correspondientes al combo actual
         const registros = datosGrafica.filter((d) => {
           const coincideInd = norm(d.indicador) === norm(indicadorNom);
           const coincideAnio = String(d.anio) === String(anioNom);
@@ -1554,30 +1555,27 @@
           if (esModoTipologia) {
             return str(d.tipologia || "OTRO").trim().toUpperCase() === nombreMostrar.toUpperCase();
           } else {
-            // Coincidencia exacta por CLUES o por Nombre
             return str(d.clues).trim() === idEntidad || str(d.nombre_unidad).trim() === nombreMostrar;
           }
         });
 
         const mapaMeses = {};
 
+        // 🟢 ACUMULACIÓN SUMATORIA DE REGISTROS (Respetando el total exacto de 1,731)
         registros.forEach((r) => {
           const m = Number(r.mes);
           const val = Number(r.valor || 0);
-          mapaMeses[m] = val;
+          mapaMeses[m] = (mapaMeses[m] || 0) + val;
         });
 
         valores = mesesBase.map((m) => (m in mapaMeses ? mapaMeses[m] : 0));
       } else {
         // =========================================================
-        // 📅 VISTA ANUAL (EVITAR DUPLICACIÓN DE VALORES)
+        // 📅 VISTA ANUAL (CONSOLIDACIÓN DE TOTAL)
         // =========================================================
         const registros = datosGrafica.filter((d) => {
           const coincideInd = norm(d.indicador) === norm(indicadorNom);
           const coincideAnio = String(d.anio) === String(anioNom);
-
-          // Acepta registros con mes 13 o los registros traídos para el cálculo anual
-          const esAnualReg = Number(d.mes) === 13 || str(d.mes) === "13";
 
           if (!coincideInd || !coincideAnio) return false;
 
@@ -1591,17 +1589,14 @@
         let totalAnual = 0;
 
         if (registros.length > 0) {
-          // 🟢 1. Buscar primero si el backend ya envió una fila explícita de Total Anual / Mes 13
+          // Buscar primero si el backend envió fila explícita de Total Anual (mes = 13)
           const regConsolidado = registros.find(r => Number(r.mes) === 13 || str(r.clues).toUpperCase() === "TOTAL");
 
           if (regConsolidado) {
-            // Si ya viene consolidado por la base de datos/Python, tomamos su valor directo sin sumar nada más
             totalAnual = Number(regConsolidado.valor || 0);
           } else if (esIndicadorRazon(indicadorNom)) {
-            // Si es razón/porcentaje y vienen los meses, se saca el promedio
             totalAnual = registros.reduce((acc, r) => acc + Number(r.valor || 0), 0) / registros.length;
           } else {
-            // Si no hay fila explícita de total, sumamos únicamente los meses de 1 a 12 (descartando duplicados de mes)
             const mapaMesesUnicos = {};
             registros.forEach((r) => {
               const m = Number(r.mes);
@@ -1835,7 +1830,6 @@
       });
     }
   }
-
 
   // PARTE 4
 
