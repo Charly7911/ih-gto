@@ -1298,10 +1298,8 @@ def subir_sinerhias():
 @login_required
 def subir_camas_no_censables():
     if request.method == 'POST':
-        # 📌 Datos del formulario
         anio = int(request.form.get("anio"))
         modo_carga = request.form.get("modo_carga")
-        # Estos campos son para tu tabla de control anual (opcional)
         estatus_inicio = request.form.get("estatus_inicio")
         fecha_actualizacion = request.form.get("fecha_actualizacion")
         estatus = request.form.get("estatus")
@@ -1326,25 +1324,44 @@ def subir_camas_no_censables():
         file.save(filepath)
 
         try:
-            # Leer Excel y normalizar nombres de columnas (minúsculas y sin espacios)
+            # Leer Excel y normalizar nombres de columnas
             df = pd.read_excel(filepath)
             df.columns = [c.lower().strip() for c in df.columns]
+
+            # 🟢 FIX: Rellenar celdas vacías con 0 para evitar valores NaN
+            df = df.fillna(0)
+
+            # 🟢 FIX: Eliminar filas donde 'clues' sea 0 o esté vacía
+            df = df[df['clues'] != 0]
 
             conn = mysql.connection
             cursor = conn.cursor()
 
-            # 🔥 Si es actualizar → borrar los registros de ese año antes de reinsertar
             if modo_carga == 'actualizar':
                 cursor.execute("DELETE FROM camas_no_censables WHERE anio = %s", (anio,))
 
             insertados = 0
             omitidos = []
 
+            # Función auxiliar segura para convertir valores a int limpiando NaN/Floats
+            def to_int(val):
+                try:
+                    return int(float(val))
+                except (ValueError, TypeError):
+                    return 0
+
             for _, row in df.iterrows():
                 clues = str(row['clues']).strip().upper()
-                mes = int(row['mes'])
+                
+                # Omitir si la CLUES es inválida o vacía
+                if not clues or clues == '0' or clues == 'NAN':
+                    continue
 
-                # Validar que la CLUES exista en tu catálogo para evitar error de Llave Foránea
+                mes = to_int(row.get('mes', 0))
+                if mes == 0:
+                    continue  # Omitir si no hay un mes válido
+
+                # Validar que la CLUES exista en el catálogo
                 cursor.execute("SELECT 1 FROM catalogo_unidades WHERE clues = %s LIMIT 1", (clues,))
                 
                 if cursor.fetchone():
@@ -1366,24 +1383,22 @@ def subir_camas_no_censables():
                         VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """, (
                         anio, clues, mes, 
-                        row.get('hab_urgencias', 0), row.get('inh_urgencias', 0), row.get('tot_urgencias', 0),
-                        row.get('hab_observacion', 0), row.get('inh_observacion', 0), row.get('tot_observacion', 0),
-                        row.get('hab_cuid_int', 0), row.get('inh_cuid_int', 0), row.get('tot_cuid_int', 0),
-                        row.get('hab_cirug_amb', 0), row.get('inh_cirug_amb', 0), row.get('tot_cirug_amb', 0),
-                        row.get('hab_quemados', 0), row.get('inh_quemados', 0), row.get('tot_quemados', 0),
-                        row.get('hab_lab_parto', 0), row.get('inh_lab_parto', 0), row.get('tot_lab_parto', 0),
-                        row.get('hab_recup_pp', 0), row.get('inh_recup_pp', 0), row.get('tot_recup_pp', 0),
-                        row.get('hab_recup_pq', 0), row.get('inh_recup_pq', 0), row.get('tot_recup_pq', 0),
-                        row.get('hab_uci_adulto', 0), row.get('inh_uci_adulto', 0), row.get('tot_uci_adulto', 0),
-                        row.get('hab_uci_ped', 0), row.get('inh_uci_ped', 0), row.get('tot_uci_ped', 0),
-                        row.get('hab_otras_areas', 0), row.get('inh_otras_areas', 0), row.get('tot_otras_areas', 0)
+                        to_int(row.get('hab_urgencias', 0)), to_int(row.get('inh_urgencias', 0)), to_int(row.get('tot_urgencias', 0)),
+                        to_int(row.get('hab_observacion', 0)), to_int(row.get('inh_observacion', 0)), to_int(row.get('tot_observacion', 0)),
+                        to_int(row.get('hab_cuid_int', 0)), to_int(row.get('inh_cuid_int', 0)), to_int(row.get('tot_cuid_int', 0)),
+                        to_int(row.get('hab_cirug_amb', 0)), to_int(row.get('inh_cirug_amb', 0)), to_int(row.get('tot_cirug_amb', 0)),
+                        to_int(row.get('hab_quemados', 0)), to_int(row.get('inh_quemados', 0)), to_int(row.get('tot_quemados', 0)),
+                        to_int(row.get('hab_lab_parto', 0)), to_int(row.get('inh_lab_parto', 0)), to_int(row.get('tot_lab_parto', 0)),
+                        to_int(row.get('hab_recup_pp', 0)), to_int(row.get('inh_recup_pp', 0)), to_int(row.get('tot_recup_pp', 0)),
+                        to_int(row.get('hab_recup_pq', 0)), to_int(row.get('inh_recup_pq', 0)), to_int(row.get('tot_recup_pq', 0)),
+                        to_int(row.get('hab_uci_adulto', 0)), to_int(row.get('inh_uci_adulto', 0)), to_int(row.get('tot_uci_adulto', 0)),
+                        to_int(row.get('hab_uci_ped', 0)), to_int(row.get('inh_uci_ped', 0)), to_int(row.get('tot_uci_ped', 0)),
+                        to_int(row.get('hab_otras_areas', 0)), to_int(row.get('inh_otras_areas', 0)), to_int(row.get('tot_otras_areas', 0))
                     ))
                     insertados += 1
                 else:
                     omitidos.append(clues)
 
-            # 🧠 Registro en tabla de control (para saber cuándo se subió el año)
-            # Nota: Asegúrate de que la tabla 'camas_control_anual' exista o cámbiale el nombre
             cursor.execute("""
                 INSERT INTO sinerhias_control_anual (anio, estatus_inicio, fecha_actualizacion, estatus)
                 VALUES (%s,%s,%s,%s)
