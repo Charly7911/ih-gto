@@ -1237,147 +1237,95 @@ def indicadores():
         # ==========================================================
         # FUNCIONES ROBUSTAS (SIN KEYERROR)
         # ==========================================================
-        def f(value):
-            if value is None:
+        def parse_float(val):
+            """Sustituye a f(val): Convierte a float previniendo None, NaN y tipos inválidos"""
+            if val is None:
                 return 0.0
             try:
-                return float(value)
+                f_val = float(val)
+                return 0.0 if math.isnan(f_val) else f_val
             except (ValueError, TypeError):
                 return 0.0
 
         def calcular_ocupacion(dias_paciente, dias_cama):
-            dp = f(dias_paciente)
-            dc = f(dias_cama)
-            return (dp / dc) * 100 if dc > 0 else 0.0
+            dp = parse_float(dias_paciente)
+            dc = parse_float(dias_cama)
+            return round((dp / dc) * 100.0, 2) if dc > 0 else 0.0
 
         def calcular_kpis(data, dias):
-            # Función auxiliar para convertir valores de forma segura
-            def f(val):
-                try:
-                    return float(val) if val is not None else 0.0
-                except (ValueError, TypeError):
-                    return 0.0
+            # Días del periodo (default 30)
+            dias_val = parse_float(dias) if dias and float(dias) > 0 else 30.0
 
             # Variables base general
-            egresos = f(data.get("total_egresos"))
-            camas = f(data.get("camas_total"))
-            quirofanos = f(data.get("quirofanos"))
+            egresos = parse_float(data.get("total_egresos"))
+            camas = parse_float(data.get("camas_total"))
+            quirofanos = parse_float(data.get("quirofanos"))
             
-            nacimientos = f(data.get("total_nacimientos") or data.get("nacimientos"))
-            abortos = f(data.get("abortos"))
-            eventos = f(data.get("eventos_obstetricos")) or (nacimientos + abortos)
+            nacimientos = parse_float(data.get("total_nacimientos") or data.get("nacimientos"))
+            abortos = parse_float(data.get("abortos"))
+            eventos = parse_float(data.get("eventos_obstetricos")) or (nacimientos + abortos)
 
-            adolescente_apeo = f(data.get("adolescente_apeo"))
-            eventos_obstetricos_adolescentes = f(data.get("eventos_obstetricos_adolescentes"))
+            adolescente_apeo = parse_float(data.get("adolescente_apeo"))
+            eventos_obstetricos_adolescentes = parse_float(data.get("eventos_obstetricos_adolescentes"))
 
-            # Días de estancia por servicio (con alias alternativos)
-            dias_est_med = f(data.get("dias_est_med") or data.get("dias_estancia_med_interna"))
-            dias_est_cir = f(data.get("dias_est_cir") or data.get("dias_estancia_cirugia"))
-            dias_est_ped = f(data.get("dias_est_ped") or data.get("dias_estancia_pediatria"))
-            dias_est_gin = f(data.get("dias_est_gin") or data.get("dias_estancia_ginecobstetricia"))
-            dias_est_otr = f(data.get("dias_est_otros") or data.get("dias_est_otr") or data.get("dias_estancia_otros"))
+            # Días de estancia por servicio
+            dias_est_med = parse_float(data.get("dias_est_med") or data.get("dias_estancia_med_interna"))
+            dias_est_cir = parse_float(data.get("dias_est_cir") or data.get("dias_estancia_cirugia"))
+            dias_est_ped = parse_float(data.get("dias_est_ped") or data.get("dias_estancia_pediatria"))
+            dias_est_gin = parse_float(data.get("dias_est_gin") or data.get("dias_estancia_ginecobstetricia"))
+            dias_est_otr = parse_float(data.get("dias_est_otros") or data.get("dias_estancia_otros"))
 
-            # Egresos por servicio (denominadores)
-            egresos_med = f(data.get("egre_med_interna") or data.get("med_interna") or data.get("egresos_med"))
-            egresos_cir = f(data.get("egre_cirugia") or data.get("cirugia") or data.get("egresos_cir"))
-            egresos_ped = f(data.get("egre_pediatria") or data.get("pediatria") or data.get("egresos_ped"))
-            egresos_gin = f(data.get("egre_gineco") or data.get("ginecobstetricia") or data.get("egresos_gin"))
-            egresos_otr = f(data.get("egre_otros") or data.get("otros") or data.get("egresos_otr"))
+            # Egresos por servicio
+            egresos_med = parse_float(data.get("egre_med_interna") or data.get("med_interna"))
+            egresos_cir = parse_float(data.get("egre_cirugia") or data.get("cirugia"))
+            egresos_ped = parse_float(data.get("egre_pediatria") or data.get("pediatria"))
+            egresos_gin = parse_float(data.get("egre_gineco") or data.get("ginecobstetricia"))
+            egresos_otr = parse_float(data.get("egre_otros") or data.get("otros"))
 
-            dias_val = float(dias) if dias else 30.0
+            # Promedios de Estancia
+            v_med = round(dias_est_med / egresos_med, 2) if egresos_med > 0 else 0.0
+            v_cir = round(dias_est_cir / egresos_cir, 2) if egresos_cir > 0 else 0.0
+            v_ped = round(dias_est_ped / egresos_ped, 2) if egresos_ped > 0 else 0.0
+            v_gin = round(dias_est_gin / egresos_gin, 2) if egresos_gin > 0 else 0.0
+            v_otr = round(dias_est_otr / egresos_otr, 2) if egresos_otr > 0 else 0.0
 
-            # Cálculos intermedios de Promedio de Estancia
-            v_med = (dias_est_med / egresos_med) if egresos_med > 0 else 0
-            v_cir = (dias_est_cir / egresos_cir) if egresos_cir > 0 else 0
-            v_ped = (dias_est_ped / egresos_ped) if egresos_ped > 0 else 0
-            v_gin = (dias_est_gin / egresos_gin) if egresos_gin > 0 else 0
-            v_otr = (dias_est_otr / egresos_otr) if egresos_otr > 0 else 0
+            urgencias_tot = parse_float(data.get("urgencias") or data.get("total_u"))
 
             return {
                 # KPIs Operativos (Productividad Diaria)
-                "consultas_por_dia": f(data.get("consultas")) / dias_val if dias_val > 0 else 0,
-                "especialidad_por_dia": f(data.get("especialidad")) / dias_val if dias_val > 0 else 0,
-                "urgencias_por_dia": f(data.get("urgencias") or data.get("total_u")) / dias_val if dias_val > 0 else 0,
-                "porcentaje_calificada": (
-                    (f(data.get("calificada")) / f(data.get("urgencias") or data.get("total_u")) * 100)
-                    if f(data.get("urgencias") or data.get("total_u")) > 0
-                    else 0
-                ),
-                "nacimientos_por_dia": nacimientos / dias_val if dias_val > 0 else 0,
-                "porcentaje_cesareas": (
-                    (f(data.get("nac_cesarea")) / nacimientos * 100) if nacimientos > 0 else 0
-                ),
-                "prom_inter_diarias_qx": (
-                    round(f(data.get("total_proced_dentro")) / (quirofanos * dias_val), 2)
-                    if quirofanos > 0 and dias_val > 0
-                    else 0
-                ),
-                "porcentaje_apeo": (f(data.get("apeo") or data.get("total_apeo")) / eventos * 100) if eventos > 0 else 0,
-                "porcentaje_adolescente_apeo": (
-                    (adolescente_apeo * 100) / eventos_obstetricos_adolescentes
-                    if eventos_obstetricos_adolescentes > 0
-                    else 0
-                ),
+                "consultas_por_dia": round(parse_float(data.get("consultas")) / dias_val, 2),
+                "especialidad_por_dia": round(parse_float(data.get("especialidad")) / dias_val, 2),
+                "urgencias_por_dia": round(urgencias_tot / dias_val, 2),
+                "porcentaje_calificada": round((parse_float(data.get("calificada")) / urgencias_tot) * 100.0, 2) if urgencias_tot > 0 else 0.0,
+                "nacimientos_por_dia": round(nacimientos / dias_val, 2),
+                "porcentaje_cesareas": round((parse_float(data.get("nac_cesarea")) / nacimientos) * 100.0, 2) if nacimientos > 0 else 0.0,
+                "prom_inter_diarias_qx": round(parse_float(data.get("total_proced_dentro")) / (quirofanos * dias_val), 2) if (quirofanos > 0 and dias_val > 0) else 0.0,
+                "porcentaje_apeo": round((parse_float(data.get("apeo") or data.get("total_apeo")) / eventos) * 100.0, 2) if eventos > 0 else 0.0,
+                "porcentaje_adolescente_apeo": round((adolescente_apeo * 100.0) / eventos_obstetricos_adolescentes, 2) if eventos_obstetricos_adolescentes > 0 else 0.0,
 
-                # Ocupación
-                "porcentaje_ocupacion": calcular_ocupacion(
-                    data.get("dias_p"), data.get("dias_cama_total")
-                ),
-                "porcentaje_ocupacion_med_interna": calcular_ocupacion(
-                    data.get("dias_p_med_int"), data.get("dias_cama_med")
-                ),
-                "porcentaje_ocupacion_cirugia": calcular_ocupacion(
-                    data.get("dias_p_cirugia"), data.get("dias_cama_cir")
-                ),
-                "porcentaje_ocupacion_pediatria": calcular_ocupacion(
-                    data.get("dias_p_pediatria"), data.get("dias_cama_ped")
-                ),
-                "porcentaje_ocupacion_gineco": calcular_ocupacion(
-                    data.get("dias_p_gineco"), data.get("dias_cama_gin")
-                ),
-                "porcentaje_ocupacion_otros": calcular_ocupacion(
-                    data.get("dias_p_otros"), data.get("dias_cama_otros")
-                ),
+                # Ocupación Porcentual
+                "porcentaje_ocupacion": calcular_ocupacion(data.get("dias_p"), data.get("dias_cama_total")),
+                "porcentaje_ocupacion_med_interna": calcular_ocupacion(data.get("dias_p_med_int"), data.get("dias_cama_med")),
+                "porcentaje_ocupacion_cirugia": calcular_ocupacion(data.get("dias_p_cirugia"), data.get("dias_cama_cir")),
+                "porcentaje_ocupacion_pediatria": calcular_ocupacion(data.get("dias_p_pediatria"), data.get("dias_cama_ped")),
+                "porcentaje_ocupacion_gineco": calcular_ocupacion(data.get("dias_p_gineco"), data.get("dias_cama_gin")),
+                "porcentaje_ocupacion_otros": calcular_ocupacion(data.get("dias_p_otros"), data.get("dias_cama_otros")),
 
-                # Estancia General
-                "prom_dias_estancia": (f(data.get("dias_estancia")) / egresos) if egresos > 0 else 0,
-
-                # Estancia por Servicio (Respuesta duplicada para garantizar compatibilidad con el frontend)
-                "prom_estancia_med_int": v_med,
-                "prom_estancia_med_interna": v_med,
+                # Estancias Promedio
+                "prom_dias_estancia": round(parse_float(data.get("dias_estancia")) / egresos, 2) if egresos > 0 else 0.0,
                 "prom_dias_estancia_med_interna": v_med,
-
-                "prom_estancia_cir": v_cir,
-                "prom_estancia_cirugia": v_cir,
                 "prom_dias_estancia_cirugia": v_cir,
-
-                "prom_estancia_ped": v_ped,
-                "prom_estancia_pediatria": v_ped,
                 "prom_dias_estancia_pediatria": v_ped,
-
-                "prom_estancia_gin": v_gin,
-                "prom_estancia_gineco": v_gin,
                 "prom_dias_estancia_gineco": v_gin,
-
-                "prom_estancia_otr": v_otr,
-                "prom_estancia_otros": v_otr,
                 "prom_dias_estancia_otros": v_otr,
 
-                # Rotación y Sustitución
-                "indice_rotacion": (egresos / camas) if camas > 0 else 0,
-                "interv_sustitucion": (
-                    (((camas * dias_val) - f(data.get("dias_p"))) / egresos) if egresos > 0 else 0
-                ),
+                # Rotación e Intervalo de Sustitución
+                "indice_rotacion": round(egresos / camas, 2) if camas > 0 else 0.0,
+                "interv_sustitucion": round((((camas * dias_val) - parse_float(data.get("dias_p"))) / egresos), 2) if egresos > 0 else 0.0,
 
                 # Mortalidad
-                "mortalidad_cruda": (
-                    (f(data.get("egre_defunciones")) * 1000 / egresos) if egresos > 0 else 0
-                ),
-                "mortalidad_ajustada": (
-                    (f(data.get("egre_defunciones_48h")) * 1000 / f(data.get("total_egresos_48h")))
-                    if f(data.get("total_egresos_48h")) > 0
-                    else 0
-                ),
+                "mortalidad_cruda": round((parse_float(data.get("egre_defunciones")) * 1000.0) / egresos, 2) if egresos > 0 else 0.0,
+                "mortalidad_ajustada": round((parse_float(data.get("egre_defunciones_48h")) * 1000.0) / parse_float(data.get("total_egresos_48h")), 2) if parse_float(data.get("total_egresos_48h")) > 0 else 0.0,
             }
         
         #PARTE 5
@@ -1385,110 +1333,79 @@ def indicadores():
         # RECORRER ROWS
         # ==========================================================  
         DEPENDENCIAS_KPIS = {
-                        # --- PRODUCTIVIDAD DIARIA ---
-                        "consultas_por_dia": ["consultas"],
-                        "especialidad_por_dia": ["especialidad"],
-                        "urgencias_por_dia": ["urgencias", "total_u"],
-                        "nacimientos_por_dia": ["total_nacimientos", "nacimientos"],
-        
-                        # --- APEO Y SALUD MATERNA ---
-                        "porcentaje_apeo": ["apeo", "total_apeo", "eventos_obstetricos", "total_nacimientos", "nacimientos", "abortos"],
-                        "porcentaje_adolescente_apeo": ["adolescente_apeo", "eventos_obstetricos_adolescentes"],
-                        "porcentaje_cesareas": ["nac_cesarea", "total_nacimientos", "nacimientos"],
-        
-                        # --- MORTALIDAD ---
-                        "mortalidad_cruda": ["egre_defunciones", "defunciones", "total_egresos"],
-                        "mortalidad_ajustada": ["egre_defunciones_48h", "defunciones_48h", "total_egresos_48h", "egresos_48h"],
-        
-                        # --- OCUPACIÓN ---
-                        "porcentaje_ocupacion": ["dias_p", "dias_cama_total"],
-                        "porcentaje_ocupacion_med_interna": ["dias_p_med_int", "dias_cama_med"],
-                        "porcentaje_ocupacion_cirugia": ["dias_p_cirugia", "dias_cama_cir"],
-                        "porcentaje_ocupacion_pediatria": ["dias_p_pediatria", "dias_cama_ped"],
-                        "porcentaje_ocupacion_gineco": ["dias_p_gineco", "dias_cama_gin"],
-                        "porcentaje_ocupacion_otros": ["dias_p_otros", "dias_cama_otros"],
-        
-                    
-                        # --- ESTANCIA Y ROTACIÓN (SOPORTE PARA NOMBRES CORTOS Y LARGOS) ---
-                        "prom_dias_estancia": ["dias_estancia", "dias_estancia_sum", "total_egresos", "egresos"],
-        
-                        # Medicina Interna
-                        "prom_estancia_med_int": ["dias_est_med", "dias_estancia_med_interna", "egre_med_interna", "med_interna", "egresos_med", "total_egresos"],
-                        "prom_estancia_med_interna": ["dias_est_med", "dias_estancia_med_interna", "egre_med_interna", "med_interna", "egresos_med", "total_egresos"],
-                        "prom_dias_estancia_med_interna": ["dias_est_med", "dias_estancia_med_interna", "egre_med_interna", "med_interna", "egresos_med", "total_egresos"],
-        
-                        # Cirugía
-                        "prom_estancia_cir": ["dias_est_cir", "dias_estancia_cirugia", "egre_cirugia", "cirugia", "egresos_cir", "egre_cir", "total_egresos"],
-                        "prom_estancia_cirugia": ["dias_est_cir", "dias_estancia_cirugia", "egre_cirugia", "cirugia", "egresos_cir", "egre_cir", "total_egresos"],
-                        "prom_dias_estancia_cirugia": ["dias_est_cir", "dias_estancia_cirugia", "egre_cirugia", "cirugia", "egresos_cir", "egre_cir", "total_egresos"],
-        
-                        # Pediatría
-                        "prom_estancia_ped": ["dias_est_ped", "dias_estancia_pediatria", "egre_pediatria", "pediatria", "egresos_ped", "egre_ped", "total_egresos"],
-                        "prom_estancia_pediatria": ["dias_est_ped", "dias_estancia_pediatria", "egre_pediatria", "pediatria", "egresos_ped", "egre_ped", "total_egresos"],
-                        "prom_dias_estancia_pediatria": ["dias_est_ped", "dias_estancia_pediatria", "egre_pediatria", "pediatria", "egresos_ped", "egre_ped", "total_egresos"],
-        
-                        # Ginecología
-                        "prom_estancia_gin": ["dias_est_gin", "dias_estancia_ginecobstetricia", "egre_gineco", "ginecobstetricia", "egresos_gin", "egre_gin", "total_egresos"],
-                        "prom_estancia_gineco": ["dias_est_gin", "dias_estancia_ginecobstetricia", "egre_gineco", "ginecobstetricia", "egresos_gin", "egre_gin", "total_egresos"],
-                        "prom_dias_estancia_gineco": ["dias_est_gin", "dias_estancia_ginecobstetricia", "egre_gineco", "ginecobstetricia", "egresos_gin", "egre_gin", "total_egresos"],
-        
-                        # Otros
-                        "prom_estancia_otr": ["dias_est_otros", "dias_est_otr", "dias_estancia_otros", "egre_otros", "otros", "egresos_otr", "egre_otr", "total_egresos"],
-                        "prom_estancia_otros": ["dias_est_otros", "dias_est_otr", "dias_estancia_otros", "egre_otros", "otros", "egresos_otr", "egre_otr", "total_egresos"],
-                        "prom_dias_estancia_otros": ["dias_est_otros", "dias_est_otr", "dias_estancia_otros", "egre_otros", "otros", "egresos_otr", "egre_otr", "total_egresos"],
-        
-                        "indice_rotacion": ["total_egresos", "camas_total"],
-                        "interv_sustitucion": ["camas_total", "dias_p", "total_egresos"],
-        
-                        # --- URGENCIAS Y QUIRÓFANO ---
-                        "porcentaje_calificada": ["calificada", "urgencias", "total_u"],
-                        "prom_inter_diarias_qx": ["total_proced_dentro", "cirugias", "quirofanos"]
+            # --- PRODUCTIVIDAD DIARIA ---
+            "consultas_por_dia": ["consultas"],
+            "especialidad_por_dia": ["especialidad"],
+            "urgencias_por_dia": ["urgencias", "total_u"],
+            "nacimientos_por_dia": ["total_nacimientos", "nacimientos"],
+    
+            # --- APEO Y SALUD MATERNA ---
+            "porcentaje_apeo": ["apeo", "total_apeo", "eventos_obstetricos", "total_nacimientos", "nacimientos", "abortos"],
+            "porcentaje_adolescente_apeo": ["adolescente_apeo", "eventos_obstetricos_adolescentes"],
+            "porcentaje_cesareas": ["nac_cesarea", "total_nacimientos", "nacimientos"],
+    
+            # --- MORTALIDAD ---
+            "mortalidad_cruda": ["egre_defunciones", "defunciones", "total_egresos"],
+            "mortalidad_ajustada": ["egre_defunciones_48h", "defunciones_48h", "total_egresos_48h", "egresos_48h"],
+    
+            # --- OCUPACIÓN ---
+            "porcentaje_ocupacion": ["dias_p", "dias_cama_total"],
+            "porcentaje_ocupacion_med_interna": ["dias_p_med_int", "dias_cama_med"],
+            "porcentaje_ocupacion_cirugia": ["dias_p_cirugia", "dias_cama_cir"],
+            "porcentaje_ocupacion_pediatria": ["dias_p_pediatria", "dias_cama_ped"],
+            "porcentaje_ocupacion_gineco": ["dias_p_gineco", "dias_cama_gin"],
+            "porcentaje_ocupacion_otros": ["dias_p_otros", "dias_cama_otros"],
+    
+            # --- ESTANCIA Y ROTACIÓN ---
+            "prom_dias_estancia": ["dias_estancia", "dias_estancia_sum", "total_egresos"],
+            "prom_dias_estancia_med_interna": ["dias_est_med", "dias_estancia_med_interna", "egre_med_interna", "med_interna"],
+            "prom_dias_estancia_cirugia": ["dias_est_cir", "dias_estancia_cirugia", "egre_cirugia", "cirugia"],
+            "prom_dias_estancia_pediatria": ["dias_est_ped", "dias_estancia_pediatria", "egre_pediatria", "pediatria"],
+            "prom_dias_estancia_gineco": ["dias_est_gin", "dias_estancia_ginecobstetricia", "egre_gineco", "ginecobstetricia"],
+            "prom_dias_estancia_otros": ["dias_est_otros", "dias_estancia_otros", "egre_otros", "otros"],
+            "indice_rotacion": ["total_egresos", "camas_total"],
+            "interv_sustitucion": ["camas_total", "dias_p", "total_egresos"],
+    
+            # --- URGENCIAS Y QUIRÓFANO ---
+            "porcentaje_calificada": ["calificada", "urgencias", "total_u"],
+            "prom_inter_diarias_qx": ["total_proced_dentro", "cirugias", "quirofanos"]
         }
 
-        indicadores_solicitados = request.args.getlist("indicadores[]") or request.args.getlist("indicadores")
-        indicadores_solicitados_set = {str(i).lower().strip() for i in indicadores_solicitados}
+        indicadores_solicitados_raw = request.args.getlist("indicadores[]") or request.args.getlist("indicadores")
+        indicadores_solicitados_set = {str(i).lower().strip() for i in indicadores_solicitados_raw}
 
-        # 🔑 2. DETECTAR INSUMOS DEPENDIENTES (AL INICIO)
+        # 🔑 DETECTAR INSUMOS DEPENDIENTES DE FORMA LIMPIA
         insumos_necesarios = set()
-        for ind_req in indicadores_solicitados:
-            ind_req_low = str(ind_req).lower().strip()
-            if ind_req_low in DEPENDENCIAS_KPIS:
-                insumos_necesarios.update({str(dep).lower().strip() for dep in DEPENDENCIAS_KPIS[ind_req_low]})    
+        for ind_req in indicadores_solicitados_set:
+            if ind_req in DEPENDENCIAS_KPIS:
+                insumos_necesarios.update({str(dep).lower().strip() for dep in DEPENDENCIAS_KPIS[ind_req]})
 
+        # 🟢 FIX 1: PROCESAR BUCLE DE ROWS_E UNA SOLA VEZ (ELIMINADO BUCLE DUPLICADO)
         for r in rows_e:
-
             anio = int(r["anio"])
-            mes = int(r["mes"]) if r.get("mes") else 13
+            mes = int(r["mes"]) if r.get("mes") is not None else 13
             unidad = r.get("nombre_unidad", "TOTAL GENERAL")
             clues_val = r.get("clues", "TOTAL")
 
-            
-
             base = {
-                field: float(r.get(field) or 0)
-                for field in SUM_FIELDS + MAX_FIELDS
+                field.lower(): parse_float(r.get(field))
+                for field in SUM_FIELDS + list(indicadores_max)
             }
-
 
             if mes != 13:
                 dias = calendar.monthrange(anio, mes)[1]
             else:
                 dias = (
                     sum(calendar.monthrange(anio, m)[1] for m in meses_validos)
-                    if meses_validos
-                    else 365
+                    if meses_validos else 365
                 )
 
-           
-
             kpis = calcular_kpis(base, dias)
-
             dataset = {**base, **kpis}
 
             for indicador, valor in dataset.items():
                 indicador_norm = str(indicador).lower().strip()
 
-                # 🔑 PERMITIR TANTO EL KPI PRINCIPAL COMO SUS INSUMOS DEPENDIENTES EN LA RESPUESTA
                 if (
                     es_descarga_masiva
                     or indicador_norm in indicadores_solicitados_set
@@ -1501,63 +1418,15 @@ def indicadores():
                         "nombre_unidad": unidad,
                         "tipologia": r.get("tipologia", "TODAS"),
                         "indicador": indicador_norm,
-                        "valor": round(float(valor), 2),
+                        "valor": round(parse_float(valor), 2),
                     })
 
-            
-
-       
-        for r in rows_e:
-
-            anio = int(r["anio"])
-            mes = int(r["mes"]) if r.get("mes") else 13
-            unidad = r.get("nombre_unidad", "TOTAL GENERAL")
-            clues_val = r.get("clues", "TOTAL")
-
-            base = {
-                field: float(r.get(field) or 0)
-                for field in SUM_FIELDS + MAX_FIELDS
-            }
-
-            if mes != 13:
-                dias = calendar.monthrange(anio, mes)[1]
-            else:
-                if meses_validos:
-                    dias = sum(
-                        calendar.monthrange(anio, m)[1]
-                        for m in meses_validos
-                    )
-                else:
-                    dias = 365
-
-            kpis = calcular_kpis(base, dias)
-
-            dataset = {**base, **kpis}
-
-            for indicador, valor in dataset.items():
-
-                indicador_norm = indicador.lower().strip()
-
-                # 🔑 PERMITIR EL INDICADOR SOLICITADO Y SUS INSUMOS ORIGEN (Usando sets normalizados)
-                if es_descarga_masiva or indicador_norm in indicadores_solicitados_set or indicador_norm in insumos_necesarios:
-
-                    data_acumulada.append({
-                        "anio": anio,
-                        "mes": mes,
-                        "clues": clues_val,
-                        "nombre_unidad": unidad,
-                        "tipologia": r.get("tipologia", "TODAS"),
-                        "indicador": indicador_norm,
-                        "valor": round(float(valor), 2),
-                    })
-    
-
-    indicadores_ya_calculados = {field.lower() for field in SUM_FIELDS + MAX_FIELDS}
-
+    # ======================================================
+    # PROCESAMIENTO VISTA UNIFICADA (VW_INDICADORES_UNIFICADOS)
+    # ======================================================
+    indicadores_ya_calculados = {field.lower() for field in SUM_FIELDS + list(indicadores_max)}
     grupos = request.args.getlist("grupos[]") or request.args.getlist("grupos")
-    unidades = request.args.getlist("clues[]") or request.args.getlist("unidades[]")
 
-    # 🔑 1. EVALUAR SI ES CONSULTA AGRUPADA O POR "TODAS"
     es_consulta_grupo = (
         not unidades 
         or "TODAS" in [g.upper() for g in grupos] 
@@ -1567,38 +1436,22 @@ def indicadores():
     quiere_vistas = bool(unidades) or bool(grupos) or es_consulta_grupo or bool(insumos_necesarios)
 
     if quiere_vistas:
-
         params_v = []
 
-        if es_consulta_grupo:
-            # 📊 QUERY AGREGADA PARA GRUPOS ("TODAS") CON CAST A NUMÉRICO Y GROUP BY ROBUSTO
-            query_v = """
-            SELECT
-                v.mes,
-                LOWER(v.indicador) AS indicador,
-                v.anio,
-                'TOTAL' AS clues,
-                'TOTAL GRUPO' AS nombre_unidad,
-                'TODAS' AS tipologia,
-                SUM(CAST(COALESCE(v.valor, 0) AS DECIMAL(15,2))) AS valor
-            FROM vw_indicadores_unificados v
-            WHERE 1=1
-            """
-        else:
-            # 🏥 QUERY INDIVIDUAL POR UNIDADES
-            query_v = """
-            SELECT
-                v.mes,
-                LOWER(v.indicador) AS indicador,
-                v.anio,
-                v.clues,
-                COALESCE(c.nombre_unidad, v.nombre_unidad) AS nombre_unidad,
-                COALESCE(c.tipologia, 'TODAS') AS tipologia,
-                v.valor
-            FROM vw_indicadores_unificados v
-            LEFT JOIN catalogo_unidades c ON v.clues = c.clues
-            WHERE 1=1
-            """
+        # 🟢 FIX 2: MANTENER CLUES Y UNIDADES REALES PARA PERMITIR SEGMENTACIÓN MULTIGRUPO
+        query_v = """
+        SELECT
+            v.mes,
+            LOWER(v.indicador) AS indicador,
+            v.anio,
+            v.clues,
+            COALESCE(c.nombre_unidad, v.nombre_unidad) AS nombre_unidad,
+            COALESCE(c.tipologia, 'TODAS') AS tipologia,
+            SUM(CAST(COALESCE(v.valor, 0) AS DECIMAL(15,2))) AS valor
+        FROM vw_indicadores_unificados v
+        LEFT JOIN catalogo_unidades c ON v.clues = c.clues
+        WHERE 1=1
+        """
 
         if unidades and not es_consulta_grupo:
             query_v += " AND v.clues IN ({})".format(",".join(["%s"] * len(unidades)))
@@ -1608,32 +1461,21 @@ def indicadores():
             query_v += " AND v.anio IN ({})".format(",".join(["%s"] * len(anios)))
             params_v.extend(anios)
 
-        # 🔑 INCLUIR TANTO LOS SOLICITADOS COMO LOS INSUMOS DETECTADOS EN LA QUERY
         if not es_descarga_masiva:
             indicadores_a_buscar = list(indicadores_solicitados_set.union(insumos_necesarios))
-
             if indicadores_a_buscar:
                 query_v += " AND LOWER(v.indicador) IN ({})".format(
                     ",".join(["%s"] * len(indicadores_a_buscar))
                 )
                 params_v.extend(indicadores_a_buscar)
 
-        # 🔑 GROUP BY ROBUSTO COMPATIBLE CON CUALQUIER MOTOR SQL
-        if es_consulta_grupo:
-            query_v += " GROUP BY v.mes, v.indicador, v.anio"
-
-        print("\n---------------- SQL VISTA ----------------")
-        print("QUERY:", query_v)
-        print("PARAMS:", params_v)
-        print("-------------------------------------------\n")
+        query_v += " GROUP BY v.mes, v.indicador, v.anio, v.clues, COALESCE(c.nombre_unidad, v.nombre_unidad), COALESCE(c.tipologia, 'TODAS')"
 
         cur.execute(query_v, params_v)
         rows_v = cur.fetchall()
 
-        print("FILAS DEVUELTAS POR LA VISTA SQL (rows_v):", len(rows_v))
-
         # ======================================================
-        # PROCESAR MESES Y ACUMULAR EN JSON FINAL
+        # FILTRADO DE MESES Y GENERACIÓN DE JSON
         # ======================================================
         meses_con_produccion_real = sorted(
             list({
@@ -1653,29 +1495,21 @@ def indicadores():
         vista_cache = {}
 
         for row in rows_v:
-
             mes = int(row["mes"])
 
             if meses_a_permitir and mes not in meses_a_permitir:
                 continue
 
             indicador = str(row["indicador"]).strip().lower()
-
-            key = (
-                row["anio"],
-                row["clues"],
-                row["nombre_unidad"],
-                row["tipologia"],
-                indicador,
-            )
-
-            valor = float(row["valor"] or 0)
+            key = (row["anio"], row["clues"], row["nombre_unidad"], row.get("tipologia", "TODAS"), indicador)
+            valor = parse_float(row["valor"])
 
             if es_anual:
                 if key not in vista_cache:
                     vista_cache[key] = valor
                 else:
-                    if indicador in indicadores_max:
+                    if indicador in indicadores_max or indicador in RECURSOS_FISICOS or indicador in indicadores_equipo_medico:
+                        # 🟢 FIX 3: MÁXIMO O PROMEDIO PARA RECURSOS EN VISTA ANUAL
                         vista_cache[key] = max(vista_cache[key], valor)
                     else:
                         vista_cache[key] += valor
@@ -1691,32 +1525,28 @@ def indicadores():
                 })
 
         # ======================================================
-        # GENERAR MES 13
+        # GENERACIÓN DE REGISTROS ANUALES (MES 13)
         # ======================================================
-
         if es_anual:
-
             for (anio, clues, unidad, tipologia, indicador), valor in vista_cache.items():
-
                 if indicador in indicadores_ya_calculados:
                     continue
 
-                data_acumulada.append(
-                    {
-                        "anio": anio,
-                        "mes": 13,
-                        "clues": clues,
-                        "nombre_unidad": unidad,
-                        "tipologia": tipologia,
-                        "indicador": indicador,
-                        "valor": round(valor, 2),
-                    }
-                )
+                data_acumulada.append({
+                    "anio": anio,
+                    "mes": 13,
+                    "clues": clues,
+                    "nombre_unidad": unidad,
+                    "tipologia": tipologia,
+                    "indicador": indicador,
+                    "valor": round(valor, 2),
+                })
 
 
     # PARTE 6
-    # ==========================================================
-    # TABLAS ESTÁTICAS (CAMAS NO CENSABLES Y EQUIPO MÉDICO)
+  
+   # ==========================================================
+    # PROCESAMIENTO DE TABLAS ESTÁTICAS (CAMAS NO CENSABLES Y EQUIPO)
     # ==========================================================
     cols_no_censables = [
         "hab_urgencias", "inh_urgencias", "tot_urgencias",
@@ -1732,42 +1562,43 @@ def indicadores():
         "hab_otras_areas", "inh_otras_areas", "tot_otras_areas",
     ]
 
-    procesar_tabla_estatica(
-        tabla="camas_no_censables",
-        alias="n",
-        columnas=cols_no_censables,
-        indicadores_solicitados=indicadores_solicitados,
-        es_descarga_masiva=es_descarga_masiva,
-        unidades=unidades,
-        anios=anios,
-        cur=cur,
-        es_anual=es_anual,
-        meses_validos=meses_validos,
-        data_acumulada=data_acumulada,
-    )
+    # Ejecución segura de consultas estáticas
+    if callable(globals().get("procesar_tabla_estatica")):
+        procesar_tabla_estatica(
+            tabla="camas_no_censables",
+            alias="n",
+            columnas=cols_no_censables,
+            indicadores_solicitados=indicadores_solicitados,
+            es_descarga_masiva=es_descarga_masiva,
+            unidades=unidades,
+            anios=anios,
+            cur=cur,
+            es_anual=es_anual,
+            meses_validos=meses_validos,
+            data_acumulada=data_acumulada,
+        )
 
-    procesar_tabla_estatica(
-        tabla="equipo_medico",
-        alias="em",
-        columnas=cols_equipo_medico,
-        indicadores_solicitados=indicadores_solicitados,
-        es_descarga_masiva=es_descarga_masiva,
-        unidades=unidades,
-        anios=anios,
-        cur=cur,
-        es_anual=es_anual,
-        meses_validos=meses_validos,
-        data_acumulada=data_acumulada,
-    )
+        procesar_tabla_estatica(
+            tabla="equipo_medico",
+            alias="em",
+            columnas=cols_equipo_medico,
+            indicadores_solicitados=indicadores_solicitados,
+            es_descarga_masiva=es_descarga_masiva,
+            unidades=unidades,
+            anios=anios,
+            cur=cur,
+            es_anual=es_anual,
+            meses_validos=meses_validos,
+            data_acumulada=data_acumulada,
+        )
 
     # ==========================================================
     # TOTAL GENERAL Y FILTRADO SEGÚN MODO DE AGRUPACIÓN (MULTIGRUPO)
     # ==========================================================
     if modo_agrupacion == "acumulado":
         # 🔑 1. OBTENER LISTA DE GRUPOS SOLICITADOS EN LA URL
-        grupos_solicitados = request.args.getlist("grupos[]")
+        grupos_solicitados = request.args.getlist("grupos[]") or request.args.getlist("grupos")
         
-        # Diccionario de nombres legibles para la leyenda de Chart.js
         etiquetas_grupos = {
             "TODAS": "TODAS LAS UNIDADES (42)",
             "HG": "Hospitales Generales (HG)",
@@ -1775,30 +1606,28 @@ def indicadores():
             "HE": "Hospitales de Especialidad (HE)"
         }
 
-        # Si no se recibió la lista explícita de grupos, usamos las tipologías presentes en la data
         if not grupos_solicitados:
-            grupos_solicitados = list({r.get("tipologia", "TODAS") for r in data_acumulada})
+            grupos_solicitados = list({r.get("tipologia", "TODAS") for r in data_acumulada if r.get("tipologia")})
 
         data_multigrupo = []
 
-        # 🔑 2. PROCESAR Y SEGMENTAR CADA GRUPO INDEPENDIENTEMENTE
+        # 🔑 2. SEGMENTAR CADA GRUPO INDEPENDIENTEMENTE SIN FALLBACKS DISTORSIONADOS
         for id_grupo in grupos_solicitados:
-            id_grupo_upper = id_grupo.upper()
+            id_grupo_upper = str(id_grupo).upper().strip()
             
-            # Obtener las CLUES asociadas a este grupo desde los parámetros
+            # Obtener CLUES enviadas explícitamente para este grupo
             clues_grupo = set(request.args.getlist(f"grupo_{id_grupo_upper}_clues[]"))
 
-            # Filtrar los registros pertenecientes a este grupo
             if clues_grupo:
                 data_subgrupo = [r for r in data_acumulada if r.get("clues") in clues_grupo]
             elif id_grupo_upper == "TODAS":
                 data_subgrupo = [r for r in data_acumulada if r.get("clues") != "TOTAL"]
             else:
-                data_subgrupo = [r for r in data_acumulada if r.get("tipologia") == id_grupo_upper]
+                data_subgrupo = [r for r in data_acumulada if str(r.get("tipologia")).upper() == id_grupo_upper]
 
-            # Si el filtro resulta vacío, usamos data_acumulada como fallback
+            # 🟢 FIX: Si un grupo no contiene datos para los filtros, omitirlo limpiamente en lugar de duplicar 'data_acumulada'
             if not data_subgrupo:
-                data_subgrupo = data_acumulada
+                continue
 
             # Generar el total exclusivo para este grupo
             totales_grupo = generar_total_general(
@@ -1819,11 +1648,11 @@ def indicadores():
                 t["clues"] = f"GRUPO_{id_grupo_upper}"
                 data_multigrupo.append(t)
 
-        data_acumulada = data_multigrupo
+        if data_multigrupo:
+            data_acumulada = data_multigrupo
 
     elif len(unidades) > 1:
         # 🏥 MODO INDIVIDUAL MULTI-UNIDAD:
-        # Mantiene cada hospital en la gráfica y le pega la fila del TOTAL GENERAL
         totales = generar_total_general(
             data_acumulada=data_acumulada,
             meses_validos=meses_validos,
@@ -1838,30 +1667,22 @@ def indicadores():
             data_acumulada.extend(totales)
 
     # ==========================================================
-    # CIERRE Y ORDENAMIENTO SEGURO
+    # CIERRE DE CURSOR Y ORDENAMIENTO DE RESPUESTA JSON
     # ==========================================================
-    cur.close()
+    try:
+        cur.close()
+    except Exception:
+        pass
 
-    # Ordenamiento defensivo previniendo valores None
+    # 🟢 FIX: ORDENAMIENTO ROBUSTO Y NORMALIZADO PREVINIENDO DESFASES EN CHART.JS
     data_acumulada.sort(
         key=lambda x: (
-            x.get("anio") or 0,
-            x.get("nombre_unidad") or "",
-            x.get("mes") if x.get("mes") is not None else 13,
-            x.get("indicador") or "",
+            int(x.get("anio") or 0),
+            str(x.get("nombre_unidad") or ""),
+            int(x.get("mes")) if (x.get("mes") is not None and str(x.get("mes")).isdigit()) else 13,
+            str(x.get("indicador") or ""),
         )
     )
-
-    # 🔍 DIAGNÓSTICO EN TERMINAL
-    print("\n============================================")
-    print("INDICADORES SOLICITADOS:", indicadores_solicitados)
-    print("INSUMOS DETECTADOS EN PYTHON:", insumos_necesarios)
-    print("TOTAL FILAS DEVUELTAS EN JSON:", len(data_acumulada))
-    
-    # Imprimir qué indicadores van realmente dentro del JSON
-    indicadores_en_json = set(d.get("indicador") for d in data_acumulada)
-    print("INDICADORES PRESENTES EN RESPUESTA JSON:", indicadores_en_json)
-    print("============================================\n")
 
     return jsonify(data_acumulada)
 
