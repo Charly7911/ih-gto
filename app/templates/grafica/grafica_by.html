@@ -120,31 +120,9 @@
               </label>
             </div>
 
-            <div class="form-check form-switch custom-switch m-0 align-items-center gap-1"
-              id="contenedorAcumularTipologia" style="display: none !important;">
-              <input class="form-check-input mt-0" type="checkbox" id="switchAcumularTipologia" />
-              <label class="form-check-label text-nowrap text-uppercase text-secondary fw-bold" style="font-size: 10px;"
-                for="switchAcumularTipologia">
-                Acumulados
-              </label>
-            </div>
 
           </div>
 
-          <!-- FILTRO DE TIPOLOGÍA DINÁMICO -->
-          <div id="contenedorTipologia" class="btn-group btn-group-sm" role="group" style="display: none !important;">
-            <input type="radio" class="btn-check" name="tipologia" id="tipTodas" value="TODAS" checked>
-            <label class="btn btn-outline-secondary" for="tipTodas">Todas</label>
-
-            <input type="radio" class="btn-check" name="tipologia" id="tipHG" value="HG">
-            <label class="btn btn-outline-secondary" for="tipHG">HG</label>
-
-            <input type="radio" class="btn-check" name="tipologia" id="tipHC" value="HC">
-            <label class="btn btn-outline-secondary" for="tipHC">HC</label>
-
-            <input type="radio" class="btn-check" name="tipologia" id="tipHE" value="HE">
-            <label class="btn btn-outline-secondary" for="tipHE">HE</label>
-          </div>
 
         </div>
 
@@ -934,19 +912,12 @@
     const setUnidades = window.unidadesSeleccionadas || new Set();
     const setIndicadores = window.indicadoresSeleccionados || new Set();
 
-    // 1. Si hay selecciones directas, ajustar visibilidad de toggles secundarios
-    if (setUnidades.size > 0) {
-      window.mostrarTodasUnidades = false;
+    // 🟢 1. LEER ESTADO REAL DEL SWITCH "UNIDADES"
+    const swUnidades = document.getElementById("switchUnidades");
+    const desglosarPorUnidades = swUnidades ? swUnidades.checked : Boolean(window.mostrarTodasUnidades);
 
-      const swUnidades = document.getElementById("switchUnidades");
-      if (swUnidades) swUnidades.checked = false;
-
-      const contenedorTipologia = document.getElementById("contenedorTipologia");
-      if (contenedorTipologia) contenedorTipologia.style.display = "none";
-
-      const contenedorAcumular = document.getElementById("contenedorAcumularTipologia");
-      if (contenedorAcumular) contenedorAcumular.style.display = "none";
-    }
+    // Sincronizar variable global
+    window.mostrarTodasUnidades = desglosarPorUnidades;
 
     // 2. DETECTAR GRUPOS PRESENTES EN EL DROPZONE / SELECCIÓN
     const badgesGrupos = Array.from(
@@ -954,8 +925,8 @@
     );
     const hayGrupos = badgesGrupos.length > 0 || Boolean(window.grupoSeleccionadoActual);
 
-    // ⛔ 3. CONTROL DE SEGURIDAD: REQUIERE OBLIGATORIAMENTE UNIDAD O GRUPO
-    if (setUnidades.size === 0 && !hayGrupos) {
+    // ⛔ 3. CONTROL DE SEGURIDAD: REQUIERE OBLIGATORIAMENTE UNIDAD, GRUPO O SWITCH ACTIVO
+    if (setUnidades.size === 0 && !hayGrupos && !desglosarPorUnidades) {
       if (typeof destruirTodasLasGraficas === "function") {
         destruirTodasLasGraficas();
       }
@@ -970,7 +941,7 @@
       return;
     }
 
-    // ⛔ 5. REQUERIR AÑOS SELECCIONADOS (SINCRONIZAR CON WINDOW)
+    // ⛔ 5. REQUERIR AÑOS SELECCIONADOS
     const aniosChecked = Array.from(
       document.querySelectorAll(".anio-check:checked")
     ).map((el) => el.value);
@@ -982,7 +953,7 @@
       return;
     }
 
-    // 🟢 Sincronizar Set global de años con la selección actual del DOM
+    // Sincronizar Set global de años con la selección actual del DOM
     window.aniosSeleccionados = new Set(aniosChecked);
 
     const modoVista = document.getElementById("modoVista")?.value;
@@ -991,9 +962,9 @@
     const params = new URLSearchParams();
 
     // =========================================================
-    // MODO DE AGRUPACIÓN Y CONSTRUCCIÓN EXACTA DE PARÁMETROS
+    // MODO DE AGRUPACIÓN Y CONSTRUCCIÓN DE PARÁMETROS
     // =========================================================
-    if (hayGrupos) {
+    if (hayGrupos && !desglosarPorUnidades) {
       params.append("modo", "acumulado");
 
       badgesGrupos.forEach((badge) => {
@@ -1031,20 +1002,13 @@
         });
       }
     } else {
+      // 🟢 MODO INDIVIDUAL O DESGLOSADO POR UNIDADES
       params.append("modo", "individual");
 
       setUnidades.forEach((u) => {
         const val = typeof u === "object" ? u.value : u;
         if (val) params.append("clues[]", val);
       });
-    }
-
-    // =========================
-    // TIPOLOGIA
-    // =========================
-    if (window.mostrarTodasUnidades) {
-      const tipologia = document.querySelector("input[name='tipologia']:checked")?.value || "TODAS";
-      params.append("tipologia", tipologia);
     }
 
     // =========================
@@ -1055,7 +1019,7 @@
     });
 
     // =========================
-    // AÑOS (LIMPIAR Y RECONSTRUIR PARÁMETROS)
+    // AÑOS
     // =========================
     aniosChecked.forEach((a) => {
       params.append("anios[]", a);
@@ -1111,8 +1075,9 @@
           sincronizarMesesUIConDatos(data);
         }
 
+        // 🟢 SE LE PASA EL ESTADO DEL SWITCH PARA MANTENER LA SEPARACIÓN DE UNIDADES EN LA GRÁFICA
         if (typeof renderGrafica === "function") {
-          renderGrafica(data);
+          renderGrafica(data, desglosarPorUnidades);
         }
 
         if (window.ultimoIndicadorArrastrado && !hayGrupos) {
@@ -1367,7 +1332,7 @@
   }
 
 
-  function renderGrafica(data) {
+  function renderGrafica(data, desglosarPorUnidadesOverride = null) {
     // 🛡️ Guardacostas para data
     if (!data && window.ultimoDataRecibido) {
       data = window.ultimoDataRecibido;
@@ -1385,19 +1350,19 @@
         .trim()
         .replace(/\s+/g, "_");
 
-    // 1. Lectura de radios y controles
+    // 1. Detección del switch "Unidades"
+    const swUnidades = document.getElementById("switchUnidades");
+    const desglosarPorUnidades = desglosarPorUnidadesOverride !== null
+      ? desglosarPorUnidadesOverride
+      : (swUnidades ? swUnidades.checked : Boolean(window.mostrarTodasUnidades));
+
+    // Lectura de controles y radios principales
     const radioSeleccionado = document.querySelector('input[name="modoVista"]:checked');
     const modoVistaSeleccionado = radioSeleccionado ? radioSeleccionado.value : "combinada";
 
     const modoVistaAnual = document.getElementById("modoVista")?.value;
     const esVistaAnual = modoVistaAnual === "anual";
     const mesesSeleccionados = typeof obtenerMesesSeleccionados === "function" ? obtenerMesesSeleccionados() : [];
-
-    const sw = document.getElementById("switchUnidades");
-    if (sw && typeof window.unidadesSeleccionadas !== "undefined" && window.unidadesSeleccionadas.size > 0) {
-      sw.checked = false;
-      if (typeof window.mostrarTodasUnidades !== "undefined") window.mostrarTodasUnidades = false;
-    }
 
     const mesesLabels = [
       "Ene", "Feb", "Mar", "Abr", "May", "Jun",
@@ -1423,7 +1388,7 @@
     // =========================================================
     let datosGrafica = data;
 
-    // 1. Descartar insumos secundarios si hay indicadores seleccionados explícitamente
+    // Descartar insumos secundarios si hay indicadores seleccionados explícitamente
     const indsSeleccionados = Array.from(window.indicadoresSeleccionados || []).map(i => norm(i));
 
     if (indsSeleccionados.length > 0) {
@@ -1433,7 +1398,7 @@
       });
     }
 
-    // 2. Filtrar registros de unidades (Modo Individual vs Grupo/Acumulado)
+    // Filtrar registros de unidades (Modo Individual vs Grupo/Acumulado)
     const esModoIndividual = datosGrafica.some(d =>
       d.clues &&
       d.clues.toUpperCase() !== "TOTAL" &&
@@ -1441,14 +1406,12 @@
     );
 
     if (esModoIndividual) {
-      // Quedarse únicamente con las filas de cada CLUES individual
       datosGrafica = datosGrafica.filter((d) => {
         const c = str(d.clues).toUpperCase();
         const n = str(d.nombre_unidad).toUpperCase();
         return c !== "TOTAL" && !c.startsWith("GRUPO_") && n !== "TOTAL GENERAL" && n !== "TOTAL GRUPO";
       });
     } else {
-      // Modo Grupo: Quedarse con los registros consolidados
       const registrosTotales = datosGrafica.filter((d) =>
         str(d.clues).toUpperCase() === "TOTAL" ||
         str(d.clues).startsWith("GRUPO_") ||
@@ -1460,7 +1423,7 @@
     }
 
     // =========================================================
-    // CALCULO ROBUSTO DE ETIQUETAS X (AÑOS HISTÓRICOS VS ACTUAL)
+    // CÁLCULO ROBUSTO DE ETIQUETAS X (EJE HORIZONTAL)
     // =========================================================
     let etiquetasX = [];
     let mesesBase = [];
@@ -1471,20 +1434,16 @@
       mesesBase = mesesSeleccionados;
       etiquetasX = mesesBase.map((m) => mesesLabels[m - 1]);
     } else {
-      // Leer años tanto del DOM como del JSON recibido
       const aniosDOM = Array.from(document.querySelectorAll(".anio-check:checked")).map(el => String(el.value));
       const aniosDatos = Array.from(new Set(datosGrafica.map((d) => String(d.anio))));
       const todosLosAnios = Array.from(new Set([...aniosDOM, ...aniosDatos]));
 
       const anioActualSistema = new Date().getFullYear().toString();
-
-      // Si hay al menos un año previo (ej. 2025), se extienden los 12 meses completos
       const tieneAnioHistorico = todosLosAnios.some((a) => Number(a) < Number(anioActualSistema));
 
       let ultimoMesReal = 12;
 
       if (!tieneAnioHistorico) {
-        // Si es SOLO el año en curso, cortamos en el último mes con producción
         const mesesConProduccionReal = datosGrafica
           .filter((d) => Number(d.valor || 0) > 0 && Number(d.mes) >= 1 && Number(d.mes) <= 12)
           .map((d) => Number(d.mes));
@@ -1497,30 +1456,17 @@
     }
 
     // =========================================================
-    // GENERACIÓN DE COMBOS ÚNICOS POR CLUES/ENTIDAD
+    // GENERACIÓN DE COMBOS Y PALETA DE COLORES
     // =========================================================
-    let combos = [];
-
-    if (window.mostrarTodasUnidades && typeof acumularPorTipologia !== "undefined" && acumularPorTipologia) {
-      combos = [
-        ...new Set(
-          datosGrafica.map((d) => {
-            const tip = str(d.tipologia || "OTRO").trim().toUpperCase();
-            return `${norm(d.indicador)}|||${d.anio}|||TIPOLOGIA_${tip}|||${tip}`;
-          })
-        ),
-      ];
-    } else {
-      combos = [
-        ...new Set(
-          datosGrafica.map((d) => {
-            const idEntidad = d.clues || d.nombre_unidad || "unidad";
-            const nombreMostrar = d.nombre_unidad || d.clues || "Unidad";
-            return `${norm(d.indicador)}|||${d.anio}|||${str(idEntidad).trim()}|||${str(nombreMostrar).trim()}`;
-          })
-        ),
-      ];
-    }
+    let combos = [
+      ...new Set(
+        datosGrafica.map((d) => {
+          const idEntidad = d.clues || d.nombre_unidad || "unidad";
+          const nombreMostrar = d.nombre_unidad || d.clues || "Unidad";
+          return `${norm(d.indicador)}|||${d.anio}|||${str(idEntidad).trim()}|||${str(nombreMostrar).trim()}`;
+        })
+      ),
+    ];
 
     const mostrarTendencia = document.getElementById("switchTendencia")?.checked || false;
 
@@ -1529,39 +1475,29 @@
       return i.includes("mortalidad") || i.includes("porcentaje") || i.includes("prom") || i.includes("indice") || i.includes("interv");
     };
 
-    // 🎨 PALETA DE COLORES
     const PALETA_COLORES_DISTINTOS = [
       "#2563eb", "#dc2626", "#16a34a", "#d97706", "#9333ea",
       "#0891b2", "#e11d48", "#059669", "#ca8a04", "#7c3aed"
     ];
 
     // =========================================================
-    // DATASETS (CONSTRUCCIÓN ACUMULADA / COMPARATIVA EXCEL)
+    // DATASETS (CONSTRUCCIÓN DE LÍNEAS / SERIES)
     // =========================================================
     const datasets = combos.flatMap((c, comboIndex) => {
       const [indicadorNom, anioNom, idEntidad, nombreMostrar] = c.split("|||");
       let valores = [];
-      const esModoTipologia = idEntidad.startsWith("TIPOLOGIA_");
 
       if (!esVistaAnual) {
-        // Filtrar registros correspondientes al combo actual
         const registros = datosGrafica.filter((d) => {
           const coincideInd = norm(d.indicador) === norm(indicadorNom);
           const coincideAnio = String(d.anio) === String(anioNom);
           const esMesValido = Number(d.mes) >= 1 && Number(d.mes) <= 12;
 
           if (!coincideInd || !coincideAnio || !esMesValido) return false;
-
-          if (esModoTipologia) {
-            return str(d.tipologia || "OTRO").trim().toUpperCase() === nombreMostrar.toUpperCase();
-          } else {
-            return str(d.clues).trim() === idEntidad || str(d.nombre_unidad).trim() === nombreMostrar;
-          }
+          return str(d.clues).trim() === idEntidad || str(d.nombre_unidad).trim() === nombreMostrar;
         });
 
         const mapaMeses = {};
-
-        // 🟢 ACUMULACIÓN SUMATORIA DE REGISTROS (Respetando el total exacto de 1,731)
         registros.forEach((r) => {
           const m = Number(r.mes);
           const val = Number(r.valor || 0);
@@ -1570,26 +1506,15 @@
 
         valores = mesesBase.map((m) => (m in mapaMeses ? mapaMeses[m] : 0));
       } else {
-        // =========================================================
-        // 📅 VISTA ANUAL (CONSOLIDACIÓN DE TOTAL)
-        // =========================================================
         const registros = datosGrafica.filter((d) => {
           const coincideInd = norm(d.indicador) === norm(indicadorNom);
           const coincideAnio = String(d.anio) === String(anioNom);
-
           if (!coincideInd || !coincideAnio) return false;
-
-          if (esModoTipologia) {
-            return str(d.tipologia || "OTRO").trim().toUpperCase() === nombreMostrar.toUpperCase();
-          } else {
-            return str(d.clues).trim() === idEntidad || str(d.nombre_unidad).trim() === nombreMostrar;
-          }
+          return str(d.clues).trim() === idEntidad || str(d.nombre_unidad).trim() === nombreMostrar;
         });
 
         let totalAnual = 0;
-
         if (registros.length > 0) {
-          // Buscar primero si el backend envió fila explícita de Total Anual (mes = 13)
           const regConsolidado = registros.find(r => Number(r.mes) === 13 || str(r.clues).toUpperCase() === "TOTAL");
 
           if (regConsolidado) {
@@ -1607,26 +1532,19 @@
             totalAnual = Object.values(mapaMesesUnicos).reduce((acc, val) => acc + val, 0);
           }
         }
-
         valores = [totalAnual];
       }
 
       if (valores.length === 0) return [];
 
       const colorBase = PALETA_COLORES_DISTINTOS[comboIndex % PALETA_COLORES_DISTINTOS.length];
-
-      const estilosLinea = [
-        [], [6, 6], [2, 3], [12, 4, 2, 4], [8, 4]
-      ];
+      const estilosLinea = [[], [6, 6], [2, 3], [12, 4, 2, 4], [8, 4]];
 
       const listaIndicadores = typeof window.indicadoresSeleccionados !== "undefined" ? Array.from(window.indicadoresSeleccionados) : [];
       const idxIndicador = listaIndicadores.indexOf(indicadorNom);
       const estiloDash = estilosLinea[Math.max(0, idxIndicador) % estilosLinea.length];
 
-      let nombreEntidadLabel = esModoTipologia
-        ? `ACUMULADO ${nombreMostrar}`
-        : nombreMostrar;
-
+      let nombreEntidadLabel = nombreMostrar;
       if (!nombreEntidadLabel || nombreEntidadLabel.toUpperCase() === "TODAS" || nombreEntidadLabel.toUpperCase() === "TOTAL GENERAL") {
         nombreEntidadLabel = "Todas las Unidades";
       }
@@ -1640,6 +1558,7 @@
       const baseDataset = {
         label: labelCompleto,
         unidad: idEntidad,
+        nombreUnidad: nombreEntidadLabel,
         indicador: indicadorNom,
         anio: anioNom,
         data: valores,
@@ -1647,10 +1566,7 @@
         borderDash: estiloDash,
         borderWidth: 2.5,
         tension: 0.3,
-        backgroundColor:
-          tipoOriginal === "area"
-            ? colorBase + "4D"
-            : colorBase,
+        backgroundColor: tipoOriginal === "area" ? colorBase + "4D" : colorBase,
         fill: tipoOriginal === "area",
         showLine: tipoOriginal !== "scatter",
         pointRadius: tipoOriginal === "scatter" ? 6 : 4,
@@ -1669,6 +1585,7 @@
           label: `Tendencia — ${indNombre} (${anioNom})`,
           indicador: indicadorNom,
           unidad: idEntidad,
+          nombreUnidad: nombreEntidadLabel,
           anio: anioNom,
           data: tendencia,
           type: "line",
@@ -1686,17 +1603,12 @@
       ];
     });
 
-    // Opciones de Chart.js
+    // Opciones para Chart.js
     const obtenerOpcionesGrafica = () => ({
       responsive: true,
       maintainAspectRatio: false,
       layout: {
-        padding: {
-          top: 35,
-          right: 20,
-          bottom: 30,
-          left: 10
-        },
+        padding: { top: 35, right: 20, bottom: 30, left: 10 },
       },
       plugins: {
         legend: { display: false },
@@ -1723,26 +1635,18 @@
       scales: {
         x: {
           display: true,
-          ticks: {
-            font: { size: 10 },
-            autoSkip: false,
-            maxRotation: 0
-          },
-          grid: {
-            display: true
-          }
+          ticks: { font: { size: 10 }, autoSkip: false, maxRotation: 0 },
+          grid: { display: true }
         },
         y: {
           beginAtZero: true,
-          ticks: {
-            font: { size: 10 }
-          }
+          ticks: { font: { size: 10 } }
         },
       },
     });
 
     // ===================================================
-    // RENDERIZADO FINAL Y LEYENDA INFERIOR
+    // LIMPIEZA PREVIA DE INSTANCIAS DE CHART.JS
     // ===================================================
     const contenedor = document.getElementById("contenedorGraficas");
     if (!contenedor) return;
@@ -1754,15 +1658,74 @@
     if (typeof window.instanciasCharts !== "undefined" && Array.isArray(window.instanciasCharts)) {
       window.instanciasCharts.forEach((c) => c && c.destroy());
       window.instanciasCharts = [];
+    } else {
+      window.instanciasCharts = [];
     }
 
+    // ===================================================
+    // RENDERIZADO 1: MODO DESGLOSADO POR UNIDADES (SWITCH ACTIVO)
+    // ===================================================
+    if (desglosarPorUnidades) {
+      const gruposUnidad = {};
+
+      datasets.forEach((ds) => {
+        const keyUnidad = ds.nombreUnidad || ds.unidad || "Unidad";
+        if (!gruposUnidad[keyUnidad]) {
+          gruposUnidad[keyUnidad] = [];
+        }
+        gruposUnidad[keyUnidad].push(ds);
+      });
+
+      const listaUnidades = Object.keys(gruposUnidad);
+      contenedor.innerHTML = "";
+
+      listaUnidades.forEach((nombreUnidadKey, index) => {
+        const subDatasets = gruposUnidad[nombreUnidadKey];
+
+        const cardDiv = document.createElement("div");
+        cardDiv.className = "tarjeta-subgrafica mb-3 p-3 border rounded bg-white shadow-sm w-100";
+        cardDiv.innerHTML = `
+                <h6 class="fw-bold text-primary mb-2 border-bottom pb-2" style="font-size: 12px; text-transform: uppercase;">
+                    🏥 Unidad: ${nombreUnidadKey}
+                </h6>
+                <div style="height: clamp(220px, 30vh, 300px); position: relative;" class="w-100">
+                    <canvas id="grafica_unidad_${index}"></canvas>
+                </div>
+                <div id="leyenda_unidad_${index}" class="mt-2"></div>
+            `;
+        contenedor.appendChild(cardDiv);
+
+        const canvasSub = document.getElementById(`grafica_unidad_${index}`);
+        const ctxSub = canvasSub.getContext("2d");
+
+        const subChart = new Chart(ctxSub, {
+          type: tipoChartJS,
+          data: { labels: etiquetasX, datasets: subDatasets },
+          options: obtenerOpcionesGrafica()
+        });
+
+        window.instanciasCharts.push(subChart);
+
+        if (typeof renderizarLeyendaEnContenedor === "function") {
+          renderizarLeyendaEnContenedor(subChart, `leyenda_unidad_${index}`);
+        } else if (typeof crearLeyendaPersonalizada === "function") {
+          crearLeyendaPersonalizada(subChart);
+        }
+      });
+
+      return; // Salir de la función al terminar las gráficas por unidad
+    }
+
+    // ===================================================
+    // RENDERIZADO 2: MODO COMBINADO (GRÁFICA ÚNICA GENERAL)
+    // ===================================================
     if (modoVistaSeleccionado === "combinada") {
       contenedor.innerHTML = `
-        <div class="grafica-container w-100" style="position: relative; height: clamp(220px, 32vh, 340px);">
-          <canvas id="grafica"></canvas>
-        </div>
-        <div id="leyendaPersonalizada" class="mt-2 w-100"></div>
-      `;
+            <div class="grafica-container w-100" style="position: relative; height: clamp(220px, 32vh, 340px);">
+                <canvas id="grafica"></canvas>
+            </div>
+            <div id="leyendaPersonalizada" class="mt-2 w-100"></div>
+        `;
 
       const canvas = document.getElementById("grafica");
       const ctx = canvas.getContext("2d");
@@ -1777,6 +1740,9 @@
         crearLeyendaPersonalizada(window.chart);
       }
 
+      // ===================================================
+      // RENDERIZADO 3: MODO SEPARADO POR INDICADOR
+      // ===================================================
     } else {
       const gruposDatasets = {};
 
@@ -1801,14 +1767,14 @@
         const cardDiv = document.createElement("div");
         cardDiv.className = "tarjeta-subgrafica mb-3 p-3 border rounded bg-white shadow-sm w-100";
         cardDiv.innerHTML = `
-          <h6 class="fw-bold text-primary mb-2 border-bottom pb-2" style="font-size: 12px; text-transform: uppercase;">
-            📊 Indicador: ${nombreInd}
-          </h6>
-          <div style="height: clamp(220px, 30vh, 300px); position: relative;" class="w-100">
-            <canvas id="grafica_sub_${index}"></canvas>
-          </div>
-          <div id="leyenda_sub_${index}" class="mt-2"></div>
-        `;
+                <h6 class="fw-bold text-primary mb-2 border-bottom pb-2" style="font-size: 12px; text-transform: uppercase;">
+                    📊 Indicador: ${nombreInd}
+                </h6>
+                <div style="height: clamp(220px, 30vh, 300px); position: relative;" class="w-100">
+                    <canvas id="grafica_sub_${index}"></canvas>
+                </div>
+                <div id="leyenda_sub_${index}" class="mt-2"></div>
+            `;
         contenedor.appendChild(cardDiv);
 
         const canvasSub = document.getElementById(`grafica_sub_${index}`);
@@ -1820,9 +1786,7 @@
           options: obtenerOpcionesGrafica()
         });
 
-        if (typeof window.instanciasCharts !== "undefined" && Array.isArray(window.instanciasCharts)) {
-          window.instanciasCharts.push(subChart);
-        }
+        window.instanciasCharts.push(subChart);
 
         if (typeof renderizarLeyendaEnContenedor === "function") {
           renderizarLeyendaEnContenedor(subChart, `leyenda_sub_${index}`);
@@ -1879,31 +1843,25 @@
 
 
     // 5. MOSTRAR UNIDADES (Ajustado con inline-flex para respetar la barra alineada)
-    document.getElementById("switchUnidades")
-      ?.addEventListener("change", function () {
-        mostrarTodasUnidades = this.checked;
+    document.getElementById("switchUnidades")?.addEventListener("change", function () {
+      window.mostrarTodasUnidades = this.checked;
 
-        // Contenedor de Tipologías (HG, HC, HE...)
-        const contenedorTipologia = document.getElementById("contenedorTipologia");
-        if (contenedorTipologia) {
-          // Usamos 'inline-flex' para convivir con los demás botones de la barra sin forzar saltos bruscos
-          contenedorTipologia.style.setProperty('display', this.checked ? "inline-flex" : "none", 'important');
-        }
 
-        // Contenedor del Switch Acumular por Tipología
-        const contenedorAcumular = document.getElementById("contenedorAcumularTipologia");
-        if (contenedorAcumular) {
-          contenedorAcumular.style.setProperty('display', this.checked ? "inline-flex" : "none", 'important');
-        }
+      // Contenedor del Switch Acumular por Tipología
+      const contenedorAcumular = document.getElementById("contenedorAcumularTipologia");
+      if (contenedorAcumular) {
+        contenedorAcumular.style.setProperty('display', this.checked ? "inline-flex" : "none", 'important');
+      }
 
-        // Si se apaga Mostrar Unidades, desmarcamos el de acumular
-        if (!this.checked) {
-          const swAcumular = document.getElementById("switchAcumularTipologia");
-          if (swAcumular) swAcumular.checked = false;
-        }
+      // Si se apaga Mostrar Unidades, desmarcamos el de acumular por tipología
+      if (!this.checked) {
+        const swAcumular = document.getElementById("switchAcumularTipologia");
+        if (swAcumular) swAcumular.checked = false;
+      }
 
-        cargarGrafica();
-      });
+      // Volver a cargar la gráfica con los nuevos parámetros
+      cargarGrafica();
+    });
 
 
     // 6. CAMBIO DE TIPOLOGÍA (HG, HC, HE, TODAS)
@@ -3168,8 +3126,6 @@
     const radioCombinada = document.querySelector('input[name="modoVista"][value="combinada"]');
     if (radioCombinada) radioCombinada.checked = true;
 
-    const contenedorTipologia = document.getElementById("contenedorTipologia");
-    if (contenedorTipologia) contenedorTipologia.style.display = "none";
 
     const tipTodas = document.getElementById("tipTodas");
     if (tipTodas) tipTodas.checked = true;
