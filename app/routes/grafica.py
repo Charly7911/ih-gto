@@ -656,6 +656,21 @@ def indicadores():
         "tomografo_32",
         "tomografo_64",
         }
+    
+
+    cols_no_censables = [
+            "hab_urgencias", "inh_urgencias", "tot_urgencias",
+            "hab_observacion", "inh_observacion", "tot_observacion",
+            "hab_cuid_int", "inh_cuid_int", "tot_cuid_int",
+            "hab_cirug_amb", "inh_cirug_amb", "tot_cirug_amb",
+            "hab_quemados", "inh_quemados", "tot_quemados",
+            "hab_lab_parto", "inh_lab_parto", "tot_lab_parto",
+            "hab_recup_pp", "inh_recup_pp", "tot_recup_pp",
+            "hab_recup_pq", "inh_recup_pq", "tot_recup_pq",
+            "hab_uci_adulto", "inh_uci_adulto", "tot_uci_adulto",
+            "hab_uci_ped", "inh_uci_ped", "tot_uci_ped",
+            "hab_otras_areas", "inh_otras_areas", "tot_otras_areas",
+        ]
 
    
     # ==========================================================
@@ -1508,10 +1523,18 @@ def indicadores():
                 if key not in vista_cache:
                     vista_cache[key] = valor
                 else:
-                    if indicador in indicadores_max or indicador in RECURSOS_FISICOS or indicador in indicadores_equipo_medico:
-                        # 🟢 FIX 3: MÁXIMO O PROMEDIO PARA RECURSOS EN VISTA ANUAL
+                    # 🟢 Evalúa usando las listas de recursos existentes sin depender de variables no definidas
+                    es_recurso_estatico = (
+                        indicador in indicadores_max 
+                        or indicador in cols_equipo_medico 
+                        or indicador in cols_no_censables
+                    )
+
+                    if es_recurso_estatico:
+                        # Para capacidad instalada, camas y equipo, toma el valor de corte/máximo
                         vista_cache[key] = max(vista_cache[key], valor)
                     else:
+                        # Para flujos de producción (egresos, consultas, urgencias, etc.), acumula la suma
                         vista_cache[key] += valor
             else:
                 data_acumulada.append({
@@ -1548,19 +1571,7 @@ def indicadores():
    # ==========================================================
     # PROCESAMIENTO DE TABLAS ESTÁTICAS (CAMAS NO CENSABLES Y EQUIPO)
     # ==========================================================
-    cols_no_censables = [
-        "hab_urgencias", "inh_urgencias", "tot_urgencias",
-        "hab_observacion", "inh_observacion", "tot_observacion",
-        "hab_cuid_int", "inh_cuid_int", "tot_cuid_int",
-        "hab_cirug_amb", "inh_cirug_amb", "tot_cirug_amb",
-        "hab_quemados", "inh_quemados", "tot_quemados",
-        "hab_lab_parto", "inh_lab_parto", "tot_lab_parto",
-        "hab_recup_pp", "inh_recup_pp", "tot_recup_pp",
-        "hab_recup_pq", "inh_recup_pq", "tot_recup_pq",
-        "hab_uci_adulto", "inh_uci_adulto", "tot_uci_adulto",
-        "hab_uci_ped", "inh_uci_ped", "tot_uci_ped",
-        "hab_otras_areas", "inh_otras_areas", "tot_otras_areas",
-    ]
+    
 
     # Ejecución segura de consultas estáticas
     if callable(globals().get("procesar_tabla_estatica")):
