@@ -1504,13 +1504,13 @@ def indicadores():
         rows_v = cur.fetchall()
 
         # ======================================================
-        # FILTRADO DE MESES Y GENERACIÓN DE JSON
+        # FILTRADO DE MESES Y GENERACIÓN DE VISTA CACHE
         # ======================================================
         meses_con_produccion_real = sorted(
             list({
                 int(r["mes"]) 
                 for r in rows_e 
-                if r.get("mes") is not None and int(r.get("mes")) in range(1, 13)
+                if r.get("mes") is not None and str(r.get("mes")).isdigit() and int(r.get("mes")) in range(1, 13)
             })
         )
 
@@ -1521,9 +1521,6 @@ def indicadores():
         else:
             meses_a_permitir = meses_validos
 
-        # ======================================================
-        # FILTRADO INTELIGENTE DE MESES Y DATOS HISTÓRICOS
-        # ======================================================
         vista_cache = {}
 
         for row in rows_v:
@@ -1531,8 +1528,7 @@ def indicadores():
             mes_raw = row.get("mes")
             mes = int(mes_raw) if (mes_raw is not None and str(mes_raw).isdigit()) else 13
 
-            # 🟢 FIX CLAVE: Si el registro es de un año previo o viene sin mes (corte anual), 
-            # no lo descartamos aunque el filtro de meses pida [1..12]
+            # Permitir registros históricos o sin mes
             es_registro_historico = anio_row < 2026 or mes == 13
 
             if not es_registro_historico and meses_a_permitir and mes not in meses_a_permitir:
@@ -1546,16 +1542,13 @@ def indicadores():
             key = (anio_row, clues_row, unidad_row, tipologia_row, indicador)
             valor = parse_float(row["valor"])
 
-            # 🟢 Para descargas masivas o vista anual, acumulamos/consolidamos en vista_cache
             if es_anual or es_descarga_masiva or es_registro_historico:
                 if key not in vista_cache:
                     vista_cache[key] = valor
                 else:
                     if indicador in indicadores_max or indicador in cols_equipo_medico or indicador in cols_no_censables:
-                        # Recursos estáticos: tomamos el valor máximo/corte
                         vista_cache[key] = max(vista_cache[key], valor)
                     else:
-                        # Producción: sumamos
                         vista_cache[key] += valor
             else:
                 data_acumulada.append({
@@ -1568,40 +1561,22 @@ def indicadores():
                     "valor": round(valor, 2),
                 })
 
-        # ======================================================
-        # INYECTAR REGISTROS HISTÓRICOS/ANUALES CON MES 13 A DATA_ACUMULADA
-        # ======================================================
+        # INYECCIÓN DE VISTA CACHE A DATA_ACUMULADA
         if es_anual or es_descarga_masiva or any(int(a) < 2026 for a in anios):
             for (anio, clues, unidad, tipologia, indicador), valor in vista_cache.items():
-                
-                # Evitar duplicar si ya fue calculado previamente en rows_e
-                ya_existe = any(
-                    r.get("anio") == anio 
-                    and r.get("clues") == clues 
-                    and r.get("indicador") == indicador 
-                    for r in data_acumulada
-                )
+                data_acumulada.append({
+                    "anio": anio,
+                    "mes": 13,
+                    "clues": clues,
+                    "nombre_unidad": unidad,
+                    "tipologia": tipologia,
+                    "indicador": indicador,
+                    "valor": round(valor, 2),
+                })
 
-                if not ya_existe:
-                    data_acumulada.append({
-                        "anio": anio,
-                        "mes": 13,  # Se asigna Mes 13 para representar el Cierre Anual
-                        "clues": clues,
-                        "nombre_unidad": unidad,
-                        "tipologia": tipologia,
-                        "indicador": indicador,
-                        "valor": round(valor, 2),
-                    })
-
-
-    # PARTE 6
-  
-   # ==========================================================
+    # ==========================================================
     # PROCESAMIENTO DE TABLAS ESTÁTICAS (CAMAS NO CENSABLES Y EQUIPO)
     # ==========================================================
-    
-
-    # Ejecución segura de consultas estáticas
     if callable(globals().get("procesar_tabla_estatica")):
         procesar_tabla_estatica(
             tabla="camas_no_censables",
@@ -1635,7 +1610,6 @@ def indicadores():
     # TOTAL GENERAL Y FILTRADO SEGÚN MODO DE AGRUPACIÓN (MULTIGRUPO)
     # ==========================================================
     if modo_agrupacion == "acumulado":
-        # 🔑 1. OBTENER LISTA DE GRUPOS SOLICITADOS EN LA URL
         grupos_solicitados = request.args.getlist("grupos[]") or request.args.getlist("grupos")
         
         etiquetas_grupos = {
@@ -1650,25 +1624,22 @@ def indicadores():
 
         data_multigrupo = []
 
-        # 🔑 2. SEGMENTAR CADA GRUPO INDEPENDIENTEMENTE SIN FALLBACKS DISTORSIONADOS
         for id_grupo in grupos_solicitados:
             id_grupo_upper = str(id_grupo).upper().strip()
-            
-            # Obtener CLUES enviadas explícitamente para este grupo
             clues_grupo = set(request.args.getlist(f"grupo_{id_grupo_upper}_clues[]"))
 
+            # 🟢 FIX 1: INCLUIR FILAS DE "TOTAL" EN EL SUBGRUPO PARA NO PERDER 2023-2025 NI RECURSOS ESTÁTICOS
             if clues_grupo:
-                data_subgrupo = [r for r in data_acumulada if r.get("clues") in clues_grupo]
+                data_subgrupo = [r for r in data_acumulada if r.get("clues") in clues_grupo or r.get("clues") == "TOTAL"]
             elif id_grupo_upper == "TODAS":
-                data_subgrupo = [r for r in data_acumulada if r.get("clues") != "TOTAL"]
+                data_subgrupo = list(data_acumulada)
             else:
-                data_subgrupo = [r for r in data_acumulada if str(r.get("tipologia")).upper() == id_grupo_upper]
+                data_subgrupo = [r for r in data_acumulada if str(r.get("tipologia")).upper() == id_grupo_upper or r.get("clues") == "TOTAL"]
 
-            # 🟢 FIX: Si un grupo no contiene datos para los filtros, omitirlo limpiamente en lugar de duplicar 'data_acumulada'
             if not data_subgrupo:
-                continue
+                data_subgrupo = list(data_acumulada)
 
-            # Generar el total exclusivo para este grupo
+            # Generar el total consolidado recalculando los KPIs sobre los insumos acumulados
             totales_grupo = generar_total_general(
                 data_acumulada=data_subgrupo,
                 meses_validos=meses_validos,
@@ -1680,18 +1651,19 @@ def indicadores():
                 indicadores_solicitados=indicadores_solicitados,
             )
 
-            # 🔑 3. ASIGNAR NOMBRE ÚNICO A CADA GRUPO PARA SEPARAR LÍNEAS EN CHART.JS
             nombre_etiqueta = etiquetas_grupos.get(id_grupo_upper, f"GRUPO {id_grupo_upper}")
             for t in totales_grupo:
                 t["nombre_unidad"] = nombre_etiqueta
                 t["clues"] = f"GRUPO_{id_grupo_upper}"
                 data_multigrupo.append(t)
 
-        if data_multigrupo:
+        # 🟢 FIX 2: SI ES DESCARGA MASIVA, MANTENEMOS AMBAS LISTAS (DETALLE POR UNIDAD + AGRUPADOS)
+        if es_descarga_masiva:
+            data_acumulada.extend(data_multigrupo)
+        elif data_multigrupo:
             data_acumulada = data_multigrupo
 
     elif len(unidades) > 1:
-        # 🏥 MODO INDIVIDUAL MULTI-UNIDAD:
         totales = generar_total_general(
             data_acumulada=data_acumulada,
             meses_validos=meses_validos,
@@ -1713,7 +1685,6 @@ def indicadores():
     except Exception:
         pass
 
-    # 🟢 FIX: ORDENAMIENTO ROBUSTO Y NORMALIZADO PREVINIENDO DESFASES EN CHART.JS
     data_acumulada.sort(
         key=lambda x: (
             int(x.get("anio") or 0),
