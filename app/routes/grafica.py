@@ -351,6 +351,15 @@ def indicadores():
         }), 401
 
 
+    RECURSOS_FISICOS = [
+            "camas_total", "quirofanos", "camas_med_int", "camas_cirugia",
+            "camas_gineco", "camas_pediatria", "camas_otros", "hab_urgencias",
+            "hab_observacion", "hab_quemados", "hab_lab_parto", "hab_recup_pp",
+            "hab_cirug_amb", "hab_recup_pq", "hab_cuid_int", "hab_uci_adulto",
+            "hab_uci_ped", "hab_otras_areas", "total_no_censables",
+        ]
+
+
     kpis_calculados = [
         "especialidad",
         "especialidad_por_dia",
@@ -1378,7 +1387,7 @@ def indicadores():
             "prom_dias_estancia_pediatria": ["dias_est_ped", "dias_estancia_pediatria", "egre_pediatria", "pediatria"],
             "prom_dias_estancia_gineco": ["dias_est_gin", "dias_estancia_ginecobstetricia", "egre_gineco", "ginecobstetricia"],
             "prom_dias_estancia_otros": ["dias_est_otros", "dias_estancia_otros", "egre_otros", "otros"],
-            "indice_rotacion": ["total_egresos", "camas_total"],
+            "indice_rotacion": ["total_egresos", "camas_total", "egresos"],
             "interv_sustitucion": ["camas_total", "dias_p", "total_egresos"],
     
             # --- URGENCIAS Y QUIRÓFANO ---
@@ -1418,14 +1427,19 @@ def indicadores():
             kpis = calcular_kpis(base, dias)
             dataset = {**base, **kpis}
 
+            # 🟢 FIX: PERMITIR QUE SINERHIAS Y SUS KPIS ENTREN A LA DESCARGA
             for indicador, valor in dataset.items():
                 indicador_norm = str(indicador).lower().strip()
 
-                if (
+                es_indicador_permitido = (
                     es_descarga_masiva
                     or indicador_norm in indicadores_solicitados_set
                     or indicador_norm in insumos_necesarios
-                ):
+                    or indicador_norm in RECURSOS_FISICOS
+                    or indicador_norm == "indice_rotacion"
+                )
+
+                if es_indicador_permitido:
                     data_acumulada.append({
                         "anio": anio,
                         "mes": mes,
