@@ -1521,63 +1521,77 @@ def indicadores():
         else:
             meses_a_permitir = meses_validos
 
+        # ======================================================
+        # FILTRADO INTELIGENTE DE MESES Y DATOS HISTÓRICOS
+        # ======================================================
         vista_cache = {}
 
         for row in rows_v:
-            mes = int(row["mes"])
+            anio_row = int(row["anio"])
+            mes_raw = row.get("mes")
+            mes = int(mes_raw) if (mes_raw is not None and str(mes_raw).isdigit()) else 13
 
-            if meses_a_permitir and mes not in meses_a_permitir:
+            # 🟢 FIX CLAVE: Si el registro es de un año previo o viene sin mes (corte anual), 
+            # no lo descartamos aunque el filtro de meses pida [1..12]
+            es_registro_historico = anio_row < 2026 or mes == 13
+
+            if not es_registro_historico and meses_a_permitir and mes not in meses_a_permitir:
                 continue
 
             indicador = str(row["indicador"]).strip().lower()
-            key = (row["anio"], row["clues"], row["nombre_unidad"], row.get("tipologia", "TODAS"), indicador)
+            clues_row = str(row["clues"]).strip().upper()
+            unidad_row = row.get("nombre_unidad") or clues_row
+            tipologia_row = row.get("tipologia", "TODAS")
+
+            key = (anio_row, clues_row, unidad_row, tipologia_row, indicador)
             valor = parse_float(row["valor"])
 
-            if es_anual:
+            # 🟢 Para descargas masivas o vista anual, acumulamos/consolidamos en vista_cache
+            if es_anual or es_descarga_masiva or es_registro_historico:
                 if key not in vista_cache:
                     vista_cache[key] = valor
                 else:
-                    # 🟢 Evalúa usando las listas de recursos existentes sin depender de variables no definidas
-                    es_recurso_estatico = (
-                        indicador in indicadores_max 
-                        or indicador in cols_equipo_medico 
-                        or indicador in cols_no_censables
-                    )
-
-                    if es_recurso_estatico:
-                        # Para capacidad instalada, camas y equipo, toma el valor de corte/máximo
+                    if indicador in indicadores_max or indicador in cols_equipo_medico or indicador in cols_no_censables:
+                        # Recursos estáticos: tomamos el valor máximo/corte
                         vista_cache[key] = max(vista_cache[key], valor)
                     else:
-                        # Para flujos de producción (egresos, consultas, urgencias, etc.), acumula la suma
+                        # Producción: sumamos
                         vista_cache[key] += valor
             else:
                 data_acumulada.append({
-                    "anio": row["anio"],
+                    "anio": anio_row,
                     "mes": mes,
-                    "clues": row["clues"],
-                    "nombre_unidad": row["nombre_unidad"],
-                    "tipologia": row.get("tipologia", "TODAS"),
+                    "clues": clues_row,
+                    "nombre_unidad": unidad_row,
+                    "tipologia": tipologia_row,
                     "indicador": indicador,
                     "valor": round(valor, 2),
                 })
 
         # ======================================================
-        # GENERACIÓN DE REGISTROS ANUALES (MES 13)
+        # INYECTAR REGISTROS HISTÓRICOS/ANUALES CON MES 13 A DATA_ACUMULADA
         # ======================================================
-        if es_anual:
+        if es_anual or es_descarga_masiva or any(int(a) < 2026 for a in anios):
             for (anio, clues, unidad, tipologia, indicador), valor in vista_cache.items():
-                if indicador in indicadores_ya_calculados:
-                    continue
+                
+                # Evitar duplicar si ya fue calculado previamente en rows_e
+                ya_existe = any(
+                    r.get("anio") == anio 
+                    and r.get("clues") == clues 
+                    and r.get("indicador") == indicador 
+                    for r in data_acumulada
+                )
 
-                data_acumulada.append({
-                    "anio": anio,
-                    "mes": 13,
-                    "clues": clues,
-                    "nombre_unidad": unidad,
-                    "tipologia": tipologia,
-                    "indicador": indicador,
-                    "valor": round(valor, 2),
-                })
+                if not ya_existe:
+                    data_acumulada.append({
+                        "anio": anio,
+                        "mes": 13,  # Se asigna Mes 13 para representar el Cierre Anual
+                        "clues": clues,
+                        "nombre_unidad": unidad,
+                        "tipologia": tipologia,
+                        "indicador": indicador,
+                        "valor": round(valor, 2),
+                    })
 
 
     # PARTE 6
