@@ -2048,12 +2048,15 @@
 
 
     const columnasDeseadas = [
+      // CONSULTAS
       "especialidad",
       "especialidad_por_dia",
       "mental",
       "bucal",
       "consultas",
       "consultas_por_dia",
+
+      // ESTUDIOS DE GABINETE
       "laboratorio",
       "rayosx",
       "ultrasonido",
@@ -2062,6 +2065,8 @@
       "tac",
       "rnm",
       "anatomia",
+
+      // URGENCIAS
       "calificada",
       "no_calificada",
       "porcentaje_calificada",
@@ -2071,68 +2076,88 @@
       "accidentes",
       "pediatrica",
       "ginecobstetricia",
+
+      // NACIMIENTOS
       "nac_eutocico",
       "nac_distocico",
       "nac_cesarea",
       "total_nacimientos",
       "nacimientos_por_dia",
       "porcentaje_cesareas",
+
+      // ABORTOS
       "abortos_lui",
       "abortos_ameu",
       "abortos_medicado",
       "abortos_no_especificado",
       "abortos_total",
+
+      // APEO
       "eventos_obstetricos",
       "total_apeo",
       "porcentaje_apeo",
       "eventos_obstetricos_adolescentes",
       "adolescente_apeo",
       "porcentaje_adolescente_apeo",
+
+      // EGRESOS
       "egre_med_interna",
       "egre_cirugia",
       "egre_pediatria",
       "egre_gineco",
       "egre_otros",
       "total_egresos",
+
+      // EGRESOS + 48 HS
       "egre_med_int_48h",
       "egre_cirugia_48h",
       "egre_pediatria_48h",
       "egre_gineco_48h",
       "egre_otros_48h",
       "total_egresos_48h",
+
+      // PROCEDIMIENTOS DENTRO DE QUIROFANO
       "med_int_dentro",
       "cirugia_dentro",
       "gineco_dentro",
-      "defunciones_med_interna",
-      "defunciones_cirugia",
-      "defunciones_ginecobstetricia",
-      "defunciones_pediatria",
-      "defunciones_otros",
-      "def_48h_med_interna",
-      "def_48h_cirugia",
-      "def_48h_ginecobstetricia",
-      "def_48h_pediatria",
-      "def_48h_otros",
       "pediatria_dentro",
       "otros_dentro",
       "total_proced_dentro",
       "prom_inter_diarias_qx",
+
+      // PROCEDIMIENTOS FUERA DE QUIROFANO
       "med_int_fuera",
       "cirugia_fuera",
       "gineco_fuera",
       "pediatria_fuera",
       "otros_fuera",
       "total_proced_fuera",
+
+      // TOTAL PROCEDIMIENTOS
       "total_proced_med_int",
       "total_proced_cirugia",
       "total_proced_gineco",
       "total_proced_pediatria",
       "total_proced_otros",
       "total_proced",
+
+      // EGRESOS POR DEFUNCIONES
       "egre_defunciones",
+      "defunciones_med_interna",
+      "defunciones_cirugia",
+      "defunciones_ginecobstetricia",
+      "defunciones_pediatria",
+      "defunciones_otros",
       "mortalidad_cruda",
       "egre_defunciones_48h",
+      "def_48h_med_interna",
+      "def_48h_cirugia",
+      "def_48h_ginecobstetricia",
+      "def_48h_pediatria",
+      "def_48h_otros",
       "mortalidad_ajustada",
+
+      // PORCENTAJE DE OCUPACION
       "dias_p_med_int",
       "dias_p_cirugia",
       "dias_p_gineco",
@@ -2144,6 +2169,8 @@
       "porcentaje_ocupacion_gineco",
       "porcentaje_ocupacion_otros",
       "porcentaje_ocupacion",
+
+      // INDICADORES DE HOSPITALIZACION
       "prom_estancia_med_interna",
       "prom_estancia_cirugia",
       "prom_estancia_pediatria",
@@ -2152,6 +2179,8 @@
       "prom_dias_estancia",
       "indice_rotacion",
       "interv_sustitucion",
+
+      // INFRAESTRUCTURA
       "camas_total",
       "camas_med_int",
       "camas_cirugia",
@@ -2169,8 +2198,7 @@
       "hab_cuid_int",
       "hab_uci_adulto",
       "hab_uci_ped",
-      "hab_otras_areas",
-
+      "hab_otras_areas"
     ];
 
     const columnasEquipo = [
