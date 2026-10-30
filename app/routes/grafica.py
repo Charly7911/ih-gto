@@ -811,6 +811,21 @@ def indicadores():
             SUM(IFNULL(e.total_egresos, 0)) AS total_egresos,        
             SUM(IFNULL(e.defunciones, 0)) AS egre_defunciones,
             SUM(IFNULL(e.defunciones_48h, 0)) AS egre_defunciones_48h,
+
+            -- DEFUNCIONES 48H POR SERVICIO
+            SUM(IFNULL(e.def_48h_med_interna, 0)) AS def_48h_med_interna,
+            SUM(IFNULL(e.def_48h_cirugia, 0)) AS def_48h_cirugia,
+            SUM(IFNULL(e.def_48h_ginecobstetricia, 0)) AS def_48h_ginecobstetricia,
+            SUM(IFNULL(e.def_48h_pediatria, 0)) AS def_48h_pediatria,
+            SUM(IFNULL(e.def_48h_otros, 0)) AS def_48h_otros,
+
+            -- DEFUNCIONES TOTALES POR SERVICIO
+            SUM(IFNULL(e.defunciones_med_interna, 0)) AS defunciones_med_interna,
+            SUM(IFNULL(e.defunciones_cirugia, 0)) AS defunciones_cirugia,
+            SUM(IFNULL(e.defunciones_ginecobstetricia, 0)) AS defunciones_ginecobstetricia,
+            SUM(IFNULL(e.defunciones_pediatria, 0)) AS defunciones_pediatria,
+            SUM(IFNULL(e.defunciones_otros, 0)) AS defunciones_otros,
+
             SUM(IFNULL(e.dias_estancia_sum, 0)) AS dias_estancia,
             SUM(IFNULL(e.dias_estancia_med_interna, 0)) AS dias_est_med,
             SUM(IFNULL(e.dias_estancia_cirugia, 0)) AS dias_est_cir,
@@ -824,7 +839,6 @@ def indicadores():
             SUM(IFNULL(e.apeo, 0)) AS apeo,
             SUM(IFNULL(e.abortos, 0)) AS abortos,
             SUM(IFNULL(e.abortos, 0) + IFNULL(e.nacimientos, 0)) AS eventos_obstetricos,
-            SUM(IFNULL(e.apeo, 0)) AS total_apeo,
             
             SUM(IFNULL(e.med_interna, 0)) AS egre_med_interna,
             SUM(IFNULL(e.cirugia, 0)) AS egre_cirugia,
