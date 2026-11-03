@@ -1613,22 +1613,31 @@ def indicadores():
 
         data_multigrupo = []
 
+        # 🔑 EXTRAER ÚNICAMENTE REGISTROS INDIVIDUALES PARA EVITAR DOBLE SUMA
+        data_base_unidades = [
+            r for r in data_acumulada 
+            if r.get("clues") != "TOTAL" 
+            and r.get("nombre_unidad") not in ["TOTAL GENERAL", "TOTAL GRUPO"]
+            and not str(r.get("clues", "")).startswith("GRUPO_")
+        ]
+
         for id_grupo in grupos_solicitados:
             id_grupo_upper = str(id_grupo).upper().strip()
             clues_grupo = set(request.args.getlist(f"grupo_{id_grupo_upper}_clues[]"))
 
-            # 🟢 FIX 1: INCLUIR FILAS DE "TOTAL" EN EL SUBGRUPO PARA NO PERDER 2023-2025 NI RECURSOS ESTÁTICOS
+            # 🟢 FIX CLAVE: Segmentar solo por CLUES o Tipología sobre la lista limpia (sin recortar a "TODAS")
             if clues_grupo:
-                data_subgrupo = [r for r in data_acumulada if r.get("clues") in clues_grupo or r.get("clues") == "TOTAL"]
+                data_subgrupo = [r for r in data_base_unidades if r.get("clues") in clues_grupo]
             elif id_grupo_upper == "TODAS":
-                data_subgrupo = list(data_acumulada)
+                data_subgrupo = list(data_base_unidades)
             else:
-                data_subgrupo = [r for r in data_acumulada if str(r.get("tipologia")).upper() == id_grupo_upper or r.get("clues") == "TOTAL"]
+                data_subgrupo = [r for r in data_base_unidades if str(r.get("tipologia")).upper() == id_grupo_upper]
 
+            # Si por algún motivo no hay coincidencias de subgrupo, usar la base limpia completa
             if not data_subgrupo:
-                data_subgrupo = list(data_acumulada)
+                data_subgrupo = list(data_base_unidades)
 
-            # Generar el total consolidado recalculando los KPIs sobre los insumos acumulados
+            # Generar los totales exclusivos para este subgrupo (respetando desgloses mensuales o anuales)
             totales_grupo = generar_total_general(
                 data_acumulada=data_subgrupo,
                 meses_validos=meses_validos,
@@ -1646,25 +1655,34 @@ def indicadores():
                 t["clues"] = f"GRUPO_{id_grupo_upper}"
                 data_multigrupo.append(t)
 
-        # 🟢 FIX 2: SI ES DESCARGA MASIVA, MANTENEMOS AMBAS LISTAS (DETALLE POR UNIDAD + AGRUPADOS)
-        if es_descarga_masiva:
+        # 🟢 Mantener la lista completa de unidades + la fila de TOTAL GRUPO para el Excel
+        if es_descarga_masiva or len(unidades) > 1:
             data_acumulada.extend(data_multigrupo)
         elif data_multigrupo:
             data_acumulada = data_multigrupo
 
-    elif len(unidades) > 1:
-        totales = generar_total_general(
-            data_acumulada=data_acumulada,
-            meses_validos=meses_validos,
-            SUM_FIELDS=SUM_FIELDS,
-            MAX_FIELDS=MAX_FIELDS,
-            indicadores_max=indicadores_max,
-            calcular_kpis=calcular_kpis,
-            es_descarga_masiva=es_descarga_masiva,
-            indicadores_solicitados=indicadores_solicitados,
-        )
-        if totales:
-            data_acumulada.extend(totales)
+    elif len(unidades) > 1 or es_descarga_masiva:
+        # Modo individual con más de 1 unidad: Generar la fila "TOTAL GRUPO" unificada
+        data_base_unidades = [
+            r for r in data_acumulada 
+            if r.get("clues") != "TOTAL" 
+            and r.get("nombre_unidad") not in ["TOTAL GENERAL", "TOTAL GRUPO"]
+            and not str(r.get("clues", "")).startswith("GRUPO_")
+        ]
+
+        if data_base_unidades:
+            totales = generar_total_general(
+                data_acumulada=data_base_unidades,
+                meses_validos=meses_validos,
+                SUM_FIELDS=SUM_FIELDS,
+                MAX_FIELDS=MAX_FIELDS,
+                indicadores_max=indicadores_max,
+                calcular_kpis=calcular_kpis,
+                es_descarga_masiva=es_descarga_masiva,
+                indicadores_solicitados=indicadores_solicitados,
+            )
+            if totales:
+                data_acumulada.extend(totales)
 
     # ==========================================================
     # CIERRE DE CURSOR Y ORDENAMIENTO DE RESPUESTA JSON
