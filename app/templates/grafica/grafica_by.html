@@ -2000,38 +2000,21 @@
     ];
 
     // =========================
-    // MESES
+    // MESES SELECCIONADOS
     // =========================
     let mesesSeleccionados = typeof obtenerMesesSeleccionados === "function" ? obtenerMesesSeleccionados() : [];
 
     if (!esAnual && mesesSeleccionados.length === 0) {
-      if (typeof chart !== "undefined" && chart) {
-        chart.destroy();
-        chart = null;
-      }
-      if (typeof instanciasCharts !== "undefined" && Array.isArray(instanciasCharts)) {
-        instanciasCharts.forEach((c) => c && c.destroy());
-        instanciasCharts = [];
-      }
-      const contenedor = document.getElementById("contenedorGraficas");
-      if (contenedor) {
-        contenedor.innerHTML = `
-            <div class="grafica-container w-100" style="height: 380px; position: relative; width: 100%;">
-                <canvas id="grafica" style="width: 100%; height: 100%;"></canvas>
-            </div>
-            <div id="leyendaPersonalizada" class="mt-3 w-100"></div>
-            `;
-      }
+      alert("Selecciona al menos un mes.");
       resetBotonExcel();
       return;
     }
 
     const params = new URLSearchParams();
 
-    // 🟢 1. BANDERAS DE DESCARGA Y MODOS
+    // 🟢 1. BANDERAS DE DESCARGA
     params.append("descarga", "true");
 
-    // Mantener la consulta acumulada activada para recuperar la fila de TOTAL GRUPO de la API
     const swUnidades = document.getElementById("switchUnidades");
     const desglosarUnidades = swUnidades ? swUnidades.checked : Boolean(window.mostrarTodasUnidades);
 
@@ -2119,14 +2102,15 @@
     });
 
     // =========================
-    // MESES
+    // MESES (CONTROL RECTIFICADO)
     // =========================
-    mesesSeleccionados.forEach((m) => {
-      params.append("meses[]", m);
-    });
-
-    // Permitir incluir los cierres históricos (Mes 13)
-    params.append("meses[]", "13");
+    if (esAnual) {
+      params.append("meses[]", "13");
+    } else {
+      mesesSeleccionados.forEach((m) => {
+        params.append("meses[]", m);
+      });
+    }
 
     // =========================
     // FETCH A LA API
@@ -2150,12 +2134,15 @@
     }
 
     // =========================
-    // FILTRADO ROBUSTO Y MATRIZ EXCEL
+    // FILTRADO Y CONSTRUCCIÓN DE MATRIZ
     // =========================
     const filas = dataTotal.filter((d) => {
       const mesNum = parseInt(d.mes);
-      if (isNaN(mesNum) || mesNum === 13) return true;
-      return esAnual ? mesNum === 13 : mesesSeleccionados.map(Number).includes(mesNum);
+      if (esAnual) {
+        return mesNum === 13;
+      }
+      // En vista mensual, filtrar solo los meses válidos [1..12] seleccionados
+      return mesesSeleccionados.map(Number).includes(mesNum);
     });
 
     const columnasPresentes = new Set();
@@ -2178,9 +2165,9 @@
     }
 
     const matriz = {};
+    const str = (val) => (val || "").toString();
 
     filas.forEach((d) => {
-      // 🟢 FIX PRINCIPAL: Identificar la fila totalizadora y asignarle 'TOTAL GRUPO'
       const esGrupoTotal = (d.clues && str(d.clues).startsWith("GRUPO_")) ||
         str(d.clues).toUpperCase() === "TOTAL" ||
         str(d.nombre_unidad).toUpperCase().includes("TOTAL");
@@ -2191,8 +2178,8 @@
       const mesNum = parseInt(d.mes);
 
       const mesTexto =
-        isNaN(mesNum) || mesNum === 13
-          ? (typeof formatearRangoMeses === "function" ? formatearRangoMeses(mesesSeleccionados, mesesLabels) : "CIERRE ANUAL")
+        mesNum === 13
+          ? "CIERRE ANUAL"
           : mesesLabels[mesNum - 1] || `Mes ${mesNum}`;
 
       const key = `${unidad}|${anio}|${mesTexto}`;
@@ -2214,11 +2201,6 @@
 
       matriz[key].valores[indicador] = valor;
     });
-
-    // Helper auxiliar de normalización
-    function str(val) {
-      return (val || "").toString();
-    }
 
     // =========================
     // EXPORTAR A EXCEL
