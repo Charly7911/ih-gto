@@ -2012,17 +2012,11 @@
 
     const params = new URLSearchParams();
 
-    // 🟢 1. BANDERAS DE DESCARGA
+    // 🟢 1. BANDERAS DE DESCARGA Y MODO
     params.append("descarga", "true");
 
-    const swUnidades = document.getElementById("switchUnidades");
-    const desglosarUnidades = swUnidades ? swUnidades.checked : Boolean(window.mostrarTodasUnidades);
-
-    if (!desglosarUnidades) {
-      params.append("modo", "acumulado");
-    } else {
-      params.append("modo", "individual");
-    }
+    // 🔑 PERMITIR SIEMPRE MODO ACUMULADO O MULTIGRUPO PARA QUE EL BACKEND INCLUYA 'TOTAL GRUPO'
+    params.append("modo", "acumulado");
 
     // =========================
     // AÑOS
@@ -2102,7 +2096,7 @@
     });
 
     // =========================
-    // MESES (CONTROL RECTIFICADO)
+    // MESES
     // =========================
     if (esAnual) {
       params.append("meses[]", "13");
@@ -2141,7 +2135,6 @@
       if (esAnual) {
         return mesNum === 13;
       }
-      // En vista mensual, filtrar solo los meses válidos [1..12] seleccionados
       return mesesSeleccionados.map(Number).includes(mesNum);
     });
 
@@ -2168,9 +2161,13 @@
     const str = (val) => (val || "").toString();
 
     filas.forEach((d) => {
-      const esGrupoTotal = (d.clues && str(d.clues).startsWith("GRUPO_")) ||
-        str(d.clues).toUpperCase() === "TOTAL" ||
-        str(d.nombre_unidad).toUpperCase().includes("TOTAL");
+      // 🟢 FIX CRÍTICO: Mapeo preciso de la fila "TOTAL GRUPO"
+      const cluesRaw = str(d.clues).trim().toUpperCase();
+      const unidadRaw = str(d.nombre_unidad).trim().toUpperCase();
+
+      const esGrupoTotal = cluesRaw === "TOTAL" ||
+        cluesRaw.startsWith("GRUPO_") ||
+        unidadRaw.includes("TOTAL");
 
       const unidad = esGrupoTotal ? "TOTAL GRUPO" : (d.nombre_unidad || "SIN UNIDAD");
       const clues = esGrupoTotal ? "TOTAL" : (d.clues || "");
@@ -2179,10 +2176,13 @@
 
       const mesTexto =
         mesNum === 13
-          ? "CIERRE ANUAL"
+          ? (typeof formatearRangoMeses === "function"
+            ? formatearRangoMeses(mesesSeleccionados, mesesLabels)
+            : "Ene - Dic")
           : mesesLabels[mesNum - 1] || `Mes ${mesNum}`;
 
-      const key = `${unidad}|${anio}|${mesTexto}`;
+      // 🔑 La clave incluye 'clues' para separar las unidades individuales de la fila 'TOTAL GRUPO' del mismo mes/año
+      const key = `${clues}|${unidad}|${anio}|${mesTexto}`;
 
       if (!matriz[key]) {
         matriz[key] = {
@@ -2192,8 +2192,6 @@
           mes: mesTexto,
           valores: {}
         };
-      } else if (!matriz[key].clues && clues) {
-        matriz[key].clues = clues;
       }
 
       const indicador = d.indicador.trim().toLowerCase();
