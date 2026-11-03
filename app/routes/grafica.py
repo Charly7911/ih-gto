@@ -56,12 +56,14 @@ def grafica_home():
 # ==========================================================
 # FUNCIÓN TOTAL GENERAL (SIN DUPLICACIÓN DE DATOS)
 # ==========================================================
+
+
 def generar_total_general(
     data_acumulada,
     meses_validos,
     SUM_FIELDS,
     MAX_FIELDS,
-    indicadores_max=None, # 👈 VALOR POR DEFECTO DEFENSIVO
+    indicadores_max=None,
     calcular_kpis=None,
     es_descarga_masiva=False,
     indicadores_solicitados=None,
@@ -70,7 +72,6 @@ def generar_total_general(
         indicadores_max = {}
 
     if not callable(calcular_kpis):
-        # Evita lanzar UnboundLocalError / TypeError
         def calcular_kpis(data, dias):
             return {}
 
@@ -82,7 +83,6 @@ def generar_total_general(
         "hab_uci_ped", "hab_otras_areas", "total_no_censables",
     ]
 
-    # 🔑 FIX 1: INCLUIR EQUIPO MÉDICO EN SUM_FIELDS O MÁXIMOS
     indicadores_equipo_medico = {
         "arco_c_analogo", "arco_c_digital", "bascula_estadimetro", "bascula_bebe",
         "camilla_radiotransp", "cardiotocografo", "carro_rojo_reanim", "cuna_calor_rad",
@@ -100,7 +100,6 @@ def generar_total_general(
         "tomografo_128", "tomografo_16", "tomografo_32", "tomografo_64",
     }
 
-    # Asegurar que los campos de equipo médico se puedan sumar/consolidar
     SUM_FIELDS = set(SUM_FIELDS) | indicadores_equipo_medico if SUM_FIELDS else indicadores_equipo_medico
 
     if not data_acumulada:
@@ -115,7 +114,7 @@ def generar_total_general(
     recursos_set = {r.lower() for r in RECURSOS_FISICOS}
     sum_fields_set = {s.lower() for s in SUM_FIELDS}
 
-    # 🔑 1. DEPURACIÓN DE REGISTROS: Extraer sólo unidades individuales para evitar doble suma
+    # 1. Depuración de registros: extraer unidades individuales para evitar doble suma
     registros_individuales = [
         r for r in data_acumulada 
         if r.get("clues") != "TOTAL" and r.get("nombre_unidad") not in ["TOTAL GENERAL", "TOTAL GRUPO"]
@@ -130,29 +129,15 @@ def generar_total_general(
         if r.get("clues") != "TOTAL"
     }
 
-    es_anual = any(r.get("mes") == 13 for r in data_limpia)
-
-    if len(unidades) == 1 and es_anual:
-        return []
+    # Detectar si la lista contiene ÚNICAMENTE registros de cierre anual (mes 13)
+    es_anual_puro = all(r.get("mes") == 13 for r in data_limpia if r.get("mes") is not None)
 
     resultados = []
 
-    # ==========================================
-    # AUXILIAR: CONSTRUIR BASE (ROBUSTA Y DEDUPLICADA)
-    # ==========================================
+    # Auxiliar para construir base deduplicada
     def construir_base(registros):
         base = defaultdict(float)
-        recursos_map = defaultdict(lambda: defaultdict(float))
-
-        # 🧪 PRINT C: REVISAR REGISTROS QUE LLEGAN A CONSTRUIR BASE POR MES
-        if registros:
-            mes_actual = registros[0].get("mes")
-            unidades_in = set(r.get("clues") for r in registros)
-            egresos_in = [r for r in registros if str(r.get("indicador")).lower() == "total_egresos"]
-            suma_egr = sum(float(r.get("valor") or 0) for r in egresos_in)
-          
-
-        # 🔑 Deduplicar registros por (anio, mes, clues, indicador)
+        
         vistos = set()
         registros_unicos = []
         for x in registros:
@@ -161,13 +146,12 @@ def generar_total_general(
                 vistos.add(clave)
                 registros_unicos.append(x)
 
-        # 1. Recursos Físicos (Máximo por unidad entre meses, luego suma)
+        # 1. Recursos Físicos
         recursos_map = defaultdict(lambda: defaultdict(float))
         for x in registros_unicos:
             indicador = str(x.get("indicador", "")).lower()
             unidad = x.get("nombre_unidad", "UNIDAD")
             
-            # Buscar en el campo 'indicador' o en las llaves del diccionario
             if indicador in recursos_set:
                 val = float(x.get("valor") or 0)
                 if val > recursos_map[indicador][unidad]:
@@ -187,16 +171,14 @@ def generar_total_general(
             campo_lower = campo.lower()
             base[campo_lower] = sum(recursos_map[campo_lower].values())
 
-        # 2. Campos Sumables (Extrae tanto de la propiedad 'indicador' como de las llaves físicas)
+        # 2. Campos Sumables
         for campo in SUM_FIELDS:
             campo_lower = campo.lower()
             suma_campo = 0.0
 
             for x in registros_unicos:
-                # Opción A: Si viene como fila vertical (indicador == 'tomografo_64')
                 if str(x.get("indicador", "")).lower() == campo_lower:
                     suma_campo += float(x.get("valor") or 0)
-                # Opción B: Si viene como columna horizontal/atributo ('tomografo_64': 2)
                 elif campo_lower in x:
                     try:
                         suma_campo += float(x.get(campo_lower) or 0)
@@ -223,9 +205,9 @@ def generar_total_general(
         return base
 
     # ==========================================
-    # CASO 1: UNA SOLA UNIDAD - MENSUAL
+    # CASO 1: UNA SOLA UNIDAD - MENSUAL / ACUMULADO
     # ==========================================
-    if len(unidades) == 1 and not es_anual:
+    if len(unidades) == 1 and not es_anual_puro:
         anios_presentes = {r["anio"] for r in data_limpia if "anio" in r}
 
         for anio in anios_presentes:
@@ -265,9 +247,9 @@ def generar_total_general(
         return resultados
 
     # ==========================================
-    # CASO 2: VARIAS UNIDADES - ANUAL (MES 13)
+    # CASO 2: CONSULTA / DESCARGA EXCLUSIVAMENTE ANUAL (MES 13)
     # ==========================================
-    if len(unidades) > 1 and es_anual:
+    if es_anual_puro:
         anios_presentes = {r["anio"] for r in data_limpia if "anio" in r}
 
         for anio in anios_presentes:
@@ -301,13 +283,15 @@ def generar_total_general(
         return resultados
 
     # ==========================================
-    # CASO 3: VARIAS UNIDADES - MENSUAL (DESGLOSE MES A MES)
+    # CASO 3: DESGLOSE MENSUAL (VARIA DE 1 A 12 MESES)
     # ==========================================
     grupos = defaultdict(list)
 
+    # Agrupar estrictamente por cada mes real [1..12]
     for r in data_limpia:
-        if r.get("mes") is not None and r.get("mes") != 13 and r.get("anio"):
-            grupos[(r["anio"], int(r["mes"]))].append(r)
+        mes_val = r.get("mes")
+        if mes_val is not None and mes_val != 13 and r.get("anio"):
+            grupos[(r["anio"], int(mes_val))].append(r)
 
     for (anio, mes), registros in grupos.items():
         base = construir_base(registros)
