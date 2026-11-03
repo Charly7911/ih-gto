@@ -1982,14 +1982,16 @@
     const btn = document.getElementById("btnExcel");
     const texto = document.getElementById("textoBtn");
 
-    btn.disabled = true;
-    texto.textContent = "Generando Excel...";
+    if (btn) btn.disabled = true;
+    if (texto) texto.textContent = "Generando Excel...";
 
-    btn.style.backgroundColor = "#ffc107"; // amarillo
-    btn.style.borderColor = "#ffc107";
-    btn.style.color = "#000";
+    if (btn) {
+      btn.style.backgroundColor = "#ffc107"; // amarillo
+      btn.style.borderColor = "#ffc107";
+      btn.style.color = "#000";
+    }
 
-    const modoVista = document.getElementById("modoVista").value;
+    const modoVista = document.getElementById("modoVista")?.value;
     const esAnual = modoVista === "anual";
 
     const mesesLabels = [
@@ -2000,7 +2002,7 @@
     // =========================
     // MESES
     // =========================
-    let mesesSeleccionados = obtenerMesesSeleccionados();
+    let mesesSeleccionados = typeof obtenerMesesSeleccionados === "function" ? obtenerMesesSeleccionados() : [];
 
     if (!esAnual && mesesSeleccionados.length === 0) {
       if (typeof chart !== "undefined" && chart) {
@@ -2014,11 +2016,11 @@
       const contenedor = document.getElementById("contenedorGraficas");
       if (contenedor) {
         contenedor.innerHTML = `
-        <div class="grafica-container w-100" style="height: 380px; position: relative; width: 100%;">
-          <canvas id="grafica" style="width: 100%; height: 100%;"></canvas>
-        </div>
-        <div id="leyendaPersonalizada" class="mt-3 w-100"></div>
-      `;
+            <div class="grafica-container w-100" style="height: 380px; position: relative; width: 100%;">
+                <canvas id="grafica" style="width: 100%; height: 100%;"></canvas>
+            </div>
+            <div id="leyendaPersonalizada" class="mt-3 w-100"></div>
+            `;
       }
       resetBotonExcel();
       return;
@@ -2026,16 +2028,24 @@
 
     const params = new URLSearchParams();
 
-    // 🔑 1. FORZAR MODO INDIVIDUAL Y BANDERAS DE DESCARGA
-    // Esto garantiza que la API devuelva las 42 unidades sin colapsar por grupos
-    params.append("modo", "individual");
+    // 🟢 1. BANDERAS DE DESCARGA Y MODOS
     params.append("descarga", "true");
+
+    // Mantener la consulta acumulada activada para recuperar la fila de TOTAL GRUPO de la API
+    const swUnidades = document.getElementById("switchUnidades");
+    const desglosarUnidades = swUnidades ? swUnidades.checked : Boolean(window.mostrarTodasUnidades);
+
+    if (!desglosarUnidades) {
+      params.append("modo", "acumulado");
+    } else {
+      params.append("modo", "individual");
+    }
 
     // =========================
     // AÑOS
     // =========================
     const aniosChecked = Array.from(
-      document.querySelectorAll(".anio-check:checked"),
+      document.querySelectorAll(".anio-check:checked")
     ).map((el) => el.value);
 
     if (aniosChecked.length === 0) {
@@ -2046,216 +2056,39 @@
 
     aniosChecked.forEach((a) => params.append("anios[]", a));
 
-
+    // Listas completas de columnas
     const columnasDeseadas = [
-      // CONSULTAS
-      "especialidad",
-      "especialidad_por_dia",
-      "mental",
-      "bucal",
-      "consultas",
-      "consultas_por_dia",
-
-      // ESTUDIOS DE GABINETE
-      "laboratorio",
-      "rayosx",
-      "ultrasonido",
-      "electro",
-      "encefa",
-      "tac",
-      "rnm",
-      "anatomia",
-
-      // URGENCIAS
-      "calificada",
-      "no_calificada",
-      "porcentaje_calificada",
-      "urgencias",
-      "urgencias_por_dia",
-      "medica",
-      "accidentes",
-      "pediatrica",
-      "ginecobstetricia",
-
-      // NACIMIENTOS
-      "nac_eutocico",
-      "nac_distocico",
-      "nac_cesarea",
-      "total_nacimientos",
-      "nacimientos_por_dia",
-      "porcentaje_cesareas",
-
-      // ABORTOS
-      "abortos_lui",
-      "abortos_ameu",
-      "abortos_medicado",
-      "abortos_no_especificado",
-      "abortos_total",
-
-      // APEO
-      "eventos_obstetricos",
-      "total_apeo",
-      "porcentaje_apeo",
-      "eventos_obstetricos_adolescentes",
-      "adolescente_apeo",
-      "porcentaje_adolescente_apeo",
-
-      // EGRESOS
-      "egre_med_interna",
-      "egre_cirugia",
-      "egre_pediatria",
-      "egre_gineco",
-      "egre_otros",
-      "total_egresos",
-
-      // EGRESOS + 48 HS
-      "egre_med_int_48h",
-      "egre_cirugia_48h",
-      "egre_pediatria_48h",
-      "egre_gineco_48h",
-      "egre_otros_48h",
-      "total_egresos_48h",
-
-      // PROCEDIMIENTOS DENTRO DE QUIROFANO
-      "med_int_dentro",
-      "cirugia_dentro",
-      "gineco_dentro",
-      "pediatria_dentro",
-      "otros_dentro",
-      "total_proced_dentro",
-      "prom_inter_diarias_qx",
-
-      // PROCEDIMIENTOS FUERA DE QUIROFANO
-      "med_int_fuera",
-      "cirugia_fuera",
-      "gineco_fuera",
-      "pediatria_fuera",
-      "otros_fuera",
-      "total_proced_fuera",
-
-      // TOTAL PROCEDIMIENTOS
-      "total_proced_med_int",
-      "total_proced_cirugia",
-      "total_proced_gineco",
-      "total_proced_pediatria",
-      "total_proced_otros",
-      "total_proced",
-
-      // EGRESOS POR DEFUNCIONES
-      "egre_defunciones",
-      "defunciones_med_interna",
-      "defunciones_cirugia",
-      "defunciones_ginecobstetricia",
-      "defunciones_pediatria",
-      "defunciones_otros",
-      "mortalidad_cruda",
-      "egre_defunciones_48h",
-      "def_48h_med_interna",
-      "def_48h_cirugia",
-      "def_48h_ginecobstetricia",
-      "def_48h_pediatria",
-      "def_48h_otros",
-      "mortalidad_ajustada",
-
-      // PORCENTAJE DE OCUPACION
-      "dias_p_med_int",
-      "dias_p_cirugia",
-      "dias_p_gineco",
-      "dias_p_pediatria",
-      "dias_p_otros",
-      "porcentaje_ocupacion_med_interna",
-      "porcentaje_ocupacion_cirugia",
-      "porcentaje_ocupacion_pediatria",
-      "porcentaje_ocupacion_gineco",
-      "porcentaje_ocupacion_otros",
-      "porcentaje_ocupacion",
-
-      // INDICADORES DE HOSPITALIZACION
-      "prom_estancia_med_interna",
-      "prom_estancia_cirugia",
-      "prom_estancia_pediatria",
-      "prom_estancia_gineco",
-      "prom_estancia_otros",
-      "prom_dias_estancia",
-      "indice_rotacion",
-      "interv_sustitucion",
-
-      // INFRAESTRUCTURA
-      "camas_total",
-      "camas_med_int",
-      "camas_cirugia",
-      "camas_gineco",
-      "camas_pediatria",
-      "camas_otros",
-      "quirofanos",
-      "hab_urgencias",
-      "hab_observacion",
-      "hab_quemados",
-      "hab_lab_parto",
-      "hab_recup_pp",
-      "hab_cirug_amb",
-      "hab_recup_pq",
-      "hab_cuid_int",
-      "hab_uci_adulto",
-      "hab_uci_ped",
-      "hab_otras_areas"
+      "especialidad", "especialidad_por_dia", "mental", "bucal", "consultas", "consultas_por_dia",
+      "laboratorio", "rayosx", "ultrasonido", "electro", "encefa", "tac", "rnm", "anatomia",
+      "calificada", "no_calificada", "porcentaje_calificada", "urgencias", "urgencias_por_dia",
+      "medica", "accidentes", "pediatrica", "ginecobstetricia",
+      "nac_eutocico", "nac_distocico", "nac_cesarea", "total_nacimientos", "nacimientos_por_dia", "porcentaje_cesareas",
+      "abortos_lui", "abortos_ameu", "abortos_medicado", "abortos_no_especificado", "abortos_total",
+      "eventos_obstetricos", "total_apeo", "porcentaje_apeo", "eventos_obstetricos_adolescentes", "adolescente_apeo", "porcentaje_adolescente_apeo",
+      "egre_med_interna", "egre_cirugia", "egre_pediatria", "egre_gineco", "egre_otros", "total_egresos",
+      "egre_med_int_48h", "egre_cirugia_48h", "egre_pediatria_48h", "egre_gineco_48h", "egre_otros_48h", "total_egresos_48h",
+      "med_int_dentro", "cirugia_dentro", "gineco_dentro", "pediatria_dentro", "otros_dentro", "total_proced_dentro", "prom_inter_diarias_qx",
+      "med_int_fuera", "cirugia_fuera", "gineco_fuera", "pediatria_fuera", "otros_fuera", "total_proced_fuera",
+      "total_proced_med_int", "total_proced_cirugia", "total_proced_gineco", "total_proced_pediatria", "total_proced_otros", "total_proced",
+      "egre_defunciones", "defunciones_med_interna", "defunciones_cirugia", "defunciones_ginecobstetricia", "defunciones_pediatria", "defunciones_otros", "mortalidad_cruda",
+      "egre_defunciones_48h", "def_48h_med_interna", "def_48h_cirugia", "def_48h_ginecobstetricia", "def_48h_pediatria", "def_48h_otros", "mortalidad_ajustada",
+      "dias_p_med_int", "dias_p_cirugia", "dias_p_gineco", "dias_p_pediatria", "dias_p_otros",
+      "porcentaje_ocupacion_med_interna", "porcentaje_ocupacion_cirugia", "porcentaje_ocupacion_pediatria", "porcentaje_ocupacion_gineco", "porcentaje_ocupacion_otros", "porcentaje_ocupacion",
+      "prom_estancia_med_interna", "prom_estancia_cirugia", "prom_estancia_pediatria", "prom_estancia_gineco", "prom_estancia_otros", "prom_dias_estancia",
+      "indice_rotacion", "interv_sustitucion",
+      "camas_total", "camas_med_int", "camas_cirugia", "camas_gineco", "camas_pediatria", "camas_otros",
+      "quirofanos", "hab_urgencias", "hab_observacion", "hab_quemados", "hab_lab_parto", "hab_recup_pp", "hab_cirug_amb", "hab_recup_pq", "hab_cuid_int", "hab_uci_adulto", "hab_uci_ped", "hab_otras_areas"
     ];
 
     const columnasEquipo = [
-      "arco_c_analogo",
-      "arco_c_digital",
-      "bascula_estadimetro",
-      "bascula_bebe",
-      "camilla_radiotransp",
-      "cardiotocografo",
-      "carro_rojo_reanim",
-      "cuna_calor_rad",
-      "cuna_calor_rad_foto",
-      "defibrilador_monit",
-      "ecocardiografo",
-      "electrocardiografo",
-      "estuche_diag",
-      "incubadora_fototer",
-      "incubadora_trasl",
-      "incubadora_cuidados",
-      "lampara_quirurgica_doble",
-      "lampara_quir_port",
-      "lampara_quir_senc",
-      "mesa_quir_obs",
-      "mesa_exploracion",
-      "mesa_quir_gral",
-      "microscopio_rutina",
-      "monitor_radiacion",
-      "monitor_signos_vit_avanz",
-      "monitor_signos_neo",
-      "monitor_signos_bas",
-      "monitor_traslado",
-      "monitor_signos_int",
-      "monitor_signos_vit_neona",
-      "monitor_anestesia",
-      "negatoscopio",
-      "refrige_lab",
-      "sierra_yesos",
-      "ultrasonido_diag",
-      "unidad_anestesia_bas",
-      "ultrasonido_terap",
-      "unidad_dental",
-      "unidad_rx_analogo",
-      "unidad_rx_dental",
-      "unidad_rx_digital",
-      "unidad_rx_port_ana",
-      "unidad_rx_port_dig",
-      "fluoroscopio_dig",
-      "fluoroscopio_dig_analog",
-      "mastografo_digital",
-      "mastografo_estereo",
-      "mastografo_estereo_tomosin",
-      "microscopio_cirugia",
-      "resonancia_mag",
-      "tomografo_128",
-      "tomografo_16",
-      "tomografo_32",
-      "tomografo_64"
+      "arco_c_analogo", "arco_c_digital", "bascula_estadimetro", "bascula_bebe", "camilla_radiotransp", "cardiotocografo", "carro_rojo_reanim",
+      "cuna_calor_rad", "cuna_calor_rad_foto", "defibrilador_monit", "ecocardiografo", "electrocardiografo", "estuche_diag", "incubadora_fototer",
+      "incubadora_trasl", "incubadora_cuidados", "lampara_quirurgica_doble", "lampara_quir_port", "lampara_quir_senc", "mesa_quir_obs", "mesa_exploracion",
+      "mesa_quir_gral", "microscopio_rutina", "monitor_radiacion", "monitor_signos_vit_avanz", "monitor_signos_neo", "monitor_signos_bas", "monitor_traslado",
+      "monitor_signos_int", "monitor_signos_vit_neona", "monitor_anestesia", "negatoscopio", "refrige_lab", "sierra_yesos", "ultrasonido_diag",
+      "unidad_anestesia_bas", "ultrasonido_terap", "unidad_dental", "unidad_rx_analogo", "unidad_rx_dental", "unidad_rx_digital", "unidad_rx_port_ana",
+      "unidad_rx_port_dig", "fluoroscopio_dig", "fluoroscopio_dig_analog", "mastografo_digital", "mastografo_estereo", "mastografo_estereo_tomosin",
+      "microscopio_cirugia", "resonancia_mag", "tomografo_128", "tomografo_16", "tomografo_32", "tomografo_64"
     ];
 
     // =========================
@@ -2286,33 +2119,25 @@
     });
 
     // =========================
-    // MESES 🔥 FIX CRÍTICO
+    // MESES
     // =========================
-    if (mesesSeleccionados.length === 0 && !esAnual) {
-      alert("Selecciona al menos un mes.");
-      resetBotonExcel();
-      return;
-    }
-
     mesesSeleccionados.forEach((m) => {
       params.append("meses[]", m);
     });
 
-    if (esAnual) {
-      params.append("meses[]", "13");
-    }
+    // Permitir incluir los cierres históricos (Mes 13)
+    params.append("meses[]", "13");
 
     // =========================
-    // FETCH
+    // FETCH A LA API
     // =========================
     let dataTotal = [];
 
     try {
-
       const res = await fetch("/grafica/api/indicadores?" + params.toString());
       dataTotal = await res.json();
 
-      if (!dataTotal.length) {
+      if (!dataTotal || !dataTotal.length) {
         alert("No hay datos para descargar.");
         resetBotonExcel();
         return;
@@ -2325,52 +2150,58 @@
     }
 
     // =========================
-    // FILTRADO Y MATRIZ EXCEL
+    // FILTRADO ROBUSTO Y MATRIZ EXCEL
     // =========================
-    const columnasSet = new Set();
-    dataTotal.forEach((d) => {
-      if (d.indicador) columnasSet.add(d.indicador.trim());
+    const filas = dataTotal.filter((d) => {
+      const mesNum = parseInt(d.mes);
+      if (isNaN(mesNum) || mesNum === 13) return true;
+      return esAnual ? mesNum === 13 : mesesSeleccionados.map(Number).includes(mesNum);
     });
 
-    const columnas = [];
-    columnasDeseadas.forEach((c) => {
-      if (columnasSet.has(c)) columnas.push(c);
-    });
-
-    columnasEquipo.forEach((c) => {
-      if (columnasSet.has(c) && indicadoresSeleccion.includes(c)) {
-        columnas.push(c);
+    const columnasPresentes = new Set();
+    filas.forEach((d) => {
+      if (d.indicador) {
+        columnasPresentes.add(d.indicador.trim().toLowerCase());
       }
     });
 
-    const filas = dataTotal.filter((d) => {
-      const mes = parseInt(d.mes);
-      return esAnual ? mes === 13 : mesesSeleccionados.map(Number).includes(mes);
+    const columnas = [];
+    columnasDeseadas.concat(columnasEquipo).forEach((c) => {
+      const cNorm = c.trim().toLowerCase();
+      if (columnasPresentes.has(cNorm) && !columnas.includes(cNorm)) {
+        columnas.push(cNorm);
+      }
     });
+
+    if (columnas.length === 0) {
+      columnasPresentes.forEach((c) => columnas.push(c));
+    }
 
     const matriz = {};
 
     filas.forEach((d) => {
-      // Ignorar filas residuales de 'TOTAL GRUPO' en caso de que vinieran en el array
-      if (d.clues && d.clues.startsWith("GRUPO_")) return;
+      // 🟢 FIX PRINCIPAL: Identificar la fila totalizadora y asignarle 'TOTAL GRUPO'
+      const esGrupoTotal = (d.clues && str(d.clues).startsWith("GRUPO_")) ||
+        str(d.clues).toUpperCase() === "TOTAL" ||
+        str(d.nombre_unidad).toUpperCase().includes("TOTAL");
 
-      const unidad = d.nombre_unidad || "SIN UNIDAD";
+      const unidad = esGrupoTotal ? "TOTAL GRUPO" : (d.nombre_unidad || "SIN UNIDAD");
+      const clues = esGrupoTotal ? "TOTAL" : (d.clues || "");
       const anio = d.anio;
       const mesNum = parseInt(d.mes);
 
       const mesTexto =
-        mesNum === 13
-          ? formatearRangoMeses(mesesSeleccionados, mesesLabels)
-          : mesesLabels[mesNum - 1];
+        isNaN(mesNum) || mesNum === 13
+          ? (typeof formatearRangoMeses === "function" ? formatearRangoMeses(mesesSeleccionados, mesesLabels) : "CIERRE ANUAL")
+          : mesesLabels[mesNum - 1] || `Mes ${mesNum}`;
 
-      const clues = d.clues || "";
       const key = `${unidad}|${anio}|${mesTexto}`;
 
       if (!matriz[key]) {
         matriz[key] = {
           clues: clues,
-          unidad,
-          anio,
+          unidad: unidad,
+          anio: anio,
           mes: mesTexto,
           valores: {}
         };
@@ -2378,16 +2209,24 @@
         matriz[key].clues = clues;
       }
 
-      const indicador = d.indicador.trim();
+      const indicador = d.indicador.trim().toLowerCase();
       const valor = parseFloat(d.valor) || 0;
 
       matriz[key].valores[indicador] = valor;
     });
 
+    // Helper auxiliar de normalización
+    function str(val) {
+      return (val || "").toString();
+    }
+
     // =========================
-    // EXPORTAR
+    // EXPORTAR A EXCEL
     // =========================
-    exportarXLSX(matriz, columnas);
+    if (typeof exportarXLSX === "function") {
+      exportarXLSX(matriz, columnas);
+    }
+
     resetBotonExcel();
   }
 
