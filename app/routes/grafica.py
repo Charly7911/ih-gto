@@ -1596,6 +1596,7 @@ def indicadores():
         )
 
 
+
     # ==========================================================
     # TOTAL GENERAL Y FILTRADO SEGÚN MODO DE AGRUPACIÓN (MULTIGRUPO Y GRAFICACIÓN)
     # ==========================================================
@@ -1611,7 +1612,7 @@ def indicadores():
             "HE": "Hospitales de Especialidad (HE)"
         }
 
-        # 1. Extraer siempre las unidades individuales para garantizar sumas sobre la base limpia
+        # 1. Base limpia con registros de unidades individuales
         data_base_unidades = [
             r for r in data_acumulada 
             if r.get("clues") != "TOTAL" 
@@ -1619,7 +1620,7 @@ def indicadores():
             and not str(r.get("clues", "")).startswith("GRUPO_")
         ]
 
-        # 🟢 CASO 1: DESCARGA A EXCEL (DESGLOSE COMPLETO + FILA TOTAL GRUPO)
+        # 🟢 CASO 1: DESCARGA A EXCEL
         if es_peticion_descarga:
             if data_base_unidades:
                 totales_globales = generar_total_general(
@@ -1636,17 +1637,14 @@ def indicadores():
                     t["nombre_unidad"] = "TOTAL GRUPO"
                     t["clues"] = "TOTAL"
                 
-                # Para Excel: Mantiene los desgloses individuales y anexa la fila TOTAL GRUPO (39,319)
                 data_acumulada.extend(totales_globales)
 
-        # 🟢 CASO 2: VISUALIZACIÓN EN GRAFICA (SOLO LÍNEAS CONSOLIDADAS POR GRUPO)
+        # 🟢 CASO 2: GRAFICACIÓN EN PANTALLA (RESPETA HG, HE, HC Y TODAS)
         else:
             data_multigrupo = []
             
-            if not grupos_solicitados or "TODAS" in [str(g).upper() for g in grupos_solicitados]:
-                grupos_a_procesar = ["TODAS"]
-            else:
-                grupos_a_procesar = grupos_solicitados
+            # Si no se envía parámetro explícito de grupos, tomar por defecto 'TODAS'
+            grupos_a_procesar = grupos_solicitados if grupos_solicitados else ["TODAS"]
 
             for id_grupo in grupos_a_procesar:
                 id_grupo_upper = str(id_grupo).upper().strip()
@@ -1678,7 +1676,6 @@ def indicadores():
                         data_multigrupo.append(t)
 
             if data_multigrupo:
-                # Para la gráfica: Reemplaza la lista completa por únicamente los totales de grupo
                 data_acumulada = data_multigrupo
 
     elif len(unidades) > 1 and es_peticion_descarga:
