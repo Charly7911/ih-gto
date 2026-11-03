@@ -1597,19 +1597,21 @@ def indicadores():
 
 
     # ==========================================================
-    # TOTAL GENERAL Y FILTRADO SEGÚN MODO DE AGRUPACIÓN (MULTIGRUPO Y EXCEL)
+    # TOTAL GENERAL Y FILTRADO SEGÚN MODO DE AGRUPACIÓN (MULTIGRUPO Y GRAFICACIÓN)
     # ==========================================================
+    es_peticion_descarga = request.args.get("descarga") == "true" or es_descarga_masiva
+
     if modo_agrupacion == "acumulado":
         grupos_solicitados = request.args.getlist("grupos[]") or request.args.getlist("grupos")
         
         etiquetas_grupos = {
-            "TODAS": "TOTAL GRUPO",
+            "TODAS": "TODAS LAS UNIDADES (42)",
             "HG": "Hospitales Generales (HG)",
             "HC": "Hospitales Comunitarios (HC)",
             "HE": "Hospitales de Especialidad (HE)"
         }
 
-        # 🔑 1. Extraer TODAS las filas individuales (42 unidades) para tener la base completa
+        # 1. Extraer siempre las unidades individuales para garantizar sumas sobre la base limpia
         data_base_unidades = [
             r for r in data_acumulada 
             if r.get("clues") != "TOTAL" 
@@ -1617,9 +1619,8 @@ def indicadores():
             and not str(r.get("clues", "")).startswith("GRUPO_")
         ]
 
-        # 🟢 CASO A: DESCARGA DE EXCEL (O SI SE SOLICITA "TODAS" / SIN GRUPO ESPECÍFICO)
-        # Garantiza que sume las 42 unidades dando los 39,319 reales
-        if es_descarga_masiva or not grupos_solicitados or "TODAS" in [str(g).upper() for g in grupos_solicitados]:
+        # 🟢 CASO 1: DESCARGA A EXCEL (DESGLOSE COMPLETO + FILA TOTAL GRUPO)
+        if es_peticion_descarga:
             if data_base_unidades:
                 totales_globales = generar_total_general(
                     data_acumulada=data_base_unidades,
@@ -1628,28 +1629,33 @@ def indicadores():
                     MAX_FIELDS=MAX_FIELDS,
                     indicadores_max=indicadores_max,
                     calcular_kpis=calcular_kpis,
-                    es_descarga_masiva=es_descarga_masiva,
+                    es_descarga_masiva=True,
                     indicadores_solicitados=indicadores_solicitados,
                 )
                 for t in totales_globales:
                     t["nombre_unidad"] = "TOTAL GRUPO"
                     t["clues"] = "TOTAL"
                 
+                # Para Excel: Mantiene los desgloses individuales y anexa la fila TOTAL GRUPO (39,319)
                 data_acumulada.extend(totales_globales)
 
-        # 🟢 CASO B: GRAFICACIÓN POR SUBGRUPOS (HG, HC, HE, etc.)
-        # Procesa cada subgrupo por separado para las gráficas
-        if grupos_solicitados and not es_descarga_masiva:
+        # 🟢 CASO 2: VISUALIZACIÓN EN GRAFICA (SOLO LÍNEAS CONSOLIDADAS POR GRUPO)
+        else:
             data_multigrupo = []
-            for id_grupo in grupos_solicitados:
-                id_grupo_upper = str(id_grupo).upper().strip()
-                if id_grupo_upper == "TODAS":
-                    continue  # Ya fue procesado en el Caso A
+            
+            if not grupos_solicitados or "TODAS" in [str(g).upper() for g in grupos_solicitados]:
+                grupos_a_procesar = ["TODAS"]
+            else:
+                grupos_a_procesar = grupos_solicitados
 
+            for id_grupo in grupos_a_procesar:
+                id_grupo_upper = str(id_grupo).upper().strip()
                 clues_grupo = set(request.args.getlist(f"grupo_{id_grupo_upper}_clues[]"))
 
                 if clues_grupo:
                     data_subgrupo = [r for r in data_base_unidades if r.get("clues") in clues_grupo]
+                elif id_grupo_upper == "TODAS":
+                    data_subgrupo = list(data_base_unidades)
                 else:
                     data_subgrupo = [r for r in data_base_unidades if str(r.get("tipologia")).upper() == id_grupo_upper]
 
@@ -1661,9 +1667,10 @@ def indicadores():
                         MAX_FIELDS=MAX_FIELDS,
                         indicadores_max=indicadores_max,
                         calcular_kpis=calcular_kpis,
-                        es_descarga_masiva=es_descarga_masiva,
+                        es_descarga_masiva=False,
                         indicadores_solicitados=indicadores_solicitados,
                     )
+                    
                     nombre_etiqueta = etiquetas_grupos.get(id_grupo_upper, f"GRUPO {id_grupo_upper}")
                     for t in totales_subgrupo:
                         t["nombre_unidad"] = nombre_etiqueta
@@ -1671,11 +1678,10 @@ def indicadores():
                         data_multigrupo.append(t)
 
             if data_multigrupo:
-                # Si es para graficar subgrupos, entregamos la consolidación de esos subgrupos
+                # Para la gráfica: Reemplaza la lista completa por únicamente los totales de grupo
                 data_acumulada = data_multigrupo
 
-    elif len(unidades) > 1 or es_descarga_masiva:
-        # Modo individual con varias unidades (anexa la fila TOTAL GRUPO al desglose individual)
+    elif len(unidades) > 1 and es_peticion_descarga:
         data_base_unidades = [
             r for r in data_acumulada 
             if r.get("clues") != "TOTAL" 
@@ -1691,7 +1697,7 @@ def indicadores():
                 MAX_FIELDS=MAX_FIELDS,
                 indicadores_max=indicadores_max,
                 calcular_kpis=calcular_kpis,
-                es_descarga_masiva=es_descarga_masiva,
+                es_descarga_masiva=True,
                 indicadores_solicitados=indicadores_solicitados,
             )
             if totales:
