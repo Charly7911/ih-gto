@@ -331,6 +331,22 @@ def subir_zip_urgencias():
     return render_template("admin/subir_zip_urgencias.html")
 
 
+# 💡 FUNCIÓN AUXILIAR PARA ACTUALIZAR PROGRESO SIN BLOQUEOS (DEADLOCKS)
+def actualizar_progreso_carga(carga_id, mensaje):
+    """Abre y cierra una conexión limpia solo para actualizar el estatus"""
+    try:
+        conn_progreso = mysql.connection
+        cursor_progreso = conn_progreso.cursor()
+        cursor_progreso.execute(
+            "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
+            (mensaje, carga_id)
+        )
+        conn_progreso.commit()
+        cursor_progreso.close()
+    except Exception as e:
+        print(f"⚠️ No se pudo actualizar el progreso: {e}")
+
+
 # 💡 FUNCIÓN DE PROCESAMIENTO E INSERCIÓN POR BLOQUES
 def procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, anio_seleccionado):
     cursor.execute("SELECT clues FROM catalogo_unidades")
@@ -377,7 +393,7 @@ def procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, an
                 ["99:99", "9999", "99:9", " : "], None
             )
 
-    # Reemplazo estricto de NaN/NaT a None para MySQL
+    # Convertir correctamente nulos de Pandas a None para MySQL
     df_final = df_final.astype(object).where(pd.notnull(df_final), None)
 
     bloque_size = 5000
@@ -391,15 +407,12 @@ def procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, an
     for i in range(0, total, bloque_size):
         bloque = valores[i : i + bloque_size]
         cursor.executemany(sql, bloque)
+        conn.commit()  # Asegura la inserción del bloque de datos
         
         pct = 15 + int(((i + len(bloque)) / total) * 70) if total > 0 else 85
         
-        # 🔑 Pasamos la cadena con el porcentaje formateado directamente en la tupla
-        cursor.execute(
-            "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
-            (f"CARGANDO REGISTROS ({pct}%)", carga_id)
-        )
-        conn.commit()
+        # Actualización de estatus independiente para no colisionar con la transacción
+        actualizar_progreso_carga(carga_id, f"CARGANDO REGISTROS ({pct}%)")
 
 
 # 💡 AGREGADOS Y RESUMEN ANUAL
