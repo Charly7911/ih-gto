@@ -215,17 +215,17 @@ def ejecutar_procesamiento_urgencias(app, anio, modo_carga, fecha_actualizacion,
 
             sql_historial = """
                 INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso) 
-                VALUES (%s, %s, %s, 'INICIANDO (0%%%%)')
+                VALUES (%s, %s, %s, %s)
             """
-            cursor.execute(sql_historial, (filename, carpeta_destino, user_id))
+            cursor.execute(sql_historial, (filename, carpeta_destino, user_id, 'INICIANDO (0%)'))
             carga_id = cursor.lastrowid
             conn.commit()
 
             procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, anio)
 
             cursor.execute(
-                "UPDATE cargas_zip SET estatus_proceso = 'CALCULANDO AGREGADOS (90%%%%)' WHERE id = %s", 
-                (carga_id,)
+                "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s", 
+                ('CALCULANDO AGREGADOS (90%)', carga_id)
             )
             conn.commit()
             
@@ -244,8 +244,8 @@ def ejecutar_procesamiento_urgencias(app, anio, modo_carga, fecha_actualizacion,
             )
 
             cursor.execute(
-                "UPDATE cargas_zip SET estatus_proceso = 'COMPLETADO (100%%%%)' WHERE id = %s", 
-                (carga_id,)
+                "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s", 
+                ('COMPLETADO (100%)', carga_id)
             )
             conn.commit()
             print(f"✅ Urgencias {anio} completado con éxito (ID Carga: {carga_id}).")
@@ -260,10 +260,14 @@ def ejecutar_procesamiento_urgencias(app, anio, modo_carga, fecha_actualizacion,
                     (f"ERROR: {err_clean}", carga_id)
                 )
                 conn.commit()
+                
+            # Reactivar llaves foráneas antes de propagar la excepción
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
             raise e
         finally:
-            cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
-            cursor.close()
+            if cursor:
+                cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+                cursor.close()
 
 
 # 💡 RUTA DE SUBIDA DEL ARCHIVO
@@ -373,13 +377,11 @@ def procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, an
                 ["99:99", "9999", "99:9", " : "], None
             )
 
-    df_final = df_final.where(pd.notnull(df_final), None)
+    # Reemplazo estricto de NaN/NaT a None para MySQL
+    df_final = df_final.astype(object).where(pd.notnull(df_final), None)
 
     bloque_size = 5000
-    valores = [
-        tuple(None if pd.isna(x) else x for x in row)
-        for row in df_final.to_numpy()
-    ]
+    valores = [tuple(x) for x in df_final.to_numpy()]
     total = len(valores)
 
     placeholders = ", ".join(["%s"] * len(columnas_db))
@@ -392,10 +394,10 @@ def procesar_txt_detallado_urgencias(conn, cursor, carga_id, carpeta_destino, an
         
         pct = 15 + int(((i + len(bloque)) / total) * 70) if total > 0 else 85
         
-        # 🔑 CORRECCIÓN: Usar %%%% para mantener %% en MySQL tras la f-string
+        # 🔑 Pasamos la cadena con el porcentaje formateado directamente en la tupla
         cursor.execute(
             "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
-            (f"CARGANDO REGISTROS ({pct}%%%%)", carga_id)
+            (f"CARGANDO REGISTROS ({pct}%)", carga_id)
         )
         conn.commit()
 
