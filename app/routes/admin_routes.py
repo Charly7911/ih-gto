@@ -486,7 +486,23 @@ def estado_carga_egresos():
             cursor.close()
 
 
-# 💡 FUNCIÓN PRINCIPAL DE PROCESAMIENTO DE EGRESOS (SÍNCRONA)
+# 💡 FUNCIÓN AUXILIAR (Asegúrate de tener esta función definida arriba)
+def actualizar_progreso_egresos(carga_id, mensaje):
+    """Actualiza cargas_zip sin interferir en la transacción principal."""
+    try:
+        conn_p = mysql.connection
+        cursor_p = conn_p.cursor()
+        cursor_p.execute(
+            "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
+            (mensaje, carga_id)
+        )
+        conn_p.commit()
+        cursor_p.close()
+    except Exception as e:
+        print(f"⚠️ No se pudo actualizar el progreso: {e}")
+
+
+# 💡 FUNCIÓN PRINCIPAL DE PROCESAMIENTO DE EGRESOS
 def ejecutar_procesamiento_egresos(
     app,
     anio,
@@ -507,7 +523,7 @@ def ejecutar_procesamiento_egresos(
         try:
             print(f">>> INICIANDO PROCESAMIENTO DIRECTO PARA EGRESOS: {filename}")
             
-            # Desactivar restricciones para acelerar la inserción masiva
+            # Desactivar restricciones temporalmente
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
             cursor.execute("SET innodb_lock_wait_timeout = 600")
 
@@ -517,28 +533,24 @@ def ejecutar_procesamiento_egresos(
                 cursor.execute("DELETE FROM procedimientos_registros WHERE anio = %s", (anio,))
                 cursor.execute("DELETE FROM egresos_agregado WHERE anio = %s", (anio,))
                 cursor.execute("DELETE FROM procedimiento_agregado WHERE anio = %s", (anio,))
-                conn.commit() # Confirmar borrado previo para liberar locks
+                conn.commit()
 
-            # 2. Registrar inicio en historial
+            # 2. Registrar inicio en historial (Usando %s normal, sin %%)
             sql_historial = """
                 INSERT INTO cargas_zip (nombre_zip, carpeta_destino, usuario_id, estatus_proceso)
-                VALUES (%s, %s, %s, 'INICIANDO (0%%)')
+                VALUES (%s, %s, %s, %s)
             """
-            cursor.execute(sql_historial, (filename, carpeta_nombre, user_id))
+            cursor.execute(sql_historial, (filename, carpeta_nombre, user_id, 'INICIANDO (0%)'))
             carga_id = cursor.lastrowid
             conn.commit()
 
-            # 3. Procesar archivos TXT (inserción por lotes)
+            # 3. Procesar archivos TXT (inserción por lotes con la función actualizada)
             procesar_txt_detallado_egresos(conn, cursor, carga_id, carpeta_destino, anio, modo_carga)
 
-            # 4. Actualizar estado e iniciar recálculo de agregados
-            cursor.execute(
-                "UPDATE cargas_zip SET estatus_proceso = 'CALCULANDO AGREGADOS (90%%)' WHERE id = %s", 
-                (carga_id,)
-            )
-            conn.commit()
+            # 4. Actualizar estado mediante la función auxiliar limpia
+            actualizar_progreso_egresos(carga_id, 'CALCULANDO AGREGADOS (90%)')
 
-            # Ejecución de procedimientos agregados y egresos agregados con la firma (cursor, anio)
+            # Ejecución de recálculos agregados
             recalcular_procedimiento_agregado(cursor, anio)
             recalcular_egresos_agregado(cursor, anio)
 
@@ -556,12 +568,9 @@ def ejecutar_procesamiento_egresos(
             )
 
             # 6. Marcar como COMPLETADO
-            cursor.execute(
-                "UPDATE cargas_zip SET estatus_proceso = 'COMPLETADO (100%%)' WHERE id = %s",
-                (carga_id,),
-            )
+            actualizar_progreso_egresos(carga_id, 'COMPLETADO (100%)')
             
-            # Confirmar toda la transacción (Agregados + Control Anual + Estatus)
+            # Confirmar la transacción principal (Agregados y Control Anual)
             conn.commit()
             print(f"✅ Proceso egresos terminado con éxito para {filename}")
 
@@ -569,24 +578,24 @@ def ejecutar_procesamiento_egresos(
             conn.rollback()
             print(f"❌ Error en la carga de egresos: {e}")
             if carga_id is not None:
-                try:
-                    err_clean = str(e).replace("'", "").replace('"', "")[:100]
-                    cursor.execute(
-                        "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
-                        (f"ERROR: {err_clean}", carga_id),
-                    )
-                    conn.commit()
-                except Exception as err_update:
-                    print(f"❌ No se pudo actualizar el estado de error en cargas_zip: {err_update}")
-            raise e
-
-        finally:
-            # Restaurar restricciones siempre al finalizar
+                err_clean = str(e).replace("'", "").replace('"', "")[:100]
+                actualizar_progreso_egresos(carga_id, f"ERROR: {err_clean}")
+            
+            # Asegurar la restauración de las llaves foráneas antes de lanzar el error
             try:
                 cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
             except Exception:
                 pass
-            cursor.close()
+            raise e
+
+        finally:
+            # Restaurar restricciones siempre al finalizar el bloque
+            try:
+                cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+            except Exception:
+                pass
+            if cursor:
+                cursor.close()
 
 
 # 💡 RUTA DE SUBIDA PARA EGRESOS
@@ -660,23 +669,13 @@ def procesar_txt_detallado_egresos(conn, cursor, carga_id, carpeta_destino, anio
     
     egresos_por_id = {}
 
-    def limpiar_dato(valor, columna=None):
+    def limpiar_dato(valor):
         if valor is None:
             return None
-
         v = str(valor).strip()
-
-        if v == "" or v.upper() == "NULL":
-            if columna in ['CLUES', 'EGRESO']:
-                return None
-            return 0
-
-        try:
-            if '.' in v and columna not in ['CLUES', 'EGRESO']:
-                return int(float(v))
-            return v
-        except:
-            return None if columna in ['CLUES', 'EGRESO'] else 0
+        if v == "" or v.upper() in ["NULL", "NONE"]:
+            return None
+        return v
 
     try:
         # --- SECCIÓN 1: EGRESOS ---
@@ -688,64 +687,75 @@ def procesar_txt_detallado_egresos(conn, cursor, carga_id, carpeta_destino, anio
                     break
 
         if path_egresos:
+            # Obtener columnas válidas de la tabla egresos_registros en la BD
+            cursor.execute("DESCRIBE egresos_registros")
+            cols_db_egre = [
+                col[0] for col in cursor.fetchall()
+                if "auto_increment" not in col[5].lower() and col[0] != "id"
+            ]
+
             with open(path_egresos, 'r', encoding='utf-8-sig') as f:
                 lector = csv.DictReader(f, delimiter='|')
-                columnas_txt = lector.fieldnames
                 
-                # Mapear 'ID' de TXT a 'registro_id' en BD SQL
-                columnas_sql = ['registro_id' if c.upper() == 'ID' else c for c in columnas_txt]
-                columnas_sql.extend(['anio', 'carga_id'])
-
-                sql_egre = f"""
-                    INSERT INTO egresos_registros ({', '.join(columnas_sql)}) 
-                    VALUES ({', '.join(['%s']*len(columnas_sql))}) 
-                    ON DUPLICATE KEY UPDATE carga_id = VALUES(carga_id)
-                """
+                # Mapeo de cabeceras del TXT a minúsculas/mayúsculas
+                field_map = {c.upper().strip(): c for c in lector.fieldnames}
 
                 bloque = []
                 registros_procesados = 0
                 
                 for fila_dict in lector:
-                    valores = []
-                    for col in columnas_txt:
-                        val = limpiar_dato(fila_dict[col], col.upper())
-                        
-                        # Normalizar SERVICIOEGRE
-                        if col.upper() == 'SERVICIOEGRE':
-                            try:
-                                c_srv = int(float(val))
-                                if 100 <= c_srv <= 199: val = '100'
-                                elif 200 <= c_srv <= 299: val = '200'
-                                elif (300 <= c_srv <= 399) or (700 <= c_srv <= 799): val = '300'
-                                elif 400 <= c_srv <= 499: val = '400'
-                                elif 500 <= c_srv <= 599 or 800 <= c_srv <= 999: val = '500'
-                            except: 
-                                pass
-                        valores.append(val)
+                    fila_clean = {k.upper().strip(): v for k, v in fila_dict.items()}
+                    
+                    reg_id = limpiar_dato(fila_clean.get('ID'))
+                    f_egre = fila_clean.get('EGRESO', '')
+                    r_anio = fila_clean.get('ANIO') or (f_egre[:4] if len(str(f_egre)) >= 4 else str(anio))
+                    
+                    if reg_id:
+                        egresos_por_id[str(reg_id)] = r_anio
 
-                    f_egre = fila_dict.get('EGRESO', '')
-                    r_anio = fila_dict.get('ANIO') or (f_egre[:4] if len(f_egre) >= 4 else anio)
-                    valores.extend([r_anio, carga_id])
-                    
-                    reg_id = fila_dict.get('ID')
-                    if reg_id: 
-                        egresos_por_id[reg_id] = r_anio
-                    
-                    bloque.append(tuple(valores))
+                    # Construir fila alineada estrictamente a la BD
+                    row_data = []
+                    for col_sql in cols_db_egre:
+                        col_upper = col_sql.upper()
+                        
+                        if col_sql == 'registro_id':
+                            val = reg_id
+                        elif col_sql == 'anio':
+                            val = r_anio
+                        elif col_sql == 'carga_id':
+                            val = carga_id
+                        else:
+                            val = limpiar_dato(fila_clean.get(col_upper))
+                            
+                            # Normalización SERVICIOEGRE
+                            if col_upper == 'SERVICIOEGRE' and val:
+                                try:
+                                    c_srv = int(float(val))
+                                    if 100 <= c_srv <= 199: val = '100'
+                                    elif 200 <= c_srv <= 299: val = '200'
+                                    elif (300 <= c_srv <= 399) or (700 <= c_srv <= 799): val = '300'
+                                    elif 400 <= c_srv <= 499: val = '400'
+                                    elif (500 <= c_srv <= 599) or (800 <= c_srv <= 999): val = '500'
+                                except Exception:
+                                    pass
+                                    
+                        row_data.append(val)
+
+                    bloque.append(tuple(row_data))
                     
                     if len(bloque) >= bloque_size:
+                        placeholders = ", ".join(["%s"] * len(cols_db_egre))
+                        sql_egre = f"INSERT INTO egresos_registros ({', '.join(cols_db_egre)}) VALUES ({placeholders})"
                         cursor.executemany(sql_egre, bloque)
-                        registros_procesados += len(bloque)
-                        
-                        # Notificar avance (Rango 10% - 50%)
-                        cursor.execute(
-                            "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
-                            (f"CARGANDO EGRESOS ({registros_procesados} regs) (30%%%%)", carga_id)
-                        )
                         conn.commit()
+                        
+                        registros_procesados += len(bloque)
+                        actualizar_progreso_egresos(carga_id, f"CARGANDO EGRESOS ({registros_procesados} regs) (30%)")
                         bloque = []
 
                 if bloque: 
+                    placeholders = ", ".join(["%s"] * len(cols_db_egre))
+                    sql_egre = f"INSERT INTO egresos_registros ({', '.join(cols_db_egre)}) VALUES ({placeholders})"
                     cursor.executemany(sql_egre, bloque)
                     conn.commit()
 
@@ -758,46 +768,52 @@ def procesar_txt_detallado_egresos(conn, cursor, carga_id, carpeta_destino, anio
                     break
 
         if path_proc:
+            cursor.execute("DESCRIBE procedimientos_registros")
+            cols_db_proc = [
+                col[0] for col in cursor.fetchall()
+                if "auto_increment" not in col[5].lower() and col[0] != "id"
+            ]
+
             with open(path_proc, 'r', encoding='utf-8-sig') as f:
                 lector_p = csv.DictReader(f, delimiter='|')
-                cols_p_txt = lector_p.fieldnames
-                cols_p_sql = ['egreso_id' if c.upper() == 'ID' else c for c in cols_p_txt]
                 
-                has_anio = 'ANIO' in [c.upper() for c in cols_p_txt]
-                if not has_anio: 
-                    cols_p_sql.append('anio')
-                cols_p_sql.append('carga_id')
-
-                sql_proc = f"""
-                    INSERT INTO procedimientos_registros ({', '.join(cols_p_sql)}) 
-                    VALUES ({', '.join(['%s']*len(cols_p_sql))})
-                """
-
                 bloque_p = []
                 procs_procesados = 0
                 
                 for fila_p_dict in lector_p:
-                    valores_p = [limpiar_dato(fila_p_dict[c]) for c in cols_p_txt]
+                    fila_p_clean = {k.upper().strip(): v for k, v in fila_p_dict.items()}
+                    reg_id_proc = limpiar_dato(fila_p_clean.get('ID'))
+
+                    row_p_data = []
+                    for col_sql in cols_db_proc:
+                        col_upper = col_sql.upper()
+                        
+                        if col_sql == 'egreso_id':
+                            val = reg_id_proc
+                        elif col_sql == 'anio':
+                            val = fila_p_clean.get('ANIO') or egresos_por_id.get(str(reg_id_proc), str(anio))
+                        elif col_sql == 'carga_id':
+                            val = carga_id
+                        else:
+                            val = limpiar_dato(fila_p_clean.get(col_upper))
+
+                        row_p_data.append(val)
                     
-                    if not has_anio:
-                        valores_p.append(egresos_por_id.get(fila_p_dict.get('ID'), anio))
-                    valores_p.append(carga_id)
-                    
-                    bloque_p.append(tuple(valores_p))
+                    bloque_p.append(tuple(row_p_data))
                     
                     if len(bloque_p) >= bloque_size:
+                        placeholders_p = ", ".join(["%s"] * len(cols_db_proc))
+                        sql_proc = f"INSERT INTO procedimientos_registros ({', '.join(cols_db_proc)}) VALUES ({placeholders_p})"
                         cursor.executemany(sql_proc, bloque_p)
-                        procs_procesados += len(bloque_p)
-                        
-                        # Notificar avance (Rango 50% - 80%)
-                        cursor.execute(
-                            "UPDATE cargas_zip SET estatus_proceso = %s WHERE id = %s",
-                            (f"CARGANDO PROCEDIMIENTOS ({procs_procesados} regs) (70%%%%)", carga_id)
-                        )
                         conn.commit()
+                        
+                        procs_procesados += len(bloque_p)
+                        actualizar_progreso_egresos(carga_id, f"CARGANDO PROCEDIMIENTOS ({procs_procesados} regs) (70%)")
                         bloque_p = []
 
                 if bloque_p: 
+                    placeholders_p = ", ".join(["%s"] * len(cols_db_proc))
+                    sql_proc = f"INSERT INTO procedimientos_registros ({', '.join(cols_db_proc)}) VALUES ({placeholders_p})"
                     cursor.executemany(sql_proc, bloque_p)
                     conn.commit()
 
