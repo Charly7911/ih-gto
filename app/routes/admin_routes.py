@@ -829,15 +829,19 @@ def procesar_txt_detallado_egresos(conn, cursor, carga_id, carpeta_destino, anio
 # ==============================================================================
 def recalcular_procedimiento_agregado(cursor, anio):
     """
-    Recibe el cursor de la transacción global activa.
-    No realiza commit local para mantener el atomicidad.
+    Recalcula la tabla procedimiento_agregado reutilizando el cursor activo.
+    Sanitiza cadenas, hace CAST en los JOINs y soporta anio como INT o STR.
     """
     try:
-        print(f"🧹 Limpiando datos de procedimientos para el año {anio}...")
-        cursor.execute("DELETE FROM procedimiento_agregado WHERE anio = %s", (anio,))
+        anio_str = str(anio)
+        print(f"🧹 Limpiando datos de procedimientos para el año {anio_str}...")
+        cursor.execute(
+            "DELETE FROM procedimiento_agregado WHERE anio = %s OR anio = %s",
+            (anio_str, int(anio))
+        )
 
         # 1️⃣ PROCEDIMIENTOS DENTRO DE QUIRÓFANO (QUIROF = 1)
-        print(f"⚙️ Calculando procedimientos dentro de quirófano {anio}...")
+        print(f"⚙️ Calculando procedimientos dentro de quirófano {anio_str}...")
         sql_dentro = """
             INSERT INTO procedimiento_agregado (
                 clues, anio, mes,
@@ -849,21 +853,24 @@ def recalcular_procedimiento_agregado(cursor, anio):
                 total_proced_dentro
             )
             SELECT
-                e.clues,
+                TRIM(UPPER(e.clues)),
                 p.anio,
-                e.MES_ESTADISTICO AS mes,
-                SUM(CASE WHEN e.SERVICIOEGRE = '100' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN e.SERVICIOEGRE = '200' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN e.SERVICIOEGRE = '400' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN e.SERVICIOEGRE = '300' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN e.SERVICIOEGRE NOT IN ('100','200','300','400') THEN 1 ELSE 0 END),
+                IFNULL(NULLIF(TRIM(e.MES_ESTADISTICO), ''), '0') AS mes,
+                SUM(CASE WHEN TRIM(e.SERVICIOEGRE) = '100' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN TRIM(e.SERVICIOEGRE) = '200' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN TRIM(e.SERVICIOEGRE) = '400' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN TRIM(e.SERVICIOEGRE) = '300' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN TRIM(e.SERVICIOEGRE) NOT IN ('100','200','300','400') THEN 1 ELSE 0 END),
                 COUNT(*)
             FROM procedimientos_registros p
-            JOIN egresos_registros e ON p.egreso_id = e.registro_id AND p.anio = e.anio
-            WHERE p.tipo = 'Q'
-              AND p.quirof = 1
-              AND p.anio = %s
-            GROUP BY e.clues, p.anio, e.MES_ESTADISTICO
+            JOIN egresos_registros e 
+              ON CAST(p.egreso_id AS CHAR) = CAST(e.registro_id AS CHAR) 
+             AND (p.anio = %s OR p.anio = %s) 
+             AND (e.anio = %s OR e.anio = %s)
+            WHERE UPPER(TRIM(p.tipo)) = 'Q'
+              AND (p.quirof = 1 OR p.quirof = '1')
+              AND (p.anio = %s OR p.anio = %s)
+            GROUP BY TRIM(UPPER(e.clues)), p.anio, IFNULL(NULLIF(TRIM(e.MES_ESTADISTICO), ''), '0')
 
             ON DUPLICATE KEY UPDATE
                 med_int_proced_dentro = VALUES(med_int_proced_dentro),
@@ -873,10 +880,10 @@ def recalcular_procedimiento_agregado(cursor, anio):
                 otros_proced_dentro = VALUES(otros_proced_dentro),
                 total_proced_dentro = VALUES(total_proced_dentro)
         """
-        cursor.execute(sql_dentro, (anio,))
+        cursor.execute(sql_dentro, (anio_str, int(anio), anio_str, int(anio), anio_str, int(anio)))
 
         # 2️⃣ PROCEDIMIENTOS FUERA DE QUIRÓFANO (QUIROF = 2)
-        print(f"⚙️ Actualizando procedimientos fuera de quirófano {anio}...")
+        print(f"⚙️ Actualizando procedimientos fuera de quirófano {anio_str}...")
         sql_fuera = """
             INSERT INTO procedimiento_agregado (
                 clues, anio, mes,
@@ -888,21 +895,24 @@ def recalcular_procedimiento_agregado(cursor, anio):
                 total_proced_fuera
             )
             SELECT
-                e.clues,
+                TRIM(UPPER(e.clues)),
                 p.anio,
-                e.MES_ESTADISTICO AS mes,
-                SUM(CASE WHEN e.SERVICIOEGRE = '100' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN e.SERVICIOEGRE = '200' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN e.SERVICIOEGRE = '400' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN e.SERVICIOEGRE = '300' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN e.SERVICIOEGRE NOT IN ('100','200','300','400') THEN 1 ELSE 0 END),
+                IFNULL(NULLIF(TRIM(e.MES_ESTADISTICO), ''), '0') AS mes,
+                SUM(CASE WHEN TRIM(e.SERVICIOEGRE) = '100' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN TRIM(e.SERVICIOEGRE) = '200' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN TRIM(e.SERVICIOEGRE) = '400' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN TRIM(e.SERVICIOEGRE) = '300' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN TRIM(e.SERVICIOEGRE) NOT IN ('100','200','300','400') THEN 1 ELSE 0 END),
                 COUNT(*)
             FROM procedimientos_registros p
-            JOIN egresos_registros e ON p.egreso_id = e.registro_id AND p.anio = e.anio
-            WHERE p.tipo = 'Q'
-              AND p.quirof = 2
-              AND p.anio = %s
-            GROUP BY e.clues, p.anio, e.MES_ESTADISTICO
+            JOIN egresos_registros e 
+              ON CAST(p.egreso_id AS CHAR) = CAST(e.registro_id AS CHAR) 
+             AND (p.anio = %s OR p.anio = %s) 
+             AND (e.anio = %s OR e.anio = %s)
+            WHERE UPPER(TRIM(p.tipo)) = 'Q'
+              AND (p.quirof = 2 OR p.quirof = '2')
+              AND (p.anio = %s OR p.anio = %s)
+            GROUP BY TRIM(UPPER(e.clues)), p.anio, IFNULL(NULLIF(TRIM(e.MES_ESTADISTICO), ''), '0')
 
             ON DUPLICATE KEY UPDATE
                 med_int_proced_fuera = VALUES(med_int_proced_fuera),
@@ -912,18 +922,18 @@ def recalcular_procedimiento_agregado(cursor, anio):
                 otros_proced_fuera = VALUES(otros_proced_fuera),
                 total_proced_fuera = VALUES(total_proced_fuera)
         """
-        cursor.execute(sql_fuera, (anio,))
+        cursor.execute(sql_fuera, (anio_str, int(anio), anio_str, int(anio), anio_str, int(anio)))
 
         # 3️⃣ TOTALES GENERALES
         sql_totales = """
             UPDATE procedimiento_agregado
             SET total_procedimientos_gen = 
                 IFNULL(total_proced_dentro, 0) + IFNULL(total_proced_fuera, 0)
-            WHERE anio = %s
+            WHERE anio = %s OR anio = %s
         """
-        cursor.execute(sql_totales, (anio,))
+        cursor.execute(sql_totales, (anio_str, int(anio)))
 
-        print(f"✅ Cálculos de procedimientos para {anio} preparados con éxito.")
+        print(f"✅ Cálculos de procedimientos para {anio_str} preparados con éxito.")
 
     except Exception as e:
         print(f"❌ Error al recalcular procedimientos: {e}")
@@ -934,11 +944,12 @@ def recalcular_procedimiento_agregado(cursor, anio):
 def recalcular_egresos_agregado(cursor, anio):
     """
     Recalcula la tabla egresos_agregado reutilizando el cursor de la transacción activa.
+    Soporta tipos de datos heterogéneos y asegura la agregación incluso sin procedimientos.
     """
     try:
-        print(f"🧹 Limpiando egresos_agregado para el año {anio}...")
-        # Borramos los datos previos del año para evitar duplicados al insertar
-        cursor.execute("DELETE FROM egresos_agregado WHERE anio = %s", (anio,))
+        anio_str = str(anio)
+        print(f"🧹 Limpiando egresos_agregado para el año {anio_str}...")
+        cursor.execute("DELETE FROM egresos_agregado WHERE anio = %s OR anio = %s", (anio_str, int(anio)))
 
         sql = """
         INSERT INTO egresos_agregado (
@@ -952,167 +963,131 @@ def recalcular_egresos_agregado(cursor, anio):
             prom_estancia_ginecobstetricia, prom_estancia_otros,
             last_updated,
             med_interna, cirugia, pediatria, ginecobstetricia, otros,
-
             def_48h_med_interna, def_48h_cirugia, def_48h_ginecobstetricia, def_48h_pediatria, def_48h_otros,
-
             defunciones_med_interna, defunciones_cirugia, defunciones_ginecobstetricia, defunciones_pediatria, defunciones_otros,
-
             nac_eutocico, nac_distocico, nac_cesarea,
-
             egresos_48h,
-
             adolescente_apeo, eventos_obstetricos_adolescentes, porcentaje_adolescente_apeo,
-
             egresos_med_interna_48h, egresos_cirugia_48h, egresos_pediatria_48h,
             egresos_ginecobstetricia_48h, egresos_otros_48h
         )
-
         SELECT
-            IFNULL(e.CLUES, 'SIN_CLUES'),
-            IFNULL(c.nombre_unidad, 'SIN NOMBRE'),
+            IFNULL(NULLIF(TRIM(e.CLUES), ''), 'SIN_CLUES') AS clues,
+            IFNULL(NULLIF(TRIM(c.nombre_unidad), ''), 'SIN NOMBRE') AS nombre_unidad,
             e.anio,
-            e.MES_ESTADISTICO,
+            IFNULL(NULLIF(TRIM(e.MES_ESTADISTICO), ''), '0') AS mes,
 
-            COUNT(DISTINCT e.registro_id),
+            COUNT(*) AS total_egresos,
 
             -- DEFUNCIONES
-            SUM(CASE WHEN CAST(e.MOTEGRE AS UNSIGNED) = 5 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN CAST(e.MOTEGRE AS UNSIGNED) = 5 AND e.DIAS_ESTA > 2 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN CAST(NULLIF(e.MOTEGRE, '') AS UNSIGNED) = 5 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN CAST(NULLIF(e.MOTEGRE, '') AS UNSIGNED) = 5 AND CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED) > 2 THEN 1 ELSE 0 END),
 
             -- NACIMIENTOS
-            SUM(CASE WHEN CAST(e.TIPNACI AS UNSIGNED) IN (1,2,3) THEN 1 ELSE 0 END),
-
-            -- CESAREAS
-            SUM(CASE WHEN CAST(e.TIPNACI AS UNSIGNED) = 3 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN CAST(NULLIF(e.TIPNACI, '') AS UNSIGNED) IN (1,2,3) THEN 1 ELSE 0 END),
+            SUM(CASE WHEN CAST(NULLIF(e.TIPNACI, '') AS UNSIGNED) = 3 THEN 1 ELSE 0 END),
 
             -- ABORTOS
-            SUM(CASE WHEN CAST(e.TIPATEN AS UNSIGNED) = 1 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN CAST(NULLIF(e.TIPATEN, '') AS UNSIGNED) = 1 THEN 1 ELSE 0 END),
 
             -- APEO
             SUM(CASE 
-                WHEN CAST(e.TIPATEN AS UNSIGNED) IN (1,2)
-                AND CAST(e.PLANFAM AS UNSIGNED) NOT IN (0,88,99)
-            THEN 1 ELSE 0 END),
+                WHEN CAST(NULLIF(e.TIPATEN, '') AS UNSIGNED) IN (1,2)
+                 AND CAST(NULLIF(e.PLANFAM, '') AS UNSIGNED) NOT IN (0,88,99)
+                THEN 1 ELSE 0 END),
 
             -- PRODUCTOS Y PROCEDIMIENTOS
-            SUM(IFNULL(e.TOTAL_PRODUCTOS, 0)),
+            SUM(IFNULL(CAST(NULLIF(e.TOTAL_PRODUCTOS, '') AS UNSIGNED), 0)),
             SUM(IFNULL(proc_sum.total_p, 0)),
 
             -- ESTANCIA
-            SUM(e.DIAS_ESTA),
-            ROUND(AVG(e.DIAS_ESTA), 2),
+            SUM(IFNULL(CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED), 0)),
+            ROUND(AVG(IFNULL(CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED), 0)), 2),
 
             -- DIAS ESTANCIA POR SERVICIO
-            SUM(CASE WHEN e.SERVICIOEGRE='100' THEN e.DIAS_ESTA ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE='200' THEN e.DIAS_ESTA ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE='300' THEN e.DIAS_ESTA ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE='400' THEN e.DIAS_ESTA ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE NOT IN ('100','200','300','400')
-                    THEN e.DIAS_ESTA ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE)='100' THEN IFNULL(CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED), 0) ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE)='200' THEN IFNULL(CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED), 0) ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE)='300' THEN IFNULL(CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED), 0) ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE)='400' THEN IFNULL(CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED), 0) ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE) NOT IN ('100','200','300','400') THEN IFNULL(CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED), 0) ELSE 0 END),
 
             -- PROMEDIO ESTANCIA POR SERVICIO
-            ROUND(AVG(CASE WHEN e.SERVICIOEGRE='100' THEN e.DIAS_ESTA END),2),
-            ROUND(AVG(CASE WHEN e.SERVICIOEGRE='200' THEN e.DIAS_ESTA END),2),
-            ROUND(AVG(CASE WHEN e.SERVICIOEGRE='300' THEN e.DIAS_ESTA END),2),
-            ROUND(AVG(CASE WHEN e.SERVICIOEGRE='400' THEN e.DIAS_ESTA END),2),
-            ROUND(AVG(CASE WHEN e.SERVICIOEGRE NOT IN ('100','200','300','400')
-                        THEN e.DIAS_ESTA END),2),
+            ROUND(AVG(CASE WHEN TRIM(e.SERVICIOEGRE)='100' THEN CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED) END), 2),
+            ROUND(AVG(CASE WHEN TRIM(e.SERVICIOEGRE)='200' THEN CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED) END), 2),
+            ROUND(AVG(CASE WHEN TRIM(e.SERVICIOEGRE)='300' THEN CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED) END), 2),
+            ROUND(AVG(CASE WHEN TRIM(e.SERVICIOEGRE)='400' THEN CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED) END), 2),
+            ROUND(AVG(CASE WHEN TRIM(e.SERVICIOEGRE) NOT IN ('100','200','300','400') THEN CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED) END), 2),
 
             NOW(),
 
             -- DISTRIBUCIÓN POR SERVICIO
-            SUM(CASE WHEN e.SERVICIOEGRE = '100' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE = '200' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE = '300' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE = '400' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE NOT IN ('100','200','300','400') THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE) = '100' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE) = '200' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE) = '300' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE) = '400' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE) NOT IN ('100','200','300','400') THEN 1 ELSE 0 END),
 
             -- DEF 48H POR SERVICIO
-            SUM(CASE WHEN e.SERVICIOEGRE='100' AND e.DIAS_ESTA>2 AND CAST(e.MOTEGRE AS UNSIGNED)=5 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE='200' AND e.DIAS_ESTA>2 AND CAST(e.MOTEGRE AS UNSIGNED)=5 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE='400' AND e.DIAS_ESTA>2 AND CAST(e.MOTEGRE AS UNSIGNED)=5 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE='300' AND e.DIAS_ESTA>2 AND CAST(e.MOTEGRE AS UNSIGNED)=5 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE NOT IN ('100','200','300','400') AND e.DIAS_ESTA>2 AND CAST(e.MOTEGRE AS UNSIGNED)=5 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE)='100' AND CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED)>2 AND CAST(NULLIF(e.MOTEGRE, '') AS UNSIGNED)=5 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE)='200' AND CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED)>2 AND CAST(NULLIF(e.MOTEGRE, '') AS UNSIGNED)=5 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE)='400' AND CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED)>2 AND CAST(NULLIF(e.MOTEGRE, '') AS UNSIGNED)=5 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE)='300' AND CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED)>2 AND CAST(NULLIF(e.MOTEGRE, '') AS UNSIGNED)=5 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE) NOT IN ('100','200','300','400') AND CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED)>2 AND CAST(NULLIF(e.MOTEGRE, '') AS UNSIGNED)=5 THEN 1 ELSE 0 END),
 
             -- DEFUNCIONES POR SERVICIO
-            SUM(CASE WHEN e.SERVICIOEGRE='100' AND CAST(e.MOTEGRE AS UNSIGNED)=5 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE='200' AND CAST(e.MOTEGRE AS UNSIGNED)=5 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE='400' AND CAST(e.MOTEGRE AS UNSIGNED)=5 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE='300' AND CAST(e.MOTEGRE AS UNSIGNED)=5 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE NOT IN ('100','200','300','400') AND CAST(e.MOTEGRE AS UNSIGNED)=5 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE)='100' AND CAST(NULLIF(e.MOTEGRE, '') AS UNSIGNED)=5 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE)='200' AND CAST(NULLIF(e.MOTEGRE, '') AS UNSIGNED)=5 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE)='400' AND CAST(NULLIF(e.MOTEGRE, '') AS UNSIGNED)=5 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE)='300' AND CAST(NULLIF(e.MOTEGRE, '') AS UNSIGNED)=5 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE) NOT IN ('100','200','300','400') AND CAST(NULLIF(e.MOTEGRE, '') AS UNSIGNED)=5 THEN 1 ELSE 0 END),
 
             -- NACIMIENTOS DETALLE
-            SUM(CASE WHEN CAST(e.TIPNACI AS UNSIGNED)=1 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN CAST(e.TIPNACI AS UNSIGNED)=2 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN CAST(e.TIPNACI AS UNSIGNED)=3 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN CAST(NULLIF(e.TIPNACI, '') AS UNSIGNED)=1 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN CAST(NULLIF(e.TIPNACI, '') AS UNSIGNED)=2 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN CAST(NULLIF(e.TIPNACI, '') AS UNSIGNED)=3 THEN 1 ELSE 0 END),
 
             -- EGRESOS >48H
-            SUM(CASE WHEN e.DIAS_ESTA > 2 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED) > 2 THEN 1 ELSE 0 END),
 
             -- ADOLESCENTE APEO
-            SUM(
-                CASE 
-                    WHEN CAST(e.TIPATEN AS UNSIGNED) IN (1,2)
-                    AND CAST(e.EDAD AS UNSIGNED) BETWEEN 10 AND 19
-                    AND CAST(e.CVEEDAD AS UNSIGNED) = 5
-                    AND CAST(e.PLANFAM AS UNSIGNED) BETWEEN 1 AND 13
-                    THEN 1 ELSE 0 
-                END
-            ),
+            SUM(CASE 
+                WHEN CAST(NULLIF(e.TIPATEN, '') AS UNSIGNED) IN (1,2)
+                 AND CAST(NULLIF(e.EDAD, '') AS UNSIGNED) BETWEEN 10 AND 19
+                 AND CAST(NULLIF(e.CVEEDAD, '') AS UNSIGNED) = 5
+                 AND CAST(NULLIF(e.PLANFAM, '') AS UNSIGNED) BETWEEN 1 AND 13
+                THEN 1 ELSE 0 END),
 
             -- EVENTOS OBSTETRICOS ADOLESCENTES
-            SUM(
-                CASE 
-                    WHEN CAST(e.TIPATEN AS UNSIGNED) IN (1,2)
-                    AND CAST(e.EDAD AS UNSIGNED) BETWEEN 10 AND 19
-                    AND CAST(e.CVEEDAD AS UNSIGNED) = 5
-                    THEN 1 ELSE 0 
-                END
-            ),
+            SUM(CASE 
+                WHEN CAST(NULLIF(e.TIPATEN, '') AS UNSIGNED) IN (1,2)
+                 AND CAST(NULLIF(e.EDAD, '') AS UNSIGNED) BETWEEN 10 AND 19
+                 AND CAST(NULLIF(e.CVEEDAD, '') AS UNSIGNED) = 5
+                THEN 1 ELSE 0 END),
 
             -- PORCENTAJE ADOLESCENTE APEO
             ROUND(
-                (
-                    SUM(
-                        CASE 
-                            WHEN CAST(e.TIPATEN AS UNSIGNED) IN (1,2)
-                            AND CAST(e.EDAD AS UNSIGNED) BETWEEN 10 AND 19
-                            AND CAST(e.CVEEDAD AS UNSIGNED) = 5
-                            AND CAST(e.PLANFAM AS UNSIGNED) BETWEEN 1 AND 13
-                            THEN 1 ELSE 0 
-                        END
-                    ) * 100.0
-                ) /
-                NULLIF(
-                    SUM(
-                        CASE
-                            WHEN CAST(e.TIPATEN AS UNSIGNED) IN (1,2)
-                            AND CAST(e.EDAD AS UNSIGNED) BETWEEN 10 AND 19
-                            AND CAST(e.CVEEDAD AS UNSIGNED) = 5
-                            THEN 1 ELSE 0 
-                        END
-                    ),
-                0),
+                (SUM(CASE WHEN CAST(NULLIF(e.TIPATEN, '') AS UNSIGNED) IN (1,2) AND CAST(NULLIF(e.EDAD, '') AS UNSIGNED) BETWEEN 10 AND 19 AND CAST(NULLIF(e.CVEEDAD, '') AS UNSIGNED) = 5 AND CAST(NULLIF(e.PLANFAM, '') AS UNSIGNED) BETWEEN 1 AND 13 THEN 1 ELSE 0 END) * 100.0) /
+                NULLIF(SUM(CASE WHEN CAST(NULLIF(e.TIPATEN, '') AS UNSIGNED) IN (1,2) AND CAST(NULLIF(e.EDAD, '') AS UNSIGNED) BETWEEN 10 AND 19 AND CAST(NULLIF(e.CVEEDAD, '') AS UNSIGNED) = 5 THEN 1 ELSE 0 END), 0),
             2),
 
             -- EGRESOS >48H POR SERVICIO
-            SUM(CASE WHEN e.SERVICIOEGRE='100' AND e.DIAS_ESTA>2 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE='200' AND e.DIAS_ESTA>2 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE='300' AND e.DIAS_ESTA>2 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE='400' AND e.DIAS_ESTA>2 THEN 1 ELSE 0 END),
-            SUM(CASE WHEN e.SERVICIOEGRE NOT IN ('100','200','300','400') AND e.DIAS_ESTA>2 THEN 1 ELSE 0 END)
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE)='100' AND CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED)>2 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE)='200' AND CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED)>2 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE)='300' AND CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED)>2 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE)='400' AND CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED)>2 THEN 1 ELSE 0 END),
+            SUM(CASE WHEN TRIM(e.SERVICIOEGRE) NOT IN ('100','200','300','400') AND CAST(NULLIF(e.DIAS_ESTA, '') AS UNSIGNED)>2 THEN 1 ELSE 0 END)
 
         FROM egresos_registros e
-        LEFT JOIN catalogo_unidades c ON e.CLUES = c.clues
+        LEFT JOIN catalogo_unidades c ON TRIM(UPPER(e.CLUES)) = TRIM(UPPER(c.clues))
         LEFT JOIN (
-            SELECT pr.egreso_id, pr.anio, COUNT(*) as total_p
+            SELECT CAST(pr.egreso_id AS CHAR) AS egreso_id, pr.anio, COUNT(*) AS total_p
             FROM procedimientos_registros pr
-            WHERE pr.anio = %s
-            GROUP BY pr.egreso_id, pr.anio
+            WHERE pr.anio = %s OR pr.anio = %s
+            GROUP BY CAST(pr.egreso_id AS CHAR), pr.anio
         ) proc_sum 
-        ON e.registro_id = proc_sum.egreso_id AND e.anio = proc_sum.anio
+        ON CAST(e.registro_id AS CHAR) = proc_sum.egreso_id AND e.anio = proc_sum.anio
 
-        WHERE e.anio = %s
+        WHERE e.anio = %s OR e.anio = %s
 
         GROUP BY 
             e.CLUES,
@@ -1121,8 +1096,8 @@ def recalcular_egresos_agregado(cursor, anio):
             e.MES_ESTADISTICO;
         """
         
-        cursor.execute(sql, (anio, anio))
-        print(f"✅ Cálculos de egresos_agregado para {anio} preparados.")
+        cursor.execute(sql, (anio_str, int(anio), anio_str, int(anio)))
+        print(f"✅ Cálculos de egresos_agregado para {anio_str} generados correctamente.")
 
     except Exception as e:
         print(f"❌ Error en recalcular_egresos_agregado: {str(e)}")
