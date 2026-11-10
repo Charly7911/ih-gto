@@ -1251,7 +1251,7 @@ def indicadores():
         # FUNCIONES ROBUSTAS (SIN KEYERROR)
         # ==========================================================
         def parse_float(val):
-            """Sustituye a f(val): Convierte a float previniendo None, NaN y tipos inválidos"""
+            """Convierte a float previniendo None, NaN y tipos inválidos"""
             if val is None:
                 return 0.0
             try:
@@ -1260,18 +1260,39 @@ def indicadores():
             except (ValueError, TypeError):
                 return 0.0
 
-        def calcular_ocupacion(dias_paciente, dias_cama):
+        def calcular_ocupacion(dias_paciente, camas_servicio, dias_periodo):
+            """
+            Calcula el porcentaje de ocupación basado en:
+            (Días Paciente / (Camas Censables * Días del Periodo)) * 100
+            """
             dp = parse_float(dias_paciente)
-            dc = parse_float(dias_cama)
-            return round((dp / dc) * 100.0, 2) if dc > 0 else 0.0
+            camas = parse_float(camas_servicio)
+            dias = parse_float(dias_periodo)
+            
+            # Días cama disponibles en el periodo real
+            dias_cama_disponibles = camas * dias
+            
+            return round((dp / dias_cama_disponibles) * 100.0, 2) if dias_cama_disponibles > 0 else 0.0
 
-        def calcular_kpis(data, dias):
-            # Días del periodo (default 30)
-            dias_val = parse_float(dias) if dias and float(dias) > 0 else 30.0
+        def obtener_dias_mes(anio, mes):
+            """Devuelve los días exactos de un mes/año determinado (ej. febrero 28/29 días)"""
+            try:
+                return float(calendar.monthrange(int(anio), int(mes))[1])
+            except Exception:
+                return 30.0
+
+        def calcular_kpis(data, dias=None, anio=None, mes=None):
+            # 🔑 1. Determinar los días exactos del periodo
+            if anio and mes:
+                dias_val = obtener_dias_mes(anio, mes)
+            elif dias and parse_float(dias) > 0:
+                dias_val = parse_float(dias)
+            else:
+                dias_val = 30.0  # Fallback si no hay mes/año ni días definidos
 
             # Variables base general
             egresos = parse_float(data.get("total_egresos"))
-            camas = parse_float(data.get("camas_total"))
+            camas = parse_float(data.get("camas_total") or data.get("camas"))
             quirofanos = parse_float(data.get("quirofanos"))
             
             nacimientos = parse_float(data.get("total_nacimientos") or data.get("nacimientos"))
@@ -1304,6 +1325,13 @@ def indicadores():
 
             urgencias_tot = parse_float(data.get("urgencias") or data.get("total_u"))
 
+            # 🔑 2. Camas censables por servicio (si no vienen individualizadas, se usa dias_cama_X / 30)
+            camas_med = parse_float(data.get("camas_med")) or (parse_float(data.get("dias_cama_med")) / 30.0)
+            camas_cir = parse_float(data.get("camas_cir")) or (parse_float(data.get("dias_cama_cir")) / 30.0)
+            camas_ped = parse_float(data.get("camas_ped")) or (parse_float(data.get("dias_cama_ped")) / 30.0)
+            camas_gin = parse_float(data.get("camas_gin")) or (parse_float(data.get("dias_cama_gin")) / 30.0)
+            camas_otr = parse_float(data.get("camas_otros")) or (parse_float(data.get("dias_cama_otros")) / 30.0)
+
             return {
                 # KPIs Operativos (Productividad Diaria)
                 "consultas_por_dia": round(parse_float(data.get("consultas")) / dias_val, 2),
@@ -1316,13 +1344,13 @@ def indicadores():
                 "porcentaje_apeo": round((parse_float(data.get("apeo") or data.get("total_apeo")) / eventos) * 100.0, 2) if eventos > 0 else 0.0,
                 "porcentaje_adolescente_apeo": round((adolescente_apeo * 100.0) / eventos_obstetricos_adolescentes, 2) if eventos_obstetricos_adolescentes > 0 else 0.0,
 
-                # Ocupación Porcentual
-                "porcentaje_ocupacion": calcular_ocupacion(data.get("dias_p"), data.get("dias_cama_total")),
-                "porcentaje_ocupacion_med_interna": calcular_ocupacion(data.get("dias_p_med_int"), data.get("dias_cama_med")),
-                "porcentaje_ocupacion_cirugia": calcular_ocupacion(data.get("dias_p_cirugia"), data.get("dias_cama_cir")),
-                "porcentaje_ocupacion_pediatria": calcular_ocupacion(data.get("dias_p_pediatria"), data.get("dias_cama_ped")),
-                "porcentaje_ocupacion_gineco": calcular_ocupacion(data.get("dias_p_gineco"), data.get("dias_cama_gin")),
-                "porcentaje_ocupacion_otros": calcular_ocupacion(data.get("dias_p_otros"), data.get("dias_cama_otros")),
+                # 🔑 3. Ocupación Porcentual recalculada con los días reales del periodo (dias_val)
+                "porcentaje_ocupacion": calcular_ocupacion(data.get("dias_p"), camas, dias_val),
+                "porcentaje_ocupacion_med_interna": calcular_ocupacion(data.get("dias_p_med_int"), camas_med, dias_val),
+                "porcentaje_ocupacion_cirugia": calcular_ocupacion(data.get("dias_p_cirugia"), camas_cir, dias_val),
+                "porcentaje_ocupacion_pediatria": calcular_ocupacion(data.get("dias_p_pediatria"), camas_ped, dias_val),
+                "porcentaje_ocupacion_gineco": calcular_ocupacion(data.get("dias_p_gineco"), camas_gin, dias_val),
+                "porcentaje_ocupacion_otros": calcular_ocupacion(data.get("dias_p_otros"), camas_otr, dias_val),
 
                 # Estancias Promedio
                 "prom_dias_estancia": round(parse_float(data.get("dias_estancia")) / egresos, 2) if egresos > 0 else 0.0,
